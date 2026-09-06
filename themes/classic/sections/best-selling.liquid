@@ -1,0 +1,33 @@
+<section class="best-selling">
+  <div class="best-selling__heading">
+    <h2>{{ section.settings.heading }}</h2>
+    {% if section.settings.subheading != blank %}<p>{{ section.settings.subheading }}</p>{% endif %}
+    {% if section.settings.show_countdown %}
+      <span class="best-selling__countdown" data-countdown-minutes="{{ section.settings.countdown_minutes }}">00d : 00h : 00m : 00s</span>
+    {% endif %}
+  </div>
+
+  {% assign target = collections[section.settings.collection] %}
+  <div class="product-grid" style="--product-grid-cols: {{ section.settings.columns }};">
+    {% if target %}
+      {% for product in target.products limit: section.settings.products_to_show %}
+        {% render 'snippets/product-card', product: product %}
+      {% endfor %}
+    {% endif %}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Best selling",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Best Selling" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "" },
+    { "type": "collection", "id": "collection", "label": "Collection", "info": "Every product in this collection is shown automatically — no need to add products one by one." },
+    { "type": "range", "id": "products_to_show", "label": "Products to show", "min": 2, "max": 12, "step": 1, "default": 8 },
+    { "type": "range", "id": "columns", "label": "Columns (desktop)", "min": 2, "max": 6, "step": 1, "default": 4 },
+    { "type": "checkbox", "id": "show_countdown", "label": "Show sale countdown", "default": false },
+    { "type": "number", "id": "countdown_minutes", "label": "Countdown length (minutes from page load)", "default": 60 }
+  ]
+}
+{% endschema %}

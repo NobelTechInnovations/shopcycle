@@ -1,0 +1,76 @@
+<footer class="site-footer site-footer--modern">
+  <div class="site-footer__top">
+    <div class="site-footer__brand">
+      <strong>{{ shop.name }}</strong>
+      <p>{{ section.settings.about }}</p>
+      {% if section.blocks.size > 0 %}
+        <div class="site-footer__social">
+          {% for block in section.blocks %}
+            {% if block.settings.url != blank %}
+              <a href="{{ block.settings.url }}" aria-label="{{ block.settings.platform }}">
+                {% render 'snippets/icon', icon: block.settings.platform, class: 'icon icon--sm' %}
+              </a>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="site-footer__col">
+      <strong>{{ section.settings.col_heading }}</strong>
+      <nav>
+        {% for link in linklists[section.settings.menu].links %}
+          <a href="{{ link.url }}">{{ link.title }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+
+    <div class="site-footer__col site-footer__col--newsletter">
+      <strong>{{ section.settings.newsletter_heading }}</strong>
+      <p>{{ section.settings.newsletter_text }}</p>
+      {% render 'snippets/newsletter-form' %}
+    </div>
+  </div>
+
+  <div class="site-footer__bottom">
+    <p class="site-footer__copyright">© {{ 'now' | date: '%Y' }} {{ section.settings.copyright }}</p>
+    {% if section.settings.payment_icons %}
+      <div class="site-footer__payments">
+        <span>AMEX</span><span>Visa</span><span>Mastercard</span><span>PayPal</span>
+      </div>
+    {% endif %}
+  </div>
+</footer>
+
+{% schema %}
+{
+  "name": "Footer",
+  "settings": [
+    { "type": "textarea", "id": "about", "label": "About text", "default": "Thoughtfully made, every day." },
+    { "type": "text", "id": "col_heading", "label": "Column heading", "default": "Explore" },
+    { "type": "menu", "id": "menu", "label": "Menu", "default": "footer-menu" },
+    { "type": "text", "id": "newsletter_heading", "label": "Newsletter heading", "default": "Join the list" },
+    { "type": "textarea", "id": "newsletter_text", "label": "Newsletter text", "default": "New arrivals and offers, straight to your inbox." },
+    { "type": "text", "id": "copyright", "label": "Copyright text", "default": "All rights reserved." },
+    { "type": "checkbox", "id": "payment_icons", "label": "Show payment icons", "default": true }
+  ],
+  "blocks": [
+    {
+      "type": "social",
+      "name": "Social icon",
+      "settings": [
+        { "type": "select", "id": "platform", "label": "Platform", "options": [
+          { "value": "facebook", "label": "Facebook" },
+          { "value": "instagram", "label": "Instagram" },
+          { "value": "tiktok", "label": "TikTok" },
+          { "value": "youtube", "label": "YouTube" },
+          { "value": "twitter", "label": "Twitter / X" },
+          { "value": "pinterest", "label": "Pinterest" }
+        ], "default": "instagram" },
+        { "type": "url", "id": "url", "label": "Link" }
+      ]
+    }
+  ],
+  "max_blocks": 6
+}
+{% endschema %}

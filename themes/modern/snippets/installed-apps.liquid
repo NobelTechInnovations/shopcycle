@@ -1,0 +1,35 @@
+{% comment %}
+  Renders whatever the merchant has installed from the App catalog
+  (Settings-adjacent "Apps" area) — each one is real, functioning
+  markup/script, not a placeholder. `apps` is only ever populated with
+  apps this specific store has actually installed (see
+  apps/service.js#getInstalledAppsContext); an app not installed simply
+  never appears in the hash, so each `{% if %}` below is really asking
+  "is this app on."
+{% endcomment %}
+{% if apps["google-analytics"] %}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ apps['google-analytics'].measurementId }}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '{{ apps["google-analytics"].measurementId }}');
+</script>
+{% endif %}
+{% if apps["facebook-pixel"] %}
+<script>
+  !function(f,b,e,v,n,t,s)
+  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+  n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];
+  s.parentNode.insertBefore(t,s)}(window, document,'script',
+  'https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', '{{ apps["facebook-pixel"].pixelId }}');
+  fbq('track', 'PageView');
+</script>
+{% endif %}
+{% if apps["custom-scripts"] %}
+{{ apps["custom-scripts"].headHtml }}
+{% endif %}

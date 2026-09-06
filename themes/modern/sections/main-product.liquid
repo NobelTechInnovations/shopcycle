@@ -1,0 +1,45 @@
+<section class="main-product main-product--modern">
+  <div class="main-product__media">
+    {% if product.images.first %}
+      <img src="{{ product.images.first.url }}" alt="{{ product.images.first.altText | default: product.title }}">
+    {% else %}
+      {% render 'snippets/image-placeholder' %}
+    {% endif %}
+  </div>
+  <div class="main-product__info">
+    <h1>{{ product.title }}</h1>
+    {% render 'snippets/price', variant: product.variants.first %}
+    <div class="main-product__description">{{ product.description }}</div>
+
+    <form method="post" action="{{ routes.cart_add_url }}" class="main-product__form">
+      {% if product.variants.size > 1 %}
+        <label for="variantId">Variant</label>
+        <select name="variantId" id="variantId">
+          {% for v in product.variants %}
+            <option value="{{ v.id }}" {% unless v.available %}disabled{% endunless %}>
+              {{ v.title }} — {{ v.price | money }}{% unless v.available %} (sold out){% endunless %}
+            </option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <input type="hidden" name="variantId" value="{{ product.variants.first.id }}">
+      {% endif %}
+
+      <label for="quantity">Quantity</label>
+      <input type="number" name="quantity" id="quantity" value="1" min="1">
+
+      {% if product.variants.first.available %}
+        {% render 'snippets/button', text: 'Add to bag', url: '#', type: 'submit' %}
+      {% else %}
+        <button type="button" class="btn btn--modern" disabled>Sold out</button>
+      {% endif %}
+    </form>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Product information",
+  "settings": []
+}
+{% endschema %}

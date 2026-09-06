@@ -1,0 +1,53 @@
+<section class="main-order-confirmation main-order-confirmation--modern">
+  {% if order %}
+    <h1>Thank you, {{ order.shippingName }}!</h1>
+    <p class="main-order-confirmation__number">Order #{{ order.orderNumber }} has been placed.</p>
+    <p class="main-order-confirmation__payment">
+      {% if order.paymentMethod == "cod" %}
+        Pay {{ order.total | money }} on delivery.
+      {% elsif order.paymentStatus == "paid" %}
+        Paid {{ order.total | money }} online.
+      {% else %}
+        Payment pending.
+      {% endif %}
+    </p>
+
+    <div class="main-order-confirmation__items">
+      {% for item in order.items %}
+        <div class="main-order-confirmation__item">
+          <span>{{ item.title }} × {{ item.quantity }}</span>
+          <span>{{ item.total | money }}</span>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="main-cart__summary">
+      <div class="main-cart__summary-line"><span>Subtotal</span><span>{{ order.subtotal | money }}</span></div>
+      {% if order.discount > 0 %}
+        <div class="main-cart__summary-line"><span>Discount{% if order.discountCode %} ({{ order.discountCode }}){% endif %}</span><span>-{{ order.discount | money }}</span></div>
+      {% endif %}
+      <div class="main-cart__summary-line"><span>Shipping</span><span>{{ order.shipping | money }}</span></div>
+      <div class="main-cart__summary-line"><span>Tax</span><span>{{ order.tax | money }}</span></div>
+      <div class="main-cart__summary-line main-cart__summary-line--total"><strong>Total</strong><strong>{{ order.total | money }}</strong></div>
+    </div>
+
+    <div class="main-order-confirmation__address">
+      <strong>Shipping to</strong>
+      <p>{{ order.shippingName }}<br>
+      {{ order.shippingAddress1 }}{% if order.shippingAddress2 %}, {{ order.shippingAddress2 }}{% endif %}<br>
+      {{ order.shippingCity }}, {{ order.shippingProvince }} {{ order.shippingZip }}<br>
+      {{ order.shippingCountry }}</p>
+    </div>
+
+    <a href="{{ routes.root_url }}" class="btn btn--modern">Continue shopping</a>
+  {% else %}
+    <p>Order not found.</p>
+  {% endif %}
+</section>
+
+{% schema %}
+{
+  "name": "Order confirmation",
+  "settings": []
+}
+{% endschema %}

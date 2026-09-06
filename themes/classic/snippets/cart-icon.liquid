@@ -1,0 +1,4 @@
+<a href="{{ routes.cart_url }}" class="cart-icon" aria-label="Cart, {{ cart.item_count }} items">
+  {% render 'snippets/icon', icon: 'bag', class: 'icon icon--sm' %}
+  <span class="cart-icon__count">{{ cart.item_count }}</span>
+</a>

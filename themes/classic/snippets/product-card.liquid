@@ -1,0 +1,27 @@
+<a href="{{ product.url }}" class="product-card">
+  <div class="product-card__image">
+    {% if product.images.first %}
+      <img src="{{ product.images.first.url }}" alt="{{ product.images.first.altText | default: product.title }}">
+    {% else %}
+      {% render 'snippets/image-placeholder' %}
+    {% endif %}
+
+    {% comment %} Sale badge is always computed from the product's own
+       compare-at price — every card that renders this snippet gets it for
+       free, never a number a merchant has to type and keep in sync. {% endcomment %}
+    {% assign variant = product.variants.first %}
+    {% if variant.comparePrice and variant.comparePrice > variant.price %}
+      {% assign pct_off = variant.comparePrice | minus: variant.price | times: 100.0 | divided_by: variant.comparePrice | round %}
+      <span class="product-card__badge product-card__badge--sale">-{{ pct_off }}%</span>
+    {% endif %}
+  </div>
+  <h3 class="product-card__title">{{ product.title }}</h3>
+  {% render 'snippets/price', variant: product.variants.first %}
+  {% if product.variants.size > 1 %}
+    <div class="product-card__swatches">
+      {% for v in product.variants limit: 4 %}
+        <span class="product-card__swatch" title="{{ v.title }}"></span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</a>

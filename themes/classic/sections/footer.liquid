@@ -1,0 +1,92 @@
+<footer class="site-footer">
+  <div class="site-footer__grid">
+    <div class="site-footer__col">
+      <strong>{{ section.settings.col1_heading }}</strong>
+      <p>{{ section.settings.about }}</p>
+      {% if section.settings.phone != blank %}<p class="site-footer__contact">{{ section.settings.phone }}</p>{% endif %}
+      {% if section.settings.email != blank %}<p class="site-footer__contact">{{ section.settings.email }}</p>{% endif %}
+      {% if section.blocks.size > 0 %}
+        <div class="site-footer__social">
+          {% for block in section.blocks %}
+            {% if block.settings.url != blank %}
+              <a href="{{ block.settings.url }}" aria-label="{{ block.settings.platform }}">
+                {% render 'snippets/icon', icon: block.settings.platform, class: 'icon icon--sm' %}
+              </a>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="site-footer__col">
+      <strong>{{ section.settings.col2_heading }}</strong>
+      {% for link in linklists[section.settings.menu].links %}
+        <a href="{{ link.url }}">{{ link.title }}</a>
+      {% endfor %}
+    </div>
+
+    <div class="site-footer__col">
+      <strong>{{ section.settings.col3_heading }}</strong>
+      {% for link in linklists[section.settings.categories_menu].links %}
+        <a href="{{ link.url }}">{{ link.title }}</a>
+      {% endfor %}
+    </div>
+
+    <div class="site-footer__col">
+      <strong>{{ section.settings.newsletter_heading }}</strong>
+      <p>{{ section.settings.newsletter_text }}</p>
+      {% render 'snippets/newsletter-form' %}
+    </div>
+  </div>
+
+  <div class="site-footer__bottom">
+    <p class="site-footer__copyright">© {{ 'now' | date: '%Y' }} {{ section.settings.copyright }}</p>
+    {% if section.settings.payment_icons %}
+      <div class="site-footer__payments">
+        <span>AMEX</span><span>Visa</span><span>Mastercard</span><span>PayPal</span>
+      </div>
+    {% endif %}
+  </div>
+</footer>
+
+{% schema %}
+{
+  "name": "Footer",
+  "settings": [
+    { "type": "text", "id": "col1_heading", "label": "Column 1 heading", "default": "Help Customers" },
+    { "type": "textarea", "id": "about", "label": "About text" },
+    { "type": "text", "id": "phone", "label": "Phone" },
+    { "type": "text", "id": "email", "label": "Email" },
+
+    { "type": "text", "id": "col2_heading", "label": "Column 2 heading", "default": "Our Company" },
+    { "type": "menu", "id": "menu", "label": "Column 2 menu", "default": "footer-menu" },
+
+    { "type": "text", "id": "col3_heading", "label": "Column 3 heading", "default": "Shop Categories" },
+    { "type": "menu", "id": "categories_menu", "label": "Column 3 menu", "default": "footer-categories-menu" },
+
+    { "type": "text", "id": "newsletter_heading", "label": "Newsletter heading", "default": "Sign Up to Newsletter" },
+    { "type": "textarea", "id": "newsletter_text", "label": "Newsletter text", "default": "Sign up for 10% off your first purchase and free shipping." },
+
+    { "type": "text", "id": "copyright", "label": "Copyright text", "default": "All rights reserved." },
+    { "type": "checkbox", "id": "payment_icons", "label": "Show payment icons", "default": true }
+  ],
+  "blocks": [
+    {
+      "type": "social",
+      "name": "Social icon",
+      "settings": [
+        { "type": "select", "id": "platform", "label": "Platform", "options": [
+          { "value": "facebook", "label": "Facebook" },
+          { "value": "instagram", "label": "Instagram" },
+          { "value": "tiktok", "label": "TikTok" },
+          { "value": "youtube", "label": "YouTube" },
+          { "value": "twitter", "label": "Twitter / X" },
+          { "value": "pinterest", "label": "Pinterest" }
+        ], "default": "instagram" },
+        { "type": "url", "id": "url", "label": "Link" }
+      ]
+    }
+  ],
+  "max_blocks": 6
+}
+{% endschema %}

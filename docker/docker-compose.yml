@@ -1,0 +1,41 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: shopcycle-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: shopcycle
+      MYSQL_USER: shopcycle
+      MYSQL_PASSWORD: shopcycle
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: shopcycle-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379" # host 6379 already taken by another local service
+    volumes:
+      - redis-data:/data
+
+  adminer:
+    image: adminer:latest
+    container_name: shopcycle-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+
+volumes:
+  mysql-data:
+  redis-data:

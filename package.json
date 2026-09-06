@@ -1,0 +1,24 @@
+{
+  "name": "shopcycle",
+  "private": true,
+  "engines": {
+    "node": ">=20 <=24"
+  },
+  "packageManager": "pnpm@11.20.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:api": "turbo run dev --filter=@shopcycle/api",
+    "dev:admin": "turbo run dev --filter=@shopcycle/admin",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "db:generate": "pnpm --filter @shopcycle/database run generate",
+    "db:migrate": "pnpm --filter @shopcycle/database run migrate",
+    "db:studio": "pnpm --filter @shopcycle/database run studio",
+    "db:seed": "pnpm --filter @shopcycle/database run seed",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0"
+  }
+}

@@ -1,0 +1,29 @@
+require("dotenv").config({ path: require("path").resolve(__dirname, "../../../../.env") });
+const { z } = require("zod");
+
+const envSchema = z.object({
+  DATABASE_URL: z.string().min(1),
+  REDIS_URL: z.string().default("redis://localhost:6379"),
+  JWT_SECRET: z.string().min(16, "JWT_SECRET should be at least 16 characters"),
+  JWT_EXPIRES_IN: z.string().default("7d"),
+  COOKIE_NAME: z.string().default("shopcycle_session"),
+  API_PORT: z.coerce.number().default(4000),
+  API_HOST: z.string().default("0.0.0.0"),
+  ADMIN_ORIGIN: z.string().default("http://localhost:3000"),
+  STOREFRONT_ORIGIN: z.string().default("http://localhost:3002"),
+  API_PUBLIC_URL: z.string().default("http://localhost:4000"),
+  NODE_ENV: z.string().default("development"),
+  // Optional — online payments at checkout are only offered when both are
+  // set (see checkout/service.js). Cash on Delivery works either way.
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error("Invalid environment configuration:", parsed.error.flatten().fieldErrors);
+  process.exit(1);
+}
+
+module.exports = { env: parsed.data };

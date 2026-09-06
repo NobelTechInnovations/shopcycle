@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="{{ shop.locale | default: 'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title | default: shop.name }}</title>
+  <link rel="stylesheet" href="{{ 'theme.css' | asset_url }}">
+  {% comment %}
+    theme.css's :root block is just static fallback values — these
+    settings-driven custom properties come after it in the cascade, so
+    they win. This is what makes the Theme Settings drawer (colors,
+    fonts, layout) actually affect the rendered storefront instead of
+    only updating a database row nothing reads.
+  {% endcomment %}
+  <style>
+    :root {
+      --color-primary: {{ settings.color_primary | default: '#111111' }};
+      --color-accent: {{ settings.color_accent | default: '#FE8138' }};
+      --color-background: {{ settings.color_background | default: '#FFF8EE' }};
+      --color-text: {{ settings.color_text | default: '#1A1613' }};
+      --container-width: {{ settings.container_width | default: 1360 }}px;
+      --button-radius: {{ settings.button_radius | default: 999 }}px;
+    }
+    body { font-family: '{{ settings.body_font | default: "Inter" }}', sans-serif; }
+    h1, h2, h3, h4, h5, h6 { font-family: '{{ settings.heading_font | default: "Poppins" }}', sans-serif; }
+  </style>
+  {% render 'snippets/installed-apps' %}
+</head>
+<body>
+  {% section 'announcement-bar' %}
+  {% section 'header' %}
+
+  <main>
+    {{ content_for_layout }}
+  </main>
+
+  {% section 'footer' %}
+  <script src="{{ 'theme.js' | asset_url }}" defer></script>
+</body>
+</html>

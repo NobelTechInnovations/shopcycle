@@ -1,0 +1,46 @@
+<section class="collection-circles">
+  <div class="collection-circles__heading">
+    <h2>{{ section.settings.heading }}</h2>
+    {% if section.settings.subheading != blank %}<p>{{ section.settings.subheading }}</p>{% endif %}
+  </div>
+  <div class="collection-circles__row">
+    {% for block in section.blocks %}
+      {% assign coll = collections[block.settings.collection] %}
+      <a href="{{ routes.root_url }}/collections/{{ block.settings.collection }}" class="collection-circles__item">
+        <span class="collection-circles__image">
+          {% if block.settings.image != blank %}
+            <img src="{{ block.settings.image | image_url }}" alt="{{ coll.title }}">
+          {% else %}
+            {% render 'snippets/image-placeholder' %}
+          {% endif %}
+        </span>
+        {% comment %} The collection's own name is used automatically — never
+           a title a merchant has to type and keep in sync by hand. Falls
+           back to a block's old hand-typed title (pre-existing content from
+           before this field was removed) if no collection is linked yet. {% endcomment %}
+        <span class="collection-circles__title">{{ coll.title | default: block.settings.title }}</span>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Collection circles",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Top Collections" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "" }
+  ],
+  "blocks": [
+    {
+      "type": "collection",
+      "name": "Collection",
+      "settings": [
+        { "type": "collection", "id": "collection", "label": "Collection" },
+        { "type": "image_picker", "id": "image", "label": "Image" }
+      ]
+    }
+  ],
+  "max_blocks": 8
+}
+{% endschema %}

@@ -1,0 +1,69 @@
+<section class="promo-split">
+  <a href="{{ section.settings.left_link }}" class="promo-split__panel promo-split__panel--image" {% if section.settings.left_image != blank %}style="background-image: url('{{ section.settings.left_image | image_url }}');"{% endif %}>
+    {% if section.settings.left_image == blank %}{% render 'snippets/image-placeholder' %}{% endif %}
+    <div class="promo-split__overlay" style="opacity: {{ section.settings.left_overlay_opacity | divided_by: 100.0 }};"></div>
+    <div class="promo-split__panel-content">
+      {% if section.settings.left_heading != blank %}<h3>{{ section.settings.left_heading }}</h3>{% endif %}
+      <span class="promo-split__cta">{% render 'snippets/icon', icon: 'bag', class: 'icon icon--xs' %} {{ section.settings.left_label }}</span>
+    </div>
+  </a>
+
+  <div class="promo-split__panel promo-split__panel--feature" {% if section.settings.center_image != blank %}style="background-image: url('{{ section.settings.center_image | image_url }}');"{% endif %}>
+    <div class="promo-split__overlay" style="opacity: {{ section.settings.center_overlay_opacity | divided_by: 100.0 }};"></div>
+    <div class="promo-split__feature-content">
+      <p class="promo-split__eyebrow">{{ section.settings.eyebrow }}</p>
+      <h2>{{ section.settings.heading }}</h2>
+      <p>{{ section.settings.subheading }}</p>
+      {% if section.settings.show_countdown %}
+        <div class="promo-split__countdown" data-countdown-minutes="{{ section.settings.countdown_minutes }}">
+          <div><strong class="js-cd-days">00</strong><span>Days</span></div>
+          <div><strong class="js-cd-hours">00</strong><span>Hour</span></div>
+          <div><strong class="js-cd-mins">00</strong><span>Mins</span></div>
+          <div><strong class="js-cd-secs">00</strong><span>Secs</span></div>
+        </div>
+      {% endif %}
+      <a href="{{ section.settings.button_link }}" class="btn promo-split__btn">{{ section.settings.button_text }}</a>
+    </div>
+  </div>
+
+  <a href="{{ section.settings.right_link }}" class="promo-split__panel promo-split__panel--image" {% if section.settings.right_image != blank %}style="background-image: url('{{ section.settings.right_image | image_url }}');"{% endif %}>
+    {% if section.settings.right_image == blank %}{% render 'snippets/image-placeholder' %}{% endif %}
+    <div class="promo-split__overlay" style="opacity: {{ section.settings.right_overlay_opacity | divided_by: 100.0 }};"></div>
+    <div class="promo-split__panel-content">
+      {% if section.settings.right_heading != blank %}<h3>{{ section.settings.right_heading }}</h3>{% endif %}
+      <span class="promo-split__cta">{% render 'snippets/icon', icon: 'bag', class: 'icon icon--xs' %} {{ section.settings.right_label }}</span>
+    </div>
+  </a>
+</section>
+
+{% schema %}
+{
+  "name": "Promo split",
+  "settings": [
+    { "type": "header", "content": "Left panel" },
+    { "type": "image_picker", "id": "left_image", "label": "Left image" },
+    { "type": "range", "id": "left_overlay_opacity", "label": "Left overlay darkness", "min": 0, "max": 80, "step": 5, "default": 0 },
+    { "type": "text", "id": "left_heading", "label": "Left heading (optional)" },
+    { "type": "text", "id": "left_label", "label": "Left button label", "default": "View Products" },
+    { "type": "url", "id": "left_link", "label": "Left link" },
+
+    { "type": "header", "content": "Center panel" },
+    { "type": "image_picker", "id": "center_image", "label": "Center background" },
+    { "type": "range", "id": "center_overlay_opacity", "label": "Center overlay darkness", "min": 0, "max": 80, "step": 5, "default": 0 },
+    { "type": "text", "id": "eyebrow", "label": "Eyebrow", "default": "DON'T MISS OUT..." },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Today's Big Deals" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "Sale up to 75% all items. Hurry up!" },
+    { "type": "checkbox", "id": "show_countdown", "label": "Show countdown", "default": true },
+    { "type": "number", "id": "countdown_minutes", "label": "Countdown length (minutes)", "default": 1440 },
+    { "type": "text", "id": "button_text", "label": "Button text", "default": "Shop Sale" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+
+    { "type": "header", "content": "Right panel" },
+    { "type": "image_picker", "id": "right_image", "label": "Right image" },
+    { "type": "range", "id": "right_overlay_opacity", "label": "Right overlay darkness", "min": 0, "max": 80, "step": 5, "default": 0 },
+    { "type": "text", "id": "right_heading", "label": "Right heading (optional)" },
+    { "type": "text", "id": "right_label", "label": "Right button label", "default": "View Products" },
+    { "type": "url", "id": "right_link", "label": "Right link" }
+  ]
+}
+{% endschema %}

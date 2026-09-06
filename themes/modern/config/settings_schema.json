@@ -1,0 +1,25 @@
+[
+  {
+    "name": "Colors",
+    "settings": [
+      { "type": "color", "id": "color_primary", "label": "Primary (buttons, text)", "default": "#111111" },
+      { "type": "color", "id": "color_accent", "label": "Accent", "default": "#FE8138" },
+      { "type": "color", "id": "color_background", "label": "Background", "default": "#FFF8EE" },
+      { "type": "color", "id": "color_text", "label": "Text", "default": "#1A1613" }
+    ]
+  },
+  {
+    "name": "Typography",
+    "settings": [
+      { "type": "font", "id": "heading_font", "label": "Heading font", "default": "Poppins" },
+      { "type": "font", "id": "body_font", "label": "Body font", "default": "Inter" }
+    ]
+  },
+  {
+    "name": "Layout",
+    "settings": [
+      { "type": "range", "id": "container_width", "label": "Container width (px)", "min": 960, "max": 1600, "step": 20, "default": 1360 },
+      { "type": "range", "id": "button_radius", "label": "Button radius (px)", "min": 0, "max": 999, "step": 3, "default": 999 }
+    ]
+  }
+]

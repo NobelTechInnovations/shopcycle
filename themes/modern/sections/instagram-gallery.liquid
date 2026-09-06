@@ -1,0 +1,49 @@
+<section class="instagram-gallery">
+  <div class="instagram-gallery__heading">
+    <h2>{{ section.settings.heading }}</h2>
+    {% if section.settings.subheading != blank %}<p>{{ section.settings.subheading }}</p>{% endif %}
+  </div>
+  <div class="instagram-gallery__row">
+    {% for block in section.blocks %}
+      {% assign product = all_products[block.settings.product] %}
+      {% if block.settings.image != blank %}
+        {% capture tile_style %}background-image: url('{{ block.settings.image | image_url }}');{% endcapture %}
+      {% else %}
+        {% assign tile_style = "" %}
+      {% endif %}
+      {% if product %}
+        <a href="{{ product.url }}" class="instagram-gallery__tile" style="{{ tile_style }}">
+          {% if block.settings.image == blank %}{% render 'snippets/image-placeholder' %}{% endif %}
+          <span class="instagram-gallery__bag" aria-label="Shop {{ product.title }}">
+            {% render 'snippets/icon', icon: 'bag', class: 'icon icon--xs' %}
+          </span>
+        </a>
+      {% else %}
+        <span class="instagram-gallery__tile" style="{{ tile_style }}">
+          {% if block.settings.image == blank %}{% render 'snippets/image-placeholder' %}{% endif %}
+        </span>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Instagram gallery",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Follow along" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "" }
+  ],
+  "blocks": [
+    {
+      "type": "post",
+      "name": "Photo",
+      "settings": [
+        { "type": "image_picker", "id": "image", "label": "Photo" },
+        { "type": "product", "id": "product", "label": "Tagged product (optional)" }
+      ]
+    }
+  ],
+  "max_blocks": 8
+}
+{% endschema %}

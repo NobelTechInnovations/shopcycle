@@ -1,0 +1,43 @@
+<header class="site-header">
+  <a href="{{ routes.root_url }}" class="site-header__logo">
+    {% if section.settings.logo != blank %}
+      <img src="{{ section.settings.logo | image_url }}" alt="{{ shop.name }}" style="max-width: {{ section.settings.logo_width }}px;">
+    {% else %}
+      {{ shop.name }}
+    {% endif %}
+  </a>
+  <nav class="site-header__nav">
+    {% for link in linklists[section.settings.menu].links %}
+      <a href="{{ link.url }}">{{ link.title }}</a>
+    {% endfor %}
+  </nav>
+  <div class="site-header__actions">
+    {% if section.settings.show_search %}
+      <form action="{{ routes.search_url }}" method="get" class="site-header__search">
+        <input type="text" name="q" placeholder="I'm looking for...">
+        <button type="submit" aria-label="Search">{% render 'snippets/icon', icon: 'search', class: 'icon icon--sm' %}</button>
+      </form>
+    {% endif %}
+    <a href="{{ routes.account_url | default: routes.root_url }}" class="site-header__icon-link" aria-label="Account">
+      {% render 'snippets/icon', icon: 'user', class: 'icon icon--sm' %}
+    </a>
+    <a href="{{ routes.root_url }}" class="site-header__icon-link" aria-label="Wishlist, 0 items">
+      {% render 'snippets/icon', icon: 'heart', class: 'icon icon--sm' %}
+      <span class="site-header__icon-count">0</span>
+    </a>
+    {% render 'snippets/cart-icon' %}
+  </div>
+</header>
+
+{% schema %}
+{
+  "name": "Header",
+  "settings": [
+    { "type": "image_picker", "id": "logo", "label": "Logo" },
+    { "type": "range", "id": "logo_width", "label": "Logo width (px)", "min": 60, "max": 260, "step": 10, "default": 140 },
+    { "type": "menu", "id": "menu", "label": "Menu", "default": "main-menu" },
+    { "type": "checkbox", "id": "show_search", "label": "Show search bar", "default": true },
+    { "type": "select", "id": "sticky", "label": "Sticky header", "options": [{"value":"true","label":"On"},{"value":"false","label":"Off"}], "default": "true" }
+  ]
+}
+{% endschema %}

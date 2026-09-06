@@ -1,0 +1,65 @@
+{
+  "sections": {
+    "hero": { "type": "hero", "settings": {} },
+    "collection-circles": {
+      "type": "collection-circles",
+      "settings": { "heading": "Top Collections", "subheading": "Express your style with our standout collection—fashion meets sophistication." },
+      "blocks": {
+        "c1": { "type": "collection", "settings": { "title": "Crop-Top" } },
+        "c2": { "type": "collection", "settings": { "title": "T-Shirts" } },
+        "c3": { "type": "collection", "settings": { "title": "Blazers" } },
+        "c4": { "type": "collection", "settings": { "title": "Coats" } }
+      },
+      "block_order": ["c1", "c2", "c3", "c4"]
+    },
+    "featured": {
+      "type": "featured-collection",
+      "settings": { "heading": "Featured products" }
+    },
+    "best-selling": {
+      "type": "best-selling",
+      "settings": { "heading": "Best Selling", "subheading": "Unmatched design—superior performance and customer satisfaction in one." },
+      "blocks": {}
+    },
+    "promo": {
+      "type": "promo-split",
+      "settings": {
+        "left_label": "View Products",
+        "eyebrow": "DON'T MISS OUT...",
+        "heading": "Today's Big Deals",
+        "subheading": "Sale up to 75% all items. Hurry up!",
+        "show_countdown": true,
+        "countdown_minutes": 10080,
+        "button_text": "Shop Sale",
+        "right_label": "View Products"
+      }
+    },
+    "collections": { "type": "collection-list", "settings": {}, "blocks": {} },
+    "image-text": { "type": "image-with-text", "settings": {} },
+    "reviews": {
+      "type": "testimonials",
+      "settings": {},
+      "blocks": {
+        "r1": { "type": "review", "settings": { "name": "Carie-Gosée H.", "verified": true, "rating": 5, "quote": "These are sooo pretty and very comfy. Perfect color as well." } },
+        "r2": { "type": "review", "settings": { "name": "Cameron Smith.", "verified": true, "rating": 5, "quote": "A perfect product, it keeps you very warm without over heating. True to size!" } }
+      },
+      "block_order": ["r1", "r2"]
+    },
+    "gram": {
+      "type": "shop-the-gram",
+      "settings": {},
+      "blocks": {}
+    },
+    "usp": {
+      "type": "usp",
+      "settings": {},
+      "blocks": {
+        "u1": { "type": "item", "settings": { "icon": "box", "title": "Free Shipping", "text": "Enjoy free worldwide shipping and returns, with customs and duties taxes included." } },
+        "u2": { "type": "item", "settings": { "icon": "check-circle", "title": "Free Returns", "text": "Free returns within 15 days, please make sure the items are in undamaged condition." } },
+        "u3": { "type": "item", "settings": { "icon": "chat", "title": "Support Online", "text": "We support customers 24/7, send questions we will solve for you immediately." } }
+      },
+      "block_order": ["u1", "u2", "u3"]
+    }
+  },
+  "order": ["hero", "collection-circles", "best-selling", "promo", "collections", "reviews", "image-text", "gram", "usp"]
+}

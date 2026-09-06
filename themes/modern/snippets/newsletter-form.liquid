@@ -1,0 +1,11 @@
+{% comment %}
+  Shared by sections/newsletter.liquid and the footer's newsletter column.
+  Posts to /newsletter/subscribe like the standalone Newsletter section
+  always has — no email-capture backend exists yet, so this is honestly
+  the same "not wired up" state as before, just not duplicated markup.
+{% endcomment %}
+<form action="/newsletter/subscribe" method="post" class="newsletter-form">
+  <input type="email" name="email" placeholder="Enter your email…" required>
+  <button type="submit">Sign Up</button>
+</form>
+<p class="newsletter-form__consent">***By entering the e-mail you accept the terms and conditions and the privacy policy.</p>

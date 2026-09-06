@@ -1,0 +1,85 @@
+<section class="main-checkout">
+  <h1>{{ section.settings.heading }}</h1>
+
+  {% if cart.items.size > 0 %}
+    {% if checkout_error %}<p class="main-checkout__error">{{ checkout_error }}</p>{% endif %}
+
+    <div class="main-checkout__layout">
+      <form method="post" action="{{ routes.checkout_url }}" class="main-checkout__form">
+        <fieldset>
+          <legend>Contact</legend>
+          <label>Email<input type="email" name="email" required></label>
+          <label>Phone<input type="tel" name="phone" required></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Shipping address</legend>
+          <label>Full name<input type="text" name="shippingName" required></label>
+          <label>Address<input type="text" name="shippingAddress1" required></label>
+          <label>Apartment, suite, etc. (optional)<input type="text" name="shippingAddress2"></label>
+          <label>City<input type="text" name="shippingCity" required></label>
+          <label>State / province<input type="text" name="shippingProvince" required></label>
+          <label>ZIP / postal code<input type="text" name="shippingZip" required></label>
+          <label>Country
+            <select name="shippingCountry" required>
+              <option value="IN">India</option>
+              <option value="US">United States</option>
+              <option value="GB">United Kingdom</option>
+              <option value="CA">Canada</option>
+              <option value="AU">Australia</option>
+              <option value="AE">United Arab Emirates</option>
+              <option value="SG">Singapore</option>
+              <option value="DE">Germany</option>
+              <option value="FR">France</option>
+              <option value="JP">Japan</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Payment</legend>
+          {% for method in payment_methods %}
+            <label class="main-checkout__payment-option">
+              <input type="radio" name="paymentMethod" value="{{ method.value }}" {% if forloop.first %}checked{% endif %}>
+              {{ method.label }}
+            </label>
+          {% endfor %}
+        </fieldset>
+
+        <button type="submit" class="btn main-checkout__submit">Place order</button>
+      </form>
+
+      <aside class="main-checkout__summary">
+        {% for item in cart.items %}
+          <div class="main-checkout__summary-item">
+            <span>{{ item.title }} × {{ item.quantity }}</span>
+            <span>{{ item.lineTotal | money }}</span>
+          </div>
+        {% endfor %}
+        <div class="main-cart__summary-line"><span>Subtotal</span><span>{{ cart.subtotal | money }}</span></div>
+        {% if cart.discount and cart.discount.amount > 0 %}
+          <div class="main-cart__summary-line"><span>Discount ({{ cart.discount.code }})</span><span>-{{ cart.discount.amount | money }}</span></div>
+        {% endif %}
+        {% if cart.shipping %}
+          <div class="main-cart__summary-line"><span>Shipping ({{ cart.shipping.name }})</span><span>{{ cart.shipping.amount | money }}</span></div>
+        {% endif %}
+        {% if cart.tax %}
+          <div class="main-cart__summary-line"><span>{{ cart.tax.name }}</span><span>{{ cart.tax.amount | money }}</span></div>
+        {% endif %}
+        <div class="main-cart__summary-line main-cart__summary-line--total"><strong>Total</strong><strong>{{ cart.total | money }}</strong></div>
+      </aside>
+    </div>
+  {% else %}
+    <p>Your cart is empty.</p>
+    <a href="{{ routes.all_products_url }}">Continue shopping</a>
+  {% endif %}
+</section>
+
+{% schema %}
+{
+  "name": "Checkout",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Checkout" }
+  ]
+}
+{% endschema %}

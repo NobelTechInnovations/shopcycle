@@ -1,0 +1,37 @@
+<section class="collection-list">
+  <h2>{{ section.settings.heading }}</h2>
+  {% comment %}
+    A fixed-width flex row (not a stretchy grid) so "3 collections, centered"
+    actually looks centered instead of 3 tiles stretched to fill whatever
+    column count a grid happened to have — this is what made the alignment
+    setting below actually do something.
+  {% endcomment %}
+  <div class="collection-list__grid collection-list__grid--{{ section.settings.alignment }}">
+    {% for handle in section.settings.collections %}
+      {% assign coll = collections[handle] %}
+      {% if coll %}
+        <a href="{{ routes.root_url }}/collections/{{ handle }}" class="collection-list__tile">
+          {% if coll.image != blank %}
+            <img src="{{ coll.image | image_url }}" alt="">
+          {% else %}
+            {% render 'snippets/image-placeholder' %}
+          {% endif %}
+          <span>{{ coll.title }}</span>
+        </a>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Collection list",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Shop by category" },
+    { "type": "collection_list", "id": "collections", "label": "Collections", "default": [],
+      "info": "Pick as many as you like — each tile shows that collection's own cover photo and name automatically." },
+    { "type": "select", "id": "alignment", "label": "Alignment", "default": "left",
+      "options": [{"value":"left","label":"Left"},{"value":"center","label":"Center"},{"value":"right","label":"Right"}] }
+  ]
+}
+{% endschema %}

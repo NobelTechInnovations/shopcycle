@@ -1,0 +1,52 @@
+{% comment %}
+  Customer Reviews is a widget, not a theme content type — reviews live in
+  the "Customer Reviews" app (Admin ▸ Apps ▸ Customer Reviews ▸ Configure),
+  added once, shown wherever this section is placed. Same `apps` global
+  every installed-app snippet reads from; this section only owns layout.
+{% endcomment %}
+{% assign reviews = apps["customer-reviews"].reviews %}
+
+<section class="testimonials testimonials--modern">
+  <div class="testimonials__heading">
+    <h2>{{ section.settings.heading }}</h2>
+    {% if section.settings.subheading != blank %}<p>{{ section.settings.subheading }}</p>{% endif %}
+  </div>
+
+  {% if reviews and reviews.size > 0 %}
+    <div class="testimonials__row">
+      {% for review in reviews %}
+        <div class="testimonial-card testimonial-card--modern">
+          <div class="testimonial-card__stars" aria-label="{{ review.rating }} out of 5 stars">
+            {% for i in (1..5) %}
+              {% if i <= review.rating %}
+                {% render 'snippets/icon', icon: 'star-filled', class: 'icon icon--xs' %}
+              {% else %}
+                {% render 'snippets/icon', icon: 'star-outline', class: 'icon icon--xs' %}
+              {% endif %}
+            {% endfor %}
+          </div>
+          <div class="testimonial-card__quote">{{ review.quote }}</div>
+          <p class="testimonial-card__name">
+            {{ review.name }}
+            {% if review.verified %}
+              <span class="testimonial-card__verified">
+                {% render 'snippets/icon', icon: 'check-circle', class: 'icon icon--xs' %} Verified
+              </span>
+            {% endif %}
+          </p>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+
+{% schema %}
+{
+  "name": "Customer reviews",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Loved by our customers" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "" },
+    { "type": "paragraph", "content": "Reviews are managed in Admin ▸ Apps ▸ Customer Reviews, not here — install that app to add your first review." }
+  ]
+}
+{% endschema %}

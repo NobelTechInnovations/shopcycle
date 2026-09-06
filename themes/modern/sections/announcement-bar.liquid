@@ -1,0 +1,14 @@
+<div class="announcement-bar announcement-bar--modern" style="background: {{ section.settings.background }}; color: {{ section.settings.text_color }};">
+  <p>{{ section.settings.text }}</p>
+</div>
+
+{% schema %}
+{
+  "name": "Announcement bar",
+  "settings": [
+    { "type": "text", "id": "text", "label": "Message", "default": "New season, new arrivals" },
+    { "type": "color", "id": "background", "label": "Background", "default": "#0F0F0F" },
+    { "type": "color", "id": "text_color", "label": "Text color", "default": "#FFFFFF" }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,62 @@
+{% comment %}
+  Customer Reviews is a widget, not a theme content type: the reviews
+  themselves live in the "Customer Reviews" app's own settings (Admin ▸
+  Apps ▸ Customer Reviews ▸ Configure), added once, and show wherever this
+  section is placed on any page/template — a merchant never adds a review
+  as a theme block. This section only controls the heading/layout; `apps`
+  is the same global every installed-app snippet already reads from.
+{% endcomment %}
+{% assign reviews = apps["customer-reviews"].reviews %}
+
+<section class="testimonials">
+  <div class="testimonials__heading">
+    <h2>{{ section.settings.heading }}</h2>
+    {% if section.settings.subheading != blank %}<p>{{ section.settings.subheading }}</p>{% endif %}
+  </div>
+
+  {% if reviews and reviews.size > 0 %}
+    <div class="testimonials__row">
+      {% for review in reviews %}
+        <div class="testimonial-card">
+          <div class="testimonial-card__body">
+            <div class="testimonial-card__stars" aria-label="{{ review.rating }} out of 5 stars">
+              {% for i in (1..5) %}
+                {% if i <= review.rating %}
+                  {% render 'snippets/icon', icon: 'star-filled', class: 'icon icon--xs' %}
+                {% else %}
+                  {% render 'snippets/icon', icon: 'star-outline', class: 'icon icon--xs' %}
+                {% endif %}
+              {% endfor %}
+            </div>
+            <p class="testimonial-card__name">
+              {{ review.name }}
+              {% if review.verified %}
+                <span class="testimonial-card__verified">
+                  {% render 'snippets/icon', icon: 'check-circle', class: 'icon icon--xs' %} Verified Buyer
+                </span>
+              {% endif %}
+            </p>
+            <div class="testimonial-card__quote">{{ review.quote }}</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% comment %}
+    No "install the app" hint rendered here on purpose — this section
+    should never show setup instructions to a real shopper. The reminder
+    lives in the section's own settings panel (see the schema's paragraph
+    below), visible to the merchant editing the theme, not to customers.
+  {% endcomment %}
+</section>
+
+{% schema %}
+{
+  "name": "Customer reviews",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Customer Say!" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "Customers love our products and we always strive to please them all." },
+    { "type": "paragraph", "content": "Reviews themselves are managed in Admin ▸ Apps ▸ Customer Reviews, not here — install that app to add your first review." }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,9 @@
+{% comment %}
+  Shown wherever an image_picker setting is unset — a real placeholder
+  instead of an empty/broken <img>. `class` sizes the wrapper the same way
+  the real image would have been sized.
+  Usage: {% render 'snippets/image-placeholder', class: 'product-card__placeholder' %}
+{% endcomment %}
+<div class="image-placeholder {{ class }}">
+  {% render 'snippets/icon', icon: 'photo', class: 'image-placeholder__icon' %}
+</div>

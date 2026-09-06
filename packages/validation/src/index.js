@@ -1,0 +1,18 @@
+module.exports = {
+  ...require("./auth"),
+  ...require("./product"),
+  ...require("./collection"),
+  ...require("./order"),
+  ...require("./customer"),
+  ...require("./theme"),
+  ...require("./discount"),
+  ...require("./shipping"),
+  ...require("./tax"),
+  ...require("./page"),
+  ...require("./menu"),
+  ...require("./checkout"),
+  ...require("./team"),
+  ...require("./analytics"),
+  ...require("./super-admin"),
+  ...require("./apps"),
+};

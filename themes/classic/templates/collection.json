@@ -1,0 +1,6 @@
+{
+  "sections": {
+    "main": { "type": "product-grid", "settings": {} }
+  },
+  "order": ["main"]
+}

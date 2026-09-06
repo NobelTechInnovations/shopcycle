@@ -1,0 +1,40 @@
+<section class="featured-product">
+  {% assign product = all_products[section.settings.product] %}
+  {% if product %}
+    <div class="featured-product__media">
+      {% if product.images.first %}
+        <img src="{{ product.images.first.url }}" alt="{{ product.images.first.altText | default: product.title }}">
+      {% else %}
+        {% render 'snippets/image-placeholder' %}
+      {% endif %}
+    </div>
+    <div class="featured-product__info">
+      {% if section.settings.eyebrow != blank %}<p class="featured-product__eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+      <h2>{{ section.settings.heading }}</h2>
+      <p class="featured-product__description">{{ section.settings.description }}</p>
+      {% render 'snippets/price', variant: product.variants.first %}
+
+      <form method="post" action="{{ routes.cart_add_url }}" class="featured-product__form">
+        <input type="hidden" name="variantId" value="{{ product.variants.first.id }}">
+        {% if product.variants.first.available %}
+          {% render 'snippets/button', text: 'Add to bag', url: '#', type: 'submit' %}
+        {% else %}
+          <button type="button" class="btn btn--modern" disabled>Sold out</button>
+        {% endif %}
+        <a href="{{ product.url }}" class="featured-product__link">View details</a>
+      </form>
+    </div>
+  {% endif %}
+</section>
+
+{% schema %}
+{
+  "name": "Featured product",
+  "settings": [
+    { "type": "product", "id": "product", "label": "Product" },
+    { "type": "text", "id": "eyebrow", "label": "Eyebrow", "default": "Fan favorite" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "The one everyone's talking about" },
+    { "type": "textarea", "id": "description", "label": "Description" }
+  ]
+}
+{% endschema %}

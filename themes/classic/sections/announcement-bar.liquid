@@ -1,0 +1,14 @@
+<div class="announcement-bar" style="background: {{ section.settings.background }}; color: {{ section.settings.text_color }};">
+  <p>{{ section.settings.text }}</p>
+</div>
+
+{% schema %}
+{
+  "name": "Announcement bar",
+  "settings": [
+    { "type": "text", "id": "text", "label": "Message", "default": "Free shipping on orders over ₹999" },
+    { "type": "color", "id": "background", "label": "Background", "default": "#1F2937" },
+    { "type": "color", "id": "text_color", "label": "Text color", "default": "#FFFFFF" }
+  ]
+}
+{% endschema %}

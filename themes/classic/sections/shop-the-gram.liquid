@@ -1,0 +1,49 @@
+<section class="shop-the-gram">
+  <div class="shop-the-gram__heading">
+    <h2>{{ section.settings.heading }}</h2>
+    {% if section.settings.subheading != blank %}<p>{{ section.settings.subheading }}</p>{% endif %}
+  </div>
+  <div class="shop-the-gram__row">
+    {% for block in section.blocks %}
+      {% assign product = all_products[block.settings.product] %}
+      {% if block.settings.image != blank %}
+        {% capture tile_style %}background-image: url('{{ block.settings.image | image_url }}');{% endcapture %}
+      {% else %}
+        {% assign tile_style = "" %}
+      {% endif %}
+      {% if product %}
+        <a href="{{ product.url }}" class="shop-the-gram__tile" style="{{ tile_style }}">
+          {% if block.settings.image == blank %}{% render 'snippets/image-placeholder' %}{% endif %}
+          <span class="shop-the-gram__bag" aria-label="Shop {{ product.title }}">
+            {% render 'snippets/icon', icon: 'bag', class: 'icon icon--xs' %}
+          </span>
+        </a>
+      {% else %}
+        <span class="shop-the-gram__tile" style="{{ tile_style }}">
+          {% if block.settings.image == blank %}{% render 'snippets/image-placeholder' %}{% endif %}
+        </span>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Shop by Gram",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Shop by Gram" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "Inspire and let yourself be inspired, from one unique fashion to another." }
+  ],
+  "blocks": [
+    {
+      "type": "post",
+      "name": "Photo",
+      "settings": [
+        { "type": "image_picker", "id": "image", "label": "Photo" },
+        { "type": "product", "id": "product", "label": "Tagged product (optional)" }
+      ]
+    }
+  ],
+  "max_blocks": 8
+}
+{% endschema %}

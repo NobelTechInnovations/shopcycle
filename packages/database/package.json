@@ -1,0 +1,20 @@
+{
+  "name": "@shopcycle/database",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/client.js",
+  "scripts": {
+    "generate": "dotenv -e ../../.env -- prisma generate --schema=prisma/schema.prisma",
+    "migrate": "dotenv -e ../../.env -- prisma migrate dev --schema=prisma/schema.prisma",
+    "studio": "dotenv -e ../../.env -- prisma studio --schema=prisma/schema.prisma",
+    "seed": "dotenv -e ../../.env -- node prisma/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.2.1",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^7.4.4",
+    "prisma": "^6.2.1"
+  }
+}

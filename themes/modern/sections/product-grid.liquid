@@ -1,0 +1,43 @@
+<section class="product-grid-section product-grid-section--modern">
+  {% if search %}
+    {% if search.query != blank %}
+      <h2>Search results for &ldquo;{{ search.query }}&rdquo;</h2>
+    {% else %}
+      <h2>Search</h2>
+    {% endif %}
+    <p class="product-grid-section__count">{{ search.result_count }} result{% if search.result_count != 1 %}s{% endif %}</p>
+  {% else %}
+    <h2>{{ section.settings.heading }}</h2>
+  {% endif %}
+  <div class="product-grid" style="--product-grid-cols: {{ section.settings.columns }};">
+    {% comment %}
+      Used two ways: as a merchant-placed "product grid" section pointing
+      at a named collection (settings.collection set), or as the main
+      listing on the collection template itself, where it should just show
+      whatever collection is currently being viewed (also reused for the
+      search template's synthetic "collection", built in storefront/service.js).
+    {% endcomment %}
+    {% if section.settings.collection != blank %}
+      {% assign target = collections[section.settings.collection] %}
+    {% else %}
+      {% assign target = collection %}
+    {% endif %}
+    {% for product in target.products %}
+      {% render 'snippets/product-card', product: product %}
+    {% endfor %}
+  </div>
+  {% if search and search.result_count == 0 %}
+    <p class="product-grid-section__empty">No products matched "{{ search.query }}".</p>
+  {% endif %}
+</section>
+
+{% schema %}
+{
+  "name": "Product collection",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "New arrivals" },
+    { "type": "collection", "id": "collection", "label": "Collection" },
+    { "type": "range", "id": "columns", "label": "Columns (desktop)", "min": 2, "max": 6, "step": 1, "default": 3 }
+  ]
+}
+{% endschema %}

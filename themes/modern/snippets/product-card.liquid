@@ -1,0 +1,18 @@
+<a href="{{ product.url }}" class="product-card product-card--modern">
+  <div class="product-card__image">
+    {% if product.images.first %}
+      <img src="{{ product.images.first.url }}" alt="{{ product.images.first.altText | default: product.title }}">
+    {% else %}
+      {% render 'snippets/image-placeholder' %}
+    {% endif %}
+
+    {% comment %} Auto-computed from the product's own compare-at price — never a number a merchant has to type and keep in sync. {% endcomment %}
+    {% assign variant = product.variants.first %}
+    {% if variant.comparePrice and variant.comparePrice > variant.price %}
+      {% assign pct_off = variant.comparePrice | minus: variant.price | times: 100.0 | divided_by: variant.comparePrice | round %}
+      <span class="product-card__badge">-{{ pct_off }}%</span>
+    {% endif %}
+  </div>
+  <h3 class="product-card__title">{{ product.title }}</h3>
+  {% render 'snippets/price', variant: product.variants.first %}
+</a>

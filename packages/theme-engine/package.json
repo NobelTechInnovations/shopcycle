@@ -1,0 +1,10 @@
+{
+  "name": "@shopcycle/theme-engine",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.js",
+  "dependencies": {
+    "@shopcycle/theme-schema": "workspace:*",
+    "liquidjs": "^10.29.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "color_primary": "#111111",
+  "color_accent": "#EF4D34",
+  "color_background": "#FFFFFF",
+  "color_text": "#1A1A1A",
+  "heading_font": "Inter",
+  "body_font": "Inter",
+  "container_width": 1280,
+  "button_radius": 999
+}

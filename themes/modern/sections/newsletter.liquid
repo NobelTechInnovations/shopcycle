@@ -1,0 +1,15 @@
+<section class="newsletter newsletter--modern">
+  <h2>{{ section.settings.heading }}</h2>
+  {% if section.settings.subheading != blank %}<p>{{ section.settings.subheading }}</p>{% endif %}
+  {% render 'snippets/newsletter-form' %}
+</section>
+
+{% schema %}
+{
+  "name": "Newsletter",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Stay in the loop" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "New arrivals, gentle reminders, no spam." }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,118 @@
+{% comment %}
+  Full-bleed hero banner — edge to edge, no container max-width, matching a
+  full-page fashion-store banner. Supports either a single slide (the
+  section's own settings — this is what every already-installed store has
+  today, so nothing breaks) or a real multi-slide carousel once one or more
+  "slide" blocks are added, each with its own image/heading/button. Prev/
+  next arrows + dot pagination only render when there's more than one slide;
+  `theme.js`'s initHeroCarousels() drives the actual sliding.
+{% endcomment %}
+{% if section.blocks.size > 0 %}
+  {% assign slides = section.blocks %}
+{% else %}
+  {% assign slides = null %}
+{% endif %}
+
+<section class="hero hero--{{ section.settings.height }}" data-hero
+  {% if section.settings.autoplay %}data-autoplay="true" data-autoplay-speed="{{ section.settings.autoplay_speed }}"{% endif %}>
+  <div class="hero__track">
+    {% if slides %}
+      {% for block in slides %}
+        <div class="hero__slide hero--align-{{ block.settings.text_alignment }} {% if forloop.first %}is-active{% endif %}" data-hero-slide>
+          {% if block.settings.image != blank %}
+            <div class="hero__media" style="background-image: url('{{ block.settings.image | image_url }}');"></div>
+          {% else %}
+            {% render 'snippets/image-placeholder', class: 'hero__media hero__media--placeholder' %}
+          {% endif %}
+          <div class="hero__overlay" style="opacity: {{ block.settings.overlay_opacity | divided_by: 100.0 }};"></div>
+          <div class="hero__content">
+            <h1>{{ block.settings.heading }}</h1>
+            <p>{{ block.settings.description }}</p>
+            {% if block.settings.button_text != blank %}
+              {% assign btn_url = block.settings.button_link | default: routes.all_products_url %}
+              {% render 'snippets/button', text: block.settings.button_text, url: btn_url %}
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="hero__slide hero--align-{{ section.settings.text_alignment }} is-active" data-hero-slide>
+        {% if section.settings.image != blank %}
+          <div class="hero__media" style="background-image: url('{{ section.settings.image | image_url }}');"></div>
+        {% else %}
+          {% render 'snippets/image-placeholder', class: 'hero__media hero__media--placeholder' %}
+        {% endif %}
+        <div class="hero__overlay" style="opacity: {{ section.settings.overlay_opacity | divided_by: 100.0 }};"></div>
+        <div class="hero__content">
+          <h1>{{ section.settings.heading }}</h1>
+          <p>{{ section.settings.description }}</p>
+          {% if section.settings.button_text != blank %}
+            {% assign btn_url = section.settings.button_link | default: routes.all_products_url %}
+            {% render 'snippets/button', text: section.settings.button_text, url: btn_url %}
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if slides and slides.size > 1 %}
+    {% if section.settings.show_arrows %}
+      <button type="button" class="hero__arrow hero__arrow--prev" data-hero-prev aria-label="Previous slide">
+        {% render 'snippets/icon', icon: 'chevron-left', class: 'icon' %}
+      </button>
+      <button type="button" class="hero__arrow hero__arrow--next" data-hero-next aria-label="Next slide">
+        {% render 'snippets/icon', icon: 'chevron-right', class: 'icon' %}
+      </button>
+    {% endif %}
+    {% if section.settings.dot_style != 'none' %}
+      <div class="hero__dots hero__dots--{{ section.settings.dot_style }}" data-hero-dots>
+        {% for block in slides %}
+          <button type="button" class="hero__dot {% if forloop.first %}is-active{% endif %}" data-hero-dot="{{ forloop.index0 }}" aria-label="Go to slide {{ forloop.index }}">
+            {% if section.settings.dot_style == 'numbers' %}{{ forloop.index }}{% endif %}
+          </button>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endif %}
+</section>
+
+{% schema %}
+{
+  "name": "Hero banner",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Summer Collection" },
+    { "type": "textarea", "id": "description", "label": "Description", "default": "Discover our latest collection" },
+    { "type": "text", "id": "button_text", "label": "Button text", "default": "Shop now" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "image_picker", "id": "image", "label": "Image" },
+    { "type": "range", "id": "overlay_opacity", "label": "Overlay opacity", "min": 0, "max": 100, "step": 5, "default": 20 },
+    { "type": "select", "id": "text_alignment", "label": "Text alignment", "default": "left",
+      "options": [{"value":"left","label":"Left"},{"value":"center","label":"Center"},{"value":"right","label":"Right"}] },
+    { "type": "select", "id": "height", "label": "Height", "default": "large",
+      "options": [{"value":"small","label":"Small"},{"value":"medium","label":"Medium"},{"value":"large","label":"Large"}] },
+    { "type": "header", "content": "Slideshow (used when there are 2+ slides)" },
+    { "type": "checkbox", "id": "autoplay", "label": "Auto-rotate slides", "default": true },
+    { "type": "range", "id": "autoplay_speed", "label": "Change slide every (seconds)", "min": 3, "max": 12, "step": 1, "default": 6 },
+    { "type": "checkbox", "id": "show_arrows", "label": "Show prev/next arrows", "default": true },
+    { "type": "select", "id": "dot_style", "label": "Pagination style", "default": "dots",
+      "options": [{"value":"dots","label":"Dots"},{"value":"lines","label":"Lines"},{"value":"numbers","label":"Numbers"},{"value":"none","label":"None"}] }
+  ],
+  "blocks": [
+    {
+      "type": "slide",
+      "name": "Slide",
+      "settings": [
+        { "type": "image_picker", "id": "image", "label": "Image" },
+        { "type": "text", "id": "heading", "label": "Heading", "default": "New Arrivals" },
+        { "type": "textarea", "id": "description", "label": "Description" },
+        { "type": "text", "id": "button_text", "label": "Button text", "default": "Shop now" },
+        { "type": "url", "id": "button_link", "label": "Button link" },
+        { "type": "range", "id": "overlay_opacity", "label": "Overlay opacity", "min": 0, "max": 100, "step": 5, "default": 20 },
+        { "type": "select", "id": "text_alignment", "label": "Text alignment", "default": "left",
+          "options": [{"value":"left","label":"Left"},{"value":"center","label":"Center"},{"value":"right","label":"Right"}] }
+      ]
+    }
+  ],
+  "max_blocks": 6
+}
+{% endschema %}

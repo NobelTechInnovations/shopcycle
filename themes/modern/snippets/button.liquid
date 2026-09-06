@@ -1,0 +1,5 @@
+{% if type == 'submit' %}
+  <button type="submit" class="btn btn--modern">{{ text }}</button>
+{% else %}
+  <a href="{{ url }}" class="btn btn--modern">{{ text }}</a>
+{% endif %}

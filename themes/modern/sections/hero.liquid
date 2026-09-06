@@ -1,0 +1,101 @@
+{% comment %}
+  Full-bleed hero — a single slide (this section's own settings, so every
+  already-installed store keeps working unchanged) or a real slideshow once
+  "Slide" blocks are added. See theme.js's initHeroCarousels().
+{% endcomment %}
+{% if section.blocks.size > 0 %}
+  {% assign slides = section.blocks %}
+{% else %}
+  {% assign slides = null %}
+{% endif %}
+
+<section class="hero hero--modern hero--fullbleed" data-hero
+  {% if section.settings.autoplay %}data-autoplay="true" data-autoplay-speed="{{ section.settings.autoplay_speed }}"{% endif %}>
+  <div class="hero__track">
+    {% if slides %}
+      {% for block in slides %}
+        <div class="hero__slide hero__content--{{ block.settings.text_position }} {% if forloop.first %}is-active{% endif %}" data-hero-slide>
+          {% if block.settings.image != blank %}
+            <div class="hero__media" style="background-image: url('{{ block.settings.image | image_url }}');"></div>
+          {% else %}
+            {% render 'snippets/image-placeholder', class: 'hero__media hero__media--placeholder' %}
+          {% endif %}
+          <div class="hero__content">
+            <h1>{{ block.settings.heading }}</h1>
+            {% if block.settings.button_text != blank %}
+              {% assign btn_url = block.settings.button_link | default: routes.all_products_url %}
+              {% render 'snippets/button', text: block.settings.button_text, url: btn_url %}
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="hero__slide hero__content--{{ section.settings.text_position }} is-active" data-hero-slide>
+        {% if section.settings.image != blank %}
+          <div class="hero__media" style="background-image: url('{{ section.settings.image | image_url }}');"></div>
+        {% else %}
+          {% render 'snippets/image-placeholder', class: 'hero__media hero__media--placeholder' %}
+        {% endif %}
+        <div class="hero__content">
+          <h1>{{ section.settings.heading }}</h1>
+          {% if section.settings.button_text != blank %}
+            {% assign btn_url = section.settings.button_link | default: routes.all_products_url %}
+            {% render 'snippets/button', text: section.settings.button_text, url: btn_url %}
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if slides and slides.size > 1 %}
+    <button type="button" class="hero__arrow hero__arrow--prev" data-hero-prev aria-label="Previous slide">
+      {% render 'snippets/icon', icon: 'chevron-left', class: 'icon' %}
+    </button>
+    <button type="button" class="hero__arrow hero__arrow--next" data-hero-next aria-label="Next slide">
+      {% render 'snippets/icon', icon: 'chevron-right', class: 'icon' %}
+    </button>
+    <div class="hero__dots" data-hero-dots>
+      {% for block in slides %}
+        <button type="button" class="hero__dot {% if forloop.first %}is-active{% endif %}" data-hero-dot="{{ forloop.index0 }}" aria-label="Go to slide {{ forloop.index }}"></button>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+
+{% schema %}
+{
+  "name": "Large hero",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Crafted for Everyday" },
+    { "type": "image_picker", "id": "image", "label": "Image" },
+    { "type": "text", "id": "button_text", "label": "Button text", "default": "Explore" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "select", "id": "text_position", "label": "Text position", "default": "bottom-left",
+      "options": [
+        { "value": "bottom-left", "label": "Bottom left" },
+        { "value": "center", "label": "Center" }
+      ] },
+    { "type": "header", "content": "Slideshow (used when there are 2+ slides)" },
+    { "type": "checkbox", "id": "autoplay", "label": "Auto-rotate slides", "default": true },
+    { "type": "range", "id": "autoplay_speed", "label": "Change slide every (seconds)", "min": 3, "max": 12, "step": 1, "default": 6 }
+  ],
+  "blocks": [
+    {
+      "type": "slide",
+      "name": "Slide",
+      "settings": [
+        { "type": "image_picker", "id": "image", "label": "Image" },
+        { "type": "text", "id": "heading", "label": "Heading", "default": "The New Edit" },
+        { "type": "text", "id": "button_text", "label": "Button text", "default": "Explore" },
+        { "type": "url", "id": "button_link", "label": "Button link" },
+        { "type": "select", "id": "text_position", "label": "Text position", "default": "bottom-left",
+          "options": [
+            { "value": "bottom-left", "label": "Bottom left" },
+            { "value": "center", "label": "Center" }
+          ] }
+      ]
+    }
+  ],
+  "max_blocks": 6
+}
+{% endschema %}

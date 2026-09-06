@@ -1,0 +1,71 @@
+<section class="main-cart main-cart--modern">
+  <h1>{{ section.settings.heading }}</h1>
+
+  {% if cart.items.size > 0 %}
+    <div class="main-cart__items">
+      {% for item in cart.items %}
+        <div class="main-cart__item">
+          {% if item.image %}
+            <img src="{{ item.image }}" alt="">
+          {% else %}
+            {% render 'snippets/image-placeholder' %}
+          {% endif %}
+          <div class="main-cart__item-info">
+            <a href="{{ item.url }}">{{ item.title }}</a>
+            <span>{{ item.price | money }}</span>
+          </div>
+          <form method="post" action="{{ routes.cart_update_url }}" class="main-cart__update-form">
+            <input type="hidden" name="variantId" value="{{ item.variantId }}">
+            <input type="number" name="quantity" value="{{ item.quantity }}" min="0">
+            <button type="submit">Update</button>
+          </form>
+          <strong>{{ item.lineTotal | money }}</strong>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="main-cart__discount">
+      {% if cart.discount %}
+        <div class="main-cart__discount-applied">
+          <span>Discount ({{ cart.discount.code }}){% if cart.discount.error %} — no longer valid{% endif %}: -{{ cart.discount.amount | money }}</span>
+          <form method="post" action="{{ routes.cart_discount_remove_url }}">
+            <button type="submit">Remove</button>
+          </form>
+        </div>
+      {% else %}
+        {% if discount_error %}<p class="main-cart__discount-error">{{ discount_error }}</p>{% endif %}
+        <form method="post" action="{{ routes.cart_discount_url }}" class="main-cart__discount-form">
+          <input type="text" name="code" placeholder="Discount code">
+          <button type="submit">Apply</button>
+        </form>
+      {% endif %}
+    </div>
+
+    <div class="main-cart__summary">
+      <div class="main-cart__summary-line"><span>Subtotal</span><span>{{ cart.subtotal | money }}</span></div>
+      {% if cart.discount and cart.discount.amount > 0 %}
+        <div class="main-cart__summary-line"><span>Discount</span><span>-{{ cart.discount.amount | money }}</span></div>
+      {% endif %}
+      {% if cart.shipping %}
+        <div class="main-cart__summary-line"><span>Shipping ({{ cart.shipping.name }})</span><span>{{ cart.shipping.amount | money }}</span></div>
+      {% endif %}
+      {% if cart.tax %}
+        <div class="main-cart__summary-line"><span>{{ cart.tax.name }}</span><span>{{ cart.tax.amount | money }}</span></div>
+      {% endif %}
+      <div class="main-cart__summary-line main-cart__summary-line--total"><strong>Total</strong><strong>{{ cart.total | money }}</strong></div>
+      <a href="{{ routes.checkout_url }}" class="btn btn--modern main-cart__checkout-btn">Checkout</a>
+    </div>
+  {% else %}
+    <p>Your bag is empty.</p>
+    <a href="{{ routes.all_products_url }}">Continue shopping</a>
+  {% endif %}
+</section>
+
+{% schema %}
+{
+  "name": "Cart items",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Your bag" }
+  ]
+}
+{% endschema %}

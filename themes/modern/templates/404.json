@@ -1,0 +1,6 @@
+{
+  "sections": {
+    "main": { "type": "rich-text", "settings": { "heading": "Page not found", "content": "The page you're looking for doesn't exist." } }
+  },
+  "order": ["main"]
+}

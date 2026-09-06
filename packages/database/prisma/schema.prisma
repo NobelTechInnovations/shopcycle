@@ -1,0 +1,745 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Auth / Tenancy
+// ─────────────────────────────────────────────
+
+enum UserStatus {
+  active
+  invited
+  disabled
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  status       UserStatus @default(active)
+  /// Platform-level administrator — manages every store, the Plan catalog,
+  /// and the App catalog from /admin/super-admin. Never set by any
+  /// self-serve flow (registration, invites); seeded directly (see
+  /// prisma/seed.js) or promoted by an existing super admin.
+  isSuperAdmin Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  storeUsers StoreUser[]
+
+  @@map("users")
+}
+
+enum StoreStatus {
+  active
+  suspended
+}
+
+model Store {
+  id        String      @id @default(cuid())
+  name      String
+  handle    String      @unique
+  /// A merchant's own domain (e.g. "shop.example.com"), resolved to this
+  /// store by the storefront in addition to the always-available
+  /// /store/:handle path — see apps/storefront middleware.js. Optional;
+  /// most stores never set one and keep using the handle path.
+  domain    String?     @unique
+  currency  String      @default("INR")
+  timezone  String      @default("Asia/Kolkata")
+  status    StoreStatus @default(active)
+  /// Misc. settings that don't warrant their own column (weight unit, order
+  /// number prefix, low-stock threshold, ...) — General settings tab.
+  settings  Json        @default("{}")
+
+  // Phase 7 — Multi-tenant SaaS billing. `trialEndsAt` is set once at
+  // registration (see auth/service.js) and never touched again outside the
+  // billing flow; `planId` null means "no plan selected yet" (first-run
+  // state), distinct from being on the free Plan row.
+  planId       String?
+  trialEndsAt  DateTime?
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  plan          Plan?          @relation(fields: [planId], references: [id], onDelete: SetNull)
+  storeUsers    StoreUser[]
+  invitations   Invitation[]
+  themes        Theme[]
+  products      Product[]
+  collections   Collection[]
+  customers     Customer[]
+  orders        Order[]
+  files         File[]
+  pages         Page[]
+  menus         Menu[]
+  discounts     Discount[]
+  shippingZones ShippingZone[]
+  taxRates      TaxRate[]
+  visitorSessions VisitorSession[]
+  pageViews       PageView[]
+  campaigns       Campaign[]
+  installedApps   StoreApp[]
+
+  @@map("stores")
+}
+
+/// A billing tier a store can be on. Seeded, not merchant-created — see
+/// prisma/seed.js. Deliberately simple (flat monthly price + a couple of
+/// numeric limits) rather than a full metered-billing model.
+model Plan {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  priceMonthly   Decimal  @db.Decimal(10, 2)
+  productLimit   Int
+  staffLimit     Int
+  description    String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  stores Store[]
+
+  @@map("plans")
+}
+
+/// A pending team invite — a StoreUser row can't exist until the invitee
+/// has a User account, so an invite by email needs its own row (and token)
+/// to exist in the meantime. Accepting one creates the User (if new) plus
+/// the StoreUser and deletes the invitation.
+model Invitation {
+  id        String    @id @default(cuid())
+  storeId   String
+  email     String
+  role      StoreRole @default(staff)
+  token     String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, email])
+  @@index([storeId])
+  @@map("invitations")
+}
+
+enum StoreRole {
+  owner
+  admin
+  staff
+}
+
+model StoreUser {
+  id        String    @id @default(cuid())
+  storeId   String
+  userId    String
+  role      StoreRole @default(staff)
+  createdAt DateTime  @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, userId])
+  @@map("store_users")
+}
+
+// ─────────────────────────────────────────────
+// Themes
+// ─────────────────────────────────────────────
+
+enum ThemeStatus {
+  installed
+  draft
+}
+
+model Theme {
+  id           String      @id @default(cuid())
+  storeId      String
+  name         String
+  handle       String
+  description  String?     @db.Text
+  version      String      @default("1.0.0")
+  status       ThemeStatus @default(installed)
+  isActive     Boolean     @default(false)
+  previewImage String?
+  /// Global theme settings (colors, typography, layout) — schema-driven, see config/settings_schema.json in the theme package
+  settingsData Json        @default("{}")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  store Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  files ThemeFile[]
+
+  @@index([storeId])
+  @@map("themes")
+}
+
+model ThemeFile {
+  id        String   @id @default(cuid())
+  themeId   String
+  /// e.g. "sections/hero.liquid", "templates/index.json", "assets/theme.css"
+  path      String
+  fileType  String
+  content   String   @db.LongText
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  theme     Theme               @relation(fields: [themeId], references: [id], onDelete: Cascade)
+  revisions ThemeFileRevision[]
+
+  @@unique([themeId, path])
+  @@map("theme_files")
+}
+
+/// A snapshot of a ThemeFile's content taken right before it's overwritten —
+/// this is the entire "version history / rollback" mechanism for the code
+/// editor. Denormalizes `path` so history is still legible even if the file
+/// is later renamed or deleted out from under it.
+model ThemeFileRevision {
+  id          String   @id @default(cuid())
+  themeFileId String
+  path        String
+  content     String   @db.LongText
+  createdAt   DateTime @default(now())
+
+  themeFile ThemeFile @relation(fields: [themeFileId], references: [id], onDelete: Cascade)
+
+  @@index([themeFileId, createdAt])
+  @@map("theme_file_revisions")
+}
+
+// ─────────────────────────────────────────────
+// Catalog
+// ─────────────────────────────────────────────
+
+enum ProductStatus {
+  active
+  draft
+  archived
+}
+
+model Product {
+  id              String        @id @default(cuid())
+  storeId         String
+  title           String
+  slug            String
+  description     String?       @db.Text
+  status          ProductStatus @default(draft)
+  vendor          String?
+  productType     String?
+  tags            String?       @db.Text
+  seoTitle        String?
+  seoDescription  String?       @db.Text
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variants           ProductVariant[]
+  images             ProductImage[]
+  collectionProducts CollectionProduct[]
+  orderItems         OrderItem[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@map("products")
+}
+
+enum VariantStatus {
+  active
+  draft
+}
+
+model ProductVariant {
+  id                 String        @id @default(cuid())
+  productId          String
+  title              String        @default("Default")
+  sku                String?
+  price              Decimal       @db.Decimal(10, 2)
+  comparePrice       Decimal?      @db.Decimal(10, 2)
+  cost               Decimal?      @db.Decimal(10, 2)
+  inventoryQuantity  Int           @default(0)
+  weight             Float?
+  status             VariantStatus @default(active)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  images     ProductImage[]
+  orderItems OrderItem[]
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  variantId String?
+  url       String
+  altText   String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+enum CollectionStatus {
+  active
+  draft
+}
+
+model Collection {
+  id          String           @id @default(cuid())
+  storeId     String
+  title       String
+  slug        String
+  description String?          @db.Text
+  image       String?
+  status      CollectionStatus @default(draft)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  store    Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products CollectionProduct[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@map("collections")
+}
+
+model CollectionProduct {
+  collectionId String
+  productId    String
+  position     Int    @default(0)
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, productId])
+  @@map("collection_products")
+}
+
+// ─────────────────────────────────────────────
+// Customers / Orders
+// ─────────────────────────────────────────────
+
+model Customer {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  email     String
+  phone     String?
+
+  // Default address — a single flat address rather than a separate
+  // address-book model, matching the "customer should have an address"
+  // scope here rather than building full multi-address management.
+  address1  String?
+  address2  String?
+  city      String?
+  province  String?
+  zip       String?
+  country   String?
+
+  acceptsEmailMarketing Boolean @default(false)
+  acceptsSmsMarketing   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store    Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orders   Order[]
+  sessions VisitorSession[]
+
+  @@unique([storeId, email])
+  @@index([storeId])
+  @@map("customers")
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  refunded
+}
+
+enum FulfillmentStatus {
+  unfulfilled
+  fulfilled
+  cancelled
+}
+
+model Order {
+  id                String            @id @default(cuid())
+  storeId           String
+  orderNumber       Int
+  customerId        String?
+  paymentStatus     PaymentStatus     @default(pending)
+  fulfillmentStatus FulfillmentStatus @default(unfulfilled)
+  subtotal          Decimal           @db.Decimal(10, 2)
+  discount          Decimal           @default(0) @db.Decimal(10, 2)
+  discountCode      String?
+  shipping          Decimal           @default(0) @db.Decimal(10, 2)
+  tax               Decimal           @default(0) @db.Decimal(10, 2)
+  total             Decimal           @db.Decimal(10, 2)
+  currency          String            @default("INR")
+
+  // Storefront checkout (Phase 6) — a snapshot taken at order time, not a
+  // live reference to Customer.address*, so editing a customer's saved
+  // address later never rewrites history for an order already placed.
+  email             String?
+  phone             String?
+  shippingName      String?
+  shippingAddress1  String?
+  shippingAddress2  String?
+  shippingCity      String?
+  shippingProvince  String?
+  shippingZip       String?
+  shippingCountry   String?
+
+  /// "cod" (cash on delivery, settles instantly at order time — no gateway
+  /// needed) or "razorpay" (online payment; only offered at checkout when
+  /// RAZORPAY_KEY_ID/SECRET are configured, see checkout/service.js).
+  paymentMethod     String            @default("cod")
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+
+  /// The storefront visitor session that placed this order, if one was
+  /// tracked (see checkout/service.js) — this is the entire mechanism
+  /// behind "which campaign drove this sale" in Analytics → Campaigns.
+  sessionId String?
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  store    Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  session  VisitorSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  items    OrderItem[]
+
+  @@unique([storeId, orderNumber])
+  @@index([storeId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String?
+  variantId String?
+  title     String
+  sku       String?
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+// ─────────────────────────────────────────────
+// Media
+// ─────────────────────────────────────────────
+
+model File {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  url       String
+  mimeType  String
+  size      Int
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("files")
+}
+
+// ─────────────────────────────────────────────
+// Content (Pages / Navigation)
+// ─────────────────────────────────────────────
+
+enum PageStatus {
+  active
+  draft
+}
+
+model Page {
+  id             String     @id @default(cuid())
+  storeId        String
+  title          String
+  slug           String
+  body           String?    @db.Text
+  status         PageStatus @default(draft)
+  seoTitle       String?
+  seoDescription String?    @db.Text
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@map("pages")
+}
+
+/// A navigation menu, e.g. "main-menu" / "footer-menu" — the `handle`
+/// matches what a section's `menu` setting references (see
+/// themes/*/sections/header.liquid, footer.liquid), and resolves at render
+/// time into the `linklists` context (see theme-engine/context.js).
+model Menu {
+  id        String     @id @default(cuid())
+  storeId   String
+  handle    String
+  title     String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  store Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items MenuItem[]
+
+  @@unique([storeId, handle])
+  @@index([storeId])
+  @@map("menus")
+}
+
+model MenuItem {
+  id       String @id @default(cuid())
+  menuId   String
+  label    String
+  url      String
+  position Int    @default(0)
+
+  menu Menu @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@index([menuId])
+  @@map("menu_items")
+}
+
+// ─────────────────────────────────────────────
+// Phase 5 — Discounts / Shipping / Taxes
+// ─────────────────────────────────────────────
+
+enum DiscountType {
+  percentage
+  fixed_amount
+}
+
+enum DiscountStatus {
+  active
+  disabled
+}
+
+model Discount {
+  id          String         @id @default(cuid())
+  storeId     String
+  code        String
+  type        DiscountType
+  value       Decimal        @db.Decimal(10, 2)
+  minSubtotal Decimal?       @db.Decimal(10, 2)
+  usageLimit  Int?
+  usageCount  Int            @default(0)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  status      DiscountStatus @default(active)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, code])
+  @@index([storeId])
+  @@map("discounts")
+}
+
+/// Deliberately simple: one flat set of rates per zone, matched by country,
+/// rather than full carrier-calculated rates — real value (merchants can
+/// price shipping) without pretending to be a full shipping-rate engine.
+model ShippingZone {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  countries String   @db.Text // comma-separated ISO country codes
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  rates ShippingRate[]
+
+  @@index([storeId])
+  @@map("shipping_zones")
+}
+
+model ShippingRate {
+  id          String   @id @default(cuid())
+  zoneId      String
+  name        String
+  price       Decimal  @db.Decimal(10, 2)
+  /// Subtotal at or above this makes the rate free — null means never free.
+  freeAbove   Decimal? @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  zone ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@index([zoneId])
+  @@map("shipping_rates")
+}
+
+/// One flat rate per region — same "real but simple" tradeoff as shipping;
+/// no tax-jurisdiction-by-address resolution without a checkout address.
+model TaxRate {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  country   String
+  province  String?
+  rate      Decimal  @db.Decimal(5, 2) // percentage, e.g. 18.00
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("tax_rates")
+}
+
+// ─────────────────────────────────────────────
+// Phase 8 — Analytics
+// ─────────────────────────────────────────────
+
+enum DeviceType {
+  desktop
+  mobile
+  tablet
+  unknown
+}
+
+/// One browsing session — resets after 30 minutes of inactivity (see
+/// analytics/service.js), same definition every analytics tool uses. UTM
+/// and referrer are captured once, at session start (first-touch
+/// attribution) — a shopper browsing five pages after clicking one ad
+/// should still show as "from that ad," not "direct" by the last page.
+model VisitorSession {
+  id          String     @id @default(cuid())
+  storeId     String
+  customerId  String?
+  country     String?
+  deviceType  DeviceType @default(unknown)
+  userAgent   String?    @db.Text
+  referrer    String?    @db.Text
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+  entryPath   String?
+  firstSeenAt DateTime   @default(now())
+  lastSeenAt  DateTime   @default(now())
+
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer  Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  pageViews PageView[]
+  orders    Order[]
+
+  @@index([storeId])
+  @@index([storeId, lastSeenAt])
+  @@map("visitor_sessions")
+}
+
+model PageView {
+  id           String   @id @default(cuid())
+  storeId      String
+  sessionId    String
+  path         String
+  templateName String?
+  createdAt    DateTime @default(now())
+
+  store   Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  session VisitorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+  @@index([sessionId])
+  @@map("page_views")
+}
+
+/// A merchant-created trackable link (Settings-adjacent, but merchandising
+/// rather than config, hence its own top-level Campaigns area) — visiting
+/// its generated URL stamps a new session with these UTM values, same as
+/// any real ad click would.
+model Campaign {
+  id              String   @id @default(cuid())
+  storeId         String
+  name            String
+  utmSource       String
+  utmMedium       String
+  utmCampaign     String
+  utmTerm         String?
+  utmContent      String?
+  destinationPath String   @default("/")
+  createdAt       DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("campaigns")
+}
+
+// ─────────────────────────────────────────────
+// Apps (platform extensions — super-admin managed catalog,
+// merchant-installed per store)
+// ─────────────────────────────────────────────
+
+/// One entry in the platform's app catalog — seeded/managed by a super
+/// admin (see super-admin/apps), not merchant-created. `key` is the
+/// stable identifier theme code and the render pipeline key off of (see
+/// storefront/service.js's `apps` global); renaming `name` should never
+/// break an already-installed store.
+model App {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?  @db.Text
+  category    String   @default("other")
+  iconEmoji   String   @default("🧩")
+  /// The settings a merchant fills in on install, as a JSON Schema-ish
+  /// shape the admin's install form renders generically: [{ id, label,
+  /// type: "text" }]. Keeps adding a new app a data-only change most of
+  /// the time, no new admin UI required.
+  settingsSchema Json  @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  installs StoreApp[]
+
+  @@map("apps")
+}
+
+model StoreApp {
+  id          String   @id @default(cuid())
+  storeId     String
+  appId       String
+  /// Merchant-filled values matching the App's settingsSchema, e.g.
+  /// { "measurementId": "G-XXXX" } for Google Analytics.
+  settings    Json     @default("{}")
+  installedAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  app   App   @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, appId])
+  @@index([storeId])
+  @@map("store_apps")
+}
