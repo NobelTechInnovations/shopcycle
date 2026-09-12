@@ -137,6 +137,55 @@ importers:
         specifier: ^19.0.0
         version: 19.2.8(react@19.2.8)
 
+  apps/super-admin:
+    dependencies:
+      '@ant-design/v5-patch-for-react-19':
+        specifier: ^1.0.3
+        version: 1.0.3(antd@5.29.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@shopcycle/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@shopcycle/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
+      antd:
+        specifier: ^5.22.0
+        version: 5.29.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      lucide-react:
+        specifier: ^0.462.0
+        version: 0.462.0(react@19.2.8)
+      next:
+        specifier: ^16.2.0
+        version: 16.3.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      autoprefixer:
+        specifier: ^10.4.20
+        version: 10.5.5(postcss@8.5.28)
+      postcss:
+        specifier: ^8.4.49
+        version: 8.5.28
+      tailwindcss:
+        specifier: ^3.4.15
+        version: 3.4.19
+
+  apps/www:
+    dependencies:
+      next:
+        specifier: ^16.2.0
+        version: 16.3.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
+
   packages/database:
     dependencies:
       '@prisma/client':

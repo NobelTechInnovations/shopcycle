@@ -11,6 +11,11 @@ const envSchema = z.object({
   API_HOST: z.string().default("0.0.0.0"),
   ADMIN_ORIGIN: z.string().default("http://localhost:3000"),
   STOREFRONT_ORIGIN: z.string().default("http://localhost:3002"),
+  // Platform-operator panel — a fully separate app/domain (e.g.
+  // adminshopcycle.com), not a route of the seller admin. Needs its own
+  // CORS origin since it's a genuinely different registrable domain in
+  // production, not just a different subdomain.
+  SUPER_ADMIN_ORIGIN: z.string().default("http://localhost:3003"),
   API_PUBLIC_URL: z.string().default("http://localhost:4000"),
   NODE_ENV: z.string().default("development"),
   // Optional — online payments at checkout are only offered when both are

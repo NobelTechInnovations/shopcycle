@@ -7,15 +7,19 @@ export default async function SuperAdminLayout({ children }) {
   try {
     me = await serverApiFetch("/api/auth/me");
   } catch {
-    redirect("/super-admin/login");
+    redirect("/login");
   }
   if (!me.user.isSuperAdmin) {
-    redirect(me.store ? "/admin" : "/super-admin/login");
+    // A store-owner session that wandered in here has nothing to "go back
+    // to" in this app — it's a fully separate domain now, so just bounce
+    // to this app's own login rather than an /admin path that doesn't
+    // exist here.
+    redirect("/login");
   }
 
   return (
     <div className="flex min-h-screen bg-app-bg">
-      <SuperAdminNav userName={me.user.name} hasStore={Boolean(me.store)} />
+      <SuperAdminNav userName={me.user.name} />
       <main className="flex-1 p-6 max-w-6xl w-full mx-auto">{children}</main>
     </div>
   );

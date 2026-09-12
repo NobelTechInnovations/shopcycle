@@ -65,7 +65,16 @@ export function Topbar({ user, store }) {
 
   const accountMenuItems = [
     ...(user?.isSuperAdmin
-      ? [{ key: "super-admin", label: "Super admin", icon: <ShieldCheck size={14} aria-hidden="true" />, onClick: () => router.push("/super-admin") }]
+      ? [
+          {
+            key: "super-admin",
+            label: "Super admin",
+            icon: <ShieldCheck size={14} aria-hidden="true" />,
+            // A separate app/domain now (adminshopcycle.com), not a route of
+            // this app — a plain navigation, not router.push.
+            onClick: () => window.location.assign(process.env.NEXT_PUBLIC_SUPER_ADMIN_URL || "http://localhost:3003"),
+          },
+        ]
       : []),
     { key: "logout", label: "Log out", icon: <LogOut size={14} aria-hidden="true" />, onClick: handleLogout },
   ];

@@ -4,9 +4,18 @@ const { env } = require("../../config/env");
 const { provisionStore } = require("../../lib/store-provisioning");
 const service = require("./service");
 
+// "lax" works fine in dev (every app runs on localhost, so they're all
+// same-site regardless of port) and would also work in prod if every app
+// shared one registrable domain — but the platform-admin panel is a
+// genuinely separate domain (adminshopcycle.com vs shopcycle.com), which
+// "lax" cookies are not sent for on cross-site fetch(). "none" + secure is
+// the one setting that's correct for both same-site and cross-site callers,
+// so it's used whenever the cookie will actually cross HTTPS in production;
+// "none" without "secure" is silently rejected by browsers, which is why
+// dev (plain http) has to stay on "lax" instead.
 const cookieOptions = {
   httpOnly: true,
-  sameSite: "lax",
+  sameSite: env.NODE_ENV === "production" ? "none" : "lax",
   secure: env.NODE_ENV === "production",
   path: "/",
   maxAge: 60 * 60 * 24 * 7, // 7 days

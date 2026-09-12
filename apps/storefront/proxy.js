@@ -3,10 +3,19 @@ import { NextResponse } from "next/server";
 const API_URL = process.env.API_INTERNAL_URL || "http://localhost:4100";
 
 // Anything that's clearly this app's own entrypoint (local dev, the bare
-// deployed platform domain) skips domain resolution — paths under
+// deployed platform domain(s)) skips domain resolution — paths under
 // /store/:handle already say which store they mean, same as always.
+// STOREFRONT_PLATFORM_HOSTS is comma-separated, e.g. "shopcycle.com" — set
+// it in production so the platform's own domain isn't mistaken for a
+// merchant's custom domain.
+const PLATFORM_HOSTS = (process.env.STOREFRONT_PLATFORM_HOSTS || "")
+  .split(",")
+  .map((h) => h.trim().toLowerCase())
+  .filter(Boolean);
+
 function isPlatformHost(hostname) {
-  return !hostname || hostname === "localhost" || hostname === "127.0.0.1";
+  if (!hostname || hostname === "localhost" || hostname === "127.0.0.1") return true;
+  return PLATFORM_HOSTS.some((h) => hostname === h || hostname.endsWith(`.${h}`));
 }
 
 /**

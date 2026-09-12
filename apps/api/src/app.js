@@ -41,10 +41,15 @@ function buildApp() {
     },
   });
 
-  // Admin needs credentialed CORS (cookie session); the storefront app's
-  // server-to-server calls don't send browser cookies at all, but it's
-  // still listed so a future client-side fetch from it isn't blocked.
-  app.register(cors, { origin: [env.ADMIN_ORIGIN, env.STOREFRONT_ORIGIN], credentials: true });
+  // Admin and super-admin both need credentialed CORS (cookie session) —
+  // super-admin is a fully separate domain in production (adminshopcycle.com),
+  // not a subdomain, so it must be listed explicitly, not inferred. The
+  // storefront app's server-to-server calls don't send browser cookies at
+  // all, but it's still listed so a future client-side fetch isn't blocked.
+  app.register(cors, {
+    origin: [env.ADMIN_ORIGIN, env.STOREFRONT_ORIGIN, env.SUPER_ADMIN_ORIGIN],
+    credentials: true,
+  });
   app.register(prismaPlugin);
   app.register(jwtAuthPlugin);
   app.register(redisPlugin);

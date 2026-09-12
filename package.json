@@ -9,6 +9,8 @@
     "dev": "turbo run dev",
     "dev:api": "turbo run dev --filter=@shopcycle/api",
     "dev:admin": "turbo run dev --filter=@shopcycle/admin",
+    "dev:super-admin": "turbo run dev --filter=@shopcycle/super-admin",
+    "dev:www": "turbo run dev --filter=@shopcycle/www",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "db:generate": "pnpm --filter @shopcycle/database run generate",

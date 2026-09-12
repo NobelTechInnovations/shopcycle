@@ -6,13 +6,15 @@ import { Form, Input, Button, Typography, Alert } from "antd";
 import { ShieldCheck } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
+const ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3000";
+
 /**
- * A deliberately separate entry point from the merchant /login — this is
- * where the platform's own operator signs in, not a store owner. Reuses
- * /api/auth/login (same account system, same JWT) but never lets a
- * non-super-admin account land in the platform panel: their session is
- * torn back down immediately if `isSuperAdmin` comes back false, rather
- * than quietly dropping them into their own store's /admin instead.
+ * The platform operator's own sign-in — a completely separate app/domain
+ * from a store owner's /login (see adminshopcycle.com vs store.shopcycle.com
+ * in the deployment plan), not just a different route of the same app
+ * anymore. Reuses /api/auth/login (same account system, same JWT) but
+ * never lets a non-super-admin account land in this panel: their session
+ * is torn back down immediately if `isSuperAdmin` comes back false.
  */
 export default function SuperAdminLoginPage() {
   const router = useRouter();
@@ -29,7 +31,7 @@ export default function SuperAdminLoginPage() {
         setError("This account is not a platform admin.");
         return;
       }
-      router.push("/super-admin");
+      router.push("/companies");
       router.refresh();
     } catch (err) {
       setError(err.message);
@@ -74,7 +76,7 @@ export default function SuperAdminLoginPage() {
         </Form>
 
         <p className="text-sm text-gray-500 mt-4 text-center">
-          Store owner? <a href="/login" className="text-gray-300 font-medium">Go to store sign in</a>
+          Store owner? <a href={ADMIN_URL} className="text-gray-300 font-medium">Go to store sign in</a>
         </p>
       </div>
     </div>
