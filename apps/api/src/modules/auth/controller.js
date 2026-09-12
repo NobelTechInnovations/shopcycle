@@ -19,6 +19,7 @@ const cookieOptions = {
   secure: env.NODE_ENV === "production",
   path: "/",
   maxAge: 60 * 60 * 24 * 7, // 7 days
+  ...(env.COOKIE_DOMAIN && { domain: env.COOKIE_DOMAIN }),
 };
 
 function issueSession(reply, fastify, user, storeId) {
@@ -42,7 +43,7 @@ async function loginHandler(request, reply) {
 }
 
 async function logoutHandler(request, reply) {
-  reply.clearCookie(env.COOKIE_NAME, { path: "/" });
+  reply.clearCookie(env.COOKIE_NAME, { path: "/", ...(env.COOKIE_DOMAIN && { domain: env.COOKIE_DOMAIN }) });
   reply.send({ ok: true });
 }
 

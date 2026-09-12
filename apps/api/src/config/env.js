@@ -7,6 +7,16 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16, "JWT_SECRET should be at least 16 characters"),
   JWT_EXPIRES_IN: z.string().default("7d"),
   COOKIE_NAME: z.string().default("shopcycle_session"),
+  // Without this, the session cookie is host-only to whatever domain the
+  // API itself runs on (api.oyklane.com) — the browser then never sends it
+  // to store.oyklane.com or superadmin.oyklane.com's own servers, so their
+  // server-side auth checks (serverApiFetch forwarding cookies to the API)
+  // see no cookie at all and bounce every request back to /login, even
+  // though the client-side session is genuinely valid. Set to ".oyklane.com"
+  // in production to share the cookie across every subdomain; left unset in
+  // dev, where a Domain attribute on "localhost" behaves inconsistently
+  // across browsers and isn't needed anyway (dev already works without it).
+  COOKIE_DOMAIN: z.string().optional(),
   API_PORT: z.coerce.number().default(4000),
   API_HOST: z.string().default("0.0.0.0"),
   ADMIN_ORIGIN: z.string().default("http://localhost:3000"),
