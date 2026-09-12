@@ -2,6 +2,7 @@ const { registerSchema, loginSchema, createStoreSchema, switchStoreSchema } = re
 const { HttpError } = require("@shopcycle/utils");
 const { env } = require("../../config/env");
 const { provisionStore } = require("../../lib/store-provisioning");
+const { computeAccessState } = require("../billing/access");
 const service = require("./service");
 
 // "lax" works fine in dev (every app runs on localhost, so they're all
@@ -123,6 +124,10 @@ async function meHandler(request, reply) {
     user: service.serializeUser(user),
     store: storeUser?.store || null,
     role: storeUser?.role || null,
+    // Lets the admin app's own layout gate to the billing screen without a
+    // second round trip — same computation loadStoreContext does per
+    // request for every other route (see billing/access.js).
+    accessState: storeUser?.store ? computeAccessState(storeUser.store) : null,
   });
 }
 

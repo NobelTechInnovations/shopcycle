@@ -32,6 +32,11 @@ const teamRoutes = require("./modules/team/routes");
 const analyticsRoutes = require("./modules/analytics/routes");
 const superAdminRoutes = require("./modules/super-admin/routes");
 const appsRoutes = require("./modules/apps/routes");
+const webhookRoutes = require("./modules/webhooks/routes");
+const metaRoutes = require("./modules/meta/routes");
+const metaAdsRoutes = require("./modules/meta-ads/routes");
+const whatsappRoutes = require("./modules/whatsapp/routes");
+const platformCustomersRoutes = require("./modules/platform-customers/routes");
 
 function buildApp() {
   const app = Fastify({
@@ -79,6 +84,11 @@ function buildApp() {
   app.register(analyticsRoutes, { prefix: "/api/analytics" });
   app.register(superAdminRoutes, { prefix: "/api/super-admin" });
   app.register(appsRoutes, { prefix: "/api/apps" });
+  app.register(webhookRoutes, { prefix: "/api/webhooks" });
+  app.register(metaRoutes, { prefix: "/api/meta" });
+  app.register(metaAdsRoutes, { prefix: "/api/meta-ads" });
+  app.register(whatsappRoutes, { prefix: "/api/whatsapp" });
+  app.register(platformCustomersRoutes, { prefix: "/api/super-admin/platform-customers" });
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) {

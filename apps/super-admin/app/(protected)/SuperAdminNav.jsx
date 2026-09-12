@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, Button } from "antd";
-import { Building2, CreditCard, Grid3x3, LogOut } from "lucide-react";
+import { Building2, CreditCard, Grid3x3, Users, LogOut } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 const NAV_ITEMS = [
@@ -21,6 +21,11 @@ const NAV_ITEMS = [
     key: "/apps",
     icon: <Grid3x3 size={16} aria-hidden="true" />,
     label: <Link href="/apps">Apps</Link>,
+  },
+  {
+    key: "/customers",
+    icon: <Users size={16} aria-hidden="true" />,
+    label: <Link href="/customers">Customers</Link>,
   },
 ];
 

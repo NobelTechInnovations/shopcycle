@@ -37,4 +37,18 @@ async function getInstalledAppsContext(prisma, storeId) {
   return Object.fromEntries(installs.map((i) => [i.app.key, i.settings]));
 }
 
-module.exports = { listForStore, installApp, uninstallApp, getInstalledAppsContext };
+/** Gate for a dedicated-panel app's own routes (Meta Ads, WhatsApp — see
+ * their routes.js) — these aren't generic settingsSchema installs, they're
+ * full API modules of their own, so "is it installed" has to be checked
+ * explicitly per request rather than the generic install/settings flow
+ * covering it. Throws the same shape of error requireActiveSubscription
+ * does, so the admin app's existing error handling needs nothing new. */
+async function assertInstalled(prisma, storeId, key) {
+  const app = await repository.findAppByKey(prisma, key);
+  const install = app && (await repository.findInstall(prisma, storeId, app.id));
+  if (!install) {
+    throw new HttpError(402, `Install the ${app?.name || key} app first.`, { appKey: key });
+  }
+}
+
+module.exports = { listForStore, installApp, uninstallApp, getInstalledAppsContext, assertInstalled };

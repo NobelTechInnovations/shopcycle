@@ -3,6 +3,7 @@ const controller = require("./controller");
 async function uploadRoutes(fastify) {
   fastify.addHook("preHandler", fastify.authenticate);
   fastify.addHook("preHandler", fastify.loadStoreContext);
+  fastify.addHook("preHandler", fastify.requireActiveSubscription);
 
   fastify.post("/upload", controller.uploadHandler);
   fastify.get("/", controller.listHandler);

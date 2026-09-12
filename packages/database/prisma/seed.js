@@ -8,38 +8,80 @@ const { prisma } = require("../src/client");
 const bcrypt = require("bcryptjs");
 
 async function main() {
-  // Billing plans (Phase 7) — seeded fixtures, not merchant-created.
-  await prisma.plan.upsert({
-    where: { name: "Free" },
-    update: {},
-    create: {
-      name: "Free",
-      priceMonthly: "0.00",
-      productLimit: 10,
-      staffLimit: 1,
-      description: "Get started: up to 10 products, 1 staff account.",
-    },
-  });
+  // Billing plans (Phase 9) — exactly two, seeded fixtures, not
+  // merchant-created. The old 3-tier Free/Starter/Growth lineup is
+  // retired: every store on one of those has its planId nulled out
+  // (Store.plan's onDelete: SetNull) and lands back in the no_plan
+  // billing state, same as a brand-new store — correct, since "no real
+  // plan chosen yet" is exactly what those old fixture plans were.
+  await prisma.plan.deleteMany({ where: { name: { in: ["Free", "Growth"] } } });
   await prisma.plan.upsert({
     where: { name: "Starter" },
-    update: {},
+    update: {
+      priceMonthly: "999.00",
+      productLimit: 1000,
+      staffLimit: 5,
+      description: "Full store access, pay-as-you-grow on ads and paid apps.",
+      commissionPercent: "2.50",
+      hasGstSoftware: false,
+      hasAdsManagerIncluded: false,
+      hasMetaAds: false,
+      paidAppsIncluded: false,
+      premiumThemesIncluded: false,
+      hasWhatsappIntegration: false,
+      hasSocialMediaManager: false,
+      prioritySupport: false,
+      cartCustomizable: false,
+      hasApiAccess: false,
+      hasCsvExport: false,
+    },
     create: {
       name: "Starter",
       priceMonthly: "999.00",
-      productLimit: 200,
+      productLimit: 1000,
       staffLimit: 5,
-      description: "For growing stores: up to 200 products, 5 staff accounts.",
+      description: "Full store access, pay-as-you-grow on ads and paid apps.",
+      commissionPercent: "2.50",
     },
   });
   await prisma.plan.upsert({
-    where: { name: "Growth" },
-    update: {},
+    where: { name: "Premium" },
+    update: {
+      priceMonthly: "2299.00",
+      productLimit: 100000,
+      staffLimit: 25,
+      description: "Everything included — ads, apps, themes, GST, and priority support.",
+      commissionPercent: "1.50",
+      hasGstSoftware: true,
+      hasAdsManagerIncluded: true,
+      hasMetaAds: true,
+      paidAppsIncluded: true,
+      premiumThemesIncluded: true,
+      hasWhatsappIntegration: true,
+      hasSocialMediaManager: true,
+      prioritySupport: true,
+      cartCustomizable: true,
+      hasApiAccess: true,
+      hasCsvExport: true,
+    },
     create: {
-      name: "Growth",
-      priceMonthly: "2999.00",
-      productLimit: 5000,
-      staffLimit: 20,
-      description: "For scaling stores: up to 5,000 products, 20 staff accounts, custom domain.",
+      name: "Premium",
+      priceMonthly: "2299.00",
+      productLimit: 100000,
+      staffLimit: 25,
+      description: "Everything included — ads, apps, themes, GST, and priority support.",
+      commissionPercent: "1.50",
+      hasGstSoftware: true,
+      hasAdsManagerIncluded: true,
+      hasMetaAds: true,
+      paidAppsIncluded: true,
+      premiumThemesIncluded: true,
+      hasWhatsappIntegration: true,
+      hasSocialMediaManager: true,
+      prioritySupport: true,
+      cartCustomizable: true,
+      hasApiAccess: true,
+      hasCsvExport: true,
     },
   });
 
@@ -108,6 +150,37 @@ async function main() {
           ],
         },
       ],
+    },
+  });
+
+  // Meta Ads and WhatsApp (Phase 10) — unlike the settings-form apps
+  // above, these have their own dedicated panels (Connect screen, campaign
+  // builder, message composer — see apps/admin/app/admin/apps/meta-ads and
+  // .../whatsapp) rather than a generic install form, so settingsSchema is
+  // left empty here; "installed" from this catalog is still exactly what
+  // gates access to those panels (see apps/service.js#assertInstalled).
+  await prisma.app.upsert({
+    where: { key: "meta-ads" },
+    update: {},
+    create: {
+      key: "meta-ads",
+      name: "Meta Ads",
+      description: "Connect Facebook to manage your ad accounts and launch new campaigns without leaving your dashboard.",
+      category: "marketing",
+      iconEmoji: "📣",
+      settingsSchema: [],
+    },
+  });
+  await prisma.app.upsert({
+    where: { key: "whatsapp" },
+    update: {},
+    create: {
+      key: "whatsapp",
+      name: "WhatsApp",
+      description: "Connect your WhatsApp Business number to message customers directly from your dashboard.",
+      category: "marketing",
+      iconEmoji: "💬",
+      settingsSchema: [],
     },
   });
 

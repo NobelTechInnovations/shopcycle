@@ -41,6 +41,27 @@ enum StoreStatus {
   suspended
 }
 
+/// A store's platform-billing lifecycle — deliberately separate from
+/// StoreStatus (which is the super admin's manual suspend switch). Computed
+/// lazily on each request from timestamps below (see
+/// billing/access.js#computeAccessState) rather than a background job:
+///  no_plan   → registered, no plan chosen yet (2-day grace, see
+///              mandateDeadline), full access until that passes
+///  trialing  → mandate authorized, free month running (trialEndsAt)
+///  active    → real billing, last renewal succeeded
+///  past_due  → a renewal charge failed (paymentFailedAt); still full
+///              access for 7 days, then admin-only blocked, then (15
+///              days) the storefront too — see access.js for the exact
+///              day-by-day thresholds
+///  cancelled → merchant or platform cancelled the subscription
+enum SubscriptionStatus {
+  no_plan
+  trialing
+  active
+  past_due
+  cancelled
+}
+
 model Store {
   id        String      @id @default(cuid())
   name      String
@@ -57,12 +78,27 @@ model Store {
   /// number prefix, low-stock threshold, ...) — General settings tab.
   settings  Json        @default("{}")
 
-  // Phase 7 — Multi-tenant SaaS billing. `trialEndsAt` is set once at
-  // registration (see auth/service.js) and never touched again outside the
-  // billing flow; `planId` null means "no plan selected yet" (first-run
-  // state), distinct from being on the free Plan row.
-  planId       String?
-  trialEndsAt  DateTime?
+  // Phase 7/9 — Multi-tenant SaaS billing. `planId` null means "no plan
+  // chosen yet" — see SubscriptionStatus's doc comment for the full
+  // lifecycle these fields drive together.
+  planId              String?
+  subscriptionStatus  SubscriptionStatus @default(no_plan)
+  /// Set once, at registration (provisionStore) — the deadline for
+  /// choosing a plan and authorizing the mandate before admin access is
+  /// blocked. Irrelevant once subscriptionStatus leaves no_plan.
+  mandateDeadline     DateTime?
+  /// Set when the mandate is authorized (subscriptionStatus → trialing) —
+  /// the free month's end date.
+  trialEndsAt         DateTime?
+  /// Set by the Razorpay webhook the moment a renewal charge fails —
+  /// the anchor the 7-day/15-day access thresholds count from. Cleared
+  /// the next time a charge succeeds.
+  paymentFailedAt     DateTime?
+  /// Razorpay's own subscription id (sub_...) — created once, when the
+  /// merchant first authorizes a plan's mandate; reused for every
+  /// subsequent renewal, so this is what the webhook uses to find which
+  /// Store a charge/failure event belongs to.
+  razorpaySubscriptionId String?  @unique
 
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -85,13 +121,19 @@ model Store {
   pageViews       PageView[]
   campaigns       Campaign[]
   installedApps   StoreApp[]
+  metaConnection    MetaConnection?
+  adCampaigns       AdCampaign[]
+  whatsappMessages  WhatsappMessage[]
 
   @@map("stores")
 }
 
 /// A billing tier a store can be on. Seeded, not merchant-created — see
-/// prisma/seed.js. Deliberately simple (flat monthly price + a couple of
-/// numeric limits) rather than a full metered-billing model.
+/// prisma/seed.js (currently exactly two: Starter and Premium). The
+/// boolean/percent columns below are read by the admin UI to lock or show
+/// features per plan (GST software, ads manager, staff limit, ...) — the
+/// underlying features themselves may not all exist yet; a flag here is a
+/// gate for when they do, not a claim that they're built.
 model Plan {
   id             String   @id @default(cuid())
   name           String   @unique
@@ -100,6 +142,34 @@ model Plan {
   staffLimit     Int
   description    String?  @db.Text
   createdAt      DateTime @default(now())
+
+  /// Platform's cut of every order this store processes, as a percent
+  /// (e.g. 2.50 = 2.5%) — shown to the merchant, not yet deducted anywhere
+  /// automatically (no payout/settlement system exists yet).
+  commissionPercent     Decimal @db.Decimal(4, 2) @default(0)
+  hasGstSoftware        Boolean @default(false)
+  /// In-built ads manager (spend-according-to-budget) included in the
+  /// plan price — off means it's available only as a separate paid add-on.
+  hasAdsManagerIncluded Boolean @default(false)
+  hasMetaAds            Boolean @default(false)
+  /// Paid apps (App.category, apps module) are free to install on this
+  /// plan instead of billed separately.
+  paidAppsIncluded      Boolean @default(false)
+  premiumThemesIncluded Boolean @default(false)
+  hasWhatsappIntegration Boolean @default(false)
+  hasSocialMediaManager  Boolean @default(false)
+  prioritySupport        Boolean @default(false)
+  /// Off = the storefront's cart/checkout is a fixed one-click flow; on =
+  /// the merchant can customize it (theme editor cart/checkout sections
+  /// become editable rather than locked to the default).
+  cartCustomizable       Boolean @default(false)
+  hasApiAccess           Boolean @default(false)
+  /// CSV export of orders/customers/products (Content ▸ Export or similar).
+  hasCsvExport           Boolean @default(false)
+  /// The matching Plan created on Razorpay's side (razorpay.plans.create)
+  /// — created once, lazily, the first time any store subscribes to this
+  /// plan (see billing/service.js), then reused for every subscription.
+  razorpayPlanId         String? @unique
 
   stores Store[]
 
@@ -350,15 +420,27 @@ model Customer {
   acceptsEmailMarketing Boolean @default(false)
   acceptsSmsMarketing   Boolean @default(false)
 
+  /// The same shopper's identity across every store on the platform,
+  /// resolved by phone (falling back to email) whenever a Customer row is
+  /// created or updated — see platform-customers/service.js#linkCustomer.
+  /// Null only for rows written before this existed or with neither phone
+  /// nor email resolvable at write time (shouldn't happen; email is
+  /// required). A store's own admin never sees this id or anything through
+  /// it — only super-admin's cross-store marketing view does.
+  platformCustomerId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  store    Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  orders   Order[]
-  sessions VisitorSession[]
+  store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  platformCustomer PlatformCustomer? @relation(fields: [platformCustomerId], references: [id], onDelete: SetNull)
+  orders           Order[]
+  sessions         VisitorSession[]
+  whatsappMessages WhatsappMessage[]
 
   @@unique([storeId, email])
   @@index([storeId])
+  @@index([platformCustomerId])
   @@map("customers")
 }
 
@@ -742,4 +824,138 @@ model StoreApp {
   @@unique([storeId, appId])
   @@index([storeId])
   @@map("store_apps")
+}
+
+// ─────────────────────────────────────────────
+// Meta integrations (Ads + WhatsApp) — Phase 10
+// ─────────────────────────────────────────────
+
+/// One Facebook Login for Business connection per store, shared by both
+/// the "Meta Ads" and "WhatsApp" apps (StoreApp installs of key "meta-ads"
+/// / "whatsapp") rather than each app doing its own OAuth — that mirrors
+/// how Meta's own login actually works (one grant covers Pages, ad
+/// accounts, and WhatsApp Business assets, scoped by whichever permissions
+/// were requested) and means a merchant who's connected once for ads
+/// doesn't have to connect Facebook again just to also turn on WhatsApp.
+/// A store installing only one of the two apps still only sees that app's
+/// own screens — this table isn't exposed directly, just used by both.
+model MetaConnection {
+  id     String @id @default(cuid())
+  storeId String @unique
+
+  /// A long-lived user access token (Graph API's 60-day token, refreshed
+  /// on use — see integrations/meta/service.js#ensureFreshToken). Holding
+  /// a system-user/permanent token would be better for a real production
+  /// deployment but requires a Meta Business tech-provider setup; this is
+  /// the integration every store can complete on their own, today.
+  accessToken    String    @db.Text
+  tokenExpiresAt DateTime?
+
+  facebookUserId   String?
+  facebookUserName String?
+
+  /// Selected once, after connecting, from the ad accounts / pages /
+  /// WhatsApp Business assets the granted token can see (see
+  /// integrations/meta/service.js#listAssets). Null until the merchant
+  /// actually picks one on the Connect screen.
+  adAccountId   String?
+  adAccountName String?
+  pageId        String?
+  pageName      String?
+  wabaId        String?
+  wabaName      String?
+  phoneNumberId    String?
+  phoneNumberLabel String?
+
+  connectedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("meta_connections")
+}
+
+/// Our own record of a campaign created through the Meta Ads panel — Meta
+/// itself remains the source of truth (see integrations/meta/service.js
+/// #syncCampaignStatus), this just avoids a Graph API round trip to
+/// render the campaigns list and lets us show it was made from here.
+model AdCampaign {
+  id             String   @id @default(cuid())
+  storeId        String
+  metaCampaignId String
+  name           String
+  objective      String
+  status         String   @default("PAUSED")
+  dailyBudget    Decimal? @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, metaCampaignId])
+  @@index([storeId])
+  @@map("ad_campaigns")
+}
+
+/// A log of every WhatsApp message sent (or received) through the
+/// WhatsApp Cloud API for a store — both the audit trail a merchant sees
+/// in the app's own screen and the record that makes a customer's WhatsApp
+/// thread renderable at all (Meta's API itself keeps no history for us).
+model WhatsappMessage {
+  id         String  @id @default(cuid())
+  storeId    String
+  customerId String?
+  toPhone    String
+
+  direction String @default("outbound") // outbound | inbound
+  /// "template" (Meta-approved, required to open a new 24h window) or
+  /// "text" (free-form, only deliverable inside an already-open window).
+  kind String
+  body String @db.Text
+
+  status            String  @default("sent") // sent | delivered | read | failed
+  providerMessageId String?
+
+  createdAt DateTime @default(now())
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([storeId])
+  @@index([customerId])
+  @@map("whatsapp_messages")
+}
+
+// ─────────────────────────────────────────────
+// Cross-store customer identity — Phase 10
+// ─────────────────────────────────────────────
+
+/// The same shopper, unified across every store on the platform — the
+/// piece that makes a customer created on xyz.com and one created on
+/// abc.com (same platform, same person) recognizable as one identity for
+/// platform-level marketing (super-admin only; a store's own admin only
+/// ever queries its own Customer rows, never this table). Matched by
+/// phone first — the more reliable shared key for Indian D2C checkout —
+/// falling back to email when no phone is on file. See
+/// platform-customers/service.js#linkCustomer for exactly how a Customer
+/// row gets attached to one of these on create/update.
+///
+/// This is the identity layer only. It does not yet grant a shopper an
+/// actual cross-store login/session (that needs OTP-based verification
+/// and session issuance across arbitrary merchant domains — a separate
+/// phase) — today it exists so super-admin can see and export a shopper's
+/// full cross-store history for marketing, and so that future phase has
+/// a stable id to hang a session off of instead of starting from scratch.
+model PlatformCustomer {
+  id    String  @id @default(cuid())
+  phone String? @unique
+  email String?
+  name  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customers Customer[]
+
+  @@index([email])
+  @@map("platform_customers")
 }

@@ -2,6 +2,7 @@ const fp = require("fastify-plugin");
 const jwt = require("@fastify/jwt");
 const cookie = require("@fastify/cookie");
 const { env } = require("../config/env");
+const { computeAccessState, isAdminBlocked } = require("../modules/billing/access");
 
 /**
  * Cookie-based JWT session. The token payload carries { userId, storeId }
@@ -92,6 +93,27 @@ async function jwtAuthPlugin(fastify) {
     request.currentUser = user;
     request.storeRole = resolved.role;
     request.store = resolved.store;
+    // Computed fresh on every request from timestamps (see billing/access.js)
+    // — never stale, and never needs a background job to keep it current.
+    request.accessState = computeAccessState(resolved.store);
+  });
+
+  /** Blocks everything except the billing screens themselves once a store's
+   * subscription state says it should be — see billing/access.js for
+   * exactly which states trigger this and why. Applied per-module
+   * (deliberately NOT inside loadStoreContext itself), so the billing
+   * module's own routes — where a merchant actually fixes the problem —
+   * never end up gating themselves. */
+  fastify.decorate("requireActiveSubscription", async function requireActiveSubscription(request, reply) {
+    if (isAdminBlocked(request.accessState)) {
+      reply.code(402).send({
+        error:
+          request.accessState === "needs_plan"
+            ? "Choose a plan to continue using your store's admin."
+            : "Your last payment failed — update billing to restore admin access.",
+        accessState: request.accessState,
+      });
+    }
   });
 
   /** Platform-level gate for /api/super-admin/* — deliberately independent

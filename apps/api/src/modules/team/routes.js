@@ -7,6 +7,7 @@ async function teamRoutes(fastify) {
   fastify.register(async function authed(scoped) {
     scoped.addHook("preHandler", fastify.authenticate);
     scoped.addHook("preHandler", fastify.loadStoreContext);
+    scoped.addHook("preHandler", fastify.requireActiveSubscription);
 
     scoped.get("/", controller.listHandler);
     scoped.post("/invite", controller.inviteHandler);

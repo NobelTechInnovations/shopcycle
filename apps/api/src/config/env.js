@@ -45,6 +45,31 @@ const envSchema = z.object({
   // set (see checkout/service.js). Cash on Delivery works either way.
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
+  // Platform billing (Phase 9) — merchants paying us monthly, via the same
+  // Razorpay account/keys above but the Subscriptions product rather than
+  // one-off Orders. RAZORPAY_WEBHOOK_SECRET is the separate secret Razorpay
+  // gives you when you register the webhook URL in their dashboard
+  // (Settings ▸ Webhooks) — required to trust a webhook call actually came
+  // from Razorpay rather than anyone who finds the URL.
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+
+  // Meta (Facebook) Login for Business — one OAuth app backs both the
+  // "Meta Ads" and "WhatsApp" integrations (see MetaConnection's doc
+  // comment in schema.prisma). Created once in Meta's own developer
+  // console (developers.facebook.com/apps); optional the same way
+  // Razorpay's keys are — the Connect screen just explains it isn't set
+  // up yet rather than the API failing to boot.
+  META_APP_ID: z.string().optional(),
+  META_APP_SECRET: z.string().optional(),
+  // Where Meta redirects back after the merchant approves access —
+  // must exactly match one of the "Valid OAuth Redirect URIs" configured
+  // on the Meta app. Points at the admin app, not the API, since that's
+  // where the Connect UI lives; the API only ever receives the resulting
+  // `code` as a query param forwarded from there.
+  META_OAUTH_REDIRECT_URI: z.string().default("http://localhost:3000/admin/apps/meta/callback"),
+  // Pinned rather than left to "latest" so a Graph API version bump
+  // upstream can't silently change response shapes under us.
+  META_GRAPH_API_VERSION: z.string().default("v21.0"),
 });
 
 const parsed = envSchema.safeParse(process.env);

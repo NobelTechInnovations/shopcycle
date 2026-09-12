@@ -1,5 +1,6 @@
 const { slugify } = require("@shopcycle/utils");
 const themesService = require("../modules/themes/service");
+const { GRACE_DAYS_BEFORE_PLAN_REQUIRED } = require("../modules/billing/access");
 
 // A store's handle doubles as its default storefront subdomain —
 // {handle}.<root domain> (see apps/storefront/lib/domain.js) — so none of
@@ -14,13 +15,21 @@ const RESERVED_HANDLES = new Set([
 
 /**
  * Everything a brand-new store needs before a merchant should ever see
- * it: a unique handle, a free-trial plan, ownership for the given user,
- * and a default theme actually installed (Classic) — without this last
- * step every new store hit the "no active theme installed" 404 wall the
- * first time anyone visited its storefront, which is exactly the bug
- * this function exists to close. `installTheme` already auto-activates a
- * store's first theme, so this store is live the moment registration (or
- * "add another store") completes.
+ * it: a unique handle, ownership for the given user, and a default theme
+ * actually installed (Classic) — without this last step every new store
+ * hit the "no active theme installed" 404 wall the first time anyone
+ * visited its storefront, which is exactly the bug this function exists
+ * to close. `installTheme` already auto-activates a store's first theme,
+ * so this store is live the moment registration (or "add another store")
+ * completes.
+ *
+ * No plan is assigned here and no trial starts yet — there is no more Free
+ * plan (see seed.js's Starter/Premium catalog). A brand-new store starts
+ * `subscriptionStatus: "no_plan"` with a `mandateDeadline` a couple of days
+ * out; the admin stays usable until that deadline passes (see
+ * billing/access.js), which is the window for the owner to pick a plan and
+ * authorize the Razorpay mandate (POST /api/store/subscribe) — only that
+ * call ever sets a trialEndsAt, and it's the real one-month free trial.
  */
 async function provisionStore(tx, { name, ownerId, role = "owner" }) {
   const baseHandle = slugify(name) || "store";
@@ -30,14 +39,13 @@ async function provisionStore(tx, { name, ownerId, role = "owner" }) {
     handle = `${baseHandle}-${suffix++}`;
   }
 
-  const freePlan = await tx.plan.findUnique({ where: { name: "Free" } });
-
   const store = await tx.store.create({
     data: {
       name,
       handle,
-      planId: freePlan?.id,
-      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      planId: null,
+      subscriptionStatus: "no_plan",
+      mandateDeadline: new Date(Date.now() + GRACE_DAYS_BEFORE_PLAN_REQUIRED * 24 * 60 * 60 * 1000),
       storeUsers: { create: { userId: ownerId, role } },
     },
   });

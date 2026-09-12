@@ -1,10 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, Button, Modal, Form, Input, InputNumber, Select, Switch, Tag, App } from "antd";
 import { Plus, Trash2 } from "lucide-react";
 import { useConfirmDialog, PageHeader } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+
+// A handful of apps have a full dedicated panel (Connect flow, campaign
+// builder, message composer — see MetaConnectPanel) instead of the
+// generic settingsSchema install form every other app in this catalog
+// uses. Keyed by App.key; anything not listed here stays on the generic
+// Configure/Install flow below.
+const DEDICATED_PANELS = {
+  "meta-ads": "/admin/apps/meta-ads",
+  whatsapp: "/admin/apps/whatsapp",
+};
 
 /** One field inside a repeater row — same small set of primitive types as
  * the top-level SettingsField, just nested under a Form.List's [name, key]. */
@@ -171,10 +182,18 @@ export default function AppsPage() {
             <div className="flex gap-2">
               {app.installed ? (
                 <>
-                  {app.settingsSchema.length > 0 && (
-                    <Button size="small" onClick={() => openConfigure(app)}>
-                      Configure
-                    </Button>
+                  {DEDICATED_PANELS[app.key] ? (
+                    <Link href={DEDICATED_PANELS[app.key]}>
+                      <Button size="small" type="primary">
+                        Manage
+                      </Button>
+                    </Link>
+                  ) : (
+                    app.settingsSchema.length > 0 && (
+                      <Button size="small" onClick={() => openConfigure(app)}>
+                        Configure
+                      </Button>
+                    )
                   )}
                   <Button size="small" danger onClick={() => handleUninstall(app)}>
                     Remove

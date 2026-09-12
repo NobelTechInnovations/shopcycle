@@ -3,6 +3,7 @@ const controller = require("./controller");
 async function shippingRoutes(fastify) {
   fastify.addHook("preHandler", fastify.authenticate);
   fastify.addHook("preHandler", fastify.loadStoreContext);
+  fastify.addHook("preHandler", fastify.requireActiveSubscription);
 
   fastify.get("/zones", controller.listZonesHandler);
   fastify.post("/zones", controller.createZoneHandler);

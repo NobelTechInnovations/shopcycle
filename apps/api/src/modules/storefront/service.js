@@ -12,11 +12,21 @@ const repository = require("./repository");
 const cartService = require("../cart/service");
 const checkoutService = require("../checkout/service");
 const appsService = require("../apps/service");
+const { computeAccessState, isStorefrontBlocked } = require("../billing/access");
 
 async function loadStoreOrThrow(prisma, handle) {
   const store = await repository.getStoreByHandle(prisma, handle);
   if (!store) throw new HttpError(404, `Store not found: ${handle}`);
   if (store.status === "suspended") throw new HttpError(503, "This store is currently unavailable");
+  // Distinct from the manual "suspended" status above: this is the
+  // automatic 15-day-unpaid shutoff (see billing/access.js). A merchant
+  // who's simply behind on a plan still gets to run their admin (blocked
+  // there separately by requireActiveSubscription) right up until this
+  // point — shoppers only stop seeing the storefront once it's been
+  // unpaid long enough that continuing to serve it stops making sense.
+  if (isStorefrontBlocked(computeAccessState(store))) {
+    throw new HttpError(503, "This store is currently unavailable");
+  }
   return store;
 }
 
