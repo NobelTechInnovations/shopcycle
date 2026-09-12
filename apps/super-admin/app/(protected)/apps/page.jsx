@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Card, Button, Modal, Form, Input, Select, App } from "antd";
 import { Plus, Pencil, Trash2 } from "lucide-react";
-import { PageHeader, useConfirmDialog } from "@shopcycle/ui";
+import { PageHeader, useConfirmDialog, AppIcon, APP_ICON_OPTIONS } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 const CATEGORY_OPTIONS = [
@@ -44,7 +44,7 @@ export default function SuperAdminAppsPage() {
   function openNew() {
     setEditing({});
     form.resetFields();
-    form.setFieldsValue({ category: "other", iconEmoji: "🧩", settingsSchema: [] });
+    form.setFieldsValue({ category: "other", iconKey: "puzzle", settingsSchema: [] });
   }
 
   function openEdit(app) {
@@ -101,7 +101,9 @@ export default function SuperAdminAppsPage() {
         {apps.map((a) => (
           <div key={a.id} className="flex items-center justify-between py-3 border-t border-app-border first:border-t-0">
             <div className="flex items-center gap-3">
-              <span className="text-xl" aria-hidden="true">{a.iconEmoji}</span>
+              <div className="w-8 h-8 rounded-md bg-app-bg border border-app-border flex items-center justify-center shrink-0">
+                <AppIcon iconKey={a.iconKey} size={16} className="text-ink" />
+              </div>
               <div>
                 <p className="text-sm font-medium m-0">{a.name}</p>
                 <p className="text-xs text-ink-muted m-0">
@@ -133,8 +135,18 @@ export default function SuperAdminAppsPage() {
           <Form.Item name="name" label="Name" rules={[{ required: true, message: "Required" }]}>
             <Input placeholder="My App" />
           </Form.Item>
-          <Form.Item name="iconEmoji" label="Icon (one emoji)" rules={[{ required: true, message: "Required" }]}>
-            <Input maxLength={4} className="w-24" />
+          <Form.Item name="iconKey" label="Icon" rules={[{ required: true, message: "Required" }]}>
+            <Select
+              className="w-40"
+              options={APP_ICON_OPTIONS.map((key) => ({
+                value: key,
+                label: (
+                  <span className="flex items-center gap-2">
+                    <AppIcon iconKey={key} size={14} /> {key}
+                  </span>
+                ),
+              }))}
+            />
           </Form.Item>
           <Form.Item name="category" label="Category">
             <Select options={CATEGORY_OPTIONS} />

@@ -218,6 +218,9 @@ importers:
       '@ant-design/v5-patch-for-react-19':
         specifier: ^1.0.3
         version: 1.0.3(antd@5.29.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@shopcycle/utils':
+        specifier: workspace:*
+        version: link:../utils
       antd:
         specifier: ^5.22.0
         version: 5.29.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -235,6 +238,9 @@ importers:
 
   packages/validation:
     dependencies:
+      '@shopcycle/utils':
+        specifier: workspace:*
+        version: link:../utils
       zod:
         specifier: ^3.23.8
         version: 3.25.76

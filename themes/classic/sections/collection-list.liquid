@@ -1,3 +1,19 @@
+{% comment %}
+  Falls back to the store's own real collections (skipping the synthetic
+  "all" one) when none are explicitly picked, and hides entirely if the
+  store truly has zero collections — same reasoning as Modern's
+  category-grid.liquid: a fresh install shouldn't show a heading over an
+  empty row just because nobody has curated this section yet.
+{% endcomment %}
+{% assign auto_handles = "" | split: "," %}
+{% for c in collections %}
+  {% unless c[0] == "all" %}
+    {% assign auto_handles = auto_handles | push: c[0] %}
+  {% endunless %}
+{% endfor %}
+{% assign display_handles = section.settings.collections | default: auto_handles %}
+
+{% if display_handles.size > 0 %}
 <section class="collection-list">
   <h2>{{ section.settings.heading }}</h2>
   {% comment %}
@@ -7,7 +23,7 @@
     setting below actually do something.
   {% endcomment %}
   <div class="collection-list__grid collection-list__grid--{{ section.settings.alignment }}">
-    {% for handle in section.settings.collections %}
+    {% for handle in display_handles limit: 4 %}
       {% assign coll = collections[handle] %}
       {% if coll %}
         <a href="{{ routes.collections_url }}/{{ handle }}" class="collection-list__tile">
@@ -22,6 +38,7 @@
     {% endfor %}
   </div>
 </section>
+{% endif %}
 
 {% schema %}
 {

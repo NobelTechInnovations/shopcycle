@@ -3,8 +3,8 @@
   "color_accent": "#FE8138",
   "color_background": "#FFF8EE",
   "color_text": "#1A1613",
-  "heading_font": "Poppins",
-  "body_font": "Inter",
+  "heading_font": "Outfit",
+  "body_font": "Outfit",
   "container_width": 1360,
   "button_radius": 999
 }

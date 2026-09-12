@@ -11,18 +11,32 @@
   {% endif %}
   <div class="product-grid" style="--product-grid-cols: {{ section.settings.columns }};">
     {% comment %}
-      Used two ways: as a merchant-placed "product grid" section pointing
-      at a named collection (settings.collection set), or as the main
-      listing on the collection template itself, where it should just show
-      whatever collection is currently being viewed (also reused for the
-      search template's synthetic "collection", built in storefront/service.js).
+      Used three ways: as a merchant-placed "product grid" section pointing
+      at a named collection (settings.collection set); as the main listing
+      on the collection template itself, showing whatever collection is
+      currently being viewed (also reused for the search template's
+      synthetic "collection", built in storefront/service.js); or — the
+      common case right after installing this theme, before a merchant has
+      picked anything — placed on the homepage with no collection in either
+      sense, where `collection` is blank too. Falling through to
+      `collections.all` (every active product, see storefront/service.js)
+      there instead of rendering nothing is what makes a fresh install's
+      homepage show real products immediately instead of a heading over an
+      empty grid.
     {% endcomment %}
     {% if section.settings.collection != blank %}
       {% assign target = collections[section.settings.collection] %}
-    {% else %}
+      {% assign target_limit = 999 %}
+    {% elsif collection %}
       {% assign target = collection %}
+      {% assign target_limit = 999 %}
+    {% else %}
+      {% comment %} Homepage preview fallback only — capped so "New
+        arrivals" doesn't try to render the store's entire catalog. {% endcomment %}
+      {% assign target = collections.all %}
+      {% assign target_limit = 8 %}
     {% endif %}
-    {% for product in target.products %}
+    {% for product in target.products limit: target_limit %}
       {% render 'snippets/product-card', product: product %}
     {% endfor %}
   </div>

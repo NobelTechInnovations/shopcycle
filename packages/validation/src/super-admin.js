@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { APP_ICON_KEYS } = require("@shopcycle/utils");
 
 const createPlanSchema = z.object({
   name: z.string().min(1, "Name is required").max(60),
@@ -26,7 +27,7 @@ const createAppSchema = z.object({
   name: z.string().min(1, "Name is required").max(80),
   description: z.string().max(500).optional().nullable(),
   category: z.string().max(40).default("other"),
-  iconEmoji: z.string().max(8).default("🧩"),
+  iconKey: z.enum(APP_ICON_KEYS).default("puzzle"),
   settingsSchema: z.array(settingsFieldSchema).default([]),
 });
 

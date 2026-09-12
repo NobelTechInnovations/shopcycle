@@ -7,13 +7,21 @@
     {% endif %}
   </div>
 
-  {% assign target = collections[section.settings.collection] %}
+  {% comment %}
+    Falls back to collections.all (every active product) when no
+    collection has been picked yet — otherwise this whole section is a
+    heading + countdown over a permanently empty grid until a merchant
+    finds this specific setting and fills it in.
+  {% endcomment %}
+  {% if section.settings.collection != blank %}
+    {% assign target = collections[section.settings.collection] %}
+  {% else %}
+    {% assign target = collections.all %}
+  {% endif %}
   <div class="product-grid" style="--product-grid-cols: {{ section.settings.columns }};">
-    {% if target %}
-      {% for product in target.products limit: section.settings.products_to_show %}
-        {% render 'snippets/product-card', product: product %}
-      {% endfor %}
-    {% endif %}
+    {% for product in target.products limit: section.settings.products_to_show %}
+      {% render 'snippets/product-card', product: product %}
+    {% endfor %}
   </div>
 </section>
 

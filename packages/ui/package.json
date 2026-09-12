@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@ant-design/v5-patch-for-react-19": "^1.0.3",
+    "@shopcycle/utils": "workspace:*",
     "antd": "^5.22.0",
     "lucide-react": "^0.462.0"
   }

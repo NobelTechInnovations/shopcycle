@@ -6,6 +6,23 @@
   <title>{{ page_title | default: shop.name }}</title>
   <link rel="stylesheet" href="{{ 'theme.css' | asset_url }}">
   {% comment %}
+    Without this, settings.heading_font/body_font below were only ever a
+    CSS `font-family` declaration with nothing to back it — the browser
+    has no way to fetch "Poppins"/"Outfit"/whatever a merchant typed
+    unless the actual @font-face is loaded, so every page silently fell
+    back to the generic system sans-serif regardless of what Theme
+    Settings said. Both settings default to the same font (Outfit) in a
+    fresh install, so this normally requests it once; Google Fonts
+    tolerates a repeated `family=` param fine on the rare theme that sets
+    them differently.
+  {% endcomment %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family={{ settings.heading_font | default: 'Outfit' | replace: ' ', '+' }}:wght@400;500;600;700&family={{ settings.body_font | default: 'Outfit' | replace: ' ', '+' }}:wght@400;500;600&display=swap"
+  >
+  {% comment %}
     theme.css's :root block is just static fallback values — these
     settings-driven custom properties come after it in the cascade, so
     they win. This is what makes the Theme Settings drawer (colors,
@@ -21,8 +38,8 @@
       --container-width: {{ settings.container_width | default: 1360 }}px;
       --button-radius: {{ settings.button_radius | default: 999 }}px;
     }
-    body { font-family: '{{ settings.body_font | default: "Inter" }}', sans-serif; }
-    h1, h2, h3, h4, h5, h6 { font-family: '{{ settings.heading_font | default: "Poppins" }}', sans-serif; }
+    body { font-family: '{{ settings.body_font | default: "Outfit" }}', sans-serif; }
+    h1, h2, h3, h4, h5, h6 { font-family: '{{ settings.heading_font | default: "Outfit" }}', sans-serif; }
   </style>
   {% render 'snippets/installed-apps' %}
 </head>

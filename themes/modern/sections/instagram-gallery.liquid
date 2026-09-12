@@ -1,3 +1,9 @@
+{% comment %}
+  This is curated content (real photos, no reasonable auto-fill exists the
+  way a product/collection list has) — hides entirely rather than showing
+  a heading over an empty row when the merchant hasn't added any photos yet.
+{% endcomment %}
+{% if section.blocks.size > 0 %}
 <section class="instagram-gallery">
   <div class="instagram-gallery__heading">
     <h2>{{ section.settings.heading }}</h2>
@@ -26,6 +32,7 @@
     {% endfor %}
   </div>
 </section>
+{% endif %}
 
 {% schema %}
 {

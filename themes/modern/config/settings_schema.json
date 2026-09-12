@@ -11,8 +11,8 @@
   {
     "name": "Typography",
     "settings": [
-      { "type": "font", "id": "heading_font", "label": "Heading font", "default": "Poppins" },
-      { "type": "font", "id": "body_font", "label": "Body font", "default": "Inter" }
+      { "type": "font", "id": "heading_font", "label": "Heading font", "default": "Outfit" },
+      { "type": "font", "id": "body_font", "label": "Body font", "default": "Outfit" }
     ]
   },
   {

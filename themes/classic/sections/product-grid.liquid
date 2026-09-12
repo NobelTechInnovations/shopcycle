@@ -19,10 +19,18 @@
     {% endcomment %}
     {% if section.settings.collection != blank %}
       {% assign target = collections[section.settings.collection] %}
-    {% else %}
+      {% assign target_limit = 999 %}
+    {% elsif collection %}
       {% assign target = collection %}
+      {% assign target_limit = 999 %}
+    {% else %}
+      {% comment %} Placed with no collection chosen and no "current
+        collection" in context (e.g. dropped on the homepage) — fall back
+        to every active product rather than rendering nothing. {% endcomment %}
+      {% assign target = collections.all %}
+      {% assign target_limit = 8 %}
     {% endif %}
-    {% for product in target.products %}
+    {% for product in target.products limit: target_limit %}
       {% render 'snippets/product-card', product: product %}
     {% endfor %}
   </div>

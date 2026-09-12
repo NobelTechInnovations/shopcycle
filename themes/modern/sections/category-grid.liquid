@@ -1,21 +1,41 @@
-<section class="category-grid">
-  {% if section.settings.heading != blank %}<h2 class="category-grid__heading">{{ section.settings.heading }}</h2>{% endif %}
-  <div class="category-grid__row category-grid__row--{{ section.settings.alignment }}">
-    {% for handle in section.settings.collections %}
-      {% assign coll = collections[handle] %}
-      {% if coll %}
-        <a href="{{ routes.collections_url }}/{{ handle }}" class="category-grid__tile">
-          {% if coll.image != blank %}
-            <img src="{{ coll.image | image_url }}" alt="">
-          {% else %}
-            {% render 'snippets/image-placeholder' %}
-          {% endif %}
-          <span>{{ coll.title }}</span>
-        </a>
-      {% endif %}
-    {% endfor %}
-  </div>
-</section>
+{% comment %}
+  Falls back to the store's own real collections (skipping the synthetic
+  "all" one, which isn't a merchant-meaningful tile) when none are
+  explicitly picked — same reasoning as product-grid.liquid's fallback:
+  a fresh install shouldn't show a heading over an empty row just because
+  nobody has curated this section yet. Hides entirely (no heading, no
+  empty row) only if the store truly has zero collections at all.
+{% endcomment %}
+{% assign auto_handles = "" | split: "," %}
+{% for c in collections %}
+  {% unless c[0] == "all" %}
+    {% assign auto_handles = auto_handles | push: c[0] %}
+  {% endunless %}
+{% endfor %}
+{% comment %} `default` treats an empty array the same as blank/nil, so this
+  only actually falls back to auto_handles when nothing was picked. {% endcomment %}
+{% assign display_handles = section.settings.collections | default: auto_handles %}
+
+{% if display_handles.size > 0 %}
+  <section class="category-grid">
+    {% if section.settings.heading != blank %}<h2 class="category-grid__heading">{{ section.settings.heading }}</h2>{% endif %}
+    <div class="category-grid__row category-grid__row--{{ section.settings.alignment }}">
+      {% for handle in display_handles limit: 4 %}
+        {% assign coll = collections[handle] %}
+        {% if coll %}
+          <a href="{{ routes.collections_url }}/{{ handle }}" class="category-grid__tile">
+            {% if coll.image != blank %}
+              <img src="{{ coll.image | image_url }}" alt="">
+            {% else %}
+              {% render 'snippets/image-placeholder' %}
+            {% endif %}
+            <span>{{ coll.title }}</span>
+          </a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
 
 {% schema %}
 {

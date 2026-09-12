@@ -19,8 +19,14 @@ export default async function AdminLayout({ children }) {
     redirect("/login");
   }
 
+  // A platform admin with no store of their own landing here (e.g. a
+  // bookmark, or a stale link) belongs on the super-admin app entirely —
+  // a genuinely separate app/origin (see NEXT_PUBLIC_SUPER_ADMIN_URL),
+  // not a route inside this one. `redirect()` happily takes an absolute
+  // URL for exactly this case; passing a relative "/super-admin" here
+  // used to 404 (no such route exists in this app).
   if (!me.store && me.user.isSuperAdmin) {
-    redirect("/super-admin");
+    redirect(process.env.NEXT_PUBLIC_SUPER_ADMIN_URL || "http://localhost:3003");
   }
 
   // No plan chosen yet, or billing has lapsed long enough to lock the

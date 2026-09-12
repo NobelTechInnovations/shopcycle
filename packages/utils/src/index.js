@@ -45,4 +45,28 @@ function detectDeviceType(userAgent) {
   return "desktop";
 }
 
-module.exports = { slugify, formatCurrency, asyncHandler, HttpError, detectDeviceType };
+/** The fixed set of valid App.iconKey values — a curated whitelist rather
+ * than any lucide icon name, so a super-admin's "New app" form is a short
+ * dropdown and iconKey can never point at a nonexistent icon. Framework-
+ * agnostic on purpose (no lucide-react/React here) so both the Zod
+ * validation schema (packages/validation) and the actual icon renderer
+ * (@shopcycle/ui's AppIcon, which maps each of these to a real lucide
+ * component) share one source of truth instead of two lists drifting
+ * apart. Add a key here first, then to AppIcon's APP_ICONS map.
+ */
+const APP_ICON_KEYS = [
+  "bar-chart",
+  "activity",
+  "code",
+  "star",
+  "megaphone",
+  "message-circle",
+  "mail",
+  "truck",
+  "credit-card",
+  "percent",
+  "search",
+  "puzzle",
+];
+
+module.exports = { slugify, formatCurrency, asyncHandler, HttpError, detectDeviceType, APP_ICON_KEYS };

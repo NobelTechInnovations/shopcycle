@@ -795,7 +795,10 @@ model App {
   name        String
   description String?  @db.Text
   category    String   @default("other")
-  iconEmoji   String   @default("🧩")
+  /// One of the fixed keys in @shopcycle/ui's APP_ICONS (e.g. "megaphone",
+  /// "puzzle") — rendered as a real icon component, never an emoji glyph.
+  /// Was `iconEmoji` (a literal emoji character) before Phase 10.
+  iconKey     String   @default("puzzle")
   /// The settings a merchant fills in on install, as a JSON Schema-ish
   /// shape the admin's install form renders generically: [{ id, label,
   /// type: "text" }]. Keeps adding a new app a data-only change most of

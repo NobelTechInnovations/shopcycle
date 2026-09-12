@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, Button, Modal, Form, Input, InputNumber, Select, Switch, Tag, App } from "antd";
 import { Plus, Trash2 } from "lucide-react";
-import { useConfirmDialog, PageHeader } from "@shopcycle/ui";
+import { useConfirmDialog, PageHeader, AppIcon } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 // A handful of apps have a full dedicated panel (Connect flow, campaign
@@ -172,9 +172,9 @@ export default function AppsPage() {
         {apps.map((app) => (
           <Card key={app.id} size="small" loading={loading}>
             <div className="flex items-start justify-between mb-2">
-              <span className="text-2xl" aria-hidden="true">
-                {app.iconEmoji}
-              </span>
+              <div className="w-9 h-9 rounded-md bg-app-bg border border-app-border flex items-center justify-center">
+                <AppIcon iconKey={app.iconKey} size={18} className="text-ink" />
+              </div>
               {app.installed && <Tag color="green">Installed</Tag>}
             </div>
             <p className="font-medium m-0">{app.name}</p>

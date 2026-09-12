@@ -1,7 +1,19 @@
 <section class="featured-collection">
   <h2>{{ section.settings.heading }}</h2>
   <div class="product-grid">
-    {% for product in collections[section.settings.collection].products limit: section.settings.products_to_show %}
+    {% comment %}
+      Falls back to collections.all (every active product — see
+      storefront/service.js) when no collection has been picked yet, same
+      reasoning as Modern's product-grid.liquid: a fresh install shouldn't
+      show this heading over an empty grid just because nobody has pointed
+      it at a specific collection.
+    {% endcomment %}
+    {% if section.settings.collection != blank %}
+      {% assign target = collections[section.settings.collection] %}
+    {% else %}
+      {% assign target = collections.all %}
+    {% endif %}
+    {% for product in target.products limit: section.settings.products_to_show %}
       {% render 'snippets/product-card', product: product %}
     {% endfor %}
   </div>

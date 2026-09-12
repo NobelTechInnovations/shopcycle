@@ -1,3 +1,8 @@
+{% comment %}
+  Curated content (real photos, no reasonable auto-fill) — hides entirely
+  rather than a heading over an empty row when no photos have been added.
+{% endcomment %}
+{% if section.blocks.size > 0 %}
 <section class="shop-the-gram">
   <div class="shop-the-gram__heading">
     <h2>{{ section.settings.heading }}</h2>
@@ -26,6 +31,7 @@
     {% endfor %}
   </div>
 </section>
+{% endif %}
 
 {% schema %}
 {

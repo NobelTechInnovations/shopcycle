@@ -91,50 +91,50 @@ async function main() {
   // adding a new field to an app is a data change, not a UI change.
   await prisma.app.upsert({
     where: { key: "google-analytics" },
-    update: {},
+    update: { iconKey: "bar-chart" },
     create: {
       key: "google-analytics",
       name: "Google Analytics",
       description: "Adds the gtag.js snippet to every storefront page using your Measurement ID.",
       category: "analytics",
-      iconEmoji: "📈",
+      iconKey: "bar-chart",
       settingsSchema: [{ id: "measurementId", label: "Measurement ID", type: "text", placeholder: "G-XXXXXXXXXX" }],
     },
   });
   await prisma.app.upsert({
     where: { key: "facebook-pixel" },
-    update: {},
+    update: { iconKey: "activity" },
     create: {
       key: "facebook-pixel",
       name: "Facebook Pixel",
       description: "Adds the Meta Pixel base code to every storefront page using your Pixel ID.",
       category: "analytics",
-      iconEmoji: "📊",
+      iconKey: "activity",
       settingsSchema: [{ id: "pixelId", label: "Pixel ID", type: "text", placeholder: "123456789012345" }],
     },
   });
   await prisma.app.upsert({
     where: { key: "custom-scripts" },
-    update: {},
+    update: { iconKey: "code" },
     create: {
       key: "custom-scripts",
       name: "Custom Scripts",
       description: "Injects your own HTML/JS snippet just before </head> on every storefront page.",
       category: "utility",
-      iconEmoji: "🧩",
+      iconKey: "code",
       settingsSchema: [{ id: "headHtml", label: "Head HTML/JS", type: "textarea", placeholder: "<script>...</script>" }],
     },
   });
   await prisma.app.upsert({
     where: { key: "customer-reviews" },
-    update: {},
+    update: { iconKey: "star" },
     create: {
       key: "customer-reviews",
       name: "Customer Reviews",
       description:
         "A simple review widget for your storefront — add every review here once; it shows wherever the Customer Reviews section is placed in your theme, on every page, no theme editing needed per review.",
       category: "marketing",
-      iconEmoji: "⭐",
+      iconKey: "star",
       settingsSchema: [
         {
           id: "reviews",
@@ -161,25 +161,25 @@ async function main() {
   // gates access to those panels (see apps/service.js#assertInstalled).
   await prisma.app.upsert({
     where: { key: "meta-ads" },
-    update: {},
+    update: { iconKey: "megaphone" },
     create: {
       key: "meta-ads",
       name: "Meta Ads",
       description: "Connect Facebook to manage your ad accounts and launch new campaigns without leaving your dashboard.",
       category: "marketing",
-      iconEmoji: "📣",
+      iconKey: "megaphone",
       settingsSchema: [],
     },
   });
   await prisma.app.upsert({
     where: { key: "whatsapp" },
-    update: {},
+    update: { iconKey: "message-circle" },
     create: {
       key: "whatsapp",
       name: "WhatsApp",
       description: "Connect your WhatsApp Business number to message customers directly from your dashboard.",
       category: "marketing",
-      iconEmoji: "💬",
+      iconKey: "message-circle",
       settingsSchema: [],
     },
   });
