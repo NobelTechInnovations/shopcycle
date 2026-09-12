@@ -10,11 +10,10 @@ const ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3000";
 
 /**
  * The platform operator's own sign-in — a completely separate app/domain
- * from a store owner's /login (see adminshopcycle.com vs store.shopcycle.com
- * in the deployment plan), not just a different route of the same app
- * anymore. Reuses /api/auth/login (same account system, same JWT) but
- * never lets a non-super-admin account land in this panel: their session
- * is torn back down immediately if `isSuperAdmin` comes back false.
+ * from a store owner's /login, with its own cookie and its own login
+ * endpoint (/api/auth/super-admin-login) — never the seller's /api/auth/login.
+ * A non-super-admin account is rejected server-side, in the API itself,
+ * rather than logged in here and immediately logged back out.
  */
 export default function SuperAdminLoginPage() {
   const router = useRouter();
@@ -25,12 +24,7 @@ export default function SuperAdminLoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const { user } = await apiFetch("/api/auth/login", { method: "POST", body: values });
-      if (!user.isSuperAdmin) {
-        await apiFetch("/api/auth/logout", { method: "POST" });
-        setError("This account is not a platform admin.");
-        return;
-      }
+      await apiFetch("/api/auth/super-admin-login", { method: "POST", body: values });
       router.push("/companies");
       router.refresh();
     } catch (err) {

@@ -17,6 +17,13 @@ const envSchema = z.object({
   // dev, where a Domain attribute on "localhost" behaves inconsistently
   // across browsers and isn't needed anyway (dev already works without it).
   COOKIE_DOMAIN: z.string().optional(),
+  // A completely separate cookie for the platform-admin panel — sharing
+  // one cookie between it and the seller admin (both now under
+  // Domain=.oyklane.com) meant logging into either one silently also
+  // half-authenticated the other, since both read the exact same JWT.
+  // Two independent cookies means logging into one never touches the
+  // other's session at all, by construction, not by convention.
+  SUPER_ADMIN_COOKIE_NAME: z.string().default("shopcycle_superadmin_session"),
   API_PORT: z.coerce.number().default(4000),
   API_HOST: z.string().default("0.0.0.0"),
   ADMIN_ORIGIN: z.string().default("http://localhost:3000"),

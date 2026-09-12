@@ -3,17 +3,13 @@ import { serverApiFetch } from "@/lib/api";
 import { SuperAdminNav } from "./SuperAdminNav";
 
 export default async function SuperAdminLayout({ children }) {
+  // Its own endpoint, its own cookie — never /api/auth/me (the seller's),
+  // so a store owner's session can never satisfy this check no matter
+  // which cookies happen to also be present for this domain.
   let me;
   try {
-    me = await serverApiFetch("/api/auth/me");
+    me = await serverApiFetch("/api/auth/super-admin-me");
   } catch {
-    redirect("/login");
-  }
-  if (!me.user.isSuperAdmin) {
-    // A store-owner session that wandered in here has nothing to "go back
-    // to" in this app — it's a fully separate domain now, so just bounce
-    // to this app's own login rather than an /admin path that doesn't
-    // exist here.
     redirect("/login");
   }
 

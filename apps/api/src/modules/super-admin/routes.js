@@ -1,7 +1,9 @@
 const controller = require("./controller");
 
 async function superAdminRoutes(fastify) {
-  fastify.addHook("preHandler", fastify.authenticate);
+  // Its own cookie, not the seller admin's — see authenticateSuperAdmin's
+  // doc comment in plugins/jwt-auth.js.
+  fastify.addHook("preHandler", fastify.authenticateSuperAdmin);
   fastify.addHook("preHandler", fastify.requireSuperAdmin);
 
   fastify.get("/companies", controller.listCompaniesHandler);

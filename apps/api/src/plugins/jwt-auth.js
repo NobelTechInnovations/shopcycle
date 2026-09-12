@@ -28,6 +28,27 @@ async function jwtAuthPlugin(fastify) {
     }
   });
 
+  /** The platform-admin panel's own auth check — deliberately reads a
+   * completely different cookie (SUPER_ADMIN_COOKIE_NAME) than
+   * `authenticate` does, so a seller's session and a platform admin's
+   * session can never be confused for each other even though both cookies
+   * now live under the same Domain=.oyklane.com (see auth/controller.js).
+   * `request.jwtVerify()` can't be reused here — it's hard-wired to
+   * @fastify/jwt's configured cookie name — so this verifies the token
+   * manually from the specific cookie instead. */
+  fastify.decorate("authenticateSuperAdmin", async function authenticateSuperAdmin(request, reply) {
+    const token = request.cookies?.[env.SUPER_ADMIN_COOKIE_NAME];
+    if (!token) {
+      reply.code(401).send({ error: "Unauthorized" });
+      return;
+    }
+    try {
+      request.user = fastify.jwt.verify(token);
+    } catch {
+      reply.code(401).send({ error: "Unauthorized" });
+    }
+  });
+
   /** Attaches request.user and request.storeUser/request.store.
    * Run this after `authenticate`. Kept separate so routes that only need
    * "is this a logged-in user" (e.g. account settings, switching stores,

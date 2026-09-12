@@ -12,6 +12,12 @@ async function authRoutes(fastify) {
   fastify.get("/my-stores", { preHandler: [fastify.authenticate] }, controller.myStoresHandler);
   fastify.post("/stores", { preHandler: [fastify.authenticate] }, controller.createStoreHandler);
   fastify.post("/switch-store", { preHandler: [fastify.authenticate] }, controller.switchStoreHandler);
+
+  // Platform-admin panel — its own cookie, its own session, see
+  // authenticateSuperAdmin's doc comment in plugins/jwt-auth.js.
+  fastify.post("/super-admin-login", controller.superAdminLoginHandler);
+  fastify.post("/super-admin-logout", controller.superAdminLogoutHandler);
+  fastify.get("/super-admin-me", { preHandler: [fastify.authenticateSuperAdmin] }, controller.superAdminMeHandler);
 }
 
 module.exports = authRoutes;

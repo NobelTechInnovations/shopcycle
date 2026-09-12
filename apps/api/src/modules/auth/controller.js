@@ -27,6 +27,15 @@ function issueSession(reply, fastify, user, storeId) {
   reply.setCookie(env.COOKIE_NAME, token, cookieOptions);
 }
 
+// Same shape as cookieOptions, just under the platform-admin panel's own
+// cookie name — see SUPER_ADMIN_COOKIE_NAME's doc comment in config/env.js.
+const superAdminCookieOptions = { ...cookieOptions };
+
+function issueSuperAdminSession(reply, fastify, user) {
+  const token = fastify.jwt.sign({ userId: user.id, storeId: null });
+  reply.setCookie(env.SUPER_ADMIN_COOKIE_NAME, token, superAdminCookieOptions);
+}
+
 async function registerHandler(request, reply) {
   const body = registerSchema.parse(request.body);
   const { user, store } = await service.register(request.server.prisma, body);
@@ -45,6 +54,43 @@ async function loginHandler(request, reply) {
 async function logoutHandler(request, reply) {
   reply.clearCookie(env.COOKIE_NAME, { path: "/", ...(env.COOKIE_DOMAIN && { domain: env.COOKIE_DOMAIN }) });
   reply.send({ ok: true });
+}
+
+/** A dedicated login for the platform-admin panel — deliberately never
+ * touches the seller cookie (issueSession/COOKIE_NAME), and rejects a
+ * non-super-admin account right here, server-side, rather than letting
+ * the frontend log in and then decide to immediately log itself back out
+ * (which is what the super-admin login page used to do against the
+ * regular /login endpoint before this existed). */
+async function superAdminLoginHandler(request, reply) {
+  const body = loginSchema.parse(request.body);
+  const user = await service.login(request.server.prisma, body);
+  if (!user.isSuperAdmin) {
+    throw new HttpError(403, "This account is not a platform admin.");
+  }
+  issueSuperAdminSession(reply, request.server, user);
+  reply.send({ user: service.serializeUser(user) });
+}
+
+async function superAdminLogoutHandler(request, reply) {
+  reply.clearCookie(env.SUPER_ADMIN_COOKIE_NAME, {
+    path: "/",
+    ...(env.COOKIE_DOMAIN && { domain: env.COOKIE_DOMAIN }),
+  });
+  reply.send({ ok: true });
+}
+
+/** The platform-admin panel's own "who am I" — reads request.user off
+ * authenticateSuperAdmin (its own cookie), not the seller `authenticate`.
+ * No store lookup at all: a super admin manages every store, not "the
+ * current one," and the seeded Platform Admin account owns none. */
+async function superAdminMeHandler(request, reply) {
+  const user = await request.server.prisma.user.findUnique({ where: { id: request.user.userId } });
+  if (!user || user.status === "disabled" || !user.isSuperAdmin) {
+    reply.code(401).send({ error: "Unauthorized" });
+    return;
+  }
+  reply.send({ user: service.serializeUser(user) });
 }
 
 /** Deliberately does its own store lookup instead of depending on
@@ -127,4 +173,7 @@ module.exports = {
   myStoresHandler,
   createStoreHandler,
   switchStoreHandler,
+  superAdminLoginHandler,
+  superAdminLogoutHandler,
+  superAdminMeHandler,
 };

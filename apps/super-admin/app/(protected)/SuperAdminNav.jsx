@@ -29,7 +29,7 @@ export function SuperAdminNav({ userName }) {
   const router = useRouter();
 
   async function handleLogout() {
-    await apiFetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/super-admin-logout", { method: "POST" });
     router.push("/login");
     router.refresh();
   }
