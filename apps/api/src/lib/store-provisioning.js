@@ -1,6 +1,17 @@
 const { slugify } = require("@shopcycle/utils");
 const themesService = require("../modules/themes/service");
 
+// A store's handle doubles as its default storefront subdomain —
+// {handle}.<root domain> (see apps/storefront/lib/domain.js) — so none of
+// these can ever be handed out: each is either a reserved platform
+// subdomain (store., admin., api., www., ...) or a non-store technical
+// host (cdn/mail/ftp) that resolving {handle}.<root domain> must never
+// mistake for an actual store.
+const RESERVED_HANDLES = new Set([
+  "www", "store", "admin", "api", "app", "assets", "cdn", "static",
+  "mail", "smtp", "ftp", "blog", "help", "support", "status", "docs",
+]);
+
 /**
  * Everything a brand-new store needs before a merchant should ever see
  * it: a unique handle, a free-trial plan, ownership for the given user,
@@ -15,7 +26,7 @@ async function provisionStore(tx, { name, ownerId, role = "owner" }) {
   const baseHandle = slugify(name) || "store";
   let handle = baseHandle;
   let suffix = 1;
-  while (await tx.store.findUnique({ where: { handle } })) {
+  while (RESERVED_HANDLES.has(handle) || (await tx.store.findUnique({ where: { handle } }))) {
     handle = `${baseHandle}-${suffix++}`;
   }
 

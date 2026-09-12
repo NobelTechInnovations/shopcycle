@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const { HttpError } = require("@shopcycle/utils");
+const { env } = require("../../config/env");
 
 const updateStoreSchema = z.object({
   name: z.string().min(1).max(120).optional(),
@@ -27,7 +28,22 @@ async function getStoreHandler(request, reply) {
 
 async function updateStoreHandler(request, reply) {
   const body = updateStoreSchema.parse(request.body);
-  if ("domain" in body) body.domain = body.domain || null;
+  if ("domain" in body) {
+    body.domain = body.domain || null;
+    // Every store already has {handle}.<root domain> for free (see
+    // apps/storefront/lib/domain.js) — that namespace is reserved for the
+    // platform's own subdomain routing, so a merchant "connecting" one of
+    // those addresses here would just be pointing the field at itself,
+    // and worse, an arbitrary *.{root domain} value would collide with
+    // whatever real handle it happens to spell.
+    const root = env.STOREFRONT_ROOT_DOMAIN.toLowerCase();
+    if (body.domain && (body.domain.toLowerCase() === root || body.domain.toLowerCase().endsWith(`.${root}`))) {
+      throw new HttpError(
+        400,
+        `Every store already gets its own ${request.store.handle}.${root} address for free — enter a domain you own instead.`
+      );
+    }
+  }
 
   try {
     const store = await request.server.prisma.store.update({

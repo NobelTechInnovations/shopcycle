@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { proxyRender, API_URL, CART_COOKIE, VISITOR_COOKIE } from "@/lib/render";
+import { storefrontPath } from "@/lib/domain";
 
 export async function GET(request, { params }) {
   const { handle } = await params;
@@ -49,8 +50,10 @@ export async function POST(request, { params }) {
     /* non-JSON error body — result stays null, generic message below */
   }
 
+  const host = request.headers.get("host");
+
   if (!res.ok) {
-    const target = new URL(`/store/${handle}/checkout`, request.url);
+    const target = new URL(storefrontPath(host, handle, "/checkout"), request.url);
     target.searchParams.set("checkoutError", result?.error || "Could not place your order. Please try again.");
     return NextResponse.redirect(target, { status: 303 });
   }
@@ -59,13 +62,13 @@ export async function POST(request, { params }) {
 
   let target;
   if (razorpay) {
-    target = new URL(`/store/${handle}/checkout/pay`, request.url);
+    target = new URL(storefrontPath(host, handle, "/checkout/pay"), request.url);
     target.searchParams.set("order", order.id);
     target.searchParams.set("rzpOrderId", razorpay.orderId);
     target.searchParams.set("amount", String(razorpay.amount));
     target.searchParams.set("key", razorpay.keyId);
   } else {
-    target = new URL(`/store/${handle}/checkout/confirmation`, request.url);
+    target = new URL(storefrontPath(host, handle, "/checkout/confirmation"), request.url);
     target.searchParams.set("order", order.id);
   }
 

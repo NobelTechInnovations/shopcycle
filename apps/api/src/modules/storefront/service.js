@@ -124,6 +124,7 @@ async function renderPage(
     checkoutError,
     orderId,
     searchQuery,
+    rootless,
   }
 ) {
   const store = await loadStoreOrThrow(prisma, handle);
@@ -133,7 +134,13 @@ async function renderPage(
   // (not just template.json structure) show up in the preview instantly.
   const filesByPath = { ...filesArrayToMap(theme.files), ...(filesOverride || {}) };
 
-  const globalContext = await buildGlobalContext(prisma, redis, store, { slug, cartId, discountError, checkoutError });
+  const globalContext = await buildGlobalContext(prisma, redis, store, {
+    slug,
+    cartId,
+    discountError,
+    checkoutError,
+    rootless,
+  });
 
   if (templateName === "product") {
     if (!slug) throw new HttpError(400, "Missing product slug");

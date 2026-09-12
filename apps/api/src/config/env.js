@@ -17,6 +17,12 @@ const envSchema = z.object({
   // production, not just a different subdomain.
   SUPER_ADMIN_ORIGIN: z.string().default("http://localhost:3003"),
   API_PUBLIC_URL: z.string().default("http://localhost:4000"),
+  // The bare domain every store's default storefront subdomain hangs off
+  // of — {handle}.<this> — e.g. "oyklane.com" in production. Used only to
+  // reject a merchant trying to "connect" a domain that's actually part of
+  // that reserved namespace (see stores/controller.js); the storefront
+  // app has its own copy of this same value for actual request routing.
+  STOREFRONT_ROOT_DOMAIN: z.string().default("localhost"),
   NODE_ENV: z.string().default("development"),
   // Optional — online payments at checkout are only offered when both are
   // set (see checkout/service.js). Cash on Delivery works either way.

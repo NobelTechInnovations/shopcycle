@@ -13,6 +13,7 @@ async function renderHandler(request, reply) {
     visitorId,
     path,
     q,
+    domainMode,
     utm_source: utmSource,
     utm_medium: utmMedium,
     utm_campaign: utmCampaign,
@@ -30,6 +31,11 @@ async function renderHandler(request, reply) {
     checkoutError,
     orderId,
     searchQuery: q,
+    // Set by the storefront app (see lib/render.js) when the visitor
+    // reached this store through its own (sub)domain rather than the
+    // internal /store/:handle preview path — every generated link should
+    // then be root-relative, never leaking that internal path.
+    rootless: domainMode === "1",
   });
 
   reply.header("content-type", "text/html; charset=utf-8");

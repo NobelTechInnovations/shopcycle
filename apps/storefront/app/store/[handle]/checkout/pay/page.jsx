@@ -30,6 +30,15 @@ export default function RazorpayPayPage() {
       return;
     }
 
+    // A rewrite (see proxy.js) is invisible to the browser — window.location
+    // always reflects what the visitor actually typed/clicked. On a store's
+    // own (sub)domain that's a clean "/checkout/pay"; on the internal
+    // /store/:handle preview path it's "/store/:handle/checkout/pay". Either
+    // way, stripping this page's own suffix off the current path gives
+    // exactly the right base for every other link on this page — no env
+    // vars or host-parsing needed client-side.
+    const basePath = window.location.pathname.replace(/\/checkout\/pay\/?$/, "");
+
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
@@ -42,29 +51,29 @@ export default function RazorpayPayPage() {
         order_id: rzpOrderId,
         name: "Checkout",
         handler: async function handlePaymentSuccess(response) {
-          const verifyRes = await fetch(`/store/${handle}/checkout/razorpay/verify`, {
+          const verifyRes = await fetch(`${basePath}/checkout/razorpay/verify`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ orderId, ...response }),
           });
           if (verifyRes.ok) {
-            window.location.href = `/store/${handle}/checkout/confirmation?order=${orderId}`;
+            window.location.href = `${basePath}/checkout/confirmation?order=${orderId}`;
           } else {
-            window.location.href = `/store/${handle}/checkout?checkoutError=${encodeURIComponent(
+            window.location.href = `${basePath}/checkout?checkoutError=${encodeURIComponent(
               "Payment could not be verified. Please contact us with your order number."
             )}`;
           }
         },
         modal: {
           ondismiss: function handleDismiss() {
-            window.location.href = `/store/${handle}/checkout?checkoutError=${encodeURIComponent(
+            window.location.href = `${basePath}/checkout?checkoutError=${encodeURIComponent(
               "Payment was cancelled."
             )}`;
           },
         },
       });
       rzp.on("payment.failed", function handlePaymentFailed() {
-        window.location.href = `/store/${handle}/checkout?checkoutError=${encodeURIComponent(
+        window.location.href = `${basePath}/checkout?checkoutError=${encodeURIComponent(
           "Payment failed. Please try again."
         )}`;
       });
@@ -94,7 +103,9 @@ export default function RazorpayPayPage() {
         <div>
           <h1 style={{ fontSize: 20 }}>Couldn't start payment</h1>
           <p style={{ color: "#6b7280" }}>
-            <a href={`/store/${handle}/checkout`}>Go back to checkout</a>
+            {/* Reached only after the client-side effect above has already run
+                (this state is never the initial render), so window is safe here. */}
+            <a href={`${window.location.pathname.replace(/\/checkout\/pay\/?$/, "")}/checkout`}>Go back to checkout</a>
           </p>
         </div>
       ) : (

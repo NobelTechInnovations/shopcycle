@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { isDomainRequest } from "./domain";
 
 const API_URL = process.env.API_INTERNAL_URL || "http://localhost:4100";
 export const CART_COOKIE = "sc_cart_id";
@@ -43,6 +44,10 @@ export async function proxyRender(handle, template, extraParams = {}, request = 
       const value = request.nextUrl.searchParams.get(key);
       if (value) params.set(key, value);
     }
+    // The Host header survives proxy.js's rewrite untouched, so this is
+    // reliable even though request.nextUrl.pathname is already the
+    // internal /store/:handle path by the time we see it here.
+    if (isDomainRequest(request.headers.get("host"))) params.set("domainMode", "1");
   }
 
   let res;

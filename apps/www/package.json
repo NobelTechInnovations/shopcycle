@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p ${WWW_PORT:-3004}",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start -p ${WWW_PORT:-3004}"
   },
   "dependencies": {

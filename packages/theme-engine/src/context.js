@@ -16,6 +16,10 @@ function buildRoutes(handle, { rootless = false } = {}) {
   const root = rootless ? "" : `/store/${handle}`;
   return {
     root_url: root || "/",
+    // A safe prefix for "{{ routes.collections_url }}/{{ handle }}" — never
+    // concatenate a path onto root_url directly, since it's "/" (not "")
+    // in rootless mode and would double up the leading slash.
+    collections_url: `${root}/collections`,
     all_products_url: `${root}/collections/all`,
     cart_url: `${root}/cart`,
     cart_add_url: `${root}/cart/add`,

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { API_URL, CART_COOKIE } from "./render";
+import { storefrontPath } from "./domain";
 
 const CART_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
@@ -8,7 +9,7 @@ const CART_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
  * mutation to the API, redirect back (303 — the standard POST/redirect/GET
  * pattern, so a page refresh after add-to-cart doesn't resubmit the form),
  * and update the cookie if the API minted a new cart. */
-export async function mutateCart(handle, endpoint, request, redirectPath) {
+export async function mutateCart(handle, endpoint, request) {
   const cookieStore = await cookies();
   const cartId = cookieStore.get(CART_COOKIE)?.value;
 
@@ -29,6 +30,7 @@ export async function mutateCart(handle, endpoint, request, redirectPath) {
     /* API returned a non-JSON error — fall through, redirect still happens */
   }
 
+  const redirectPath = storefrontPath(request.headers.get("host"), handle, "/cart");
   const response = NextResponse.redirect(new URL(redirectPath, request.url), { status: 303 });
   if (cart?.cartId) {
     response.cookies.set(CART_COOKIE, cart.cartId, {
@@ -44,7 +46,7 @@ export async function mutateCart(handle, endpoint, request, redirectPath) {
 /** Same POST/redirect/GET shape as mutateCart, for the discount-code
  * apply/remove forms — a different body shape (code, not variantId/qty),
  * so it's a separate small function rather than overloading mutateCart. */
-export async function mutateCartDiscount(handle, endpoint, request, redirectPath) {
+export async function mutateCartDiscount(handle, endpoint, request) {
   const cookieStore = await cookies();
   const cartId = cookieStore.get(CART_COOKIE)?.value;
 
@@ -67,6 +69,7 @@ export async function mutateCartDiscount(handle, endpoint, request, redirectPath
   // A rejected code (expired, over its usage limit, wrong minimum) isn't a
   // "fail silently and redirect anyway" case — the shopper typed something
   // and needs to know why it didn't work.
+  const redirectPath = storefrontPath(request.headers.get("host"), handle, "/cart");
   const target = new URL(redirectPath, request.url);
   if (!res.ok) {
     target.searchParams.set("discountError", body?.error || "That discount code isn't valid.");

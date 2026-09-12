@@ -6,7 +6,7 @@
   <div class="collection-circles__row">
     {% for block in section.blocks %}
       {% assign coll = collections[block.settings.collection] %}
-      <a href="{{ routes.root_url }}/collections/{{ block.settings.collection }}" class="collection-circles__item">
+      <a href="{{ routes.collections_url }}/{{ block.settings.collection }}" class="collection-circles__item">
         <span class="collection-circles__image">
           {% if block.settings.image != blank %}
             <img src="{{ block.settings.image | image_url }}" alt="{{ coll.title }}">

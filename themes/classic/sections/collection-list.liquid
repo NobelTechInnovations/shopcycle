@@ -10,7 +10,7 @@
     {% for handle in section.settings.collections %}
       {% assign coll = collections[handle] %}
       {% if coll %}
-        <a href="{{ routes.root_url }}/collections/{{ handle }}" class="collection-list__tile">
+        <a href="{{ routes.collections_url }}/{{ handle }}" class="collection-list__tile">
           {% if coll.image != blank %}
             <img src="{{ coll.image | image_url }}" alt="">
           {% else %}
