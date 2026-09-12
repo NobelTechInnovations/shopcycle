@@ -45,13 +45,18 @@ async function resolveTheme(prisma, store, themeId) {
  * merchant needing to know that namespace exists. Absolute URLs (external
  * links) pass through untouched. */
 function buildLinklists(menus, routes) {
+  // routes.root_url is "/" in rootless mode (a real, clickable "go home"
+  // href) rather than "" — but concatenating a link under it needs the
+  // bare prefix ("" here, not "/"), or every menu link would come out
+  // "//about" instead of "/about".
+  const linkRoot = routes.root_url === "/" ? "" : routes.root_url;
   const linklists = {};
   for (const menu of menus) {
     linklists[menu.handle] = {
       title: menu.title,
       links: menu.items.map((item) => ({
         title: item.label,
-        url: /^https?:\/\//.test(item.url) ? item.url : `${routes.root_url}${item.url.startsWith("/") ? "" : "/"}${item.url}`,
+        url: /^https?:\/\//.test(item.url) ? item.url : `${linkRoot}${item.url.startsWith("/") ? "" : "/"}${item.url}`,
       })),
     };
   }
@@ -62,7 +67,7 @@ function buildLinklists(menus, routes) {
  * of which template is being rendered — cheap enough at this store's scale
  * (see the repository functions' doc note on eager-loading), and it keeps
  * this function the single place that knows the full storefront data shape. */
-async function buildGlobalContext(prisma, redis, store, { slug, cartId, discountError, checkoutError } = {}) {
+async function buildGlobalContext(prisma, redis, store, { slug, cartId, discountError, checkoutError, rootless } = {}) {
   const [products, collections, cart, menus, apps] = await Promise.all([
     repository.getAllActiveProducts(prisma, store.id),
     repository.getAllActiveCollections(prisma, store.id),
@@ -72,19 +77,20 @@ async function buildGlobalContext(prisma, redis, store, { slug, cartId, discount
   ]);
 
   const all_products = {};
-  for (const p of products) all_products[p.slug] = serializeProduct(p, store.handle);
+  for (const p of products) all_products[p.slug] = serializeProduct(p, store.handle, { rootless });
 
   const collectionsMap = {};
   for (const c of collections) {
     collectionsMap[c.slug] = serializeCollection(
       { ...c, products: c.products.map((cp) => cp.product) },
-      store.handle
+      store.handle,
+      { rootless }
     );
   }
   // `collections.all` is the conventional "every active product" pseudo-collection.
   collectionsMap.all = { id: "all", title: "All products", slug: "all", products: Object.values(all_products) };
 
-  const routes = buildRoutes(store.handle);
+  const routes = buildRoutes(store.handle, { rootless });
 
   return {
     shop: { name: store.name, handle: store.handle, currency: store.currency, locale: "en" },
