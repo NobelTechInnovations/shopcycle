@@ -64,15 +64,17 @@ function sessionsBySource(prisma, storeId, from, to) {
 }
 
 /** Prisma's groupBy has no portable date-truncation, so this is the one
- * spot in the module that drops to raw SQL — MySQL-specific (matches the
- * datasource in schema.prisma), not meant to be swapped to another DB
- * without revisiting this query. */
+ * spot in the module that drops to raw SQL — PostgreSQL-specific (matches
+ * the datasource in schema.prisma), not meant to be swapped to another DB
+ * without revisiting this query. Column names are double-quoted because
+ * the schema maps tables to snake_case but leaves columns camelCase, and
+ * Postgres folds unquoted identifiers to lowercase. */
 async function sessionsPerDay(prisma, storeId, from, to) {
   const rows = await prisma.$queryRaw`
-    SELECT DATE(firstSeenAt) as date, COUNT(*) as count
+    SELECT "firstSeenAt"::date as date, COUNT(*) as count
     FROM visitor_sessions
-    WHERE storeId = ${storeId} AND firstSeenAt >= ${from} AND firstSeenAt <= ${to}
-    GROUP BY DATE(firstSeenAt)
+    WHERE "storeId" = ${storeId} AND "firstSeenAt" >= ${from} AND "firstSeenAt" <= ${to}
+    GROUP BY "firstSeenAt"::date
     ORDER BY date ASC
   `;
   return rows.map((r) => ({ date: r.date, count: Number(r.count) }));
@@ -80,10 +82,10 @@ async function sessionsPerDay(prisma, storeId, from, to) {
 
 async function pageViewsPerDay(prisma, storeId, from, to) {
   const rows = await prisma.$queryRaw`
-    SELECT DATE(createdAt) as date, COUNT(*) as count
+    SELECT "createdAt"::date as date, COUNT(*) as count
     FROM page_views
-    WHERE storeId = ${storeId} AND createdAt >= ${from} AND createdAt <= ${to}
-    GROUP BY DATE(createdAt)
+    WHERE "storeId" = ${storeId} AND "createdAt" >= ${from} AND "createdAt" <= ${to}
+    GROUP BY "createdAt"::date
     ORDER BY date ASC
   `;
   return rows.map((r) => ({ date: r.date, count: Number(r.count) }));
@@ -91,10 +93,10 @@ async function pageViewsPerDay(prisma, storeId, from, to) {
 
 async function salesPerDay(prisma, storeId, from, to) {
   const rows = await prisma.$queryRaw`
-    SELECT DATE(createdAt) as date, COUNT(*) as orders, SUM(total) as revenue
+    SELECT "createdAt"::date as date, COUNT(*) as orders, SUM("total") as revenue
     FROM orders
-    WHERE storeId = ${storeId} AND createdAt >= ${from} AND createdAt <= ${to}
-    GROUP BY DATE(createdAt)
+    WHERE "storeId" = ${storeId} AND "createdAt" >= ${from} AND "createdAt" <= ${to}
+    GROUP BY "createdAt"::date
     ORDER BY date ASC
   `;
   return rows.map((r) => ({ date: r.date, orders: Number(r.orders), revenue: Number(r.revenue) }));
@@ -102,11 +104,11 @@ async function salesPerDay(prisma, storeId, from, to) {
 
 async function topProducts(prisma, storeId, from, to) {
   const rows = await prisma.$queryRaw`
-    SELECT oi.title as title, SUM(oi.quantity) as quantity, SUM(oi.total) as revenue
+    SELECT oi."title" as title, SUM(oi."quantity") as quantity, SUM(oi."total") as revenue
     FROM order_items oi
-    JOIN orders o ON o.id = oi.orderId
-    WHERE o.storeId = ${storeId} AND o.createdAt >= ${from} AND o.createdAt <= ${to}
-    GROUP BY oi.title
+    JOIN orders o ON o."id" = oi."orderId"
+    WHERE o."storeId" = ${storeId} AND o."createdAt" >= ${from} AND o."createdAt" <= ${to}
+    GROUP BY oi."title"
     ORDER BY revenue DESC
   `;
   return rows.map((r) => ({ title: r.title, quantity: Number(r.quantity), revenue: Number(r.revenue) }));

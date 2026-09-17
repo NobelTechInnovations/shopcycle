@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────
@@ -253,7 +254,7 @@ model ThemeFile {
   /// e.g. "sections/hero.liquid", "templates/index.json", "assets/theme.css"
   path      String
   fileType  String
-  content   String   @db.LongText
+  content   String   @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -272,7 +273,7 @@ model ThemeFileRevision {
   id          String   @id @default(cuid())
   themeFileId String
   path        String
-  content     String   @db.LongText
+  content     String   @db.Text
   createdAt   DateTime @default(now())
 
   themeFile ThemeFile @relation(fields: [themeFileId], references: [id], onDelete: Cascade)

@@ -1,7 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 
 // Reuse a single PrismaClient across hot-reloads / module reloads so we
-// don't exhaust MySQL connections in dev.
+// don't exhaust Postgres/Supabase connections in dev.
 const globalForPrisma = globalThis;
 
 const prisma =
