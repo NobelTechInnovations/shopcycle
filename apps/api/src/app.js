@@ -16,6 +16,8 @@ const storeRoutes = require("./modules/stores/routes");
 const dashboardRoutes = require("./modules/dashboard/routes");
 const productRoutes = require("./modules/products/routes");
 const collectionRoutes = require("./modules/collections/routes");
+const brandRoutes = require("./modules/brands/routes");
+const categoryRoutes = require("./modules/categories/routes");
 const orderRoutes = require("./modules/orders/routes");
 const customerRoutes = require("./modules/customers/routes");
 const themeRoutes = require("./modules/themes/routes");
@@ -68,6 +70,8 @@ function buildApp() {
   app.register(dashboardRoutes, { prefix: "/api/dashboard" });
   app.register(productRoutes, { prefix: "/api/products" });
   app.register(collectionRoutes, { prefix: "/api/collections" });
+  app.register(brandRoutes, { prefix: "/api/brands" });
+  app.register(categoryRoutes, { prefix: "/api/categories" });
   app.register(orderRoutes, { prefix: "/api/orders" });
   app.register(customerRoutes, { prefix: "/api/customers" });
   app.register(themeRoutes, { prefix: "/api/themes" });

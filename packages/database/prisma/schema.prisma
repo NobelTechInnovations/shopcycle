@@ -110,6 +110,8 @@ model Store {
   themes        Theme[]
   products      Product[]
   collections   Collection[]
+  brands        Brand[]
+  categories    Category[]
   customers     Customer[]
   orders        Order[]
   files         File[]
@@ -301,6 +303,8 @@ model Product {
   status          ProductStatus @default(draft)
   vendor          String?
   productType     String?
+  brandId         String?
+  categoryId      String?
   tags            String?       @db.Text
   seoTitle        String?
   seoDescription  String?       @db.Text
@@ -308,6 +312,8 @@ model Product {
   updatedAt       DateTime      @updatedAt
 
   store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  brand              Brand?              @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  category           Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   variants           ProductVariant[]
   images             ProductImage[]
   collectionProducts CollectionProduct[]
@@ -315,7 +321,43 @@ model Product {
 
   @@unique([storeId, slug])
   @@index([storeId])
+  @@index([brandId])
+  @@index([categoryId])
   @@map("products")
+}
+
+model Brand {
+  id        String   @id @default(cuid())
+  storeId   String
+  title     String
+  slug      String
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@map("brands")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  storeId   String
+  title     String
+  slug      String
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@map("categories")
 }
 
 enum VariantStatus {

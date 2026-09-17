@@ -2,6 +2,8 @@ module.exports = {
   ...require("./auth"),
   ...require("./product"),
   ...require("./collection"),
+  ...require("./brand"),
+  ...require("./category"),
   ...require("./order"),
   ...require("./customer"),
   ...require("./theme"),

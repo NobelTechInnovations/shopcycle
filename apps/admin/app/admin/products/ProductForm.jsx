@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Form, Input, InputNumber, Select, Button, Card, Upload, App } from "antd";
 import { Plus, Trash2, UploadCloud } from "lucide-react";
@@ -23,12 +23,19 @@ export function ProductForm({ product }) {
     product ? product.images.map((img) => ({ uid: img.id, url: img.url })) : []
   );
   const [uploading, setUploading] = useState(false);
+  const [brands, setBrands] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [form] = Form.useForm();
   const seoTitle = Form.useWatch("seoTitle", form);
   const seoDescription = Form.useWatch("seoDescription", form);
   const title = Form.useWatch("title", form);
   const description = Form.useWatch("description", form);
   const isEdit = Boolean(product);
+
+  useEffect(() => {
+    apiFetch("/api/brands?pageSize=100").then((data) => setBrands(data.brands));
+    apiFetch("/api/categories?pageSize=100").then((data) => setCategories(data.categories));
+  }, []);
 
   const initialValues = product
     ? {
@@ -37,6 +44,8 @@ export function ProductForm({ product }) {
         status: product.status,
         vendor: product.vendor,
         productType: product.productType,
+        brandId: product.brandId,
+        categoryId: product.categoryId,
         seoTitle: product.seoTitle,
         seoDescription: product.seoDescription,
         variants: product.variants.map((v) => ({
@@ -211,10 +220,26 @@ export function ProductForm({ product }) {
               </Form.Item>
             </Card>
             <Card size="small" title="Organization">
+              <Form.Item name="categoryId" label="Category">
+                <Select
+                  allowClear
+                  placeholder="Select category"
+                  optionFilterProp="label"
+                  options={categories.map((c) => ({ value: c.id, label: c.title }))}
+                />
+              </Form.Item>
+              <Form.Item name="brandId" label="Brand">
+                <Select
+                  allowClear
+                  placeholder="Select brand"
+                  optionFilterProp="label"
+                  options={brands.map((b) => ({ value: b.id, label: b.title }))}
+                />
+              </Form.Item>
               <Form.Item name="productType" label="Product type">
                 <Input />
               </Form.Item>
-              <Form.Item name="vendor" label="Vendor">
+              <Form.Item name="vendor" label="Vendor" className="mb-0">
                 <Input />
               </Form.Item>
             </Card>

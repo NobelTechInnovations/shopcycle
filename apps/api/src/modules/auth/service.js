@@ -10,11 +10,14 @@ async function register(prisma, { name, email, password, storeName }) {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const { user, store } = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({ data: { name, email, passwordHash } });
-    const store = await provisionStore(tx, { name: storeName, ownerId: user.id });
-    return { user, store };
-  });
+  const { user, store } = await prisma.$transaction(
+    async (tx) => {
+      const user = await tx.user.create({ data: { name, email, passwordHash } });
+      const store = await provisionStore(tx, { name: storeName, ownerId: user.id });
+      return { user, store };
+    },
+    { timeout: 15000 }
+  );
 
   return { user, store };
 }

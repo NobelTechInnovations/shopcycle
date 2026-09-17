@@ -2,6 +2,8 @@ const include = {
   variants: { orderBy: { createdAt: "asc" } },
   images: { orderBy: { position: "asc" } },
   collectionProducts: { include: { collection: true } },
+  brand: true,
+  category: true,
 };
 
 function list(prisma, storeId, { q, status, page, pageSize }) {

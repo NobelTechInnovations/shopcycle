@@ -62,9 +62,26 @@ const NAV_ITEMS = [
     label: <Link href="/admin/orders">Orders</Link>,
   },
   {
-    key: "/admin/products",
+    key: "products-group",
     icon: <Package size={16} aria-hidden="true" />,
     label: <Link href="/admin/products">Products</Link>,
+    children: [
+      {
+        key: "/admin/products",
+        icon: <Package size={14} aria-hidden="true" />,
+        label: <Link href="/admin/products">All products</Link>,
+      },
+      {
+        key: "/admin/products/brands",
+        icon: <Tag size={14} aria-hidden="true" />,
+        label: <Link href="/admin/products/brands">Brands</Link>,
+      },
+      {
+        key: "/admin/products/categories",
+        icon: <Grid3x3 size={14} aria-hidden="true" />,
+        label: <Link href="/admin/products/categories">Categories</Link>,
+      },
+    ],
   },
   {
     key: "/admin/collections",
@@ -144,6 +161,7 @@ export function Sidebar() {
   if (pathname.startsWith("/admin/content")) openKeys.push("content-group");
   if (pathname.startsWith("/admin/online-store")) openKeys.push("online-store-group");
   if (pathname.startsWith("/admin/analytics")) openKeys.push("analytics-group");
+  if (pathname.startsWith("/admin/products")) openKeys.push("products-group");
 
   return (
     <aside className="w-60 shrink-0 border-r border-app-border bg-app-surface h-screen sticky top-0 overflow-y-auto">

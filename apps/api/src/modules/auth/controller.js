@@ -152,8 +152,9 @@ async function myStoresHandler(request, reply) {
  * Switches the session to the new store, same as switchStoreHandler. */
 async function createStoreHandler(request, reply) {
   const body = createStoreSchema.parse(request.body);
-  const store = await request.server.prisma.$transaction((tx) =>
-    provisionStore(tx, { name: body.storeName, ownerId: request.user.userId })
+  const store = await request.server.prisma.$transaction(
+    (tx) => provisionStore(tx, { name: body.storeName, ownerId: request.user.userId }),
+    { timeout: 15000 }
   );
   issueSession(reply, request.server, { id: request.user.userId }, store.id);
   reply.code(201).send({ store });

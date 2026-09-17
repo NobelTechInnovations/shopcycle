@@ -24,6 +24,8 @@ const createProductSchema = z.object({
   status: z.enum(["active", "draft", "archived"]).default("draft"),
   vendor: z.string().optional().nullable(),
   productType: z.string().optional().nullable(),
+  brandId: z.string().optional().nullable(),
+  categoryId: z.string().optional().nullable(),
   tags: z.string().optional().nullable(),
   seoTitle: z.string().optional().nullable(),
   seoDescription: z.string().optional().nullable(),
