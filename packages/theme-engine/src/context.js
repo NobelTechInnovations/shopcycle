@@ -26,6 +26,8 @@ function buildRoutes(handle, { rootless = false } = {}) {
     cart_update_url: `${root}/cart/update`,
     cart_discount_url: `${root}/cart/discount`,
     cart_discount_remove_url: `${root}/cart/discount/remove`,
+    cart_gift_card_url: `${root}/cart/gift-card`,
+    cart_gift_card_remove_url: `${root}/cart/gift-card/remove`,
     pages_url: `${root}/pages`,
     checkout_url: `${root}/checkout`,
     search_url: `${root}/search`,
@@ -34,6 +36,8 @@ function buildRoutes(handle, { rootless = false } = {}) {
     account_login_url: `${root}/account/login`,
     account_logout_url: `${root}/account/logout`,
     account_update_url: `${root}/account/update`,
+    account_register_url: `${root}/account/register`,
+    account_password_url: `${root}/account/password`,
     order_lookup_url: `${root}/orders/lookup`,
     orders_url: `${root}/orders`,
     // Growth (Phase 6)

@@ -17,13 +17,27 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { storefrontUrlFor, initials } from "@/lib/storefront";
+import { CommandPalette } from "./CommandPalette";
 
 export function Topbar({ user, store, onOpenNav }) {
   const router = useRouter();
   const { message } = App.useApp();
   const [stores, setStores] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [form] = Form.useForm();
+
+  // Cmd/Ctrl+K opens search from anywhere in the admin.
+  useEffect(() => {
+    function onKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     apiFetch("/api/auth/my-stores")
@@ -134,10 +148,25 @@ export function Topbar({ user, store, onOpenNav }) {
           <Menu size={20} aria-hidden="true" />
         </button>
       )}
-      <label className="hidden sm:flex items-center gap-2 flex-1 max-w-md h-9 px-3 rounded-md bg-app-bg border border-transparent text-ink-muted focus-within:border-accent/40 focus-within:bg-app-surface transition-colors">
+      <button
+        type="button"
+        onClick={() => setSearchOpen(true)}
+        className="hidden sm:flex items-center gap-2 flex-1 max-w-md h-9 px-3 rounded-md bg-app-bg border border-transparent text-ink-muted text-sm cursor-pointer hover:border-app-border transition-colors"
+        aria-label="Search (Ctrl+K)"
+      >
         <Search size={15} aria-hidden="true" />
-        <Input variant="borderless" placeholder="Search" aria-label="Search" className="!px-0" />
-      </label>
+        <span className="flex-1 text-left">Search</span>
+        <kbd className="inline-flex items-center h-5 px-1.5 rounded border border-app-border bg-app-surface text-[11px] font-sans text-ink-muted">⌘K</kbd>
+      </button>
+      <button
+        type="button"
+        onClick={() => setSearchOpen(true)}
+        aria-label="Search"
+        className="sm:hidden w-10 h-10 rounded-md flex items-center justify-center text-ink bg-transparent border-0 cursor-pointer hover:bg-app-bg"
+      >
+        <Search size={18} aria-hidden="true" />
+      </button>
+      <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <div className="flex items-center gap-2">
         {store && (
           <Button

@@ -1,10 +1,113 @@
 {
-  "color_primary": "#111111",
-  "color_accent": "#FE8138",
-  "color_background": "#FFF8EE",
-  "color_text": "#1A1613",
-  "heading_font": "Outfit",
-  "body_font": "Outfit",
-  "container_width": 1360,
-  "button_radius": 999
+  "color_background": "#FFFFFF",
+  "color_text": "#0E0E0E",
+  "color_primary": "#0E0E0E",
+  "color_accent": "#D7F75B",
+  "color_surface": "#F3F3EF",
+  "color_dark": "#0E0E0E",
+  "heading_font": "Plus Jakarta Sans",
+  "body_font": "DM Sans",
+  "heading_weight": "700",
+  "heading_case": "none",
+  "heading_tracking": "tight",
+  "base_size": 16,
+  "container_width": 1440,
+  "section_spacing": "comfortable",
+  "button_radius": 4,
+  "card_radius": 4,
+  "card_image_ratio": "portrait",
+  "card_hover_image": true,
+  "card_show_brand": false,
+  "card_quick_add": true,
+  "card_align": "left",
+  "cart_type": "drawer",
+  "social_instagram": "",
+  "social_facebook": "",
+  "social_youtube": "",
+  "social_x": "",
+  "social_pinterest": "",
+  "social_whatsapp": "",
+  "sections": {
+    "announcement-bar": {
+      "settings": {
+        "show": true,
+        "style": "marquee",
+        "background": "#0E0E0E",
+        "text_color": "#FFFFFF"
+      },
+      "blocks": {
+        "m1": {
+          "type": "message",
+          "settings": {
+            "text": "Free shipping on orders over ₹999",
+            "link": ""
+          }
+        },
+        "m2": {
+          "type": "message",
+          "settings": {
+            "text": "Cash on delivery across India",
+            "link": ""
+          }
+        },
+        "m3": {
+          "type": "message",
+          "settings": {
+            "text": "Easy 7-day returns",
+            "link": ""
+          }
+        }
+      },
+      "block_order": [
+        "m1",
+        "m2",
+        "m3"
+      ]
+    },
+    "header": {
+      "settings": {
+        "menu": "main-menu",
+        "layout": "left",
+        "sticky": true,
+        "transparent": true,
+        "logo_width": 110
+      }
+    },
+    "footer": {
+      "settings": {
+        "about": "Modern essentials, made with care and shipped across India.",
+        "show_payments": true,
+        "show_wordmark": true,
+        "copyright": "All rights reserved."
+      },
+      "blocks": {
+        "f1": {
+          "type": "links",
+          "settings": {
+            "heading": "Shop",
+            "menu": "main-menu"
+          }
+        },
+        "f2": {
+          "type": "links",
+          "settings": {
+            "heading": "Help",
+            "menu": "footer-menu"
+          }
+        },
+        "f3": {
+          "type": "newsletter",
+          "settings": {
+            "heading": "Stay in the loop",
+            "text": "Early access to drops and members-only offers."
+          }
+        }
+      },
+      "block_order": [
+        "f1",
+        "f2",
+        "f3"
+      ]
+    }
+  }
 }

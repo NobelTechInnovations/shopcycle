@@ -26,7 +26,7 @@ export default function SuperAdminLoginPage() {
   const [challengeToken, setChallengeToken] = useState(null);
 
   function signedIn() {
-    router.push("/companies");
+    router.push("/overview");
     router.refresh();
   }
 

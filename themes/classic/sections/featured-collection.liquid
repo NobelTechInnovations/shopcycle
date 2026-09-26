@@ -19,9 +19,9 @@
         {% endfor %}
       </div>
     {% else %}
-      <div class="products" style="--cols: 4">
-        {% for i in (1..4) %}
-          <article class="card card--placeholder"><div class="card__media">{% render 'snippets/placeholder', kind: 'product' %}</div><div class="card__body"><h3 class="card__title">Your product</h3><p class="price"><span class="price__now">₹1,299.00</span></p></div></article>
+      <div class="products products--{{ section.settings.layout }}" style="--cols: {{ section.settings.columns }}">
+        {% for i in (1..section.settings.columns) %}
+          {% render 'snippets/product-card-placeholder', index: i %}
         {% endfor %}
       </div>
     {% endif %}

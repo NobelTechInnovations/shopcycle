@@ -1,6 +1,7 @@
 const { checkoutSchema, verifyRazorpayPaymentSchema } = require("@shopcycle/validation");
 const storefrontService = require("../storefront/service");
 const service = require("./service");
+const shopperService = require("../shopper/service");
 
 async function getHandler(request, reply) {
   const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
@@ -16,8 +17,10 @@ async function getHandler(request, reply) {
 async function placeOrderHandler(request, reply) {
   const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
   const body = checkoutSchema.parse(request.body);
+  const shopper = await shopperService.customerFromToken(request.server, store, request.headers["x-shopper-token"]);
   const result = await service.placeOrder(request.server.prisma, store.id, body.cartId, store.handle, body, {
     store,
+    shopper,
     log: request.log,
   });
   reply.code(201).send(result);

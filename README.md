@@ -45,6 +45,27 @@ If you ever change `API_PORT` in the root `.env`, update `NEXT_PUBLIC_API_URL` i
 - API: http://localhost:4000
 - Adminer (DB browser): http://localhost:8080 (server: `mysql`, user: `shopcycle`, pass: `shopcycle`, db: `shopcycle`)
 
+## Deploying the API (Hostinger Node.js hosting)
+
+The API needs the whole repository (it uses the workspace packages and the
+`themes/` folder), so deploy the repo root, not just `apps/api`.
+
+| Setting | Value |
+| --- | --- |
+| Node.js version | 22 |
+| Package manager | pnpm (version comes from `packageManager` in `package.json`: pnpm 10) |
+| Install command | `pnpm install --frozen-lockfile` |
+| Build command | none for the API |
+| Entry file | `apps/api/server.js` (maps the host's `PORT` to `API_PORT`) |
+| Environment | everything in `.env.example` marked for the API — at least `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `DATA_ENCRYPTION_KEY`, `API_PUBLIC_URL`, `NODE_ENV=production` |
+
+- pnpm is pinned to 10 on purpose. The corepack bundled with Node 22 looks for
+  `bin/pnpm.cjs`, which pnpm 11+ no longer ships, so a host resolving "latest"
+  pnpm fails with `Cannot find module …/corepack/v1/pnpm/12.x/bin/pnpm.cjs`.
+- The Prisma client is generated during install (`packages/database`
+  postinstall), so no separate `prisma generate` step is needed. It doesn't
+  need database access.
+
 ## Phase status
 
 - [x] Phase 0 — repo, tooling, docker, schema scaffold

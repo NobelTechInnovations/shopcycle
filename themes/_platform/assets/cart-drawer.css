@@ -1,0 +1,342 @@
+/* Oyklane cart drawer — themed by the same --oy-* tokens as the platform
+   pages (fonts, colours, radius come from the theme's settings). */
+.oy-drawer-open,
+.oy-drawer-open body {
+  overflow: hidden;
+}
+.oy-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  font-family: var(--oy-font-body, system-ui, sans-serif);
+  color: var(--oy-text, #1a1a1a);
+}
+.oy-drawer[hidden] {
+  display: none;
+}
+.oy-drawer__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 12, 0.42);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.oy-drawer__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--oy-bg, #fff);
+  box-shadow: -24px 0 60px -30px rgba(0, 0, 0, 0.35);
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  outline: none;
+}
+.oy-drawer.is-open .oy-drawer__scrim {
+  opacity: 1;
+}
+.oy-drawer.is-open .oy-drawer__panel {
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oy-drawer__scrim,
+  .oy-drawer__panel {
+    transition: none;
+  }
+}
+
+.oy-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--oy-line, #e5e5e5);
+}
+.oy-drawer__head h2 {
+  margin: 0;
+  font-family: var(--oy-font-heading, inherit);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.oy-drawer__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-right: -8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.oy-drawer__close:hover {
+  background: var(--oy-surface, #f5f5f5);
+}
+.oy-drawer :focus-visible {
+  outline: 2px solid var(--oy-primary, #111);
+  outline-offset: 2px;
+}
+
+.oy-drawer__notice {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 13.5px;
+  background: var(--oy-success-bg, #e8f6ee);
+  color: var(--oy-success, #15703a);
+}
+.oy-drawer__notice.is-shown {
+  display: flex;
+}
+
+.oy-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 20px 20px;
+}
+.oy-drawer__body[aria-busy="true"] {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.oy-drawer__body[aria-busy="true"]:empty {
+  min-height: 200px;
+  background:
+    linear-gradient(var(--oy-surface, #f3f3f3) 0 0) 0 20px / 88px 110px no-repeat,
+    linear-gradient(var(--oy-surface, #f3f3f3) 0 0) 104px 28px / 60% 14px no-repeat,
+    linear-gradient(var(--oy-surface, #f3f3f3) 0 0) 104px 54px / 30% 12px no-repeat;
+}
+
+.oy-drawer__ship {
+  margin: 16px 0 4px;
+  font-size: 13.5px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.oy-drawer__bar {
+  flex-basis: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--oy-surface, #f0f0f0);
+  overflow: hidden;
+  margin-top: 6px;
+}
+.oy-drawer__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--oy-primary, #111);
+  transition: width 0.4s ease;
+}
+
+.oy-drawer__lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.oy-line {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--oy-line, #eee);
+  align-items: start;
+}
+.oy-line:last-child {
+  border-bottom: 0;
+}
+.oy-line__media {
+  display: block;
+  aspect-ratio: 4 / 5;
+  border-radius: calc(var(--oy-radius, 12px) * 0.7);
+  overflow: hidden;
+  background: var(--oy-surface, #f5f5f5);
+}
+.oy-line__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.oy-line__ph {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: var(--oy-muted, #888);
+}
+.oy-line__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.oy-line__title {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 14.5px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.oy-line__title:hover {
+  text-decoration: underline;
+}
+.oy-line__price {
+  font-size: 13px;
+  color: var(--oy-muted, #777);
+  font-variant-numeric: tabular-nums;
+}
+.oy-line__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+.oy-line__total {
+  font-size: 14.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.oy-line__remove {
+  border: 0;
+  padding: 4px 0;
+  background: none;
+  color: var(--oy-muted, #777);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.oy-line__remove:hover {
+  color: var(--oy-text, #111);
+}
+.oy-qty {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--oy-line-strong, #d4d4d4);
+  border-radius: var(--oy-radius-button, 999px);
+  height: 36px;
+}
+.oy-qty button {
+  width: 34px;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: inherit;
+}
+.oy-qty button:hover {
+  background: var(--oy-surface, #f5f5f5);
+}
+.oy-qty span {
+  min-width: 26px;
+  text-align: center;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.oy-drawer__foot {
+  padding: 16px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--oy-line, #e5e5e5);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--oy-bg, #fff);
+}
+.oy-drawer__foot[hidden] {
+  display: none;
+}
+.oy-sum {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.oy-sum--save {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--oy-success, #15703a);
+}
+.oy-drawer__fine {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  color: var(--oy-muted, #777);
+}
+.oy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 1px solid var(--oy-primary, #111);
+  border-radius: var(--oy-radius-button, 999px);
+  background: var(--oy-primary, #111);
+  color: var(--oy-on-primary, #fff);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+}
+.oy-btn:hover {
+  opacity: 0.9;
+}
+.oy-btn--block {
+  width: 100%;
+}
+.oy-btn--ghost {
+  background: transparent;
+  color: var(--oy-text, #111);
+  border-color: var(--oy-line-strong, #d4d4d4);
+}
+.oy-btn--ghost:hover {
+  background: var(--oy-surface, #f5f5f5);
+  opacity: 1;
+}
+.oy-drawer__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 64px 12px;
+  color: var(--oy-muted, #777);
+}
+.oy-drawer__empty p {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--oy-text, #111);
+  font-weight: 500;
+}
+
+/* Add-to-cart buttons while the item is being added. */
+[aria-busy="true"].is-loading {
+  cursor: progress;
+  opacity: 0.7;
+}

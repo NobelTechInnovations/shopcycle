@@ -45,6 +45,11 @@ export async function proxyRender(handle, template, extraParams = {}, request = 
     params.set("path", request.nextUrl.pathname);
     // Flash messages from a form's POST/redirect/GET (newsletter signups,
     // account forms) reach whichever page the visitor lands back on.
+    // Previewing an unpublished theme (Online Store ▸ Themes ▸ Preview) —
+    // on any page, not just the home page. The API only renders a theme
+    // that belongs to this store.
+    const previewTheme = request.nextUrl.searchParams.get("themeId");
+    if (previewTheme && /^[a-z0-9]{10,40}$/i.test(previewTheme) && !params.has("themeId")) params.set("themeId", previewTheme);
     for (const key of ["notice", "formError"]) {
       const value = request.nextUrl.searchParams.get(key);
       if (value && !params.has(key)) params.set(key, value.slice(0, 300));

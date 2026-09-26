@@ -17,6 +17,13 @@ const { throttle } = require("../../lib/throttle");
 
 const emailSchema = z.object({ email: z.string().trim().email("Enter a valid email").max(200) });
 const verifySchema = emailSchema.extend({ code: z.string().trim().min(4).max(12) });
+const passwordLoginSchema = emailSchema.extend({ password: z.string().min(1, "Enter your password").max(200) });
+const registerSchema = emailSchema.extend({
+  name: z.string().trim().min(1, "Enter your name").max(120),
+  password: z.string().max(200),
+  acceptsMarketing: z.coerce.boolean().optional(),
+});
+const passwordSchema = z.object({ currentPassword: z.string().max(200).optional().nullable(), password: z.string().max(200) });
 
 const profileSchema = z.object({
   name: z.string().trim().min(1, "Enter your name").max(120),
@@ -71,6 +78,32 @@ async function verifyCodeHandler(request, reply) {
   await throttle(request.server, `otp-verify:${store.id}:${service.normalizeEmail(email)}`, { max: 15, windowSeconds: 15 * 60 });
   const customer = await service.verifyCode(request.server.prisma, store, email, code);
   reply.send({ token: service.signSession(request.server, store, customer), customer: { id: customer.id, name: customer.name } });
+}
+
+async function registerHandler(request, reply) {
+  const store = await storeFor(request);
+  const body = registerSchema.parse(request.body);
+  await throttle(request.server, `shopper-register:${store.id}:${service.normalizeEmail(body.email)}`, { max: 5, windowSeconds: 15 * 60 });
+  const customer = await service.register(request.server.prisma, store, body);
+  reply.code(201).send({ token: service.signSession(request.server, store, customer, "password"), customer: { id: customer.id, name: customer.name } });
+}
+
+async function passwordLoginHandler(request, reply) {
+  const store = await storeFor(request);
+  const { email, password } = passwordLoginSchema.parse(request.body);
+  await throttle(request.server, `shopper-password:${store.id}:${service.normalizeEmail(email)}`, { max: 10, windowSeconds: 15 * 60 });
+  const customer = await service.passwordSignIn(request.server.prisma, store, email, password);
+  reply.send({ token: service.signSession(request.server, store, customer, "password"), customer: { id: customer.id, name: customer.name } });
+}
+
+async function setPasswordHandler(request, reply) {
+  const store = await storeFor(request);
+  const customer = await requireShopper(request, store);
+  const body = passwordSchema.parse(request.body);
+  await throttle(request.server, `shopper-set-password:${customer.id}`, { max: 10, windowSeconds: 15 * 60 });
+  const updated = await service.setPassword(request.server.prisma, customer, body);
+  // The old sessions are gone (tokenVersion moved on); this device keeps going.
+  reply.send({ token: service.signSession(request.server, store, updated, "password") });
 }
 
 async function updateProfileHandler(request, reply) {
@@ -142,6 +175,9 @@ async function recoverHandler(request, reply) {
 module.exports = {
   requestCodeHandler,
   verifyCodeHandler,
+  registerHandler,
+  passwordLoginHandler,
+  setPasswordHandler,
   updateProfileHandler,
   signOutEverywhereHandler,
   lookupHandler,

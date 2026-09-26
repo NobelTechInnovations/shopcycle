@@ -17,6 +17,7 @@
   "card_hover_image": true,
   "card_show_brand": true,
   "card_quick_add": true,
+  "cart_type": "drawer",
   "social_instagram": "",
   "social_facebook": "",
   "social_youtube": "",
@@ -34,7 +35,7 @@
         "m1": {
           "type": "message",
           "settings": {
-            "text": "Free delivery on orders over ₹999",
+            "text": "Free delivery on orders over \u20b9999",
             "link": ""
           }
         },

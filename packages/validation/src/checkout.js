@@ -12,7 +12,9 @@ const checkoutSchema = z.object({
   shippingProvince: z.string().min(1, "State/province is required"),
   shippingZip: z.string().min(1, "ZIP/postal code is required"),
   shippingCountry: z.string().min(1, "Country is required"),
-  paymentMethod: z.enum(["cod", "razorpay"]).default("cod"),
+  // "gift_card" only when a gift card covers the whole order — the API
+  // decides that from the cart, whatever the form says.
+  paymentMethod: z.enum(["cod", "razorpay", "gift_card"]).default("cod"),
   // The unticked-by-default "email me offers" box — explicit consent only.
   acceptsMarketing: z.boolean().default(false),
 });

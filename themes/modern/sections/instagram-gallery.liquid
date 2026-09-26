@@ -1,56 +1,42 @@
-{% comment %}
-  This is curated content (real photos, no reasonable auto-fill exists the
-  way a product/collection list has) — hides entirely rather than showing
-  a heading over an empty row when the merchant hasn't added any photos yet.
-{% endcomment %}
-{% if section.blocks.size > 0 %}
-<section class="instagram-gallery">
-  <div class="instagram-gallery__heading">
-    <h2>{{ section.settings.heading }}</h2>
-    {% if section.settings.subheading != blank %}<p>{{ section.settings.subheading }}</p>{% endif %}
-  </div>
-  <div class="instagram-gallery__row">
-    {% for block in section.blocks %}
-      {% assign product = all_products[block.settings.product] %}
-      {% if block.settings.image != blank %}
-        {% capture tile_style %}background-image: url('{{ block.settings.image | image_url }}');{% endcapture %}
-      {% else %}
-        {% assign tile_style = "" %}
-      {% endif %}
-      {% if product %}
-        <a href="{{ product.url }}" class="instagram-gallery__tile" style="{{ tile_style }}">
-          {% if block.settings.image == blank %}{% render 'snippets/image-placeholder' %}{% endif %}
-          <span class="instagram-gallery__bag" aria-label="Shop {{ product.title }}">
-            {% render 'snippets/icon', icon: 'bag', class: 'icon icon--xs' %}
-          </span>
-        </a>
-      {% else %}
-        <span class="instagram-gallery__tile" style="{{ tile_style }}">
-          {% if block.settings.image == blank %}{% render 'snippets/image-placeholder' %}{% endif %}
-        </span>
-      {% endif %}
-    {% endfor %}
+{% comment %} A grid of photos — your Instagram, customer photos, a lookbook. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, align: 'left', link_url: section.settings.link, link_text: section.settings.link_text %}
+    <div class="gallery">
+      {% for block in section.blocks limit: 6 %}
+        {% if block.settings.link != blank %}<a class="gallery__item" href="{{ block.settings.link }}">{% else %}<div class="gallery__item">{% endif %}
+          {% if block.settings.image != blank %}
+            <img src="{{ block.settings.image | image_url }}" alt="{{ block.settings.alt | escape }}" loading="lazy" width="800" height="800">
+          {% else %}
+            {% assign art = 'product-' | append: forloop.index %}{{ art | placeholder_svg }}
+          {% endif %}
+        {% if block.settings.link != blank %}</a>{% else %}</div>{% endif %}
+      {% endfor %}
+    </div>
   </div>
 </section>
-{% endif %}
 
 {% schema %}
 {
-  "name": "Instagram gallery",
+  "name": "Photo gallery",
   "settings": [
-    { "type": "text", "id": "heading", "label": "Heading", "default": "Follow along" },
-    { "type": "text", "id": "subheading", "label": "Subheading", "default": "" }
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "@yourbrand" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Seen on Instagram" },
+    { "type": "text", "id": "link_text", "label": "Link text", "default": "Follow us" },
+    { "type": "url", "id": "link", "label": "Link" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
   ],
   "blocks": [
-    {
-      "type": "post",
-      "name": "Photo",
-      "settings": [
-        { "type": "image_picker", "id": "image", "label": "Photo" },
-        { "type": "product", "id": "product", "label": "Tagged product (optional)" }
-      ]
-    }
+    { "type": "image", "name": "Photo", "settings": [
+      { "type": "image_picker", "id": "image", "label": "Photo" },
+      { "type": "text", "id": "alt", "label": "Description", "default": "" },
+      { "type": "url", "id": "link", "label": "Link (optional)" }
+    ] }
   ],
-  "max_blocks": 8
+  "default_blocks": [
+    { "type": "image", "settings": {} }, { "type": "image", "settings": {} }, { "type": "image", "settings": {} },
+    { "type": "image", "settings": {} }, { "type": "image", "settings": {} }, { "type": "image", "settings": {} }
+  ],
+  "max_blocks": 6
 }
 {% endschema %}

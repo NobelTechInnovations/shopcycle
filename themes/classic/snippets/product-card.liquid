@@ -12,7 +12,7 @@
         <img class="card__hover" src="{{ product.images[1].url }}" alt="" loading="lazy" width="800" height="1000">
       {% endif %}
     {% else %}
-      {% render 'snippets/placeholder', kind: 'product' %}
+      {% render 'snippets/placeholder', kind: 'image' %}
     {% endif %}
     <span class="card__badges">
       {% unless product.available %}
@@ -24,7 +24,7 @@
   </a>
   {% if settings.card_quick_add and product.available %}
     {% if product.variants.size == 1 %}
-      <form class="card__quick" method="post" action="{{ routes.cart_add_url }}">
+      <form class="card__quick" method="post" action="{{ routes.cart_add_url }}" data-product-title="{{ product.title | escape }}">
         <input type="hidden" name="variantId" value="{{ pv.id }}">
         <input type="hidden" name="quantity" value="1">
         <button type="submit" class="card__quick-btn" aria-label="Add {{ product.title }} to cart">{% render 'snippets/icon', icon: 'plus' %}<span>Add</span></button>

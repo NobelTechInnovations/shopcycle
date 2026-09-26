@@ -1,0 +1,14 @@
+{% comment %}
+  A stand-in card while a section has no products to show yet — like
+  Shopify's "Example product title". `index` (1-based) varies the art.
+{% endcomment %}
+{% assign n = index | default: 1 | minus: 1 | modulo: 6 | plus: 1 %}
+{% assign prices = '1499,899,2499,649,1199,999' | split: ',' %}
+{% assign price_index = n | minus: 1 %}
+<article class="card card--placeholder" aria-label="Example product">
+  <div class="card__media">{% render 'snippets/placeholder', kind: 'product', n: n %}</div>
+  <div class="card__body">
+    <h3 class="card__title">Example product title</h3>
+    <p class="price"><span class="price__now">{{ prices[price_index] | times: 1 | money }}</span></p>
+  </div>
+</article>

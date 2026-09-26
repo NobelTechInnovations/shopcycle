@@ -87,6 +87,12 @@ function serializeCustomer(customer) {
     zip: safe(customer.zip),
     country: safe(customer.country),
     accepts_marketing: customer.acceptsEmailMarketing,
+    has_password: Boolean(customer.passwordHash),
+    email_verified: Boolean(customer.emailVerifiedAt),
+    // Signed in by code within the last half hour: may set a new password
+    // without the old one (see shopper/service.js#setPassword).
+    can_reset_password:
+      customer.signInMethod === "code" && Date.now() / 1000 - (customer.signedInAt || 0) < 30 * 60,
   };
 }
 
@@ -226,7 +232,7 @@ async function bestSellers(prisma, store, allProducts, limit = 12) {
  * of which template is being rendered — cheap enough at this store's scale
  * (see the repository functions' doc note on eager-loading), and it keeps
  * this function the single place that knows the full storefront data shape. */
-async function buildGlobalContext(prisma, store, { slug, cartId, discountError, checkoutError, rootless, customer = null, themeSettings = {} } = {}) {
+async function buildGlobalContext(prisma, store, { slug, cartId, discountError, checkoutError, giftCardError, rootless, customer = null, themeSettings = {} } = {}) {
   const routes = buildRoutes(store.handle, { rootless });
   const [products, collections, cart, menus, apps, facts, articles] = await Promise.all([
     repository.getAllActiveProducts(prisma, store.id),
@@ -286,6 +292,7 @@ async function buildGlobalContext(prisma, store, { slug, cartId, discountError, 
     page_title: store.name,
     discount_error: safe(discountError),
     checkout_error: safe(checkoutError),
+    gift_card_error: safe(giftCardError),
     payment_methods: checkoutService.availablePaymentMethods(),
     platform: { fonts_url: platform.fontsUrl(themeSettings) },
     apps,
@@ -335,6 +342,7 @@ async function renderPage(
     filesOverride,
     discountError,
     checkoutError,
+    giftCardError,
     orderId,
     searchQuery,
     rootless,
@@ -343,6 +351,7 @@ async function renderPage(
     shopperToken,
     orderToken,
     loginStep,
+    loginMode,
     loginEmail,
     formError,
     notice,
@@ -381,6 +390,7 @@ async function renderPage(
     cartId,
     discountError,
     checkoutError,
+    giftCardError,
     rootless,
     customer,
     themeSettings,
@@ -489,13 +499,18 @@ async function renderPage(
   if (templateName === "account-login") {
     globalContext.login = {
       step: loginStep === "code" ? "code" : "email",
+      mode: ["register", "code"].includes(loginMode) ? loginMode : "password",
       email: safe(loginEmail) || "",
       return_to: returnTo || null,
     };
   }
   if (templateName === "account" && customer) {
+    // Until the email is verified by a code, only orders placed while
+    // signed in: anyone can type an address at sign-up.
     const orders = await prisma.order.findMany({
-      where: { storeId: store.id, OR: [{ customerId: customer.id }, { email: { equals: customer.email, mode: "insensitive" } }] },
+      where: customer.emailVerifiedAt
+        ? { storeId: store.id, OR: [{ customerId: customer.id }, { email: { equals: customer.email, mode: "insensitive" } }] }
+        : { storeId: store.id, customerId: customer.id, placedSignedIn: true },
       include: FULL_INCLUDE,
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -558,7 +573,20 @@ async function renderPage(
 
   // Head: design tokens from the theme's settings, the platform
   // stylesheet (platform pages), and search/social tags.
-  const head = `${await platform.headTags(themeSettings, { system })}${seoTags(seo)}`;
+  const drawer = platform.cartDrawerOn(themeSettings, templateName)
+    ? {
+        add: routes.cart_add_url,
+        update: routes.cart_update_url,
+        cart: routes.cart_url,
+        cartJson: `${routes.cart_url}.json`,
+        checkout: routes.checkout_url,
+        shop: routes.all_products_url,
+        root: routes.root_url,
+        currency: store.currency,
+        freeShippingAbove: globalContext.shop.free_shipping_above,
+      }
+    : null;
+  const head = `${await platform.headTags(themeSettings, { system, drawer })}${seoTags(seo)}`;
   html = html.includes("</head>") ? html.replace("</head>", `${head}</head>`) : head + html;
 
   // CSS is fetched by the browser via a separate <link> GET to the asset
@@ -571,7 +599,7 @@ async function renderPage(
     html = html.replace("</head>", `<style>${filesOverride["assets/theme.css"]}</style></head>`);
   }
 
-  let tail = await platform.bodyTags({ system });
+  let tail = await platform.bodyTags({ system, drawer });
   if (templateName === "checkout") tail += checkoutEnhancements(routes, customer);
   if (tail) html = html.includes("</body>") ? html.replace("</body>", `${tail}</body>`) : html + tail;
 

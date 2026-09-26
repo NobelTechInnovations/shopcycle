@@ -15,7 +15,7 @@
               <img src="{{ block.settings.image | image_url }}" alt="{{ block.settings.alt }}" {% if forloop.first %}fetchpriority="high"{% else %}loading="lazy"{% endif %} width="2400" height="1200">
             </picture>
           {% else %}
-            {% render 'snippets/placeholder', kind: 'lifestyle' %}
+            {% render 'snippets/placeholder', kind: 'lifestyle', n: forloop.index %}
           {% endif %}
           <span class="slide__scrim" style="opacity: {{ block.settings.overlay | divided_by: 100.0 }}"></span>
         </div>

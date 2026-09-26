@@ -95,5 +95,11 @@ async function removeGiftCardHandler(request, reply) {
 }
 
 module.exports = {
+  getHandler,
+  addHandler,
+  updateHandler,
+  applyDiscountHandler,
+  removeDiscountHandler,
   applyGiftCardHandler,
-  removeGiftCardHandler, getHandler, addHandler, updateHandler, applyDiscountHandler, removeDiscountHandler };
+  removeGiftCardHandler,
+};

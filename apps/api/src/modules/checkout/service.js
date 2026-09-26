@@ -50,7 +50,7 @@ async function createRazorpayOrder(amountInRupees, receipt) {
  * (never trusting client-submitted totals) so the price/discount/shipping/
  * tax actually charged is always what the store's current configuration
  * says it should be, not whatever the checkout form happened to render. */
-async function placeOrder(prisma, storeId, cartId, handle, input, { store, log } = {}) {
+async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopper = null, log } = {}) {
   input = { ...input, email: String(input.email).trim().toLowerCase() };
   const raw = await cartService.readRaw(prisma, storeId, cartId);
   const cart = await cartService.hydrateCart(prisma, storeId, cartId, raw);
@@ -61,6 +61,9 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, log }
   const giftCard = cart.gift_card && cart.gift_card.amount > 0 ? cart.gift_card : null;
   const due = cart.due;
   if (due <= 0) input = { ...input, paymentMethod: "gift_card" };
+  else if (input.paymentMethod === "gift_card") {
+    throw new HttpError(400, "Your gift card no longer covers the whole order. Choose how to pay the rest.");
+  }
   if (input.paymentMethod === "razorpay" && !razorpayConfigured()) {
     throw new HttpError(400, "Online payment isn't available for this store yet");
   }
@@ -91,10 +94,16 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, log }
     // on a later order doesn't unsubscribe someone who opted in before.
     ...(input.acceptsMarketing && { acceptsEmailMarketing: true }),
   };
-  const existingCustomer = await customersRepository.findByEmail(prisma, storeId, input.email);
-  const customer = existingCustomer
-    ? await customersRepository.update(prisma, existingCustomer.id, customerFields)
-    : await customersRepository.create(prisma, storeId, { email: input.email, ...customerFields });
+  // Signed in and checking out with the account's own email: the order
+  // belongs to the account. A guest using an account's email still gets
+  // the order recorded, but can't change what the account has saved.
+  const signedIn = Boolean(shopper && shopper.email.toLowerCase() === input.email);
+  const existingCustomer = signedIn ? shopper : await customersRepository.findByEmail(prisma, storeId, input.email);
+  const customer = !existingCustomer
+    ? await customersRepository.create(prisma, storeId, { email: input.email, ...customerFields })
+    : existingCustomer.passwordHash && !signedIn
+      ? existingCustomer
+      : await customersRepository.update(prisma, existingCustomer.id, customerFields);
 
   const orderItems = cart.items.map((item) => ({
     productId: item.productId,
@@ -126,6 +135,7 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, log }
     sessionId: session?.id || null,
     giftCardAmount: giftCard?.amount || 0,
     giftCardId: giftCard?.id || null,
+    placedSignedIn: signedIn,
     ...(due <= 0 && { paymentStatus: "paid" }),
   };
 

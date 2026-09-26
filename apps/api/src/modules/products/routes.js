@@ -7,6 +7,7 @@ async function productRoutes(fastify) {
 
   fastify.get("/", controller.listHandler);
   fastify.post("/", controller.createHandler);
+  fastify.post("/bulk", controller.bulkHandler);
   fastify.get("/:id", controller.getHandler);
   fastify.patch("/:id", controller.updateHandler);
   fastify.delete("/:id", controller.deleteHandler);

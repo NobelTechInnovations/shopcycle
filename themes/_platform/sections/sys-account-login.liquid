@@ -1,10 +1,16 @@
-{% comment %} Shopper sign-in by emailed code — two steps on one URL. {% endcomment %}
+{% comment %}
+  Shopper sign-in and sign-up — one page, three modes:
+    password (default) · code (email me a code, then the code step) · register
+{% endcomment %}
+{%- capture return_field -%}{% if login.return_to %}<input type="hidden" name="return_to" value="{{ login.return_to }}">{% endif %}{%- endcapture -%}
+{%- capture return_query -%}{% if login.return_to %}?return_to={{ login.return_to }}{% endif %}{%- endcapture -%}
 <div class="sys">
   <section class="sys-section">
     <div class="sys-container">
       <div class="sys-auth">
-        {% if login.step == "code" %}
-          <p class="sys-eyebrow" style="margin-bottom:10px">{{ shop.name }}</p>
+        <p class="sys-eyebrow" style="margin-bottom:10px">{{ shop.name }}</p>
+
+        {% if login.mode == "code" and login.step == "code" %}
           <h1 class="sys-h1">Check your email</h1>
           <p class="sys-muted" style="margin:10px 0 24px">We sent a 6-digit code to <strong style="color:var(--oy-text)">{{ login.email }}</strong>. It expires in 10 minutes.</p>
           <div class="sys-card">
@@ -24,16 +30,45 @@
               <a class="sys-link" href="{{ routes.account_login_url }}?change=1">Use a different email</a>
             </form>
           </div>
-        {% else %}
-          <p class="sys-eyebrow" style="margin-bottom:10px">{{ shop.name }}</p>
-          <h1 class="sys-h1">Sign in</h1>
-          <p class="sys-muted" style="margin:10px 0 24px">Enter your email and we'll send you a code — no password needed. You'll see your orders, and checkout remembers your address.</p>
+
+        {% elsif login.mode == "register" %}
+          <h1 class="sys-h1">Create an account</h1>
+          <p class="sys-muted" style="margin:10px 0 24px">Track your orders in one place, and check out faster with your details saved.</p>
+          <div class="sys-card">
+            {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+            <form method="post" action="{{ routes.account_register_url }}" class="sys-stack" data-sys-once>
+              {{ return_field }}
+              <label class="sys-field">
+                <span class="sys-label">Full name</span>
+                <input class="sys-input" name="name" autocomplete="name" required autofocus maxlength="120">
+              </label>
+              <label class="sys-field">
+                <span class="sys-label">Email</span>
+                <input class="sys-input" type="email" name="email" autocomplete="email" required value="{{ login.email }}" placeholder="you@example.com">
+              </label>
+              <label class="sys-field">
+                <span class="sys-label">Password</span>
+                <span class="sys-password">
+                  <input class="sys-input" type="password" name="password" autocomplete="new-password" required minlength="8" maxlength="200" aria-describedby="pw-hint" data-sys-password>
+                  <button type="button" class="sys-password__toggle" data-sys-reveal aria-label="Show password">Show</button>
+                </span>
+                <span class="sys-hint" id="pw-hint">At least 8 characters.</span>
+              </label>
+              <label class="sys-check"><input type="checkbox" name="acceptsMarketing" value="true"> <span>Email me about new arrivals and offers</span></label>
+              <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Creating your account…">Create account</button>
+            </form>
+          </div>
+          <p class="sys-small sys-muted" style="margin-top:20px;text-align:center">Already have an account? <a class="sys-link" href="{{ routes.account_login_url }}{{ return_query }}">Sign in</a></p>
+
+        {% elsif login.mode == "code" %}
+          <h1 class="sys-h1">Sign in with a code</h1>
+          <p class="sys-muted" style="margin:10px 0 24px">Enter your email and we'll send you a one-time code — no password needed. Use this if you've forgotten your password, too.</p>
           <div class="sys-card">
             {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
             {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
             <form method="post" action="{{ routes.account_login_url }}" class="sys-stack" data-sys-once>
               <input type="hidden" name="intent" value="request">
-              {% if login.return_to %}<input type="hidden" name="return_to" value="{{ login.return_to }}">{% endif %}
+              {{ return_field }}
               <label class="sys-field">
                 <span class="sys-label">Email</span>
                 <input class="sys-input" type="email" name="email" autocomplete="email" required autofocus value="{{ login.email }}" placeholder="you@example.com">
@@ -41,7 +76,37 @@
               <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Sending…">Email me a code</button>
             </form>
           </div>
-          <p class="sys-small sys-muted" style="margin-top:20px;text-align:center">Ordered as a guest? <a class="sys-link" href="{{ routes.order_lookup_url }}">Find your order</a></p>
+          <p class="sys-small sys-muted" style="margin-top:20px;text-align:center"><a class="sys-link" href="{{ routes.account_login_url }}{{ return_query }}">Sign in with a password instead</a></p>
+
+        {% else %}
+          <h1 class="sys-h1">Sign in</h1>
+          <p class="sys-muted" style="margin:10px 0 24px">See your orders, and check out faster with your details saved.</p>
+          <div class="sys-card">
+            {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+            {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
+            <form method="post" action="{{ routes.account_login_url }}" class="sys-stack" data-sys-once>
+              <input type="hidden" name="intent" value="password">
+              {{ return_field }}
+              <label class="sys-field">
+                <span class="sys-label">Email</span>
+                <input class="sys-input" type="email" name="email" autocomplete="email" required {% unless login.email != blank %}autofocus{% endunless %} value="{{ login.email }}" placeholder="you@example.com">
+              </label>
+              <label class="sys-field">
+                <span class="sys-row sys-row--between"><span class="sys-label">Password</span><a class="sys-link sys-small" href="{{ routes.account_login_url }}?mode=code{% if login.return_to %}&return_to={{ login.return_to }}{% endif %}">Forgot password?</a></span>
+                <span class="sys-password">
+                  <input class="sys-input" type="password" name="password" autocomplete="current-password" required maxlength="200" {% if login.email != blank %}autofocus{% endif %} data-sys-password>
+                  <button type="button" class="sys-password__toggle" data-sys-reveal aria-label="Show password">Show</button>
+                </span>
+              </label>
+              <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Signing in…">Sign in</button>
+            </form>
+            <div class="sys-or"><span>or</span></div>
+            <a class="sys-btn sys-btn--secondary sys-btn--block" href="{{ routes.account_login_url }}?mode=code{% if login.return_to %}&return_to={{ login.return_to }}{% endif %}">
+              {% render 'snippets/sys-icon', icon: 'mail' %} Email me a sign-in code
+            </a>
+          </div>
+          <p class="sys-small sys-muted" style="margin-top:20px;text-align:center">New here? <a class="sys-link" href="{{ routes.account_register_url }}{{ return_query }}">Create an account</a></p>
+          <p class="sys-small sys-muted" style="margin-top:6px;text-align:center">Ordered as a guest? <a class="sys-link" href="{{ routes.order_lookup_url }}">Find your order</a></p>
         {% endif %}
       </div>
     </div>

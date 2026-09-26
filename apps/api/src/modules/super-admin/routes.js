@@ -1,5 +1,6 @@
 const controller = require("./controller");
 const security = require("./security");
+const { overview } = require("./overview");
 const { recordAudit } = require("../../lib/audit");
 
 // Human-readable audit action names for platform mutations. Anything
@@ -41,6 +42,7 @@ async function superAdminRoutes(fastify) {
     });
   });
 
+  fastify.get("/overview", async (request) => overview(request.server.prisma));
   fastify.get("/companies", controller.listCompaniesHandler);
   fastify.patch("/companies/:id/status", controller.updateCompanyStatusHandler);
 

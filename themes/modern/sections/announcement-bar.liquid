@@ -1,14 +1,52 @@
-<div class="announcement-bar announcement-bar--modern" style="background: {{ section.settings.background }}; color: {{ section.settings.text_color }};">
-  <p>{{ section.settings.text }}</p>
+{% comment %}
+  Slim bar above the header. "Scrolling" runs the messages as a ticker;
+  "Rotating" shows one at a time. Hidden when switched off or empty.
+{% endcomment %}
+{% if section.settings.show and section.blocks.size > 0 %}
+<div class="announce announce--{{ section.settings.style }}" style="--an-bg: {{ section.settings.background }}; --an-fg: {{ section.settings.text_color }}" role="region" aria-label="Announcements">
+  {% if section.settings.style == 'marquee' %}
+    <div class="announce__track" aria-hidden="true">
+      {% for i in (1..4) %}
+        <div class="announce__group">
+          {% for block in section.blocks %}
+            <span class="announce__item">{% render 'snippets/icon', icon: 'star4', class: 'icon announce__star' %}{{ block.settings.text }}</span>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+    <ul class="visually-hidden">
+      {% for block in section.blocks %}<li>{% if block.settings.link != blank %}<a href="{{ block.settings.link }}">{{ block.settings.text }}</a>{% else %}{{ block.settings.text }}{% endif %}</li>{% endfor %}
+    </ul>
+  {% else %}
+    <div class="container announce__rotator" data-announce>
+      {% for block in section.blocks %}
+        <p class="announce__msg{% if forloop.first %} is-active{% endif %}">
+          {% if block.settings.link != blank %}<a href="{{ block.settings.link }}">{{ block.settings.text }}</a>{% else %}{{ block.settings.text }}{% endif %}
+        </p>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>
+{% endif %}
 
 {% schema %}
 {
   "name": "Announcement bar",
   "settings": [
-    { "type": "text", "id": "text", "label": "Message", "default": "New season, new arrivals" },
-    { "type": "color", "id": "background", "label": "Background", "default": "#0F0F0F" },
-    { "type": "color", "id": "text_color", "label": "Text color", "default": "#FFFFFF" }
-  ]
+    { "type": "checkbox", "id": "show", "label": "Show announcement bar", "default": true },
+    { "type": "select", "id": "style", "label": "Style", "default": "marquee", "options": [
+      { "value": "marquee", "label": "Scrolling ticker" },
+      { "value": "rotate", "label": "One message at a time" }
+    ] },
+    { "type": "color", "id": "background", "label": "Background", "default": "#0E0E0E" },
+    { "type": "color", "id": "text_color", "label": "Text", "default": "#FFFFFF" }
+  ],
+  "blocks": [
+    { "type": "message", "name": "Message", "settings": [
+      { "type": "text", "id": "text", "label": "Text", "default": "Free shipping on orders over ₹999" },
+      { "type": "text", "id": "link", "label": "Link (optional)", "default": "" }
+    ] }
+  ],
+  "max_blocks": 6
 }
 {% endschema %}

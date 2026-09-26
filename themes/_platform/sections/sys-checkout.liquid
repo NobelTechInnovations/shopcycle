@@ -25,6 +25,10 @@
     <div class="sys-sumrow"><span>Delivery</span><span class="sys-num">{% if cart.shipping %}{% if cart.shipping.amount > 0 %}{{ cart.shipping.amount | money }}{% else %}Free{% endif %}{% else %}Free{% endif %}</span></div>
     {% if cart.tax %}<div class="sys-sumrow"><span>{{ cart.tax.name }}</span><span class="sys-num">{{ cart.tax.amount | money }}</span></div>{% endif %}
     <div class="sys-sumrow sys-sumrow--total"><span>Total</span><span class="sys-num">{{ cart.total | money }}</span></div>
+    {% if cart.gift_card and cart.gift_card.amount > 0 %}
+      <div class="sys-sumrow sys-sumrow--saving"><span>Gift card ••••{{ cart.gift_card.last4 }}</span><span class="sys-num">−{{ cart.gift_card.amount | money }}</span></div>
+      <div class="sys-sumrow sys-sumrow--total"><span>To pay</span><span class="sys-num">{{ cart.due | money }}</span></div>
+    {% endif %}
   </div>
 {% endcapture %}
 
@@ -32,9 +36,12 @@
   <details class="sys-mobile-summary">
     <summary>
       <span class="sys-row" style="gap:8px">{% render 'snippets/sys-icon', icon: 'bag' %} Show order summary {% render 'snippets/sys-icon', icon: 'chevron-down' %}</span>
-      <strong class="sys-num">{{ cart.total | money }}</strong>
+      <strong class="sys-num">{{ cart.due | money }}</strong>
     </summary>
-    <div class="sys-mobile-summary__body">{{ summary_items }}</div>
+    <div class="sys-mobile-summary__body">
+      {{ summary_items }}
+      <div class="sys-stack" style="gap:10px;margin-top:18px">{% render 'snippets/sys-gift-card', back: 'checkout', slot: 'mobile' %}</div>
+    </div>
   </details>
 
   <div class="sys-checkout-wrap">
@@ -117,6 +124,15 @@
               <h2>Payment</h2>
               <span class="sys-secure">{% render 'snippets/sys-icon', icon: 'lock' %} Secure</span>
             </div>
+            {% if cart.due <= 0 %}
+              <div class="sys-alert sys-alert--success" role="status" style="margin:0">
+                {% render 'snippets/sys-icon', icon: 'gift' %} Your gift card covers the whole order — there's nothing more to pay.
+              </div>
+              <input type="hidden" name="paymentMethod" value="gift_card">
+            {% else %}
+            {% if cart.gift_card and cart.gift_card.amount > 0 %}
+              <p class="sys-small sys-muted" style="margin:0 0 12px">Your gift card pays {{ cart.gift_card.amount | money }}. Choose how to pay the remaining {{ cart.due | money }}.</p>
+            {% endif %}
             <div class="sys-pay" role="radiogroup" aria-label="Payment method">
               {% for method in payment_methods %}
                 <label class="sys-pay__opt">
@@ -138,14 +154,16 @@
                 </label>
               {% endfor %}
             </div>
+            {% endif %}
           </div>
 
-          <button type="submit" class="sys-btn sys-btn--lg sys-btn--block" data-busy-label="Placing your order…">Place order · {{ cart.total | money }}</button>
+          <button type="submit" class="sys-btn sys-btn--lg sys-btn--block" data-busy-label="Placing your order…">{% if cart.due <= 0 %}Place order{% else %}Place order · {{ cart.due | money }}{% endif %}</button>
           <p class="sys-small sys-muted" style="text-align:center">By placing your order you agree to {{ shop.name }}'s terms and privacy policy.</p>
         </form>
 
         <aside class="sys-checkout__aside" aria-label="Order summary">
           {{ summary_items }}
+          <div class="sys-stack" style="gap:10px;margin-top:20px">{% render 'snippets/sys-gift-card', back: 'checkout', slot: 'aside' %}</div>
           <div class="sys-stack" style="gap:8px;margin-top:24px">
             {% if shop.return_days > 0 %}<span class="sys-note">{% render 'snippets/sys-icon', icon: 'return' %} Easy {{ shop.return_days }}-day returns</span>{% endif %}
             <span class="sys-note">{% render 'snippets/sys-icon', icon: 'shield' %} Payments and details are sent over an encrypted connection</span>

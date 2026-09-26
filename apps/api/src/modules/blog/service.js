@@ -29,6 +29,21 @@ function readingMinutes(body) {
   return Math.max(1, Math.round(words / 200));
 }
 
+const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+
+/** Posts can be written as HTML or as plain text; plain text becomes
+ * paragraphs (a blank line between them) with line breaks kept. */
+function bodyHtml(body) {
+  const text = String(body || "");
+  if (/<\/?[a-z][^>]*>/i.test(text)) return text;
+  return text
+    .split(/\n\s*\n/)
+    .map((para) => para.trim())
+    .filter(Boolean)
+    .map((para) => `<p>${para.replace(/[&<>"']/g, (c) => ESC[c]).replace(/\n/g, "<br>")}</p>`)
+    .join("\n");
+}
+
 /** A post as the storefront sees it. `full` adds the body. */
 function serializeArticle(article, routes, { full = false, timeZone } = {}) {
   return {
@@ -47,7 +62,7 @@ function serializeArticle(article, routes, { full = false, timeZone } = {}) {
     reading_minutes: readingMinutes(article.body),
     seo_title: article.seoTitle || null,
     seo_description: article.seoDescription || null,
-    ...(full && { content: article.body || "" }),
+    ...(full && { content: bodyHtml(article.body) }),
   };
 }
 

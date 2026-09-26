@@ -2,11 +2,13 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { proxyRender, API_URL, CART_COOKIE, VISITOR_COOKIE } from "@/lib/render";
 import { storefrontPath } from "@/lib/domain";
+import { shopperToken } from "@/lib/shopper";
 
 export async function GET(request, { params }) {
   const { handle } = await params;
-  const checkoutError = request.nextUrl.searchParams.get("checkoutError");
-  return proxyRender(handle, "checkout", checkoutError ? { checkoutError } : {}, request);
+  const sp = request.nextUrl.searchParams;
+  const flash = Object.fromEntries(["checkoutError", "giftCardError"].filter((k) => sp.get(k)).map((k) => [k, sp.get(k)]));
+  return proxyRender(handle, "checkout", flash, request);
 }
 
 /** Places the order server-side (never trusting anything the client could
@@ -38,9 +40,10 @@ export async function POST(request, { params }) {
     acceptsMarketing: form.get("acceptsMarketing") === "true",
   };
 
+  const token = await shopperToken();
   const res = await fetch(`${API_URL}/api/storefront/${handle}/checkout`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(token && { "x-shopper-token": token }) },
     body: JSON.stringify(body),
   });
 

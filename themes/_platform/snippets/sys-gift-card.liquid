@@ -1,0 +1,26 @@
+{% comment %}
+  Apply / remove a gift card. `back` is where the form returns to
+  ("cart" or "checkout"). Sits outside the checkout form (no nesting).
+{% endcomment %}
+{% if cart.gift_card %}
+  <form method="post" action="{{ routes.cart_gift_card_remove_url }}" class="sys-row sys-row--between sys-row--wrap" style="gap:8px">
+    <input type="hidden" name="back" value="{{ back }}">
+    <span class="sys-applied">{% render 'snippets/sys-icon', icon: 'gift' %} Gift card ••••{{ cart.gift_card.last4 }}<button type="submit" aria-label="Remove gift card ending {{ cart.gift_card.last4 }}">{% render 'snippets/sys-icon', icon: 'x' %}</button></span>
+    {% if cart.gift_card.error %}
+      <span class="sys-small" style="color:var(--oy-danger)">{{ cart.gift_card.error }}</span>
+    {% else %}
+      <span class="sys-small sys-muted sys-num">{{ cart.gift_card.balance_after | money }} left on the card</span>
+    {% endif %}
+  </form>
+{% else %}
+  <details class="sys-disclose"{% if gift_card_error %} open{% endif %}>
+    <summary>{% render 'snippets/sys-icon', icon: 'gift' %} Have a gift card? {% render 'snippets/sys-icon', icon: 'chevron-down' %}</summary>
+    <form method="post" action="{{ routes.cart_gift_card_url }}" class="sys-inline-form" style="margin-top:10px">
+      <input type="hidden" name="back" value="{{ back }}">
+      <label class="sys-sr-only" for="sys-gift-{{ back }}-{{ slot }}">Gift card code</label>
+      <input class="sys-input" id="sys-gift-{{ back }}-{{ slot }}" type="text" name="code" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" maxlength="24" spellcheck="false" style="text-transform:uppercase">
+      <button type="submit" class="sys-btn sys-btn--secondary">Apply</button>
+    </form>
+  </details>
+{% endif %}
+{% if gift_card_error %}<p class="sys-alert sys-alert--error" role="alert" style="margin:0">{{ gift_card_error }}</p>{% endif %}

@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, ConfigProvider } from "antd";
-import { Building2, CreditCard, Grid3x3, Users, LogOut, ShieldCheck, ScrollText, Mail } from "lucide-react";
+import { Building2, CreditCard, Grid3x3, Users, LogOut, ShieldCheck, ScrollText, Mail, LayoutDashboard } from "lucide-react";
 import { BrandMark } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 const NAV_ITEMS = [
+  {
+    key: "/overview",
+    icon: <LayoutDashboard size={16} aria-hidden="true" />,
+    label: <Link href="/overview">Overview</Link>,
+  },
   {
     key: "/companies",
     icon: <Building2 size={16} aria-hidden="true" />,
@@ -70,7 +75,7 @@ export function SuperAdminNav({ userName }) {
 
   return (
     <aside className="w-60 shrink-0 h-screen sticky top-0 flex flex-col" style={{ background: "#0B0B0F" }}>
-      <Link href="/companies" className="h-14 flex items-center px-5 shrink-0" aria-label="Platform home">
+      <Link href="/overview" className="h-14 flex items-center px-5 shrink-0" aria-label="Platform home">
         <BrandMark size={24} tone="dark" label="Platform" />
       </Link>
       <ConfigProvider

@@ -26,6 +26,9 @@ import {
   Boxes,
   ShoppingBag,
   RotateCcw,
+  Gift,
+  Newspaper,
+  SlidersHorizontal,
 } from "lucide-react";
 
 // Mirrors the full target IA (not just what's wired in Phase 1) so the shell
@@ -107,6 +110,11 @@ const NAV_ITEMS = [
         icon: <Grid3x3 size={14} aria-hidden="true" />,
         label: <Link href="/admin/products/categories">Categories</Link>,
       },
+      {
+        key: "/admin/gift-cards",
+        icon: <Gift size={14} aria-hidden="true" />,
+        label: <Link href="/admin/gift-cards">Gift cards</Link>,
+      },
     ],
   },
   {
@@ -135,6 +143,11 @@ const NAV_ITEMS = [
         label: <Link href="/admin/content/pages">Pages</Link>,
       },
       {
+        key: "/admin/content/blog",
+        icon: <Newspaper size={14} aria-hidden="true" />,
+        label: <Link href="/admin/content/blog">Blog posts</Link>,
+      },
+      {
         key: "/admin/content/navigation",
         icon: <NavigationIcon size={14} aria-hidden="true" />,
         label: <Link href="/admin/content/navigation">Navigation</Link>,
@@ -155,6 +168,11 @@ const NAV_ITEMS = [
         key: "/admin/online-store/themes",
         icon: <Palette size={14} aria-hidden="true" />,
         label: <Link href="/admin/online-store/themes">Themes</Link>,
+      },
+      {
+        key: "/admin/online-store/preferences",
+        icon: <SlidersHorizontal size={14} aria-hidden="true" />,
+        label: <Link href="/admin/online-store/preferences">Preferences</Link>,
       },
     ],
   },

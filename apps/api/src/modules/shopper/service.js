@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const { HttpError } = require("@shopcycle/utils");
 const { sendEmail } = require("../../lib/mailer");
 const { safeEqual } = require("../../lib/crypto");
@@ -6,10 +7,15 @@ const templates = require("../../emails/templates");
 const customersRepository = require("../customers/repository");
 
 /**
- * Shopper accounts. There are no passwords: a shopper signs in with a
- * 6-digit code emailed to them (ShopperOtp), and gets a session for that
- * one store only. Guest checkout keeps working exactly as before — an
- * account just remembers their details and shows their orders.
+ * Shopper accounts, for one store only. Two ways in:
+ *   - a 6-digit code emailed to them (ShopperOtp) — this also proves they
+ *     own the address (emailVerifiedAt);
+ *   - an email and password, set at sign-up or later from the account page.
+ * A password account whose email was never verified only sees orders
+ * placed while signed in to it, and can't be created over an existing
+ * customer record that already holds someone's orders or address.
+ * Guest checkout keeps working exactly as before — an account just
+ * remembers their details and shows their orders.
  *
  * Session: a JWT with aud "shopper", the store id (`sid`) and the
  * customer's tokenVersion (`tv`). The storefront keeps it in an HttpOnly
@@ -21,6 +27,13 @@ const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const MAX_CODES_PER_WINDOW = 3; // per email, per store, per 10 minutes
 const SESSION_TTL = "30d";
+const MIN_PASSWORD = 8;
+// Lets a shopper who signed in by code set a new password without the old
+// one (the "forgot password" path) — only shortly after that sign-in.
+const CODE_SESSION_RESET_WINDOW_S = 30 * 60;
+// Compared against when no password exists, so "no such account" takes as
+// long as "wrong password".
+const DUMMY_HASH = "$2a$10$CwTycUXWue0Thq9StjUM0uJ8.6fXhjMpJ9C3kWo8wP2E6jz1rQ4mC";
 
 const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
 
@@ -103,11 +116,82 @@ async function verifyCode(prisma, store, rawEmail, rawCode) {
   });
 }
 
-function signSession(fastify, store, customer) {
+/** `method` is how they signed in ("code" or "password"). */
+function signSession(fastify, store, customer, method = "code") {
   return fastify.jwt.sign(
-    { sub: customer.id, sid: store.id, tv: customer.tokenVersion ?? 0, aud: "shopper" },
+    { sub: customer.id, sid: store.id, tv: customer.tokenVersion ?? 0, aud: "shopper", m: method },
     { expiresIn: SESSION_TTL }
   );
+}
+
+function checkPassword(password) {
+  const value = String(password || "");
+  if (value.length < MIN_PASSWORD) throw new HttpError(400, `Use at least ${MIN_PASSWORD} characters for your password.`);
+  if (value.length > 200) throw new HttpError(400, "That password is too long.");
+  return value;
+}
+
+/** A customer record a new sign-up may take over: nobody has signed in to
+ * it, and it holds nothing private yet (a newsletter signup, say). */
+async function claimable(prisma, customer) {
+  if (customer.passwordHash || customer.emailVerifiedAt) return false;
+  if (customer.address1 || customer.phone) return false;
+  const orders = await prisma.order.count({ where: { storeId: customer.storeId, OR: [{ customerId: customer.id }, { email: { equals: customer.email, mode: "insensitive" } }] } });
+  return orders === 0;
+}
+
+async function register(prisma, store, input) {
+  const email = normalizeEmail(input.email);
+  const password = checkPassword(input.password);
+  const name = String(input.name || "").trim() || email.split("@")[0];
+  const existing = await customersRepository.findByEmail(prisma, store.id, email);
+  if (existing && existing.passwordHash) {
+    throw new HttpError(409, "There's already an account with this email. Sign in instead.");
+  }
+  if (existing && !(await claimable(prisma, existing))) {
+    // They've ordered or signed in here before. Typing the address proves
+    // nothing, so their order history needs an emailed code first.
+    throw new HttpError(
+      409,
+      "You've shopped here before with this email. To keep your orders private, sign in with an email code first — you can set a password from your account after that."
+    );
+  }
+  const data = {
+    name,
+    passwordHash: await bcrypt.hash(password, 10),
+    passwordSetAt: new Date(),
+    lastSignInAt: new Date(),
+    ...(input.acceptsMarketing && { acceptsEmailMarketing: true }),
+  };
+  if (existing) return prisma.customer.update({ where: { id: existing.id }, data });
+  const created = await customersRepository.create(prisma, store.id, { email, name });
+  return prisma.customer.update({ where: { id: created.id }, data });
+}
+
+async function passwordSignIn(prisma, store, rawEmail, password) {
+  const email = normalizeEmail(rawEmail);
+  const customer = await customersRepository.findByEmail(prisma, store.id, email);
+  const ok = await bcrypt.compare(String(password || ""), customer?.passwordHash || DUMMY_HASH);
+  if (!customer?.passwordHash || !ok) throw new HttpError(400, "Email or password is incorrect.");
+  return prisma.customer.update({ where: { id: customer.id }, data: { lastSignInAt: new Date() } });
+}
+
+/** Sets or changes the password from the account page. The current one is
+ * needed, unless they signed in by emailed code in the last half hour
+ * (how a forgotten password is replaced). Other devices are signed out;
+ * the caller gets a fresh session for this one. */
+async function setPassword(prisma, customer, { currentPassword, password }) {
+  const next = checkPassword(password);
+  const viaRecentCode = customer.signInMethod === "code" && Date.now() / 1000 - (customer.signedInAt || 0) < CODE_SESSION_RESET_WINDOW_S;
+  if (customer.passwordHash && !viaRecentCode) {
+    if (!(await bcrypt.compare(String(currentPassword || ""), customer.passwordHash))) {
+      throw new HttpError(400, "Your current password isn't right.");
+    }
+  }
+  return prisma.customer.update({
+    where: { id: customer.id },
+    data: { passwordHash: await bcrypt.hash(next, 10), passwordSetAt: new Date(), tokenVersion: { increment: 1 } },
+  });
 }
 
 /** The signed-in shopper for this store, or null. Anything off — wrong
@@ -123,7 +207,8 @@ async function customerFromToken(fastify, store, token) {
   if (payload.aud !== "shopper" || payload.sid !== store.id || !payload.sub) return null;
   const customer = await fastify.prisma.customer.findFirst({ where: { id: payload.sub, storeId: store.id } });
   if (!customer || (payload.tv ?? 0) !== customer.tokenVersion) return null;
-  return customer;
+  // Sessions from before passwords existed were all by code.
+  return Object.assign(customer, { signInMethod: payload.m === "password" ? "password" : "code", signedInAt: payload.iat || 0 });
 }
 
 async function updateProfile(prisma, store, customer, input) {
@@ -145,4 +230,15 @@ async function signOutEverywhere(prisma, customer) {
   await prisma.customer.update({ where: { id: customer.id }, data: { tokenVersion: { increment: 1 } } });
 }
 
-module.exports = { requestCode, verifyCode, signSession, customerFromToken, updateProfile, signOutEverywhere, normalizeEmail };
+module.exports = {
+  requestCode,
+  verifyCode,
+  register,
+  passwordSignIn,
+  setPassword,
+  signSession,
+  customerFromToken,
+  updateProfile,
+  signOutEverywhere,
+  normalizeEmail,
+};

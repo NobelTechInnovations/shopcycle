@@ -12,13 +12,13 @@ const { loadThemePackage } = require("./file-loader");
 const MASTER_THEMES = {
   classic: {
     name: "Classic",
-    version: "2.0.0",
+    version: "2.1.1",
     description: "Clean and versatile — slideshow, collections, product rows, offers, reviews and a journal. Suits fashion, home, beauty and gifting.",
   },
   modern: {
     name: "Modern",
-    version: "1.1.0",
-    description: "Warm editorial look for premium D2C brands.",
+    version: "2.0.1",
+    description: "Bold and editorial for D2C brands — full-bleed hero, scrolling text, bento categories, promo tiles, reviews and FAQ.",
   },
 };
 
@@ -90,21 +90,31 @@ async function installTheme(prisma, storeId, handle) {
   ]);
 
   const settingsData = JSON.parse(settingsSchemaRaw);
+  const name =
+    existingThemeCount > 0 && (await prisma.theme.count({ where: { storeId, handle } })) > 0
+      ? `${master.name} ${master.version.split(".").slice(0, 2).join(".")}`
+      : master.name;
 
-  return prisma.theme.create({
-    data: {
-      storeId,
-      name: existingThemeCount > 0 && (await prisma.theme.count({ where: { storeId, handle } })) > 0 ? `${master.name} ${master.version.split(".").slice(0, 2).join(".")}` : master.name,
-      handle,
-      version: master.version,
-      description: master.description,
-      status: "installed",
-      isActive: existingThemeCount === 0, // first theme a store installs goes live automatically
-      settingsData,
-      files: { create: files },
-    },
-    include: { files: false },
-  });
+  // The files go in as one bulk insert — a nested create is one INSERT per
+  // file, which over a distant database is what made store sign-up slow.
+  const write = async (db) => {
+    const theme = await db.theme.create({
+      data: {
+        storeId,
+        name,
+        handle,
+        version: master.version,
+        description: master.description,
+        status: "installed",
+        isActive: existingThemeCount === 0, // first theme a store installs goes live automatically
+        settingsData,
+      },
+    });
+    await db.themeFile.createMany({ data: files.map((f) => ({ ...f, themeId: theme.id })) });
+    return theme;
+  };
+  // Inside the caller's transaction (store sign-up) or in one of our own.
+  return typeof prisma.$transaction === "function" ? prisma.$transaction(write, { timeout: 30000 }) : write(prisma);
 }
 
 /** Exactly one theme may be active per store — flip both in one transaction

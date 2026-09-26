@@ -209,13 +209,13 @@ importers:
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
+      prisma:
+        specifier: ^6.2.1
+        version: 6.19.3
     devDependencies:
       dotenv-cli:
         specifier: ^7.4.4
         version: 7.4.4
-      prisma:
-        specifier: ^6.2.1
-        version: 6.19.3
 
   packages/theme-engine:
     dependencies:

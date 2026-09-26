@@ -4,7 +4,7 @@
   "engines": {
     "node": ">=20 <=24"
   },
-  "packageManager": "pnpm@11.20.0",
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "turbo run dev",
     "dev:api": "turbo run dev --filter=@shopcycle/api",

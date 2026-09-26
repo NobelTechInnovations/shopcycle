@@ -1,5 +1,6 @@
 const { Liquid, Tag } = require("liquidjs");
 const { stripSchema, extractSchema, mergeSettings, resolveBlocks } = require("@shopcycle/theme-schema");
+const { placeholderSvg } = require("./placeholders");
 
 /**
  * Builds a LiquidJS engine for one render call.
@@ -79,6 +80,9 @@ function createLiquidEngine(filesByPath, meta, settingsData) {
     }
   }
   engine.registerTag("section", SectionTag);
+
+  // Illustrations for empty slots (no products/images yet) — see placeholders.js.
+  engine.registerFilter("placeholder_svg", (name, className) => placeholderSvg(name, className));
 
   engine.registerFilter("money", (value) => {
     const amount = Number(value) || 0;

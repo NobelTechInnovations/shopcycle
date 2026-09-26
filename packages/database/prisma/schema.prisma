@@ -741,6 +741,13 @@ model Customer {
   lastSignInAt    DateTime?
   tokenVersion    Int       @default(0)
 
+  /// Optional password sign-in, alongside emailed codes (bcrypt). Null for
+  /// guest and code-only customers. An account whose email was never
+  /// verified by a code only sees orders placed while signed in to it
+  /// (Order.placedSignedIn) — typing an email at sign-up proves nothing.
+  passwordHash  String?
+  passwordSetAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -825,6 +832,8 @@ model Order {
   /// total − giftCardAmount — is what the shopper pays by COD or online.
   giftCardAmount     Decimal   @default(0) @db.Decimal(10, 2)
   giftCardId         String?
+  /// Placed by a shopper signed in to the account with this email.
+  placedSignedIn     Boolean   @default(false)
 
   /// GST tax invoice to the shopper (Premium): a per-store serial issued
   /// once, when the order first ships or on request — see orders/invoice.js.

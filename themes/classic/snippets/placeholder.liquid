@@ -1,29 +1,15 @@
 {% comment %}
-  Shown where the merchant hasn't picked an image yet — soft, on-brand
-  shapes instead of a grey box, so a fresh store still looks finished.
-  kind: 'lifestyle' (wide banners) | 'product' | 'collection'
+  Shown where the merchant hasn't added a photo yet — the platform's
+  illustrations (the placeholder_svg filter), so a new store still looks
+  finished. kind: 'lifestyle' (wide banners) | 'product' | 'collection' |
+  'image' (a real item without a photo); `n` picks a variation.
 {% endcomment %}
-{% case kind %}
-{% when 'lifestyle' %}
-<svg class="placeholder" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-  <rect width="1600" height="900" style="fill:var(--c-surface)"/>
-  <circle cx="1180" cy="420" r="300" style="fill:var(--c-accent);opacity:.18"/>
-  <circle cx="1320" cy="560" r="180" style="fill:var(--c-text);opacity:.06"/>
-  <rect x="980" y="250" width="260" height="360" rx="18" style="fill:var(--c-bg);opacity:.75"/>
-  <rect x="1270" y="330" width="170" height="250" rx="16" style="fill:var(--c-bg);opacity:.6"/>
-  <path d="M0 760 C 380 700, 760 820, 1600 720 L1600 900 L0 900 Z" style="fill:var(--c-text);opacity:.05"/>
-</svg>
-{% when 'collection' %}
-<svg class="placeholder" viewBox="0 0 600 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-  <rect width="600" height="600" style="fill:var(--c-surface)"/>
-  <circle cx="300" cy="330" r="170" style="fill:var(--c-accent);opacity:.15"/>
-  <rect x="215" y="190" width="170" height="230" rx="16" style="fill:var(--c-bg);opacity:.8"/>
-</svg>
+{% assign k = kind | default: 'product' %}
+{% if k == 'image' %}
+  {% assign art = 'image' %}
+{% elsif n == blank %}
+  {% assign art = k | append: '-1' %}
 {% else %}
-<svg class="placeholder" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-  <rect width="800" height="1000" style="fill:var(--c-surface)"/>
-  <ellipse cx="400" cy="800" rx="230" ry="36" style="fill:var(--c-text);opacity:.06"/>
-  <rect x="270" y="330" width="260" height="440" rx="36" style="fill:var(--c-bg);opacity:.85"/>
-  <rect x="330" y="260" width="140" height="90" rx="18" style="fill:var(--c-accent);opacity:.25"/>
-</svg>
-{% endcase %}
+  {% assign art = k | append: '-' | append: n %}
+{% endif %}
+{{ art | placeholder_svg: 'placeholder' }}

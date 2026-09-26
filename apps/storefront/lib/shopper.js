@@ -13,6 +13,11 @@ import { storefrontPath, isDomainRequest } from "./domain";
  */
 export const SHOPPER_COOKIE = "sc_customer";
 export const LOGIN_EMAIL_COOKIE = "sc_login_email";
+export const RETURN_COOKIE = "sc_login_return";
+// The email typed into a sign-in/sign-up form that failed, to fill it back in.
+export const PREFILL_COOKIE = "sc_login_prefill";
+// Where a shopper may be sent back to after signing in.
+export const RETURN_TARGETS = { checkout: "/checkout", cart: "/cart" };
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 
 function cookiePath(request, handle) {
@@ -46,6 +51,21 @@ export function redirectTo(request, handle, suffix, params = {}) {
   const target = new URL(storefrontPath(request.headers.get("host"), handle, suffix), request.url);
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") target.searchParams.set(k, String(v));
   return NextResponse.redirect(target, { status: 303 });
+}
+
+export function withPrefill(response, request, handle, email) {
+  response.cookies.set(PREFILL_COOKIE, String(email || "").slice(0, 200), cookieOptions(request, handle, 5 * 60));
+  return response;
+}
+
+/** After any successful sign-in or sign-up: sets the session cookie and
+ * goes to `target` (the cart or checkout they came from) or the account. */
+export function signedInResponse(request, handle, token, target) {
+  const response = redirectTo(request, handle, target || "/account");
+  setShopperCookie(response, request, handle, token);
+  clearCookie(response, request, handle, RETURN_COOKIE);
+  clearCookie(response, request, handle, PREFILL_COOKIE);
+  return response;
 }
 
 /** POSTs JSON to the API's storefront routes, forwarding the shopper's

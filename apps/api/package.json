@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js"

@@ -19,6 +19,8 @@
         <div class="products products--slider" style="--cols: 4">
           {% for product in coll.products limit: section.settings.limit %}
             {% render 'snippets/product-card', product: product %}
+          {% else %}
+            {% for i in (1..4) %}{% render 'snippets/product-card-placeholder', index: i %}{% endfor %}
           {% endfor %}
         </div>
         <div class="center-row"><a class="btn btn--ghost" href="{{ coll.url }}">Shop {{ block.settings.title | default: coll.title }}</a></div>

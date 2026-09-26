@@ -20,6 +20,9 @@
         <div class="sys-two">
           <div class="sys-card">
             <h2 class="sys-card__title">Orders</h2>
+            {% unless customer.email_verified %}
+              <p class="sys-muted sys-small" style="margin:-4px 0 14px">Showing orders placed while signed in. Ordered as a guest before? <a class="sys-link" href="{{ routes.order_lookup_url }}">Find that order</a>.</p>
+            {% endunless %}
             {% if customer.orders.size > 0 %}
               <ul class="sys-orders">
                 {% for order in customer.orders %}
@@ -45,7 +48,7 @@
             {% else %}
               <div class="sys-empty" style="padding:28px 0">
                 <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'package' %}</span>
-                <p>You haven't placed any orders yet.</p>
+                <p>You haven't placed any orders {% if customer.email_verified %}yet{% else %}while signed in yet{% endif %}.</p>
                 <a class="sys-btn" href="{{ routes.all_products_url }}">Start shopping</a>
               </div>
             {% endif %}
@@ -67,6 +70,27 @@
               </div>
               <label class="sys-check"><input type="checkbox" name="acceptsEmailMarketing" value="true" {% if customer.accepts_marketing %}checked{% endif %}> <span>Email me about new arrivals and offers</span></label>
               <button type="submit" class="sys-btn sys-btn--block" data-busy-label="Saving…">Save details</button>
+            </form>
+
+            <hr class="sys-rule">
+            <h2 class="sys-card__title" style="margin-bottom:4px">{% if customer.has_password %}Change password{% else %}Set a password{% endif %}</h2>
+            <p class="sys-muted sys-small" style="margin-bottom:18px">
+              {% if customer.has_password %}Other devices are signed out when you change it.{% else %}Sign in with your email and a password next time, instead of a code.{% endif %}
+            </p>
+            <form method="post" action="{{ routes.account_password_url }}" class="sys-stack" style="gap:14px" data-sys-once>
+              {% if customer.has_password and customer.can_reset_password == false %}
+                <label class="sys-field"><span class="sys-label">Current password</span><input class="sys-input" type="password" name="currentPassword" autocomplete="current-password" required maxlength="200"></label>
+              {% endif %}
+              <label class="sys-field">
+                <span class="sys-label">New password</span>
+                <span class="sys-password">
+                  <input class="sys-input" type="password" name="password" autocomplete="new-password" required minlength="8" maxlength="200" data-sys-password>
+                  <button type="button" class="sys-password__toggle" data-sys-reveal aria-label="Show password">Show</button>
+                </span>
+                <span class="sys-hint">At least 8 characters.</span>
+              </label>
+              <label class="sys-field"><span class="sys-label">Confirm new password</span><input class="sys-input" type="password" name="confirmPassword" autocomplete="new-password" required minlength="8" maxlength="200"></label>
+              <button type="submit" class="sys-btn sys-btn--secondary sys-btn--block" data-busy-label="Saving…">Save password</button>
             </form>
           </div>
         </div>

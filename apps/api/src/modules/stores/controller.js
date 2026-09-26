@@ -36,6 +36,19 @@ const updateStoreSchema = z.object({
         .regex(/^[A-Za-z0-9]{1,5}$/, "Use 1 to 5 letters or numbers")
         .optional(),
       lowStockThreshold: z.coerce.number().int().min(0).max(100000).optional(),
+      // Online Store ▸ Preferences — the home page's search and social listing.
+      seo: z
+        .object({
+          title: z.string().trim().max(120).optional(),
+          description: z.string().trim().max(320).optional(),
+          image: z
+            .string()
+            .trim()
+            .max(1000)
+            .refine((v) => !v || /^(https?:\/\/|\/)/.test(v), "Upload an image")
+            .optional(),
+        })
+        .optional(),
     })
     .optional(),
 });

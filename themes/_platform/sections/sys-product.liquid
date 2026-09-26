@@ -49,7 +49,7 @@
           </div>
           <p class="sys-pinfo__taxnote">{% if shop.taxes_included %}Inclusive of all taxes{% else %}Taxes calculated at checkout{% endif %}{% if shop.free_shipping_above %} · Free delivery over {{ shop.free_shipping_above | money }}{% endif %}</p>
 
-          <form method="post" action="{{ routes.cart_add_url }}" class="sys-stack" style="gap:20px" data-sys-product>
+          <form method="post" action="{{ routes.cart_add_url }}" class="sys-stack" style="gap:20px" data-sys-product data-product-title="{{ product.title | escape }}">
             {% if many %}
               <fieldset class="sys-options">
                 <legend>Option: <span data-sys-selected>{{ current.title }}</span></legend>

@@ -7,7 +7,7 @@
       {% for block in section.blocks %}
         <li>
           <a class="gallery__item" href="{{ block.settings.link | default: gallery_link | default: routes.all_products_url }}">
-            {% if block.settings.image != blank %}<img src="{{ block.settings.image | image_url }}" alt="{{ block.settings.alt }}" loading="lazy" width="600" height="600">{% else %}{% render 'snippets/placeholder', kind: 'collection' %}{% endif %}
+            {% if block.settings.image != blank %}<img src="{{ block.settings.image | image_url }}" alt="{{ block.settings.alt }}" loading="lazy" width="600" height="600">{% else %}{% render 'snippets/placeholder', kind: 'product', n: forloop.index %}{% endif %}
             <span class="gallery__hover">{% render 'snippets/icon', icon: 'instagram' %}</span>
           </a>
         </li>

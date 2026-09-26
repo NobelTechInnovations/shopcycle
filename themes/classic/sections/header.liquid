@@ -55,7 +55,7 @@
       <a class="icon-btn header__account" href="{{ routes.account_url }}" aria-label="{% if customer %}My account{% else %}Sign in{% endif %}">{% render 'snippets/icon', icon: 'user' %}</a>
       <a class="icon-btn header__cart" href="{{ routes.cart_url }}" aria-label="Cart, {{ cart.item_count }} item{% if cart.item_count != 1 %}s{% endif %}">
         {% render 'snippets/icon', icon: 'bag' %}
-        {% if cart.item_count > 0 %}<span class="header__count">{{ cart.item_count }}</span>{% endif %}
+        <span class="header__count" data-cart-count{% if cart.item_count == 0 %} hidden{% endif %}>{{ cart.item_count }}</span>
       </a>
     </div>
   </div>

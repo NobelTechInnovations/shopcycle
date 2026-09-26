@@ -1,101 +1,63 @@
 {% comment %}
-  Full-bleed hero — a single slide (this section's own settings, so every
-  already-installed store keeps working unchanged) or a real slideshow once
-  "Slide" blocks are added. See theme.js's initHeroCarousels().
+  Full-bleed hero: a photo (with an optional phone crop), a headline and up
+  to two buttons. Without a photo it shows an illustration, so a new store
+  still looks finished. The header can sit over it (Header settings).
 {% endcomment %}
-{% if section.blocks.size > 0 %}
-  {% assign slides = section.blocks %}
-{% else %}
-  {% assign slides = null %}
-{% endif %}
-
-<section class="hero hero--modern hero--fullbleed" data-hero
-  {% if section.settings.autoplay %}data-autoplay="true" data-autoplay-speed="{{ section.settings.autoplay_speed }}"{% endif %}>
-  <div class="hero__track">
-    {% if slides %}
-      {% for block in slides %}
-        <div class="hero__slide hero__content--{{ block.settings.text_position }} {% if forloop.first %}is-active{% endif %}" data-hero-slide>
-          {% if block.settings.image != blank %}
-            <div class="hero__media" style="background-image: url('{{ block.settings.image | image_url }}');"></div>
-          {% else %}
-            {% render 'snippets/image-placeholder', class: 'hero__media hero__media--placeholder' %}
-          {% endif %}
-          <div class="hero__content">
-            <h1>{{ block.settings.heading }}</h1>
-            {% if block.settings.button_text != blank %}
-              {% assign btn_url = block.settings.button_link | default: routes.all_products_url %}
-              {% render 'snippets/button', text: block.settings.button_text, url: btn_url %}
-            {% endif %}
-          </div>
-        </div>
-      {% endfor %}
+<section class="hero hero--{{ section.settings.height }} hero--{{ section.settings.position }} hero--{{ section.settings.text_color }}" style="--hero-shade: {{ section.settings.overlay | divided_by: 100.0 }}">
+  <div class="hero__media">
+    {% if section.settings.image != blank %}
+      <picture>
+        {% if section.settings.mobile_image != blank %}<source media="(max-width: 749px)" srcset="{{ section.settings.mobile_image | image_url }}">{% endif %}
+        <img src="{{ section.settings.image | image_url }}" alt="{{ section.settings.image_alt | escape }}" width="2400" height="1350" fetchpriority="high">
+      </picture>
     {% else %}
-      <div class="hero__slide hero__content--{{ section.settings.text_position }} is-active" data-hero-slide>
-        {% if section.settings.image != blank %}
-          <div class="hero__media" style="background-image: url('{{ section.settings.image | image_url }}');"></div>
-        {% else %}
-          {% render 'snippets/image-placeholder', class: 'hero__media hero__media--placeholder' %}
-        {% endif %}
-        <div class="hero__content">
-          <h1>{{ section.settings.heading }}</h1>
-          {% if section.settings.button_text != blank %}
-            {% assign btn_url = section.settings.button_link | default: routes.all_products_url %}
-            {% render 'snippets/button', text: section.settings.button_text, url: btn_url %}
-          {% endif %}
-        </div>
-      </div>
+      <div class="hero__ph">{{ 'lifestyle-1' | placeholder_svg }}</div>
     {% endif %}
   </div>
-
-  {% if slides and slides.size > 1 %}
-    <button type="button" class="hero__arrow hero__arrow--prev" data-hero-prev aria-label="Previous slide">
-      {% render 'snippets/icon', icon: 'chevron-left', class: 'icon' %}
-    </button>
-    <button type="button" class="hero__arrow hero__arrow--next" data-hero-next aria-label="Next slide">
-      {% render 'snippets/icon', icon: 'chevron-right', class: 'icon' %}
-    </button>
-    <div class="hero__dots" data-hero-dots>
-      {% for block in slides %}
-        <button type="button" class="hero__dot {% if forloop.first %}is-active{% endif %}" data-hero-dot="{{ forloop.index0 }}" aria-label="Go to slide {{ forloop.index }}"></button>
-      {% endfor %}
+  <div class="container hero__inner">
+    <div class="hero__content">
+      {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+      {% if section.settings.heading != blank %}<h1 class="display">{{ section.settings.heading }}</h1>{% endif %}
+      {% if section.settings.text != blank %}<p class="hero__text">{{ section.settings.text }}</p>{% endif %}
+      {% if section.settings.button_label != blank or section.settings.button2_label != blank %}
+        <div class="btn-row">
+          {% if section.settings.button_label != blank %}<a class="btn {% if section.settings.text_color == 'light' %}btn--light{% endif %}" href="{{ section.settings.button_link | default: routes.all_products_url }}">{{ section.settings.button_label }}</a>{% endif %}
+          {% if section.settings.button2_label != blank %}<a class="btn btn--ghost {% if section.settings.text_color == 'light' %}btn--ghost-light{% endif %}" href="{{ section.settings.button2_link | default: routes.all_products_url }}">{{ section.settings.button2_label }}</a>{% endif %}
+        </div>
+      {% endif %}
     </div>
-  {% endif %}
+  </div>
 </section>
 
 {% schema %}
 {
-  "name": "Large hero",
+  "name": "Hero",
   "settings": [
-    { "type": "text", "id": "heading", "label": "Heading", "default": "Crafted for Everyday" },
-    { "type": "image_picker", "id": "image", "label": "Image" },
-    { "type": "text", "id": "button_text", "label": "Button text", "default": "Explore" },
+    { "type": "image_picker", "id": "image", "label": "Image", "info": "2400 × 1350 px or larger works best." },
+    { "type": "image_picker", "id": "mobile_image", "label": "Phone image (optional)", "info": "A taller crop for small screens." },
+    { "type": "text", "id": "image_alt", "label": "Image description", "default": "" },
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "New season" },
+    { "type": "textarea", "id": "heading", "label": "Heading", "default": "Made for the everyday" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "Essentials designed to last — thoughtfully made and delivered across India." },
+    { "type": "text", "id": "button_label", "label": "Button", "default": "Shop now" },
     { "type": "url", "id": "button_link", "label": "Button link" },
-    { "type": "select", "id": "text_position", "label": "Text position", "default": "bottom-left",
-      "options": [
-        { "value": "bottom-left", "label": "Bottom left" },
-        { "value": "center", "label": "Center" }
-      ] },
-    { "type": "header", "content": "Slideshow (used when there are 2+ slides)" },
-    { "type": "checkbox", "id": "autoplay", "label": "Auto-rotate slides", "default": true },
-    { "type": "range", "id": "autoplay_speed", "label": "Change slide every (seconds)", "min": 3, "max": 12, "step": 1, "default": 6 }
-  ],
-  "blocks": [
-    {
-      "type": "slide",
-      "name": "Slide",
-      "settings": [
-        { "type": "image_picker", "id": "image", "label": "Image" },
-        { "type": "text", "id": "heading", "label": "Heading", "default": "The New Edit" },
-        { "type": "text", "id": "button_text", "label": "Button text", "default": "Explore" },
-        { "type": "url", "id": "button_link", "label": "Button link" },
-        { "type": "select", "id": "text_position", "label": "Text position", "default": "bottom-left",
-          "options": [
-            { "value": "bottom-left", "label": "Bottom left" },
-            { "value": "center", "label": "Center" }
-          ] }
-      ]
-    }
-  ],
-  "max_blocks": 6
+    { "type": "text", "id": "button2_label", "label": "Second button", "default": "Our story" },
+    { "type": "url", "id": "button2_link", "label": "Second button link" },
+    { "type": "select", "id": "height", "label": "Height", "default": "large", "options": [
+      { "value": "medium", "label": "Medium" },
+      { "value": "large", "label": "Large" },
+      { "value": "full", "label": "Full screen" }
+    ] },
+    { "type": "select", "id": "position", "label": "Text position", "default": "bottom-left", "options": [
+      { "value": "bottom-left", "label": "Bottom left" },
+      { "value": "center", "label": "Centre" },
+      { "value": "middle-left", "label": "Middle left" }
+    ] },
+    { "type": "select", "id": "text_color", "label": "Text colour", "default": "light", "options": [
+      { "value": "light", "label": "Light (for darker photos)" },
+      { "value": "dark", "label": "Dark (for lighter photos)" }
+    ] },
+    { "type": "range", "id": "overlay", "label": "Shade over the photo (%)", "min": 0, "max": 80, "step": 5, "default": 30 }
+  ]
 }
 {% endschema %}

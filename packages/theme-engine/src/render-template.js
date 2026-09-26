@@ -31,7 +31,9 @@ async function renderTemplate({
   }
   const template = typeof raw === "string" ? JSON.parse(raw) : raw;
 
-  const baseContext = { ...globalContext, settings: settingsData || {} };
+  // `template.name` ("index", "product", …) as in Shopify — lets a theme
+  // style or behave differently per page (e.g. a header over the hero).
+  const baseContext = { ...globalContext, template: { name: templateName }, settings: settingsData || {} };
 
   const order = template.order || [];
   const renderedSections = [];

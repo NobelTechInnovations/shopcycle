@@ -9,6 +9,9 @@ const flood = { rateLimit: { max: 600, timeWindow: "1 minute" } };
 async function shopperRoutes(fastify) {
   fastify.post("/:handle/account/code", { config: flood }, controller.requestCodeHandler);
   fastify.post("/:handle/account/code/verify", { config: flood }, controller.verifyCodeHandler);
+  fastify.post("/:handle/account/register", { config: flood }, controller.registerHandler);
+  fastify.post("/:handle/account/password-login", { config: flood }, controller.passwordLoginHandler);
+  fastify.post("/:handle/account/password", { config: flood }, controller.setPasswordHandler);
   fastify.post("/:handle/account/profile", { config: flood }, controller.updateProfileHandler);
   fastify.post("/:handle/account/sign-out-everywhere", { config: flood }, controller.signOutEverywhereHandler);
   fastify.post("/:handle/orders/lookup", { config: flood }, controller.lookupHandler);

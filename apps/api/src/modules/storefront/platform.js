@@ -48,12 +48,10 @@ async function load() {
   const assets = {
     "system.css": byPath["assets/system.css"] || "",
     "system.js": byPath["assets/system.js"] || "",
+    "cart-drawer.css": byPath["assets/cart-drawer.css"] || "",
+    "cart-drawer.js": byPath["assets/cart-drawer.js"] || "",
   };
-  const version = crypto
-    .createHash("sha256")
-    .update(assets["system.css"] + assets["system.js"])
-    .digest("hex")
-    .slice(0, 12);
+  const version = crypto.createHash("sha256").update(Object.values(assets).join("\n")).digest("hex").slice(0, 12);
   // Only templates/sections/snippets/layouts join a render; assets are
   // served by assetHandler below.
   const renderFiles = Object.fromEntries(Object.entries(byPath).filter(([p]) => !p.startsWith("assets/")));
@@ -170,17 +168,32 @@ function assetUrl(name, version) {
 
 /** What goes before </head> on a platform page: tokens, then the shared
  * stylesheet (after the theme's own CSS, so it wins). */
-async function headTags(settings, { system }) {
+/** The theme's "Cart type" setting: "drawer" (the default) slides a cart
+ * panel in on add-to-cart; "page" goes to the full cart page. Never on the
+ * cart and checkout pages themselves. */
+function cartDrawerOn(settings, templateName) {
+  return (settings?.cart_type || "drawer") === "drawer" && templateName !== "cart" && templateName !== "checkout";
+}
+
+async function headTags(settings, { system, drawer }) {
   const { version } = await load();
   let tags = `<style id="oy-tokens">${tokensCss(settings)}</style>`;
   if (system) tags += `<link rel="stylesheet" href="${assetUrl("system.css", version)}">`;
+  if (drawer) tags += `<link rel="stylesheet" href="${assetUrl("cart-drawer.css", version)}">`;
   return tags;
 }
 
-async function bodyTags({ system }) {
-  if (!system) return "";
+/** `drawer` is the drawer's config (routes, currency) when it's on. */
+async function bodyTags({ system, drawer }) {
   const { version } = await load();
-  return `<script src="${assetUrl("system.js", version)}" defer></script>`;
+  let tags = "";
+  if (system) tags += `<script src="${assetUrl("system.js", version)}" defer></script>`;
+  if (drawer) {
+    // JSON inside <script>: "<" is escaped so a value can't close the tag.
+    const json = JSON.stringify(drawer).replace(/</g, "\\u003c");
+    tags += `<script type="application/json" id="oy-cart-config">${json}</script><script src="${assetUrl("cart-drawer.js", version)}" defer></script>`;
+  }
+  return tags;
 }
 
 async function asset(name) {
@@ -203,6 +216,7 @@ module.exports = {
   fontsUrl,
   headTags,
   bodyTags,
+  cartDrawerOn,
   asset,
   PLATFORM_DIR,
 };

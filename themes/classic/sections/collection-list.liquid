@@ -13,7 +13,7 @@
         {% if coll_img == blank and coll.products.size > 0 %}{% assign coll_img = coll.products[0].featured_image.url %}{% endif %}
         <a class="clist__item" href="{% if coll %}{{ coll.url }}{% else %}{{ routes.all_products_url }}{% endif %}">
           <span class="clist__media">
-            {% if coll_img != blank %}<img src="{{ coll_img | image_url }}" alt="" loading="lazy" width="600" height="600">{% else %}{% render 'snippets/placeholder', kind: 'collection' %}{% endif %}
+            {% if coll_img != blank %}<img src="{{ coll_img | image_url }}" alt="" loading="lazy" width="600" height="600">{% else %}{% render 'snippets/placeholder', kind: 'collection', n: forloop.index %}{% endif %}
             {% if section.settings.style == 'tiles' %}<span class="clist__overlay"><span class="clist__name">{{ block.settings.title | default: coll.title | default: 'Collection' }}</span>{% render 'snippets/icon', icon: 'arrow-right' %}</span>{% endif %}
           </span>
           {% unless section.settings.style == 'tiles' %}

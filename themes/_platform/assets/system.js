@@ -105,6 +105,18 @@
     });
   });
 
+  // ── Show / hide password ───────────────────────────────
+  document.querySelectorAll("[data-sys-reveal]").forEach(function (btn) {
+    var input = btn.parentNode.querySelector("[data-sys-password]");
+    if (!input) return;
+    btn.addEventListener("click", function () {
+      var show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "Hide" : "Show";
+      btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    });
+  });
+
   // ── One submit only (checkout, account forms) ──────────
   document.querySelectorAll("[data-sys-once]").forEach(function (form) {
     form.addEventListener("submit", function () {

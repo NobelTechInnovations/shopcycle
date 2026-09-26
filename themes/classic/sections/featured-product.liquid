@@ -2,7 +2,7 @@
   One product in the spotlight, with add-to-cart right on the home page.
   Variants are a plain <select> so it works without JavaScript.
 {% endcomment %}
-{% assign fp = all_products[section.settings.product] %}
+{% assign fp = all_products[section.settings.product] | default: best_sellers.first %}
 <section class="section{% if section.settings.surface %} section--surface{% endif %}">
   <div class="container">
     <div class="spotlight">
@@ -10,8 +10,10 @@
         {% if fp and fp.images.size > 0 %}
           <img src="{{ fp.images[0].url }}" alt="{{ fp.images[0].altText | default: fp.title }}" loading="lazy" width="1200" height="1500">
           {% if fp.images.size > 1 %}<img src="{{ fp.images[1].url }}" alt="" loading="lazy" width="1200" height="1500">{% endif %}
+        {% elsif fp %}
+          {% render 'snippets/placeholder', kind: 'image' %}
         {% else %}
-          {% render 'snippets/placeholder', kind: 'product' %}
+          {% render 'snippets/placeholder', kind: 'product', n: 4 %}
         {% endif %}
       </div>
       <div class="spotlight__info">
@@ -23,7 +25,7 @@
             {% if pv.comparePrice and pv.comparePrice > pv.price %}<span class="price__now price__now--sale">{{ pv.price | money }}</span> <s class="price__was">{{ pv.comparePrice | money }}</s>{% else %}<span class="price__now">{{ pv.price | money }}</span>{% endif %}
           </p>
           {% if fp.description != blank %}<p class="spotlight__desc">{{ fp.description | strip_html | truncatewords: 40 }}</p>{% endif %}
-          <form method="post" action="{{ routes.cart_add_url }}" class="spotlight__form">
+          <form method="post" action="{{ routes.cart_add_url }}" class="spotlight__form" data-product-title="{{ fp.title | escape }}">
             {% if fp.variants.size > 1 %}
               <label class="field"><span>Option</span>
                 <select name="variantId">
@@ -40,8 +42,9 @@
             </div>
           </form>
         {% else %}
-          <h2 class="h2">Pick a product to feature</h2>
-          <p class="spotlight__desc">Choose one in the theme editor — its photos, price and an add-to-cart button appear here.</p>
+          <h2 class="h2">Example product title</h2>
+          <p class="price price--lg"><span class="price__now">{{ 1999 | money }}</span></p>
+          <p class="spotlight__desc">Pick a product for this section in the theme editor — its photos, price and an add-to-cart button show here.</p>
         {% endif %}
       </div>
     </div>

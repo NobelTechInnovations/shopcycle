@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Table, Button, Dropdown, App } from "antd";
-import { Plus, Package, Search, Upload, Download, ChevronDown } from "lucide-react";
+import { Plus, Package, Search, Upload, Download, ChevronDown, X } from "lucide-react";
 import { PageHeader, StatusBadge, EmptyState, ListCard, Thumb, SearchInput, DeleteIconButton, useConfirmDialog } from "@shopcycle/ui";
 import { formatCurrency } from "@shopcycle/utils";
 import { apiFetch, apiDownload } from "@/lib/api";
@@ -50,6 +50,8 @@ export default function ProductsPage() {
   const [tab, setTab] = useState("all");
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
+  const [selected, setSelected] = useState([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const { message } = App.useApp();
   const pageSize = 20;
 
@@ -62,6 +64,7 @@ export default function ProductsPage() {
       const data = await apiFetch(`/api/products?${params.toString()}`);
       setProducts(data.products);
       setTotal(data.total);
+      setSelected([]);
     } finally {
       setLoading(false);
     }
@@ -81,6 +84,30 @@ export default function ProductsPage() {
         await apiFetch(`/api/products/${product.id}`, { method: "DELETE" });
         load();
       },
+    });
+  }
+
+  async function runBulk(action) {
+    setBulkBusy(true);
+    try {
+      const { count } = await apiFetch("/api/products/bulk", { method: "POST", body: { ids: selected, action } });
+      const verb = { activate: "set to active", draft: "set to draft", archive: "archived", delete: "deleted" }[action];
+      message.success(`${count} ${count === 1 ? "product" : "products"} ${verb}`);
+      load();
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  function bulkDelete() {
+    confirmDialog({
+      title: `Delete ${selected.length} ${selected.length === 1 ? "product" : "products"}?`,
+      description: "They come off your store and out of shoppers' carts. Past orders keep their line items. This can't be undone.",
+      okText: "Delete",
+      danger: true,
+      onConfirm: () => runBulk("delete"),
     });
   }
 
@@ -178,10 +205,37 @@ export default function ProductsPage() {
           />
         }
       >
+        {selected.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-app-border bg-accent-soft/60" role="region" aria-label="Bulk actions">
+            <span className="text-sm font-medium text-ink mr-1 tabular-nums">{selected.length} selected</span>
+            <Button size="small" loading={bulkBusy} onClick={() => runBulk("activate")}>
+              Set active
+            </Button>
+            <Button size="small" loading={bulkBusy} onClick={() => runBulk("draft")}>
+              Set draft
+            </Button>
+            <Button size="small" loading={bulkBusy} onClick={() => runBulk("archive")}>
+              Archive
+            </Button>
+            <Button size="small" danger loading={bulkBusy} onClick={bulkDelete}>
+              Delete
+            </Button>
+            <Button size="small" type="text" className="ml-auto" icon={<X size={14} aria-hidden="true" />} onClick={() => setSelected([])}>
+              Clear
+            </Button>
+          </div>
+        )}
         <Table
           rowKey="id"
           scroll={{ x: "max-content" }}
           loading={loading}
+          rowSelection={{
+            selectedRowKeys: selected,
+            onChange: setSelected,
+            columnWidth: 44,
+            // Clicking the checkbox shouldn't also open the product.
+            getCheckboxProps: () => ({ onClick: (e) => e.stopPropagation() }),
+          }}
           columns={columns}
           dataSource={products}
           rowClassName="oy-row-link"

@@ -4,6 +4,7 @@
   "private": true,
   "main": "src/client.js",
   "scripts": {
+    "postinstall": "prisma generate --schema=prisma/schema.prisma",
     "generate": "dotenv -e ../../.env -- prisma generate --schema=prisma/schema.prisma",
     "migrate": "dotenv -e ../../.env -- prisma migrate dev --schema=prisma/schema.prisma",
     "push": "dotenv -e ../../.env -- prisma db push --schema=prisma/schema.prisma",
@@ -12,10 +13,10 @@
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "prisma": "^6.2.1"
   },
   "devDependencies": {
-    "dotenv-cli": "^7.4.4",
-    "prisma": "^6.2.1"
+    "dotenv-cli": "^7.4.4"
   }
 }

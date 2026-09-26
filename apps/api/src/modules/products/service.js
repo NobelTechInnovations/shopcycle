@@ -41,4 +41,21 @@ async function deleteProduct(prisma, storeId, id) {
   await repository.remove(prisma, id);
 }
 
-module.exports = { listProducts, getProduct, createProduct, updateProduct, deleteProduct, uniqueSlug };
+/** Bulk actions from the product list: set a status on, or delete, many
+ * products at once. Only this store's products are touched — ids from
+ * another store are simply not matched. */
+async function bulkProducts(prisma, storeId, { ids, action }) {
+  const owned = await prisma.product.findMany({ where: { storeId, id: { in: ids } }, select: { id: true } });
+  const ownedIds = owned.map((p) => p.id);
+  if (!ownedIds.length) return { count: 0 };
+  if (action === "delete") {
+    for (const id of ownedIds) await repository.remove(prisma, id);
+    return { count: ownedIds.length };
+  }
+  const status = { activate: "active", draft: "draft", archive: "archived" }[action];
+  if (!status) throw new HttpError(400, "Unknown action");
+  const { count } = await prisma.product.updateMany({ where: { storeId, id: { in: ownedIds } }, data: { status } });
+  return { count };
+}
+
+module.exports = { listProducts, getProduct, createProduct, updateProduct, deleteProduct, bulkProducts, uniqueSlug };

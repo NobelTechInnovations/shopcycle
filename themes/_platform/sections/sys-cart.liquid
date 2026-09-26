@@ -66,6 +66,7 @@
                   <button type="submit" class="sys-btn sys-btn--secondary">Apply</button>
                 </form>
               {% endif %}
+              {% render 'snippets/sys-gift-card', back: 'cart', slot: 'page' %}
 
               <div class="sys-stack" style="gap:10px">
                 <div class="sys-sumrow"><span>Subtotal</span><span class="sys-num">{{ cart.subtotal | money }}</span></div>
@@ -75,6 +76,10 @@
                 <div class="sys-sumrow"><span>Delivery</span><span class="sys-num">{% if cart.shipping %}{% if cart.shipping.amount > 0 %}{{ cart.shipping.amount | money }}{% else %}Free{% endif %}{% else %}Calculated at checkout{% endif %}</span></div>
                 {% if cart.tax %}<div class="sys-sumrow"><span>{{ cart.tax.name }}</span><span class="sys-num">{{ cart.tax.amount | money }}</span></div>{% endif %}
                 <div class="sys-sumrow sys-sumrow--total"><span>Total</span><span class="sys-num">{{ cart.total | money }}</span></div>
+                {% if cart.gift_card and cart.gift_card.amount > 0 %}
+                  <div class="sys-sumrow sys-sumrow--saving"><span>Gift card</span><span class="sys-num">−{{ cart.gift_card.amount | money }}</span></div>
+                  <div class="sys-sumrow sys-sumrow--total"><span>To pay</span><span class="sys-num">{{ cart.due | money }}</span></div>
+                {% endif %}
               </div>
 
               <a class="sys-btn sys-btn--lg sys-btn--block" href="{{ routes.checkout_url }}">{% render 'snippets/sys-icon', icon: 'lock' %} Checkout</a>

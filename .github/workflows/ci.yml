@@ -108,6 +108,11 @@ jobs:
           ADMIN_ORIGIN: http://localhost:3000
         run: node apps/api/test/e2e-orders.js
 
+      - name: Growth — shopper passwords, gift cards, blog, SEO, search, bulk actions
+        env:
+          ADMIN_ORIGIN: http://localhost:3000
+        run: node apps/api/test/e2e-growth.js
+
       - name: API log on failure
         if: failure()
         run: cat api.log || true

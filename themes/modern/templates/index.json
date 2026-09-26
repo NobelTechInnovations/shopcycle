@@ -1,24 +1,18 @@
 {
   "sections": {
-    "hero": { "type": "hero", "settings": {}, "blocks": {}, "block_order": [] },
-    "usp": {
-      "type": "usp",
-      "settings": {},
-      "blocks": {
-        "u1": { "type": "item", "settings": { "icon": "truck", "title": "Fast Delivery", "text": "Every order shipped within 24 hours, tracked door to door." } },
-        "u2": { "type": "item", "settings": { "icon": "check-circle", "title": "Easy Returns", "text": "Not the right fit? Free returns within 30 days." } },
-        "u3": { "type": "item", "settings": { "icon": "chat", "title": "Here to Help", "text": "Real people, real answers — reach us any time." } }
-      },
-      "block_order": ["u1", "u2", "u3"]
-    },
-    "categories": { "type": "category-grid", "settings": { "heading": "Shop by category", "collections": [], "alignment": "left" } },
-    "editorial": { "type": "editorial-banner", "settings": {} },
-    "collection": { "type": "product-grid", "settings": { "heading": "New arrivals", "columns": 3 } },
-    "promo": { "type": "promo-banner", "settings": {} },
-    "featured": { "type": "featured-product", "settings": {} },
+    "hero": { "type": "hero", "settings": {} },
+    "ticker": { "type": "marquee", "settings": {} },
+    "categories": { "type": "category-grid", "settings": {} },
+    "new_arrivals": { "type": "product-grid", "settings": { "eyebrow": "Just in", "heading": "New arrivals", "source": "newest" } },
+    "story": { "type": "editorial-banner", "settings": {} },
+    "promos": { "type": "promo-banner", "settings": {} },
+    "bestsellers": { "type": "product-grid", "settings": { "eyebrow": "Most loved", "heading": "Best sellers", "source": "best_sellers", "surface": true } },
+    "spotlight": { "type": "featured-product", "settings": { "surface": false } },
+    "features": { "type": "usp", "settings": { "surface": true } },
     "reviews": { "type": "testimonials", "settings": {} },
-    "gram": { "type": "instagram-gallery", "settings": {}, "blocks": {} },
+    "journal": { "type": "featured-blog", "settings": {} },
+    "faq": { "type": "faq", "settings": { "surface": true } },
     "newsletter": { "type": "newsletter", "settings": {} }
   },
-  "order": ["hero", "usp", "categories", "editorial", "collection", "promo", "featured", "reviews", "gram", "newsletter"]
+  "order": ["hero", "ticker", "categories", "new_arrivals", "story", "promos", "bestsellers", "spotlight", "features", "reviews", "journal", "faq", "newsletter"]
 }
