@@ -66,6 +66,19 @@ The API needs the whole repository (it uses the workspace packages and the
   postinstall), so no separate `prisma generate` step is needed. It doesn't
   need database access.
 
+### Railway
+
+`railway.json` at the repo root does it: leave the service's root directory
+as `/` (the API needs the workspace), and Railway installs the workspace,
+generates the Prisma client, starts `node apps/api/server.js` and checks
+`/health`. It never builds the Next.js apps, and only redeploys when the API,
+the shared packages or the themes change.
+
+Sessions are cookies, so the API and the admin/storefront must share one
+registrable domain (e.g. `api.oyklane.com` + `admin.oyklane.com` with
+`COOKIE_DOMAIN=.oyklane.com`). `*.up.railway.app` and `*.vercel.app` are
+separate sites to the browser, so sign-in won't stick across them.
+
 ## Phase status
 
 - [x] Phase 0 — repo, tooling, docker, schema scaffold
