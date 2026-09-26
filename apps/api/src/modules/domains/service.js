@@ -130,11 +130,56 @@ async function probeLive(domain, handle) {
   }
 }
 
+/** What the hosting says about the domain over plain HTTP. Vercel answers
+ * DEPLOYMENT_NOT_FOUND for a domain that points at it but isn't added to
+ * any project — no site, so no certificate can ever be issued. */
+async function probeHosting(domain) {
+  try {
+    const res = await fetch(`http://${domain}/`, { redirect: "manual", signal: AbortSignal.timeout(8000) });
+    const body = res.status === 404 ? await res.text().catch(() => "") : "";
+    return { notAdded: res.status === 404 && /DEPLOYMENT_NOT_FOUND/i.test(body) };
+  } catch {
+    return { notAdded: false };
+  }
+}
+
+/** With a Vercel token: make sure the domain is on the storefront project
+ * (adding it if it isn't) and return any ownership record Vercel wants —
+ * it asks for a TXT record when the domain was used on another account. */
+async function ensureOnVercel(domain) {
+  const project = encodeURIComponent(env.VERCEL_STOREFRONT_PROJECT_ID);
+  let r = await vercel("GET", `/v9/projects/${project}/domains/${encodeURIComponent(domain)}`);
+  if (r.status === 404) {
+    await addToVercel(domain).catch(() => {});
+    r = await vercel("GET", `/v9/projects/${project}/domains/${encodeURIComponent(domain)}`);
+  }
+  if (!r.ok) return { added: false, verification: [] };
+  const verification = (r.data?.verification || []).map((v) => ({
+    type: v.type,
+    name: String(v.domain || "").replace(new RegExp(`\\.?${domain.replace(/\./g, "\\.")}$`), "") || "@",
+    value: v.value,
+    host: v.domain,
+    purpose: "ownership",
+  }));
+  return { added: true, verified: r.data?.verified !== false, verification };
+}
+
 async function status(prisma, store) {
   const domain = store.domain || null;
   const records = dnsRecords(domain);
   const [checks, live] = domain ? await Promise.all([Promise.all(records.map(checkRecord)), probeLive(domain, store.handle)]) : [[], false];
   const dnsOk = checks.length > 0 && checks.every((c) => c.ok);
+
+  // Not live but DNS is right: find out what the hosting still needs.
+  let hosting = { managed: vercelOn(), notAdded: false, verification: [] };
+  if (domain && dnsOk && !live) {
+    if (vercelOn()) {
+      const v = await ensureOnVercel(domain).catch(() => ({ added: false, verification: [] }));
+      hosting = { managed: true, notAdded: !v.added, verification: v.verification || [] };
+    } else {
+      hosting = { managed: false, ...(await probeHosting(domain)), verification: [] };
+    }
+  }
 
   // Remember whether it's live: links and redirects switch to the domain
   // only then (see storefront-url.js and the storefront proxy).
@@ -156,7 +201,7 @@ async function status(prisma, store) {
     stage,
     redirect: redirectsToDomain(store),
     handle: store.handle,
-    hosting: { managed: vercelOn() },
+    hosting,
   };
 }
 

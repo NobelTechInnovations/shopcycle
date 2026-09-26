@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const { slugify } = require("@shopcycle/utils");
 const themesService = require("../modules/themes/service");
 const { GRACE_DAYS_BEFORE_PLAN_REQUIRED } = require("../modules/billing/access");
@@ -33,11 +34,14 @@ const RESERVED_HANDLES = new Set([
  * call ever sets a trialEndsAt, and it's the real one-month free trial.
  */
 async function provisionStore(tx, { name, ownerId, role = "owner" }) {
-  const baseHandle = slugify(name) || "store";
+  // The handle is the store's free address ({handle}.<root>). If the name
+  // is taken, add a short random tag — sonchiri-2f3a — rather than a
+  // counter that hints at how many stores share the name.
+  const baseHandle = (slugify(name) || "store").slice(0, 34).replace(/-+$/, "") || "store";
   let handle = baseHandle;
-  let suffix = 1;
-  while (RESERVED_HANDLES.has(handle) || (await tx.store.findUnique({ where: { handle } }))) {
-    handle = `${baseHandle}-${suffix++}`;
+  for (let attempt = 0; RESERVED_HANDLES.has(handle) || (await tx.store.findUnique({ where: { handle } })); attempt += 1) {
+    const tag = crypto.randomBytes(attempt < 5 ? 2 : 4).toString("hex");
+    handle = `${baseHandle}-${tag}`;
   }
 
   const store = await tx.store.create({

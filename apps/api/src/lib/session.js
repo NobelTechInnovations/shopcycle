@@ -27,21 +27,31 @@ const cookieOptions = {
 
 const clearOptions = { path: "/", ...(env.COOKIE_DOMAIN && { domain: env.COOKIE_DOMAIN }) };
 
+// With a shared cookie domain, also delete any old copy scoped to the API's
+// own host, so the browser never holds two sessions that disagree.
+function dropHostOnlyCopy(reply, name) {
+  if (env.COOKIE_DOMAIN) reply.clearCookie(name, { path: "/" });
+}
+
 function setSellerSession(reply, fastify, user, storeId) {
   const token = fastify.signSession(user, { audience: AUDIENCE.seller, storeId: storeId || null });
+  dropHostOnlyCopy(reply, env.COOKIE_NAME);
   reply.setCookie(env.COOKIE_NAME, token, cookieOptions);
 }
 
 function setPlatformSession(reply, fastify, user) {
   const token = fastify.signSession(user, { audience: AUDIENCE.platform });
+  dropHostOnlyCopy(reply, env.SUPER_ADMIN_COOKIE_NAME);
   reply.setCookie(env.SUPER_ADMIN_COOKIE_NAME, token, cookieOptions);
 }
 
 function clearSellerSession(reply) {
+  dropHostOnlyCopy(reply, env.COOKIE_NAME);
   reply.clearCookie(env.COOKIE_NAME, clearOptions);
 }
 
 function clearPlatformSession(reply) {
+  dropHostOnlyCopy(reply, env.SUPER_ADMIN_COOKIE_NAME);
   reply.clearCookie(env.SUPER_ADMIN_COOKIE_NAME, clearOptions);
 }
 

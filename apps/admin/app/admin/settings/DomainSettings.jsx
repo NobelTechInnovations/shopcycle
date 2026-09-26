@@ -172,7 +172,20 @@ export function DomainSettings({ canEdit = true }) {
         title="Your own domain"
         extra={
           info.domain ? (
-            <StatusBadge status={info.live ? "active" : "pending"} label={info.live ? "Live" : info.stage === "hosting" ? "Activating HTTPS" : "Waiting for DNS"} />
+            <StatusBadge
+              status={info.live ? "active" : "pending"}
+              label={
+                info.live
+                  ? "Live"
+                  : info.stage === "dns"
+                    ? "Waiting for DNS"
+                    : info.hosting.verification?.length
+                      ? "Needs one more record"
+                      : info.hosting.notAdded
+                        ? "Waiting for activation"
+                        : "Activating HTTPS"
+              }
+            />
           ) : null
         }
       >
@@ -221,17 +234,43 @@ export function DomainSettings({ canEdit = true }) {
                 message={`Your store is live at https://${info.domain}`}
                 description={info.kind === "apex" ? `www.${info.domain} works too.` : undefined}
               />
+            ) : info.stage === "hosting" && info.hosting.verification?.length ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="One more record to prove the domain is yours"
+                description="Your domain was used on another site before, so the hosting asks for this extra record. Add it at your domain provider, then press Check again."
+              />
+            ) : info.stage === "hosting" && info.hosting.notAdded && !info.hosting.managed ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="DNS is right, but the domain isn't switched on at Oyklane yet"
+                description={
+                  <>
+                    Your records are correct — nothing more to do on your side. The domain still has to be added on the platform, which is what issues its
+                    security certificate (HTTPS). Your free address keeps working meanwhile.
+                    <details className="mt-2 text-xs">
+                      <summary className="cursor-pointer">For the platform team</summary>
+                      Add <code>{info.domain}</code>
+                      {info.kind === "apex" ? (
+                        <>
+                          {" "}and <code>www.{info.domain}</code>
+                        </>
+                      ) : null}{" "}
+                      to the storefront project on Vercel (Settings ▸ Domains) — or set <code>VERCEL_TOKEN</code> and{" "}
+                      <code>VERCEL_STOREFRONT_PROJECT_ID</code> on the API so connecting a domain does it automatically.
+                    </details>
+                  </>
+                }
+              />
             ) : info.stage === "hosting" ? (
               <Alert
                 type="info"
                 showIcon
                 icon={<Clock size={16} />}
                 message="DNS is set up correctly — activating HTTPS"
-                description={
-                  info.hosting.managed
-                    ? "The security certificate is being issued. This usually takes a few minutes — press Check again."
-                    : "Oyklane is adding your domain and its security certificate. This usually takes under a day; your free address keeps working meanwhile."
-                }
+                description="The security certificate is being issued. This usually takes a few minutes; we check again automatically, or press Check again."
               />
             ) : (
               <Alert
@@ -266,7 +305,7 @@ export function DomainSettings({ canEdit = true }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {info.records.map((r) => (
+                  {[...info.records, ...(info.hosting.verification || []).map((v) => ({ ...v, ok: false, found: [] }))].map((r) => (
                     <tr key={`${r.type}-${r.name}`} className="border-t border-app-border align-middle">
                       <td className="py-2.5 pr-3 font-semibold text-ink">{r.type}</td>
                       <td className="py-2.5 pr-3">

@@ -62,8 +62,31 @@ async function jwtAuthPlugin(fastify) {
     return payload;
   }
 
+  /**
+   * The session cookie's value. A browser can hold two cookies with the same
+   * name — an old one scoped to the API's own host (from before
+   * COOKIE_DOMAIN was set) and the current one on the shared domain — and
+   * sends both. The admin's own server only ever sees the shared-domain one,
+   * so the API must use that one too, or the two disagree about which store
+   * is open. Browsers list the older cookie first, so the last is current;
+   * the stale host-only copy is deleted on the way out.
+   */
+  function sessionToken(request, reply, name) {
+    const raw = request.headers.cookie || "";
+    const values = raw
+      .split(";")
+      .map((part) => part.trim())
+      .filter((part) => part.startsWith(`${name}=`))
+      .map((part) => decodeURIComponent(part.slice(name.length + 1)));
+    if (values.length > 1 && env.COOKIE_DOMAIN) {
+      reply.clearCookie(name, { path: "/" }); // no Domain: removes only the host-only copy
+      return values[values.length - 1];
+    }
+    return request.cookies?.[name];
+  }
+
   fastify.decorate("authenticate", async function authenticate(request, reply) {
-    const payload = await verifySession(request, request.cookies?.[env.COOKIE_NAME], AUDIENCE.seller);
+    const payload = await verifySession(request, sessionToken(request, reply, env.COOKIE_NAME), AUDIENCE.seller);
     if (!payload) {
       reply.code(401).send({ error: "Unauthorized" });
       return;
@@ -75,7 +98,7 @@ async function jwtAuthPlugin(fastify) {
    * different cookie (SUPER_ADMIN_COOKIE_NAME) than `authenticate`, and
    * only accepts tokens minted for the platform console. */
   fastify.decorate("authenticateSuperAdmin", async function authenticateSuperAdmin(request, reply) {
-    const payload = await verifySession(request, request.cookies?.[env.SUPER_ADMIN_COOKIE_NAME], AUDIENCE.platform);
+    const payload = await verifySession(request, sessionToken(request, reply, env.SUPER_ADMIN_COOKIE_NAME), AUDIENCE.platform);
     if (!payload) {
       reply.code(401).send({ error: "Unauthorized" });
       return;
