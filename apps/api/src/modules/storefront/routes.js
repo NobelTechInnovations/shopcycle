@@ -1,4 +1,5 @@
 const controller = require("./controller");
+const { redirectsToDomain } = require("../../lib/storefront-url");
 const service = require("./service");
 const growth = require("./growth");
 
@@ -10,9 +11,9 @@ async function storefrontRoutes(fastify) {
   // once it's live — the storefront redirects there. Null otherwise.
   fastify.get("/primary-domain", async (request, reply) => {
     const handle = String(request.query.handle || "").toLowerCase().slice(0, 80);
-    const store = handle ? await fastify.prisma.store.findUnique({ where: { handle }, select: { domain: true, domainVerifiedAt: true } }) : null;
+    const store = handle ? await fastify.prisma.store.findUnique({ where: { handle }, select: { domain: true, domainVerifiedAt: true, settings: true } }) : null;
     reply.header("cache-control", "public, max-age=60");
-    return { domain: store?.domain && store.domainVerifiedAt ? store.domain : null };
+    return { domain: store?.domain && store.domainVerifiedAt && redirectsToDomain(store) ? store.domain : null };
   });
   fastify.get("/platform-assets/:file", controller.platformAssetHandler);
 

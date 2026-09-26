@@ -1,5 +1,6 @@
 const { env } = require("./config/env");
 const { sweepAbandonedCheckouts } = require("./modules/checkout/abandoned");
+const domains = require("./modules/domains/service");
 
 /**
  * Background work that runs inside the API process on a timer — small
@@ -25,6 +26,12 @@ function startJobs(fastify) {
       if (result.sent) fastify.log.info(result, "jobs: abandoned-checkout reminders sent");
     } catch (err) {
       fastify.log.error({ err }, "jobs: abandoned-checkout sweep failed");
+    }
+    try {
+      const result = await domains.recheckPending(fastify.prisma);
+      if (result.live) fastify.log.info(result, "jobs: custom domains went live");
+    } catch (err) {
+      fastify.log.error({ err }, "jobs: domain re-check failed");
     } finally {
       running = false;
     }

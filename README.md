@@ -79,6 +79,33 @@ registrable domain (e.g. `api.oyklane.com` + `admin.oyklane.com` with
 `COOKIE_DOMAIN=.oyklane.com`). `*.up.railway.app` and `*.vercel.app` are
 separate sites to the browser, so sign-in won't stick across them.
 
+### Addresses and domains
+
+| Address | Serves | Hosted on |
+| --- | --- | --- |
+| `oyklane.com` | marketing site (apps/www) | Vercel |
+| `store.oyklane.com` | seller admin (apps/admin) — never a storefront | Vercel |
+| `api.oyklane.com` | API (apps/api) | Railway (custom domain) |
+| `{handle}.oyklane.com` | each store's public site (apps/storefront) | Vercel, wildcard `*.oyklane.com` |
+| `shop.example.com` | a store's own domain, connected in Settings ▸ Domains | Vercel (same storefront project) |
+
+The storefront finds the store from the hostname alone. Theme files,
+platform scripts and uploaded images are served through the store's own
+address, so no hosting URL (`*.railway.app`, `*.vercel.app`) ever appears on
+a store page. A connected domain is marked live only after it answers over
+HTTPS; from then on `{handle}.oyklane.com` forwards to it (the seller can
+turn that off).
+
+Environment for this:
+
+- API (Railway): `STOREFRONT_ROOT_DOMAIN=oyklane.com`, `API_PUBLIC_URL=https://api.oyklane.com`,
+  `COOKIE_DOMAIN=.oyklane.com`, and — to add custom domains and their SSL to
+  Vercel automatically — `VERCEL_TOKEN`, `VERCEL_STOREFRONT_PROJECT_ID`,
+  `VERCEL_TEAM_ID` (team projects only).
+- Storefront (Vercel): `STOREFRONT_ROOT_DOMAIN=oyklane.com`, `API_INTERNAL_URL=https://api.oyklane.com`;
+  domains `*.oyklane.com` (wildcard SSL needs `oyklane.com` on Vercel's nameservers).
+- Admin (Vercel): `NEXT_PUBLIC_API_URL=https://api.oyklane.com`, `NEXT_PUBLIC_STOREFRONT_ROOT_DOMAIN=oyklane.com`.
+
 ## Phase status
 
 - [x] Phase 0 — repo, tooling, docker, schema scaffold

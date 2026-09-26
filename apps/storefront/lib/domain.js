@@ -9,7 +9,9 @@
 // browser/OS resolves to 127.0.0.1 with zero /etc/hosts setup) works the
 // same way in local dev without any env configuration — production must
 // set the real value explicitly.
-export const ROOT_DOMAIN = (process.env.STOREFRONT_ROOT_DOMAIN || "localhost").toLowerCase();
+// Tolerates a pasted URL ("https://oyklane.com/").
+export const ROOT_DOMAIN =
+  (process.env.STOREFRONT_ROOT_DOMAIN || "localhost").trim().toLowerCase().replace(/^[a-z]+:\/\//, "").split(/[/:]/)[0] || "localhost";
 
 // Handles no store may ever be provisioned with — each is either a
 // reserved platform subdomain (store., admin., api., www., ...) or a

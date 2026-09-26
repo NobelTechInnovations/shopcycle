@@ -162,18 +162,31 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-// In production the root domain can be inferred from the API's own address
-// (api.oyklane.com → oyklane.com) — "localhost" there would make every
-// store link point at a developer's machine.
-if (parsed.data.NODE_ENV === "production" && parsed.data.STOREFRONT_ROOT_DOMAIN === "localhost") {
-  try {
-    const host = new URL(parsed.data.API_PUBLIC_URL).hostname;
-    if (host && host !== "localhost" && host.split(".").length >= 3) {
-      parsed.data.STOREFRONT_ROOT_DOMAIN = host.split(".").slice(1).join(".");
-      console.warn(`STOREFRONT_ROOT_DOMAIN not set — using ${parsed.data.STOREFRONT_ROOT_DOMAIN} (from API_PUBLIC_URL). Set it explicitly.`);
+// Store addresses are {handle}.<root domain> — never a hosting provider's
+// domain (Railway, Vercel…), which must stay invisible to shoppers. If the
+// root domain isn't set (or is one of those), it's taken from the admin's
+// own address: store.oyklane.com → oyklane.com.
+const INFRA_DOMAINS = ["railway.app", "vercel.app", "onrender.com", "herokuapp.com", "netlify.app", "fly.dev", "pages.dev", "azurewebsites.net"];
+const isInfraDomain = (host) => INFRA_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
+{
+  const d = parsed.data;
+  if (isInfraDomain(d.STOREFRONT_ROOT_DOMAIN)) {
+    console.error(`STOREFRONT_ROOT_DOMAIN=${d.STOREFRONT_ROOT_DOMAIN} is a hosting provider's domain — set it to your own (e.g. oyklane.com).`);
+    d.STOREFRONT_ROOT_DOMAIN = "localhost";
+  }
+  if (d.NODE_ENV === "production" && d.STOREFRONT_ROOT_DOMAIN === "localhost") {
+    try {
+      const host = new URL(d.ADMIN_ORIGIN).hostname.toLowerCase();
+      const parts = host.split(".");
+      if (parts.length >= 3 && !isInfraDomain(host)) {
+        d.STOREFRONT_ROOT_DOMAIN = parts.slice(1).join(".");
+        console.warn(`STOREFRONT_ROOT_DOMAIN not set — using ${d.STOREFRONT_ROOT_DOMAIN} (from ADMIN_ORIGIN). Set it explicitly.`);
+      } else {
+        console.error("STOREFRONT_ROOT_DOMAIN is not set — store addresses can't be built. Set it to your domain, e.g. oyklane.com.");
+      }
+    } catch {
+      /* stays unset */
     }
-  } catch {
-    /* keep localhost */
   }
 }
 
@@ -204,4 +217,4 @@ if (parsed.data.BILLING_SANDBOX && parsed.data.NODE_ENV === "production") {
   }
 }
 
-module.exports = { env: parsed.data };
+module.exports = { env: parsed.data, isInfraDomain };

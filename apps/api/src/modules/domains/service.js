@@ -1,6 +1,8 @@
 const dns = require("dns").promises;
 const { HttpError } = require("@shopcycle/utils");
-const { env } = require("../../config/env");
+const { env, isInfraDomain } = require("../../config/env");
+const { oyklaneAddress, redirectsToDomain } = require("../../lib/storefront-url");
+const { RESERVED_HANDLES } = require("../../lib/store-provisioning");
 
 /**
  * Store addresses. Every store is live at {handle}.<root domain> from the
@@ -39,10 +41,7 @@ function isApex(domain) {
   return parts.length === 3 && TWO_PART_SUFFIXES.has(parts.slice(1).join("."));
 }
 
-function defaultAddress(store) {
-  const root = env.STOREFRONT_ROOT_DOMAIN;
-  return root === "localhost" ? `${env.STOREFRONT_ORIGIN.replace(/\/$/, "")}/store/${store.handle}` : `https://${store.handle}.${root}`;
-}
+const defaultAddress = (store) => oyklaneAddress(store);
 
 function dnsRecords(domain) {
   if (!domain) return [];
@@ -155,14 +154,53 @@ async function status(prisma, store) {
     live,
     connected: live,
     stage,
+    redirect: redirectsToDomain(store),
+    handle: store.handle,
     hosting: { managed: vercelOn() },
   };
+}
+
+/** Send the Oyklane address to the store's own domain, or keep both working. */
+async function setRedirect(prisma, store, redirect) {
+  const settings = { ...(store.settings && typeof store.settings === "object" ? store.settings : {}), domainRedirect: Boolean(redirect) };
+  const updated = await prisma.store.update({ where: { id: store.id }, data: { settings } });
+  return status(prisma, updated);
+}
+
+const HANDLE_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
+
+/** Changes {handle}.<root>. The store's id — and so all its data — stays
+ * the same; the old address simply stops answering. */
+async function changeHandle(prisma, store, input) {
+  const handle = String(input || "").trim().toLowerCase();
+  if (handle === store.handle) return status(prisma, store);
+  if (!HANDLE_RE.test(handle) || handle.includes("--")) {
+    throw new HttpError(400, "Use 3–40 lowercase letters, numbers and single dashes, starting and ending with a letter or number.");
+  }
+  if (RESERVED_HANDLES.has(handle)) throw new HttpError(400, "That name is reserved — pick another.");
+  const taken = await prisma.store.findUnique({ where: { handle }, select: { id: true } });
+  if (taken) throw new HttpError(409, "Another store already uses that name.");
+  const updated = await prisma.store.update({ where: { id: store.id }, data: { handle } });
+  return status(prisma, updated);
+}
+
+/** Background: stores whose domain isn't live yet get re-checked, so they
+ * switch to their domain as soon as DNS and HTTPS are ready. */
+async function recheckPending(prisma, { limit = 20 } = {}) {
+  const stores = await prisma.store.findMany({ where: { domain: { not: null }, domainVerifiedAt: null }, take: limit, orderBy: { updatedAt: "asc" } });
+  let live = 0;
+  for (const store of stores) {
+    const r = await status(prisma, store).catch(() => null);
+    if (r?.live) live += 1;
+  }
+  return { checked: stores.length, live };
 }
 
 async function connect(prisma, store, input) {
   const domain = normalizeDomain(input).replace(/^www\./, "");
   if (!DOMAIN_RE.test(domain)) throw new HttpError(400, "Enter a domain like shop.example.com or example.com.");
   const root = env.STOREFRONT_ROOT_DOMAIN;
+  if (isInfraDomain(domain)) throw new HttpError(400, "Enter a domain you own — hosting-provider addresses can't be connected.");
   if (domain === root || domain.endsWith(`.${root}`)) {
     throw new HttpError(400, `${defaultAddress(store)} is already your store's free address — enter a domain you own.`);
   }
@@ -180,4 +218,4 @@ async function disconnect(prisma, store) {
   return status(prisma, updated);
 }
 
-module.exports = { status, connect, disconnect, normalizeDomain, isApex };
+module.exports = { status, connect, disconnect, setRedirect, changeHandle, recheckPending, normalizeDomain, isApex };

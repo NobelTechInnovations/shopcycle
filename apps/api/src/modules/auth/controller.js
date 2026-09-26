@@ -1,3 +1,4 @@
+const { storefrontBaseUrl, oyklaneAddress } = require("../../lib/storefront-url");
 const { z } = require("zod");
 const { registerSchema, loginSchema, createStoreSchema, switchStoreSchema } = require("@shopcycle/validation");
 const { HttpError } = require("@shopcycle/utils");
@@ -160,7 +161,9 @@ async function meHandler(request, reply) {
 
   reply.send({
     user: service.serializeUser(user),
-    store: storeUser?.store || null,
+    store: storeUser?.store
+      ? { ...storeUser.store, publicUrl: storefrontBaseUrl(storeUser.store), oyklaneUrl: oyklaneAddress(storeUser.store) }
+      : null,
     role: storeUser?.role || null,
     // Lets the admin app's own layout gate to the billing screen without a
     // second round trip — same computation loadStoreContext does per

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isPlatformHost, subdomainHandle } from "@/lib/domain";
+import { isPlatformHost, subdomainHandle, ROOT_DOMAIN } from "@/lib/domain";
 
 const API_URL = process.env.API_INTERNAL_URL || "http://localhost:4100";
 
@@ -47,6 +47,15 @@ export async function proxy(request) {
   if (isPlatformHost(host)) return NextResponse.next();
 
   const suffix = pathname === "/" ? "" : pathname;
+
+  // {handle}.store.<root> was never a store address (store.<root> is the
+  // admin) — old links built that way go to {handle}.<root>.
+  if (ROOT_DOMAIN !== "localhost" && host.endsWith(`.store.${ROOT_DOMAIN}`)) {
+    const label = host.slice(0, -`.store.${ROOT_DOMAIN}`.length);
+    if (label && !label.includes(".")) {
+      return NextResponse.redirect(new URL(`https://${label}.${ROOT_DOMAIN}${pathname}${request.nextUrl.search}`), 308);
+    }
+  }
 
   const handle = subdomainHandle(host);
   if (handle) {

@@ -359,6 +359,7 @@ async function renderPage(
     loginEmail,
     formError,
     notice,
+    localAssets = false,
     // Phase 6 — listings and the blog.
     sort,
     inStock,
@@ -370,6 +371,10 @@ async function renderPage(
 ) {
   const store = await loadStoreOrThrow(prisma, handle);
   const theme = await resolveTheme(prisma, store, themeId);
+  // Storefront pages load their CSS, JS and images from the store's own
+  // address (the storefront app proxies them); null = straight from the
+  // API, for the admin's editor preview.
+  const assetBase = localAssets ? (rootless ? "" : `/store/${store.handle}`) : null;
   const themeSettings = settingsOverride ?? theme.settingsData ?? {};
   const system = platform.isSystemTemplate(templateName);
 
@@ -568,7 +573,7 @@ async function renderPage(
       templateOverride: system ? undefined : templateOverride,
       settingsData: themeSettings,
       globalContext,
-      meta: { handle: store.handle, themeId: theme.id, currency: store.currency, apiUrl: env.API_PUBLIC_URL },
+      meta: { handle: store.handle, themeId: theme.id, currency: store.currency, apiUrl: env.API_PUBLIC_URL, assetBase },
     });
   } catch (err) {
     if (err.code === "TEMPLATE_NOT_FOUND") throw new HttpError(404, "Page not found");
@@ -590,7 +595,7 @@ async function renderPage(
         freeShippingAbove: globalContext.shop.free_shipping_above,
       }
     : null;
-  const head = `${await platform.headTags(themeSettings, { system, drawer })}${seoTags(seo)}`;
+  const head = `${await platform.headTags(themeSettings, { system, drawer, assetBase })}${seoTags(seo)}`;
   html = html.includes("</head>") ? html.replace("</head>", `${head}</head>`) : head + html;
 
   // CSS is fetched by the browser via a separate <link> GET to the asset
@@ -603,9 +608,16 @@ async function renderPage(
     html = html.replace("</head>", `<style>${filesOverride["assets/theme.css"]}</style></head>`);
   }
 
-  let tail = await platform.bodyTags({ system, drawer });
+  let tail = await platform.bodyTags({ system, drawer, assetBase });
   if (templateName === "checkout") tail += checkoutEnhancements(routes, customer);
   if (tail) html = html.includes("</body>") ? html.replace("</body>", `${tail}</body>`) : html + tail;
+
+  // Uploaded images are stored with the API's address; on the storefront
+  // they're served through the store's own address instead. Only this
+  // store's uploads (/uploads/<store id>/…) are touched.
+  if (assetBase != null) {
+    html = html.replace(new RegExp(`https?:\\/\\/[^"'\\s/<>()]+\\/uploads\\/${store.id}\\/`, "g"), `${assetBase}/uploads/${store.id}/`);
+  }
 
   return { html, cartId: globalContext.cart.cartId };
 }

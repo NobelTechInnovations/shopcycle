@@ -37,6 +37,7 @@ async function renderHandler(request, reply) {
 
   const { html, cartId: resolvedCartId } = await service.renderPage(request.server.prisma, {
     handle,
+    localAssets: true,
     templateName: template,
     slug,
     themeId,

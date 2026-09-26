@@ -13,6 +13,8 @@ const ROOT_DOMAIN =
  * path. Mirrors apps/storefront/lib/domain.js's routing rules. */
 export function storefrontUrlFor(store) {
   if (!store) return STOREFRONT_URL;
+  // Built by the API (its own domain once live, else {handle}.<root>).
+  if (store.publicUrl) return store.publicUrl;
   // The store's own domain only once it's live (Settings ▸ Domains).
   if (store.domain && store.domainVerifiedAt) return `https://${store.domain}`;
   if (ROOT_DOMAIN !== "localhost") return `https://${store.handle}.${ROOT_DOMAIN}`;

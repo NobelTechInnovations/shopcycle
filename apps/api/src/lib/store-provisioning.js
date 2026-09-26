@@ -56,4 +56,4 @@ async function provisionStore(tx, { name, ownerId, role = "owner" }) {
   return store;
 }
 
-module.exports = { provisionStore };
+module.exports = { provisionStore, RESERVED_HANDLES };

@@ -1,3 +1,4 @@
+const { storefrontBaseUrl, oyklaneAddress } = require("../../lib/storefront-url");
 const { storeSettings, mergeSettings } = require("../../lib/store-settings");
 const { z } = require("zod");
 const { HttpError } = require("@shopcycle/utils");
@@ -69,7 +70,10 @@ const switchPlanSchema = z.object({
 
 async function getStoreHandler(request, reply) {
   // resolvedSettings: Store.settings with every default filled in.
-  reply.send({ store: request.store, role: request.storeRole, resolvedSettings: storeSettings(request.store) });
+  // The admin never builds store addresses itself — these are the only ones
+  // it shows (lib/storefront-url.js).
+  const store = { ...request.store, publicUrl: storefrontBaseUrl(request.store), oyklaneUrl: oyklaneAddress(request.store) };
+  reply.send({ store, role: request.storeRole, resolvedSettings: storeSettings(request.store) });
 }
 
 async function updateStoreHandler(request, reply) {

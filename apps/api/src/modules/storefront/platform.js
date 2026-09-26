@@ -162,7 +162,11 @@ function fontsUrl(settings = {}) {
   return `https://fonts.googleapis.com/css2?${q}&display=swap`;
 }
 
-function assetUrl(name, version) {
+/** `base` set: served through the store's own address (storefront pages —
+ * shoppers never see the API's host). Unset: straight from the API (the
+ * admin's theme editor preview). */
+function assetUrl(name, version, base) {
+  if (base != null) return `${base}/oy-assets/${name}?v=${version}`;
   return `${env.API_PUBLIC_URL.replace(/\/$/, "")}/api/storefront/platform-assets/${name}?v=${version}`;
 }
 
@@ -175,23 +179,23 @@ function cartDrawerOn(settings, templateName) {
   return (settings?.cart_type || "drawer") === "drawer" && templateName !== "cart" && templateName !== "checkout";
 }
 
-async function headTags(settings, { system, drawer }) {
+async function headTags(settings, { system, drawer, assetBase }) {
   const { version } = await load();
   let tags = `<style id="oy-tokens">${tokensCss(settings)}</style>`;
-  if (system) tags += `<link rel="stylesheet" href="${assetUrl("system.css", version)}">`;
-  if (drawer) tags += `<link rel="stylesheet" href="${assetUrl("cart-drawer.css", version)}">`;
+  if (system) tags += `<link rel="stylesheet" href="${assetUrl("system.css", version, assetBase)}">`;
+  if (drawer) tags += `<link rel="stylesheet" href="${assetUrl("cart-drawer.css", version, assetBase)}">`;
   return tags;
 }
 
 /** `drawer` is the drawer's config (routes, currency) when it's on. */
-async function bodyTags({ system, drawer }) {
+async function bodyTags({ system, drawer, assetBase }) {
   const { version } = await load();
   let tags = "";
-  if (system) tags += `<script src="${assetUrl("system.js", version)}" defer></script>`;
+  if (system) tags += `<script src="${assetUrl("system.js", version, assetBase)}" defer></script>`;
   if (drawer) {
     // JSON inside <script>: "<" is escaped so a value can't close the tag.
     const json = JSON.stringify(drawer).replace(/</g, "\\u003c");
-    tags += `<script type="application/json" id="oy-cart-config">${json}</script><script src="${assetUrl("cart-drawer.js", version)}" defer></script>`;
+    tags += `<script type="application/json" id="oy-cart-config">${json}</script><script src="${assetUrl("cart-drawer.js", version, assetBase)}" defer></script>`;
   }
   return tags;
 }

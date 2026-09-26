@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Input, Button, App, Alert, Skeleton } from "antd";
+import { Card, Input, Button, App, Alert, Skeleton, Switch } from "antd";
 import { Globe, Copy, ExternalLink, CheckCircle2, Clock, RefreshCw, Trash2 } from "lucide-react";
 import { StatusBadge, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
@@ -32,6 +32,33 @@ export function DomainSettings({ canEdit = true }) {
   const [info, setInfo] = useState(null);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(null);
+  const [editingHandle, setEditingHandle] = useState(false);
+  const [handleValue, setHandleValue] = useState("");
+
+  async function saveHandle() {
+    setBusy("handle");
+    try {
+      const next = await apiFetch("/api/store/domain/handle", { method: "PATCH", body: { handle: handleValue } });
+      setInfo(next);
+      setEditingHandle(false);
+      message.success("Store address changed");
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function setRedirect(redirect) {
+    setBusy("redirect");
+    try {
+      setInfo(await apiFetch("/api/store/domain/redirect", { method: "PATCH", body: { redirect } }));
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   const load = useCallback(async (quiet) => {
     if (!quiet) setBusy("check");
@@ -86,23 +113,58 @@ export function DomainSettings({ canEdit = true }) {
   return (
     <div className="max-w-2xl flex flex-col gap-4">
       <Card size="small" title="Free Oyklane address">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0">
-              <Globe size={17} aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <p className="m-0 text-sm font-medium text-ink truncate">{info.defaultAddress.replace(/^https?:\/\//, "")}</p>
-              <p className="m-0 text-xs text-ink-muted">Always works, even after you connect your own domain.</p>
+        {!info.defaultAddress ? (
+          <Alert type="warning" showIcon message="Store addresses aren't set up on this platform yet" description="The platform's root domain (STOREFRONT_ROOT_DOMAIN) isn't configured." />
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0">
+                  <Globe size={17} aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="m-0 text-sm font-medium text-ink truncate">{info.defaultAddress.replace(/^https?:\/\//, "")}</p>
+                  <p className="m-0 text-xs text-ink-muted">
+                    {info.live && info.redirect ? `Forwards to ${info.domain}` : "Your store's public address. Always works."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <CopyButton value={hrefFor(info.defaultAddress)} />
+                <Button size="small" href={hrefFor(info.defaultAddress)} target="_blank" rel="noopener noreferrer" icon={<ExternalLink size={13} aria-hidden="true" />}>
+                  Open
+                </Button>
+                {canEdit && info.rootDomain !== "localhost" && !editingHandle && (
+                  <Button size="small" type="text" onClick={() => (setHandleValue(info.handle), setEditingHandle(true))}>
+                    Change
+                  </Button>
+                )}
+              </div>
             </div>
+            {editingHandle && (
+              <div className="flex flex-col gap-2 rounded-lg bg-app-bg p-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    value={handleValue}
+                    onChange={(e) => setHandleValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                    suffix={<span className="text-ink-muted">.{info.rootDomain}</span>}
+                    maxLength={40}
+                    aria-label="Store address"
+                  />
+                  <div className="flex gap-2">
+                    <Button type="primary" loading={busy === "handle"} disabled={!handleValue || handleValue === info.handle} onClick={saveHandle}>
+                      Save
+                    </Button>
+                    <Button onClick={() => setEditingHandle(false)}>Cancel</Button>
+                  </div>
+                </div>
+                <p className="m-0 text-xs text-ink-muted">
+                  The old address stops working straight away — update links you've shared. Your products, orders and customers don't change.
+                </p>
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-1">
-            <CopyButton value={hrefFor(info.defaultAddress)} />
-            <Button size="small" href={hrefFor(info.defaultAddress)} target="_blank" rel="noopener noreferrer" icon={<ExternalLink size={13} aria-hidden="true" />}>
-              Open
-            </Button>
-          </div>
-        </div>
+        )}
       </Card>
 
       <Card
@@ -157,7 +219,7 @@ export function DomainSettings({ canEdit = true }) {
                 showIcon
                 icon={<CheckCircle2 size={16} />}
                 message={`Your store is live at https://${info.domain}`}
-                description={`${info.kind === "apex" ? `www.${info.domain} works too. ` : ""}Your free address now forwards here.`}
+                description={info.kind === "apex" ? `www.${info.domain} works too.` : undefined}
               />
             ) : info.stage === "hosting" ? (
               <Alert
@@ -179,6 +241,18 @@ export function DomainSettings({ canEdit = true }) {
                 message="Add these records at your domain provider"
                 description="Open your provider's DNS settings, add each record below exactly as shown (delete any old A or CNAME record for the same name), and save. Changes usually show up within an hour, sometimes up to 48 hours."
               />
+            )}
+
+            {info.live && (
+              <label className="flex items-start justify-between gap-4 rounded-lg border border-app-border px-3 py-3 cursor-pointer">
+                <span>
+                  <span className="block text-sm font-medium text-ink">Send visitors to {info.domain}</span>
+                  <span className="block text-xs text-ink-muted">
+                    {info.defaultAddress?.replace(/^https?:\/\//, "")} forwards here, so shoppers and search engines see one address. Turn off to keep both working separately.
+                  </span>
+                </span>
+                <Switch checked={info.redirect} loading={busy === "redirect"} disabled={!canEdit} onChange={setRedirect} />
+              </label>
             )}
 
             <div className="overflow-x-auto">

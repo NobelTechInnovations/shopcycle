@@ -101,7 +101,10 @@ function createLiquidEngine(filesByPath, meta, settingsData) {
   // not whatever's currently live).
   engine.registerFilter(
     "asset_url",
-    (path) => `${meta.apiUrl || ""}/api/storefront/${meta.handle}/assets/${meta.themeId}/${encodeURIComponent(path)}`
+    (path) =>
+      meta.assetBase != null
+        ? `${meta.assetBase}/assets/${meta.themeId}/${encodeURIComponent(path)}` // through the store's own address
+        : `${meta.apiUrl || ""}/api/storefront/${meta.handle}/assets/${meta.themeId}/${encodeURIComponent(path)}`
   );
 
   // Product images are already full URLs from an external host in this

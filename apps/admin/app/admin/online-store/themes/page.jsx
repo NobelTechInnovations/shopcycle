@@ -9,8 +9,10 @@ import { apiFetch } from "@/lib/api";
 
 const STOREFRONT_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL || "http://localhost:3002";
 
-function previewUrl(storeHandle, themeId) {
-  return `${STOREFRONT_URL}/store/${storeHandle}?themeId=${themeId}`;
+// Previews open on the store's own Oyklane address (never a hosting URL).
+function previewUrl(store, themeId) {
+  const base = store.oyklaneUrl || `${STOREFRONT_URL}/store/${store.handle}`;
+  return `${base.replace(/\/$/, "")}/?themeId=${themeId}`;
 }
 
 /** A live, scaled-down render of the theme's home page. */
@@ -142,7 +144,7 @@ export default function ThemesPage() {
       {live && store && (
         <Card className="mb-8" styles={{ body: { padding: 20 } }}>
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-6 items-center">
-            <LivePreview src={previewUrl(store.handle, live.id)} title={`${live.name} preview`} />
+            <LivePreview src={previewUrl(store, live.id)} title={`${live.name} preview`} />
             <div className="flex flex-col gap-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -160,7 +162,7 @@ export default function ThemesPage() {
                     Customize
                   </Button>
                 </Link>
-                <a href={previewUrl(store.handle, live.id)} target="_blank" rel="noopener noreferrer">
+                <a href={previewUrl(store, live.id)} target="_blank" rel="noopener noreferrer">
                   <Button icon={<Eye size={15} aria-hidden="true" />}>View store</Button>
                 </a>
                 <Link href={`/theme-editor/${live.id}/code`}>
@@ -178,7 +180,7 @@ export default function ThemesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {others.map((theme) => (
               <Card key={theme.id} size="small" styles={{ body: { padding: 14 } }}>
-                <LivePreview src={previewUrl(store.handle, theme.id)} title={`${theme.name} preview`} />
+                <LivePreview src={previewUrl(store, theme.id)} title={`${theme.name} preview`} />
                 <div className="flex items-start justify-between gap-2 mt-3">
                   <div className="min-w-0">
                     <h3 className="text-sm font-semibold m-0 truncate">{theme.name}</h3>
@@ -205,7 +207,7 @@ export default function ThemesPage() {
                   <Link href={`/theme-editor/${theme.id}`}>
                     <Button size="small">Customize</Button>
                   </Link>
-                  <a href={previewUrl(store.handle, theme.id)} target="_blank" rel="noopener noreferrer">
+                  <a href={previewUrl(store, theme.id)} target="_blank" rel="noopener noreferrer">
                     <Button size="small" icon={<Eye size={14} aria-hidden="true" />}>
                       Preview
                     </Button>

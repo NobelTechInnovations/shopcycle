@@ -333,6 +333,31 @@ async function main() {
     r = await owner("POST", "/api/products/bulk", { ids: [second.id], action: "delete" });
     check("bulk delete", r.data.count === 1 && !(await prisma.product.findUnique({ where: { id: second.id } })), r.data);
 
+    // ── Domains ──
+    r = await sf("GET", `/api/storefront/${H}/render/index`);
+    check("store pages never reference the API's own address", !String(r.data).includes(`localhost:${API_PORT}`) && String(r.data).includes(`/store/${H}/oy-assets/`), String(r.data).match(/(href|src)="[^"]*assets[^"]*"/)?.[0]);
+    r = await owner("PUT", "/api/store/domain", { domain: "myshop.up.railway.app" });
+    check("hosting-provider domains can't be connected", r.status === 400, r.data);
+    r = await owner("PUT", "/api/store/domain", { domain: `https://WWW.growth-${stamp}.example.com/` });
+    check("connect a domain (URL and www cleaned up)", r.status === 200 && r.data.domain === `growth-${stamp}.example.com` && r.data.stage === "dns" && r.data.live === false, r.data);
+    check("subdomain gets a single CNAME record", r.data.records?.length === 1 && r.data.records[0].type === "CNAME", r.data.records);
+    r = await sf("GET", `/api/storefront/primary-domain?handle=${H}`);
+    check("the Oyklane address doesn't forward to a domain that isn't live", r.data.domain === null, r.data);
+    r = await sf("GET", `/api/storefront/resolve-domain?domain=growth-${stamp}.example.com`);
+    check("the connected domain resolves to the store", r.data.handle === H, r.data);
+    r = await owner("PATCH", "/api/store/domain/redirect", { redirect: false });
+    check("turn off forwarding", r.status === 200 && r.data.redirect === false, r.data);
+    r = await owner("PATCH", "/api/store/domain/handle", { handle: "store" });
+    check("reserved names can't be a store address", r.status === 400, r.data);
+    const newHandle = `growth-shop-${stamp}`;
+    r = await owner("PATCH", "/api/store/domain/handle", { handle: newHandle });
+    check("change the store's Oyklane address", r.status === 200 && r.data.handle === newHandle, r.data);
+    check("same store, same id", (await prisma.store.findUnique({ where: { id: store.id } })).handle === newHandle);
+    r = await sf("GET", `/api/storefront/${newHandle}/render/index`);
+    check("store answers on its new address", r.status === 200);
+    r = await owner("DELETE", "/api/store/domain");
+    check("disconnect the domain", r.status === 200 && r.data.domain === null, r.data);
+
     // ── Platform overview is for the platform console only ──
     r = await owner("GET", "/api/super-admin/overview");
     check("a store owner can't read the platform overview", r.status === 401 || r.status === 403, r.status);
