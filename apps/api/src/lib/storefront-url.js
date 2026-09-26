@@ -9,7 +9,8 @@ const { env } = require("../config/env");
  *      the root domain is just "localhost"
  */
 function storefrontBaseUrl(store) {
-  if (store.domain) return `https://${store.domain}`;
+  // A connected domain only once it's been seen live over HTTPS.
+  if (store.domain && store.domainVerifiedAt) return `https://${store.domain}`;
   const root = (env.STOREFRONT_ROOT_DOMAIN || "localhost").toLowerCase();
   if (root !== "localhost") return `https://${store.handle}.${root}`;
   return `${env.STOREFRONT_ORIGIN.replace(/\/$/, "")}/store/${store.handle}`;

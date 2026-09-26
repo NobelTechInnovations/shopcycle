@@ -141,7 +141,17 @@ export function SettingsPanel({ catalog, products, collections, menus, onOpenSet
                       </button>
                       <Button size="small" type="text" icon={<ChevronUp size={12} aria-hidden="true" />} aria-label="Move up" disabled={idx === 0} onClick={() => moveBlock(selectedSectionKey, blockId, -1)} />
                       <Button size="small" type="text" icon={<ChevronDown size={12} aria-hidden="true" />} aria-label="Move down" disabled={idx === blockOrder.length - 1} onClick={() => moveBlock(selectedSectionKey, blockId, 1)} />
-                      <Button size="small" type="text" danger icon={<Trash2 size={12} aria-hidden="true" />} aria-label="Remove" onClick={() => removeBlock(selectedSectionKey, blockId)} />
+                      <Tooltip title={blockOrder.length === 1 && schema.default_blocks ? "A section needs at least one — hide the section instead" : "Remove"}>
+                        <Button
+                          size="small"
+                          type="text"
+                          danger
+                          icon={<Trash2 size={12} aria-hidden="true" />}
+                          aria-label="Remove"
+                          disabled={blockOrder.length === 1 && Boolean(schema.default_blocks)}
+                          onClick={() => removeBlock(selectedSectionKey, blockId)}
+                        />
+                      </Tooltip>
                     </div>
                     {open && (
                       <div className="flex flex-col gap-3 px-3 pb-3 pt-1 border-t border-app-border">

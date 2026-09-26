@@ -302,6 +302,11 @@ model Store {
   /// /store/:handle path — see apps/storefront middleware.js. Optional;
   /// most stores never set one and keep using the handle path.
   domain   String?     @unique
+  /// Set when the connected domain was last seen serving this store over
+  /// HTTPS (domains/service.js#status). Only then do links and the
+  /// {handle}.<root> address switch to it — never to a domain that isn't
+  /// live yet.
+  domainVerifiedAt DateTime?
   currency String      @default("INR")
   timezone String      @default("Asia/Kolkata")
   status   StoreStatus @default(active)

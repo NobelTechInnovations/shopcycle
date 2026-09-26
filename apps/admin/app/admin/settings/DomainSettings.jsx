@@ -108,7 +108,11 @@ export function DomainSettings({ canEdit = true }) {
       <Card
         size="small"
         title="Your own domain"
-        extra={info.domain ? <StatusBadge status={info.connected ? "active" : "pending"} label={info.connected ? "Connected" : "Waiting for DNS"} /> : null}
+        extra={
+          info.domain ? (
+            <StatusBadge status={info.live ? "active" : "pending"} label={info.live ? "Live" : info.stage === "hosting" ? "Activating HTTPS" : "Waiting for DNS"} />
+          ) : null
+        }
       >
         {!info.domain ? (
           <>
@@ -147,13 +151,25 @@ export function DomainSettings({ canEdit = true }) {
               </div>
             </div>
 
-            {info.connected ? (
+            {info.live ? (
               <Alert
                 type="success"
                 showIcon
                 icon={<CheckCircle2 size={16} />}
-                message={`Your store is live at ${info.domain}`}
-                description={info.kind === "apex" ? `www.${info.domain} works too.` : undefined}
+                message={`Your store is live at https://${info.domain}`}
+                description={`${info.kind === "apex" ? `www.${info.domain} works too. ` : ""}Your free address now forwards here.`}
+              />
+            ) : info.stage === "hosting" ? (
+              <Alert
+                type="info"
+                showIcon
+                icon={<Clock size={16} />}
+                message="DNS is set up correctly — activating HTTPS"
+                description={
+                  info.hosting.managed
+                    ? "The security certificate is being issued. This usually takes a few minutes — press Check again."
+                    : "Oyklane is adding your domain and its security certificate. This usually takes under a day; your free address keeps working meanwhile."
+                }
               />
             ) : (
               <Alert
@@ -203,14 +219,6 @@ export function DomainSettings({ canEdit = true }) {
               <p className="text-xs text-ink-muted m-0">
                 We currently see: {info.records.filter((r) => !r.ok && r.found?.length).map((r) => `${r.host} → ${r.found.join(", ")}`).join("; ")}
               </p>
-            )}
-            {!info.hosting.managed && (
-              <p className="text-xs text-ink-muted m-0">
-                Once DNS is in place, the Oyklane team activates the domain and its security certificate (HTTPS) — usually within a day.
-              </p>
-            )}
-            {info.hosting.managed && info.dnsOk && info.hosting.verified === false && (
-              <p className="text-xs text-ink-muted m-0">DNS looks right — the security certificate (HTTPS) is being issued. This takes a few minutes.</p>
             )}
           </div>
         )}

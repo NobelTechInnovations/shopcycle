@@ -6,6 +6,14 @@ const growth = require("./growth");
 // HTML and raw theme assets for anonymous visitors.
 async function storefrontRoutes(fastify) {
   fastify.get("/resolve-domain", controller.resolveDomainHandler);
+  // For the storefront's {handle}.<root> requests: the store's own domain,
+  // once it's live — the storefront redirects there. Null otherwise.
+  fastify.get("/primary-domain", async (request, reply) => {
+    const handle = String(request.query.handle || "").toLowerCase().slice(0, 80);
+    const store = handle ? await fastify.prisma.store.findUnique({ where: { handle }, select: { domain: true, domainVerifiedAt: true } }) : null;
+    reply.header("cache-control", "public, max-age=60");
+    return { domain: store?.domain && store.domainVerifiedAt ? store.domain : null };
+  });
   fastify.get("/platform-assets/:file", controller.platformAssetHandler);
 
   // Growth (growth.js): search engines and newsletter signups.

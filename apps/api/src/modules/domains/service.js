@@ -41,7 +41,7 @@ function isApex(domain) {
 
 function defaultAddress(store) {
   const root = env.STOREFRONT_ROOT_DOMAIN;
-  return root === "localhost" ? `${env.STOREFRONT_ORIGIN.replace(/\/$/, "")}/store/${store.handle}` : `${store.handle}.${root}`;
+  return root === "localhost" ? `${env.STOREFRONT_ORIGIN.replace(/\/$/, "")}/store/${store.handle}` : `https://${store.handle}.${root}`;
 }
 
 function dnsRecords(domain) {
@@ -118,25 +118,44 @@ async function checkRecord(record) {
   }
 }
 
-async function status(store) {
+/** The real test: does https://<domain>/ answer with this store? The
+ * storefront tags every store response with x-oyklane-store. This fails
+ * until DNS points here AND the hosting has the domain with an SSL
+ * certificate — exactly the moment shoppers can use it. */
+async function probeLive(domain, handle) {
+  try {
+    const res = await fetch(`https://${domain}/`, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(8000) });
+    return res.headers.get("x-oyklane-store") === handle;
+  } catch {
+    return false;
+  }
+}
+
+async function status(prisma, store) {
   const domain = store.domain || null;
   const records = dnsRecords(domain);
-  const checks = domain ? await Promise.all(records.map(checkRecord)) : [];
-  let hosting = { managed: vercelOn(), verified: null, ssl: null };
-  if (domain && vercelOn()) {
-    const r = await vercel("GET", `/v6/domains/${encodeURIComponent(domain)}/config`).catch(() => null);
-    if (r?.ok) hosting = { managed: true, verified: !r.data.misconfigured, ssl: !r.data.misconfigured };
-  }
+  const [checks, live] = domain ? await Promise.all([Promise.all(records.map(checkRecord)), probeLive(domain, store.handle)]) : [[], false];
   const dnsOk = checks.length > 0 && checks.every((c) => c.ok);
+
+  // Remember whether it's live: links and redirects switch to the domain
+  // only then (see storefront-url.js and the storefront proxy).
+  if (prisma && domain && live !== Boolean(store.domainVerifiedAt)) {
+    await prisma.store.update({ where: { id: store.id }, data: { domainVerifiedAt: live ? new Date() : null } });
+  }
+
+  // Why it isn't live yet, in the order a merchant would fix it.
+  const stage = !domain ? null : live ? "live" : !dnsOk ? "dns" : "hosting";
   return {
     defaultAddress: defaultAddress(store),
     rootDomain: env.STOREFRONT_ROOT_DOMAIN,
     domain,
     kind: domain ? (isApex(domain) ? "apex" : "subdomain") : null,
     records: checks,
-    connected: Boolean(domain) && dnsOk && hosting.verified !== false,
     dnsOk,
-    hosting,
+    live,
+    connected: live,
+    stage,
+    hosting: { managed: vercelOn() },
   };
 }
 
@@ -151,14 +170,14 @@ async function connect(prisma, store, input) {
   if (taken) throw new HttpError(409, "That domain is already connected to another store.");
   if (store.domain && store.domain !== domain) await removeFromVercel(store.domain);
   await addToVercel(domain);
-  const updated = await prisma.store.update({ where: { id: store.id }, data: { domain } });
-  return status(updated);
+  const updated = await prisma.store.update({ where: { id: store.id }, data: { domain, domainVerifiedAt: null } });
+  return status(prisma, updated);
 }
 
 async function disconnect(prisma, store) {
   await removeFromVercel(store.domain);
-  const updated = await prisma.store.update({ where: { id: store.id }, data: { domain: null } });
-  return status(updated);
+  const updated = await prisma.store.update({ where: { id: store.id }, data: { domain: null, domainVerifiedAt: null } });
+  return status(prisma, updated);
 }
 
 module.exports = { status, connect, disconnect, normalizeDomain, isApex };

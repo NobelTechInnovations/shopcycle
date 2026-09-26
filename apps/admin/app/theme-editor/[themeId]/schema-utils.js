@@ -47,7 +47,7 @@ export function hydrateTemplateDefaults(catalog, template) {
     const schema = catalog[entry.type];
     const settings = mergeSettings(schema, entry.settings || {});
 
-    if (!entry.blocks && schema?.default_blocks) {
+    if ((!entry.blocks || !(entry.block_order || []).length) && schema?.default_blocks) {
       sections[key] = { ...entry, settings, ...materializeDefaultBlocks(schema) };
       continue;
     }
@@ -74,7 +74,7 @@ export function hydrateTemplateDefaults(catalog, template) {
 export function hydrateGlobalSectionDefaults(catalog, sectionType, entry) {
   const schema = catalog[sectionType];
   const settings = mergeSettings(schema, entry?.settings ?? entry ?? {});
-  if (!entry?.blocks && schema?.default_blocks) return { settings, ...materializeDefaultBlocks(schema) };
+  if ((!entry?.blocks || !(entry?.block_order || []).length) && schema?.default_blocks) return { settings, ...materializeDefaultBlocks(schema) };
 
   const blockOrder = entry?.block_order || [];
   const blocksIn = entry?.blocks || {};

@@ -11,7 +11,7 @@ async function domainRoutes(fastify) {
     if (request.storeRole === "staff") throw new HttpError(403, "Only the store owner or an admin can change domains.");
   };
 
-  fastify.get("/", async (request) => service.status(request.store));
+  fastify.get("/", async (request) => service.status(fastify.prisma, request.store));
 
   fastify.put("/", async (request) => {
     manager(request);

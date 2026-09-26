@@ -162,6 +162,21 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+// In production the root domain can be inferred from the API's own address
+// (api.oyklane.com → oyklane.com) — "localhost" there would make every
+// store link point at a developer's machine.
+if (parsed.data.NODE_ENV === "production" && parsed.data.STOREFRONT_ROOT_DOMAIN === "localhost") {
+  try {
+    const host = new URL(parsed.data.API_PUBLIC_URL).hostname;
+    if (host && host !== "localhost" && host.split(".").length >= 3) {
+      parsed.data.STOREFRONT_ROOT_DOMAIN = host.split(".").slice(1).join(".");
+      console.warn(`STOREFRONT_ROOT_DOMAIN not set — using ${parsed.data.STOREFRONT_ROOT_DOMAIN} (from API_PUBLIC_URL). Set it explicitly.`);
+    }
+  } catch {
+    /* keep localhost */
+  }
+}
+
 // Free plans for everyone is not a mistake a production deploy gets to make.
 if (parsed.data.BILLING_SANDBOX && parsed.data.NODE_ENV === "production") {
   console.error("BILLING_SANDBOX=true is not allowed when NODE_ENV=production. Remove it and set the Razorpay keys.");
