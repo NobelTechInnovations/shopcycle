@@ -1,54 +1,56 @@
 {% comment %}
-  Falls back to the store's own real collections (skipping the synthetic
-  "all" one) when none are explicitly picked, and hides entirely if the
-  store truly has zero collections — same reasoning as Modern's
-  category-grid.liquid: a fresh install shouldn't show a heading over an
-  empty row just because nobody has curated this section yet.
+  Shop-by-collection row. Style: circles (small round thumbnails), cards
+  (photo with the name beneath) or tiles (name over the photo). Each block
+  picks a collection; its own image overrides the collection's.
 {% endcomment %}
-{% assign auto_handles = "" | split: "," %}
-{% for c in collections %}
-  {% unless c[0] == "all" %}
-    {% assign auto_handles = auto_handles | push: c[0] %}
-  {% endunless %}
-{% endfor %}
-{% assign display_handles = section.settings.collections | default: auto_handles %}
-
-{% if display_handles.size > 0 %}
-<section class="collection-list">
-  <h2>{{ section.settings.heading }}</h2>
-  {% comment %}
-    A fixed-width flex row (not a stretchy grid) so "3 collections, centered"
-    actually looks centered instead of 3 tiles stretched to fill whatever
-    column count a grid happened to have — this is what made the alignment
-    setting below actually do something.
-  {% endcomment %}
-  <div class="collection-list__grid collection-list__grid--{{ section.settings.alignment }}">
-    {% for handle in display_handles limit: 4 %}
-      {% assign coll = collections[handle] %}
-      {% if coll %}
-        <a href="{{ routes.collections_url }}/{{ handle }}" class="collection-list__tile">
-          {% if coll.image != blank %}
-            <img src="{{ coll.image | image_url }}" alt="">
-          {% else %}
-            {% render 'snippets/image-placeholder' %}
-          {% endif %}
-          <span>{{ coll.title }}</span>
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, subtitle: section.settings.subheading, align: section.settings.align, link_url: routes.all_products_url, link_text: section.settings.link_text %}
+    <div class="clist clist--{{ section.settings.style }}" style="--cols: {{ section.settings.columns }}">
+      {% for block in section.blocks %}
+        {% assign coll = collections[block.settings.collection] %}
+        {% assign coll_img = block.settings.image | default: coll.image %}
+        {% if coll_img == blank and coll.products.size > 0 %}{% assign coll_img = coll.products[0].featured_image.url %}{% endif %}
+        <a class="clist__item" href="{% if coll %}{{ coll.url }}{% else %}{{ routes.all_products_url }}{% endif %}">
+          <span class="clist__media">
+            {% if coll_img != blank %}<img src="{{ coll_img | image_url }}" alt="" loading="lazy" width="600" height="600">{% else %}{% render 'snippets/placeholder', kind: 'collection' %}{% endif %}
+            {% if section.settings.style == 'tiles' %}<span class="clist__overlay"><span class="clist__name">{{ block.settings.title | default: coll.title | default: 'Collection' }}</span>{% render 'snippets/icon', icon: 'arrow-right' %}</span>{% endif %}
+          </span>
+          {% unless section.settings.style == 'tiles' %}
+            <span class="clist__name">{{ block.settings.title | default: coll.title | default: 'Collection' }}</span>
+            {% if section.settings.show_count and coll %}<span class="clist__count">{{ coll.products.size }} product{% if coll.products.size != 1 %}s{% endif %}</span>{% endif %}
+          {% endunless %}
         </a>
-      {% endif %}
-    {% endfor %}
+      {% endfor %}
+    </div>
   </div>
 </section>
-{% endif %}
 
 {% schema %}
 {
   "name": "Collection list",
   "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "" },
     { "type": "text", "id": "heading", "label": "Heading", "default": "Shop by category" },
-    { "type": "collection_list", "id": "collections", "label": "Collections", "default": [],
-      "info": "Pick as many as you like — each tile shows that collection's own cover photo and name automatically." },
-    { "type": "select", "id": "alignment", "label": "Alignment", "default": "left",
-      "options": [{"value":"left","label":"Left"},{"value":"center","label":"Center"},{"value":"right","label":"Right"}] }
-  ]
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "" },
+    { "type": "select", "id": "align", "label": "Heading alignment", "default": "center", "options": [{ "value": "left", "label": "Left" }, { "value": "center", "label": "Centre" }] },
+    { "type": "select", "id": "style", "label": "Style", "default": "circles", "options": [
+      { "value": "circles", "label": "Circles" },
+      { "value": "cards", "label": "Cards" },
+      { "value": "tiles", "label": "Tiles (name on photo)" }
+    ] },
+    { "type": "range", "id": "columns", "label": "Per row on desktop", "min": 2, "max": 6, "step": 1, "default": 5 },
+    { "type": "checkbox", "id": "show_count", "label": "Show product count", "default": false },
+    { "type": "text", "id": "link_text", "label": "\"View all\" link text", "default": "" },
+    { "type": "checkbox", "id": "surface", "label": "Use alternate background", "default": false }
+  ],
+  "blocks": [
+    { "type": "collection", "name": "Collection", "settings": [
+      { "type": "collection", "id": "collection", "label": "Collection" },
+      { "type": "text", "id": "title", "label": "Name (optional)", "default": "" },
+      { "type": "image_picker", "id": "image", "label": "Image (optional)" }
+    ] }
+  ],
+  "max_blocks": 12
 }
 {% endschema %}

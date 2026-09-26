@@ -9,6 +9,7 @@ async function themeRoutes(fastify) {
   fastify.post("/install", controller.installHandler);
   fastify.get("/:id", controller.getHandler);
   fastify.post("/:id/activate", controller.activateHandler);
+  fastify.delete("/:id", controller.deleteHandler);
   fastify.patch("/:id/settings", controller.updateSettingsHandler);
   fastify.patch("/:id/files", controller.upsertFileHandler);
   fastify.post("/:id/files", controller.createFileHandler);

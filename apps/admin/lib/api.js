@@ -54,6 +54,29 @@ export async function apiUpload(path, file) {
   return data;
 }
 
+/** Downloads a file the API serves (CSV exports) with the session cookie,
+ * then hands it to the browser as a download. A plain <a href> to the API
+ * can't be used for errors: a 403 ("Premium only") would just download as
+ * a file instead of showing a message. */
+export async function apiDownload(path, fallbackName = "download.csv") {
+  const res = await fetch(`${API_URL}${path}`, { credentials: "include" });
+  if (!res.ok) {
+    const data = await parseBody(res).catch(() => null);
+    throw new ApiError(data?.error || "Download failed", res.status);
+  }
+  const disposition = res.headers.get("content-disposition") || "";
+  const name = disposition.match(/filename="([^"]+)"/)?.[1] || fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return name;
+}
+
 /** Server Components/layouts don't have a browser cookie jar — forward the
  * incoming request's cookies manually so the API sees the same session. */
 export async function serverApiFetch(path, { method = "GET", body, headers } = {}) {

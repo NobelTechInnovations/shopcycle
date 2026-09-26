@@ -20,6 +20,7 @@ import {
 import { StatusBadge, EmptyState } from "@shopcycle/ui";
 import { formatCurrency } from "@shopcycle/utils";
 import { storefrontUrlFor, storefrontLabelFor } from "@/lib/storefront";
+import { VerifyEmailBanner } from "@/components/VerifyEmailBanner";
 
 const columns = [
   { title: "Order", dataIndex: "orderNumber", render: (n) => <span className="font-medium">#{n}</span> },
@@ -189,7 +190,7 @@ function SetupGuide({ setup }) {
   );
 }
 
-export function DashboardView({ data }) {
+export function DashboardView({ data, user }) {
   const { stats, recentOrders, storeStatus, setup, store, greetingName } = data;
   // The greeting depends on the viewer's own clock — computed after mount
   // so server-rendered HTML (server's timezone) never disagrees with the
@@ -208,6 +209,8 @@ export function DashboardView({ data }) {
           <p className="text-sm text-ink-muted mt-1 mb-0">Here&apos;s what&apos;s happening with {store?.name || "your store"}.</p>
         </div>
       </div>
+
+      {user && !user.emailVerified && <VerifyEmailBanner email={user.email} />}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
         <StatCard icon={IndianRupee} label="Total sales" value={formatCurrency(stats.sales)} href="/admin/analytics" />

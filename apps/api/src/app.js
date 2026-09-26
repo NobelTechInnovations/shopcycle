@@ -109,7 +109,8 @@ function buildApp() {
   });
 
   // Admin and super-admin both need credentialed CORS (cookie session).
-  app.register(cors, { origin: TRUSTED_ORIGINS, credentials: true });
+  // content-disposition is exposed so CSV downloads keep their filenames.
+  app.register(cors, { origin: TRUSTED_ORIGINS, credentials: true, exposedHeaders: ["content-disposition"] });
   app.register(prismaPlugin);
   app.register(jwtAuthPlugin);
   app.register(redisPlugin);

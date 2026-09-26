@@ -21,11 +21,21 @@ function itemQuantities(order) {
   const refunded = sumBy((order.refunds || []).flatMap((r) => r.items || []));
   const returned = sumBy((order.returns || []).filter((r) => r.status !== "declined").flatMap((r) => r.items || []));
 
+  // Orders marked "fulfilled" with the old status dropdown have no
+  // shipment records — they did ship, so count everything as shipped
+  // rather than offering to ship them again.
+  const legacyShipped = order.fulfillmentStatus === "fulfilled" && (order.fulfillments || []).length === 0;
+
   const byItem = {};
   for (const item of order.items || []) {
     const ordered = item.quantity;
-    const fulfilled = Math.min(shipped[item.id] || 0, ordered);
+    const fulfilled = legacyShipped ? ordered : Math.min(shipped[item.id] || 0, ordered);
     const refundedQty = Math.min(refunded[item.id] || 0, ordered);
+    // Refunds use up unshipped units first; any beyond that were shipped
+    // units refunded without a return — they're effectively back too. A
+    // return that was then refunded counts once, hence max() not sum.
+    const refundedShipped = Math.max(refundedQty - (ordered - fulfilled), 0);
+    const back = Math.max(returned[item.id] || 0, refundedShipped);
     byItem[item.id] = {
       ordered,
       fulfilled,
@@ -33,7 +43,7 @@ function itemQuantities(order) {
       returned: returned[item.id] || 0,
       toFulfill: Math.max(ordered - fulfilled - refundedQty, 0),
       refundable: Math.max(ordered - refundedQty, 0),
-      returnable: Math.max(fulfilled - (returned[item.id] || 0), 0),
+      returnable: Math.max(fulfilled - back, 0),
     };
   }
   return byItem;

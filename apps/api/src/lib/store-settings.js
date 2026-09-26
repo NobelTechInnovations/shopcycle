@@ -18,6 +18,8 @@ const DEFAULTS = {
   invoicePrefix: "INV",
   // Products ▸ Inventory flags stock at or below this.
   lowStockThreshold: 5,
+  // Online Store ▸ Preferences: the home page's search/social listing.
+  seo: { title: "", description: "", image: "" },
 };
 
 function storeSettings(store) {
@@ -26,6 +28,7 @@ function storeSettings(store) {
     ...DEFAULTS,
     ...raw,
     notifications: { ...DEFAULTS.notifications, ...(raw.notifications || {}) },
+    seo: { ...DEFAULTS.seo, ...(raw.seo || {}) },
   };
 }
 
@@ -36,6 +39,7 @@ function mergeSettings(store, patch) {
     ...current,
     ...patch,
     ...(patch.notifications && { notifications: { ...(current.notifications || {}), ...patch.notifications } }),
+    ...(patch.seo && { seo: { ...(current.seo || {}), ...patch.seo } }),
   };
 }
 

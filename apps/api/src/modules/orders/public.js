@@ -58,7 +58,13 @@ function publicOrder(store, order, { statusUrl, invoiceUrl } = {}) {
     ...(order.paymentMethod !== "cod"
       ? [{ key: "paid", label: STEP_LABELS.paid, done: ["paid", "partially_refunded", "refunded"].includes(order.paymentStatus), date: null }]
       : []),
-    { key: "shipped", label: STEP_LABELS.shipped, done: Boolean(firstShipped), date: dateLabel(store, firstShipped) },
+    {
+      key: "shipped",
+      label: STEP_LABELS.shipped,
+      // (Orders shipped before shipments were recorded have no dates.)
+      done: Boolean(firstShipped) || ["fulfilled", "partially_fulfilled"].includes(order.fulfillmentStatus),
+      date: dateLabel(store, firstShipped),
+    },
     {
       key: "delivered",
       label: STEP_LABELS.delivered,
@@ -87,6 +93,8 @@ function publicOrder(store, order, { statusUrl, invoiceUrl } = {}) {
     shipping: Number(order.shipping),
     tax: Number(order.tax),
     total: Number(order.total),
+    giftCardAmount: Number(order.giftCardAmount || 0),
+    amountDue: Math.max(0, Number(order.total) - Number(order.giftCardAmount || 0)),
     refundedAmount: Number(order.refundedAmount),
     shippingName: safe(order.shippingName),
     shippingAddress1: safe(order.shippingAddress1),

@@ -58,6 +58,9 @@ async function requestCode(prisma, store, rawEmail, log) {
     replyTo: store.supportEmail || undefined,
     refType: "shopper",
     refId: email,
+    // The code is in the real subject line; the store's email log (which
+    // staff can read) must never show it.
+    logSubject: `Sign-in code for ${store.name}`,
     log,
   });
 }

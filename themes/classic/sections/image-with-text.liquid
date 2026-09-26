@@ -1,18 +1,19 @@
-<section class="image-with-text image-with-text--{{ section.settings.layout }}">
-  <div class="image-with-text__media">
-  {% if section.settings.image != blank %}
-    <img src="{{ section.settings.image | image_url }}" alt="">
-  {% else %}
-    {% render 'snippets/image-placeholder' %}
-  {% endif %}
-  </div>
-  <div class="image-with-text__content">
-    <h2>{{ section.settings.heading }}</h2>
-    <p>{{ section.settings.text }}</p>
-    {% if section.settings.button_text != blank %}
-      {% assign btn_url = section.settings.button_link | default: routes.all_products_url %}
-      {% render 'snippets/button', text: section.settings.button_text, url: btn_url %}
-    {% endif %}
+{% comment %} Brand story / feature: a photo beside a heading, text and a button. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    <div class="split split--{{ section.settings.image_position }}">
+      <div class="split__media">
+        {% if section.settings.image != blank %}<img src="{{ section.settings.image | image_url }}" alt="{{ section.settings.alt }}" loading="lazy" width="1200" height="1400">{% else %}{% render 'snippets/placeholder', kind: 'product' %}{% endif %}
+      </div>
+      <div class="split__text">
+        {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+        <h2 class="h2">{{ section.settings.heading }}</h2>
+        <div class="rte">{{ section.settings.text | newline_to_br }}</div>
+        {% if section.settings.button_text != blank %}
+          <a class="btn btn--ghost" href="{{ section.settings.button_link | default: routes.all_products_url }}">{{ section.settings.button_text }}</a>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </section>
 
@@ -21,12 +22,14 @@
   "name": "Image with text",
   "settings": [
     { "type": "image_picker", "id": "image", "label": "Image" },
-    { "type": "text", "id": "heading", "label": "Heading", "default": "Our story" },
-    { "type": "textarea", "id": "text", "label": "Text" },
-    { "type": "text", "id": "button_text", "label": "Button text" },
+    { "type": "text", "id": "alt", "label": "Image description", "default": "" },
+    { "type": "select", "id": "image_position", "label": "Image position", "default": "left", "options": [{ "value": "left", "label": "Left" }, { "value": "right", "label": "Right" }] },
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Our story" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Small batches, made with care" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "We work with makers across India to create pieces that last — natural materials, fair wages and packaging you can recycle." },
+    { "type": "text", "id": "button_text", "label": "Button", "default": "Read more" },
     { "type": "url", "id": "button_link", "label": "Button link" },
-    { "type": "select", "id": "layout", "label": "Layout", "default": "image-left",
-      "options": [{"value":"image-left","label":"Image left"},{"value":"image-right","label":"Image right"}] }
+    { "type": "checkbox", "id": "surface", "label": "Use alternate background", "default": true }
   ]
 }
 {% endschema %}

@@ -7,6 +7,7 @@ const operations = require("./operations");
 const { createRefund } = require("./refunds");
 const { itemQuantities } = require("./quantities");
 const { returnDeadline } = require("./returns");
+const giftCards = require("../gift-cards/service");
 
 function computeTotals(items, { discount = 0, shipping = 0, tax = 0 }) {
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
@@ -24,8 +25,15 @@ async function listOrders(prisma, storeId, query) {
 async function getOrder(prisma, store, id) {
   const order = await operations.loadOrder(prisma, store.id, id);
   const deadline = returnDeadline(store, order);
+  const giftCard = order.giftCardId
+    ? {
+        ...(await prisma.giftCard.findUnique({ where: { id: order.giftCardId }, select: { id: true, last4: true } })),
+        refundable: await giftCards.refundableToCard(prisma, order),
+      }
+    : null;
   return {
     ...order,
+    giftCard,
     quantities: itemQuantities(order),
     refundable: Math.max(Number(order.total) - Number(order.refundedAmount), 0),
     returnDeadline: deadline,

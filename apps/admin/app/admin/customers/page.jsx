@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Table, Input, Button, Modal, Form, App } from "antd";
-import { Plus, Users, Search } from "lucide-react";
+import { Plus, Users, Search, Download } from "lucide-react";
 import { PageHeader, EmptyState, ListCard, SearchInput } from "@shopcycle/ui";
 import { formatCurrency } from "@shopcycle/utils";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiDownload } from "@/lib/api";
 import { initials } from "@/lib/storefront";
 
 export default function CustomersPage() {
@@ -107,9 +107,17 @@ export default function CustomersPage() {
         title="Customers"
         subtitle={loading ? " " : `${total} ${total === 1 ? "customer" : "customers"}${q ? " match" : ""}`}
         actions={
-          <Button type="primary" icon={<Plus size={15} aria-hidden="true" />} onClick={() => setModalOpen(true)}>
-            Add customer
-          </Button>
+          <>
+            <Button
+              icon={<Download size={15} aria-hidden="true" />}
+              onClick={() => apiDownload("/api/data/exports/customers", "customers.csv").catch((err) => message.error(err.message))}
+            >
+              Export
+            </Button>
+            <Button type="primary" icon={<Plus size={15} aria-hidden="true" />} onClick={() => setModalOpen(true)}>
+              Add customer
+            </Button>
+          </>
         }
       />
 

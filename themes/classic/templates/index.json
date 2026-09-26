@@ -1,65 +1,117 @@
 {
   "sections": {
-    "hero": { "type": "hero", "settings": {} },
-    "collection-circles": {
-      "type": "collection-circles",
-      "settings": { "heading": "Top Collections", "subheading": "Express your style with our standout collection—fashion meets sophistication." },
+    "hero": {
+      "type": "slideshow",
+      "settings": { "height": "large", "autoplay": true, "speed": 6, "label": "Featured" },
       "blocks": {
-        "c1": { "type": "collection", "settings": { "title": "Crop-Top" } },
-        "c2": { "type": "collection", "settings": { "title": "T-Shirts" } },
-        "c3": { "type": "collection", "settings": { "title": "Blazers" } },
-        "c4": { "type": "collection", "settings": { "title": "Coats" } }
+        "s1": {
+          "type": "slide",
+          "settings": {
+            "eyebrow": "New season",
+            "heading": "Made to be lived in",
+            "text": "Everyday essentials in natural fabrics — thoughtfully made, delivered across India.",
+            "button_text": "Shop new arrivals",
+            "button2_text": "Our story",
+            "position": "left",
+            "text_color": "dark",
+            "overlay": 0
+          }
+        },
+        "s2": {
+          "type": "slide",
+          "settings": {
+            "eyebrow": "Free delivery over ₹999",
+            "heading": "Gifts they'll keep",
+            "text": "Ready to wrap, with cash on delivery and easy 7-day returns.",
+            "button_text": "Shop gifts",
+            "position": "center",
+            "text_color": "dark",
+            "overlay": 0
+          }
+        }
       },
-      "block_order": ["c1", "c2", "c3", "c4"]
+      "block_order": ["s1", "s2"]
     },
-    "featured": {
+    "features": {
+      "type": "multicolumn",
+      "settings": { "heading": "", "style": "inline", "surface": false },
+      "blocks": {
+        "f1": { "type": "column", "settings": { "icon": "truck", "title": "Free delivery", "text": "On orders over ₹999" } },
+        "f2": { "type": "column", "settings": { "icon": "cash", "title": "Cash on delivery", "text": "Pay when it arrives" } },
+        "f3": { "type": "column", "settings": { "icon": "return", "title": "Easy returns", "text": "7 days, no fuss" } },
+        "f4": { "type": "column", "settings": { "icon": "shield", "title": "Secure payments", "text": "UPI, cards and wallets" } }
+      },
+      "block_order": ["f1", "f2", "f3", "f4"]
+    },
+    "categories": {
+      "type": "collection-list",
+      "settings": { "heading": "Shop by category", "align": "center", "style": "circles", "columns": 5, "show_count": false, "link_text": "", "surface": false },
+      "blocks": {
+        "c1": { "type": "collection", "settings": { "title": "New in" } },
+        "c2": { "type": "collection", "settings": { "title": "Bestsellers" } },
+        "c3": { "type": "collection", "settings": { "title": "Home" } },
+        "c4": { "type": "collection", "settings": { "title": "Gifts" } },
+        "c5": { "type": "collection", "settings": { "title": "Sale" } }
+      },
+      "block_order": ["c1", "c2", "c3", "c4", "c5"]
+    },
+    "new-arrivals": {
       "type": "featured-collection",
-      "settings": { "heading": "Featured products" }
-    },
-    "best-selling": {
-      "type": "best-selling",
-      "settings": { "heading": "Best Selling", "subheading": "Unmatched design—superior performance and customer satisfaction in one." },
-      "blocks": {}
+      "settings": { "heading": "New arrivals", "source": "newest", "limit": 8, "columns": 4, "layout": "slider", "link_text": "View all", "align": "left" }
     },
     "promo": {
-      "type": "promo-split",
+      "type": "promo-banner",
       "settings": {
-        "left_label": "View Products",
-        "eyebrow": "DON'T MISS OUT...",
-        "heading": "Today's Big Deals",
-        "subheading": "Sale up to 75% all items. Hurry up!",
-        "show_countdown": true,
-        "countdown_minutes": 10080,
-        "button_text": "Shop Sale",
-        "right_label": "View Products"
+        "background": "#1F2A24",
+        "text_color": "light",
+        "align": "left",
+        "eyebrow": "Limited time",
+        "heading": "The festive edit — up to 40% off",
+        "text": "Gift-ready favourites, while stocks last.",
+        "ends_at": "",
+        "button_text": "Shop the offer",
+        "full_width": false
       }
     },
-    "collections": { "type": "collection-list", "settings": {}, "blocks": {} },
-    "image-text": { "type": "image-with-text", "settings": {} },
+    "best-sellers": {
+      "type": "featured-collection",
+      "settings": { "eyebrow": "Most loved", "heading": "Best sellers", "source": "best_sellers", "limit": 8, "columns": 4, "layout": "slider", "link_text": "Shop all", "align": "left" }
+    },
+    "story": {
+      "type": "image-with-text",
+      "settings": {
+        "image_position": "left",
+        "eyebrow": "Our story",
+        "heading": "Small batches, made with care",
+        "text": "We work with makers across India to create pieces that last — natural materials, fair wages and packaging you can recycle.",
+        "button_text": "Read more",
+        "surface": true
+      }
+    },
     "reviews": {
       "type": "testimonials",
-      "settings": {},
+      "settings": { "eyebrow": "Loved by customers", "heading": "What people are saying" },
       "blocks": {
-        "r1": { "type": "review", "settings": { "name": "Carie-Gosée H.", "verified": true, "rating": 5, "quote": "These are sooo pretty and very comfy. Perfect color as well." } },
-        "r2": { "type": "review", "settings": { "name": "Cameron Smith.", "verified": true, "rating": 5, "quote": "A perfect product, it keeps you very warm without over heating. True to size!" } }
+        "r1": { "type": "review", "settings": { "rating": 5, "quote": "Beautiful quality and it arrived in two days. Already ordered another one for my sister.", "name": "Ananya R.", "place": "Bengaluru" } },
+        "r2": { "type": "review", "settings": { "rating": 5, "quote": "Paid cash on delivery, the packaging was lovely and the fit is perfect.", "name": "Rahul M.", "place": "Pune" } },
+        "r3": { "type": "review", "settings": { "rating": 4, "quote": "Exchanged a size without any trouble. Customer support replied within the hour.", "name": "Fatima S.", "place": "Hyderabad" } }
       },
-      "block_order": ["r1", "r2"]
+      "block_order": ["r1", "r2", "r3"]
     },
-    "gram": {
-      "type": "shop-the-gram",
-      "settings": {},
-      "blocks": {}
+    "journal": {
+      "type": "featured-blog",
+      "settings": { "eyebrow": "Journal", "heading": "Stories and guides", "count": 3, "show_excerpt": true }
     },
-    "usp": {
-      "type": "usp",
-      "settings": {},
-      "blocks": {
-        "u1": { "type": "item", "settings": { "icon": "box", "title": "Free Shipping", "text": "Enjoy free worldwide shipping and returns, with customs and duties taxes included." } },
-        "u2": { "type": "item", "settings": { "icon": "check-circle", "title": "Free Returns", "text": "Free returns within 15 days, please make sure the items are in undamaged condition." } },
-        "u3": { "type": "item", "settings": { "icon": "chat", "title": "Support Online", "text": "We support customers 24/7, send questions we will solve for you immediately." } }
-      },
-      "block_order": ["u1", "u2", "u3"]
+    "newsletter": {
+      "type": "newsletter",
+      "settings": {
+        "heading": "Get 10% off your first order",
+        "text": "Join our list for new arrivals, restocks and members-only offers.",
+        "button_text": "Subscribe",
+        "background": "#F6F3EE",
+        "text_color": "dark"
+      }
     }
   },
-  "order": ["hero", "collection-circles", "best-selling", "promo", "collections", "reviews", "image-text", "gram", "usp"]
+  "order": ["hero", "features", "categories", "new-arrivals", "promo", "best-sellers", "story", "reviews", "journal", "newsletter"]
 }

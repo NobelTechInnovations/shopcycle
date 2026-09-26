@@ -36,7 +36,10 @@ async function syncOrderCommission(prisma, orderId) {
   if (earning) {
     if (!accrual) {
       const percent = Number(order.store.plan?.commissionPercent || 0);
-      if (percent <= 0) return;
+      // The fee is on money actually paid for the order — the part paid
+      // with a store gift card isn't a new payment.
+      const base = round2(Number(order.total) - Number(order.giftCardAmount || 0));
+      if (percent <= 0 || base <= 0) return;
       await prisma.commissionEntry
         .create({
           data: {
@@ -44,9 +47,9 @@ async function syncOrderCommission(prisma, orderId) {
             orderId: order.id,
             orderNumber: order.orderNumber,
             kind: "accrual",
-            orderTotal: order.total,
+            orderTotal: base,
             percent,
-            amount: round2((Number(order.total) * percent) / 100),
+            amount: round2((base * percent) / 100),
           },
         })
         .catch((err) => {

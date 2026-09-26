@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, ConfigProvider } from "antd";
-import { Building2, CreditCard, Grid3x3, Users, LogOut, ShieldCheck, ScrollText } from "lucide-react";
+import { Building2, CreditCard, Grid3x3, Users, LogOut, ShieldCheck, ScrollText, Mail } from "lucide-react";
 import { BrandMark } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
@@ -33,6 +33,11 @@ const NAV_ITEMS = [
     key: "/audit-log",
     icon: <ScrollText size={16} aria-hidden="true" />,
     label: <Link href="/audit-log">Audit log</Link>,
+  },
+  {
+    key: "/emails",
+    icon: <Mail size={16} aria-hidden="true" />,
+    label: <Link href="/emails">Emails</Link>,
   },
   {
     key: "/security",

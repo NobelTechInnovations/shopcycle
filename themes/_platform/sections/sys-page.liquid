@@ -1,0 +1,19 @@
+{% comment %} Content pages (About, FAQ, policies…). Merchant-written HTML. {% endcomment %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container sys-container--narrow">
+      <ol class="sys-crumbs" aria-label="Breadcrumb">
+        <li><a href="{{ routes.root_url }}">Home</a></li>
+        <li aria-current="page">{{ page.title }}</li>
+      </ol>
+      <h1 class="sys-h1" style="margin-bottom:24px">{{ page.title }}</h1>
+      <div class="sys-prose">
+        {% if page.body contains '<' %}{{ page.body }}{% else %}{{ page.body | newline_to_br }}{% endif %}
+      </div>
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{ "name": "Page", "settings": [] }
+{% endschema %}

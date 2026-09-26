@@ -10,6 +10,7 @@ const ordersRepository = require("../orders/repository");
 const { adjustStock } = require("../../lib/inventory");
 const { addOrderEvent } = require("../orders/events");
 const notify = require("../orders/notify");
+const giftCards = require("../gift-cards/service");
 
 function razorpayConfigured() {
   return Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
@@ -55,6 +56,11 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, log }
   const cart = await cartService.hydrateCart(prisma, storeId, cartId, raw);
   if (cart.items.length === 0) throw new HttpError(400, "Your cart is empty");
   if (cart.discount?.error) throw new HttpError(400, cart.discount.error);
+  if (cart.gift_card?.error) throw new HttpError(400, `${cart.gift_card.error} Remove it from your cart to continue.`);
+  // A gift card covering the whole order leaves nothing to collect.
+  const giftCard = cart.gift_card && cart.gift_card.amount > 0 ? cart.gift_card : null;
+  const due = cart.due;
+  if (due <= 0) input = { ...input, paymentMethod: "gift_card" };
   if (input.paymentMethod === "razorpay" && !razorpayConfigured()) {
     throw new HttpError(400, "Online payment isn't available for this store yet");
   }
@@ -81,6 +87,9 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, log }
     province: input.shippingProvince,
     zip: input.shippingZip,
     country: input.shippingCountry,
+    // Consent is only ever given here, never taken away: unticking the box
+    // on a later order doesn't unsubscribe someone who opted in before.
+    ...(input.acceptsMarketing && { acceptsEmailMarketing: true }),
   };
   const existingCustomer = await customersRepository.findByEmail(prisma, storeId, input.email);
   const customer = existingCustomer
@@ -115,6 +124,9 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, log }
     shippingCountry: input.shippingCountry,
     paymentMethod: input.paymentMethod,
     sessionId: session?.id || null,
+    giftCardAmount: giftCard?.amount || 0,
+    giftCardId: giftCard?.id || null,
+    ...(due <= 0 && { paymentStatus: "paid" }),
   };
 
   // Decrement inventory and create the order in one transaction — an order
@@ -136,12 +148,17 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, log }
       if (!item.variantId) continue;
       await adjustStock(tx, { storeId, variantId: item.variantId, delta: -item.quantity, reason: "sold", orderId: created.id });
     }
+    // Spent in the same transaction as the order: if the card's balance
+    // changed since the cart was loaded, nothing is created or charged.
+    if (giftCard) await giftCards.redeem(tx, giftCard, created.id, giftCard.amount);
     await addOrderEvent(
       tx,
       created.id,
       {
         kind: "placed",
-        message: `Order placed on the online store · ${input.paymentMethod === "cod" ? "cash on delivery" : "paying online"}`,
+        message: `Order placed on the online store · ${
+          input.paymentMethod === "gift_card" ? "paid with a gift card" : input.paymentMethod === "cod" ? "cash on delivery" : "paying online"
+        }${giftCard && input.paymentMethod !== "gift_card" ? ` · gift card ••••${giftCard.last4} used for ${giftCard.amount}` : ""}`,
         actorName: "Customer",
       },
       { strict: true }
@@ -165,7 +182,7 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, log }
 
   let razorpay = null;
   if (input.paymentMethod === "razorpay") {
-    const rp = await createRazorpayOrder(cart.total, order.id);
+    const rp = await createRazorpayOrder(due, order.id);
     razorpay = { orderId: rp.id, amount: rp.amount, currency: rp.currency, keyId: env.RAZORPAY_KEY_ID };
     await prisma.order.update({ where: { id: order.id }, data: { razorpayOrderId: rp.id } });
   }
@@ -178,7 +195,8 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, log }
 
   // Cash on delivery is final now; an online order is confirmed (and
   // emailed) once its payment is verified.
-  if (input.paymentMethod === "cod" && store) {
+  if (input.paymentMethod === "gift_card") await syncOrderCommission(prisma, order.id);
+  if (input.paymentMethod !== "razorpay" && store) {
     await notify.sendOrderPlaced(prisma, store, order, log).catch((err) => log?.error({ err }, "checkout: confirmation email failed"));
   }
 

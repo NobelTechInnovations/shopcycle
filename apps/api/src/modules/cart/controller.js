@@ -1,6 +1,7 @@
 const { z } = require("zod");
 const storefrontService = require("../storefront/service");
 const cartService = require("./service");
+const { throttle } = require("../../lib/throttle");
 
 const mutateSchema = z.object({
   cartId: z.string().optional(),
@@ -72,4 +73,27 @@ async function removeDiscountHandler(request, reply) {
   reply.send({ cart });
 }
 
-module.exports = { getHandler, addHandler, updateHandler, applyDiscountHandler, removeDiscountHandler };
+const giftCardSchema = z.object({
+  cartId: z.string().optional(),
+  code: z.string().trim().min(1, "Enter a gift card code").max(40),
+});
+
+async function applyGiftCardHandler(request, reply) {
+  const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
+  const { cartId, code } = giftCardSchema.parse(request.body);
+  // ~80-bit codes can't be guessed, but cap attempts per cart anyway.
+  await throttle(request.server, `gift-card:${store.id}:${cartId || "none"}`, { max: 10, windowSeconds: 10 * 60 });
+  const cart = await cartService.applyGiftCard(request.server.prisma, store.id, cartId, code, store.handle);
+  reply.send({ cart });
+}
+
+async function removeGiftCardHandler(request, reply) {
+  const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
+  const { cartId } = removeDiscountSchema.parse(request.body);
+  const cart = await cartService.removeGiftCard(request.server.prisma, store.id, cartId, store.handle);
+  reply.send({ cart });
+}
+
+module.exports = {
+  applyGiftCardHandler,
+  removeGiftCardHandler, getHandler, addHandler, updateHandler, applyDiscountHandler, removeDiscountHandler };

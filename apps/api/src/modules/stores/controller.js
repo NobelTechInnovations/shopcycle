@@ -1,3 +1,4 @@
+const { storeSettings, mergeSettings } = require("../../lib/store-settings");
 const { z } = require("zod");
 const { HttpError } = require("@shopcycle/utils");
 const { env } = require("../../config/env");
@@ -19,6 +20,24 @@ const updateStoreSchema = z.object({
     .optional()
     .or(z.literal(""))
     .nullable(),
+  // Shown to shoppers (order emails' Reply-To, order status page, invoices).
+  supportEmail: z.string().trim().email("Enter a valid email").max(200).optional().nullable().or(z.literal("")),
+  supportPhone: z.string().trim().max(20).optional().nullable().or(z.literal("")),
+  // Partial update of Store.settings — merged, never replaced (lib/store-settings.js).
+  settings: z
+    .object({
+      notifications: z
+        .object({ newOrderAlert: z.boolean().optional(), abandonedCheckout: z.boolean().optional() })
+        .optional(),
+      returnWindowDays: z.coerce.number().int().min(0).max(90).optional(),
+      invoicePrefix: z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z0-9]{1,5}$/, "Use 1 to 5 letters or numbers")
+        .optional(),
+      lowStockThreshold: z.coerce.number().int().min(0).max(100000).optional(),
+    })
+    .optional(),
 });
 
 /** Billing and store-level settings are for owners and admins. Staff can
@@ -36,7 +55,8 @@ const switchPlanSchema = z.object({
 });
 
 async function getStoreHandler(request, reply) {
-  reply.send({ store: request.store, role: request.storeRole });
+  // resolvedSettings: Store.settings with every default filled in.
+  reply.send({ store: request.store, role: request.storeRole, resolvedSettings: storeSettings(request.store) });
 }
 
 async function updateStoreHandler(request, reply) {
@@ -58,6 +78,11 @@ async function updateStoreHandler(request, reply) {
       );
     }
   }
+
+  for (const key of ["supportEmail", "supportPhone"]) {
+    if (key in body) body[key] = body[key] || null;
+  }
+  if (body.settings) body.settings = mergeSettings(request.store, body.settings);
 
   try {
     const store = await request.server.prisma.store.update({

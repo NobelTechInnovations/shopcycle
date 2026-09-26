@@ -6,10 +6,12 @@ import { Upload as UploadIcon, X } from "lucide-react";
 import { apiUpload } from "@/lib/api";
 import { IMAGE_ACCEPT } from "@/lib/uploads";
 
-const FONT_OPTIONS = ["Inter", "Fira Sans", "Playfair Display", "Poppins", "Space Grotesk"].map((f) => ({
-  value: f,
-  label: f,
-}));
+// Google Fonts that read well for Indian storefronts (Latin + good
+// numerals for ₹ prices). Sans first, then serif/display.
+const FONT_OPTIONS = [
+  { label: "Sans serif", options: ["Inter", "Jost", "Manrope", "DM Sans", "Plus Jakarta Sans", "Outfit", "Poppins", "Figtree", "Work Sans", "Mulish", "Nunito Sans", "Space Grotesk", "Fira Sans", "Mukta"].map((f) => ({ value: f, label: f })) },
+  { label: "Serif & display", options: ["Playfair Display", "Fraunces", "Cormorant Garamond", "Lora", "DM Serif Display", "Libre Baskerville", "Marcellus"].map((f) => ({ value: f, label: f })) },
+];
 
 /** A real upload, not a URL paste — matches how the Products page picks
  * images (apiUpload -> Files library), so a merchant never needs to know
@@ -107,7 +109,7 @@ export function SettingField({ setting, value, onChange, products = [], collecti
       return <ColorPicker value={value || "#000000"} onChangeComplete={(c) => onChange(c.toHexString())} showText />;
 
     case "font":
-      return <Select className="w-full" value={value} onChange={onChange} options={FONT_OPTIONS} />;
+      return <Select className="w-full" showSearch value={value} onChange={onChange} options={FONT_OPTIONS} />;
 
     case "collection":
       return (

@@ -36,6 +36,9 @@ function buildRoutes(handle, { rootless = false } = {}) {
     account_update_url: `${root}/account/update`,
     order_lookup_url: `${root}/orders/lookup`,
     orders_url: `${root}/orders`,
+    // Growth (Phase 6)
+    blog_url: `${root}/blog`,
+    newsletter_url: `${root}/newsletter`,
   };
 }
 
@@ -57,14 +60,39 @@ function serializeVariant(variant) {
 
 function serializeProduct(product, handle, { rootless = false } = {}) {
   const root = rootless ? "" : `/store/${handle}`;
+  const variants = (product.variants || []).map(serializeVariant);
+  // The cheapest variant drives "from" prices and the card's sale badge.
+  const priceVariant = variants.reduce((min, v) => (!min || v.price < min.price ? v : min), null);
+  const prices = variants.map((v) => v.price);
+  const onSale = Boolean(priceVariant && priceVariant.comparePrice && priceVariant.comparePrice > priceVariant.price);
   return {
     id: product.id,
     title: product.title,
     slug: product.slug,
+    handle: product.slug,
     description: product.description || "",
     url: `${root}/products/${product.slug}`,
     images: (product.images || []).map(serializeImage),
-    variants: (product.variants || []).map(serializeVariant),
+    featured_image: product.images?.[0] ? serializeImage(product.images[0]) : null,
+    variants,
+    price_variant: priceVariant,
+    price: priceVariant ? priceVariant.price : 0,
+    price_varies: prices.length > 1 && Math.min(...prices) !== Math.max(...prices),
+    compare_at_price: priceVariant?.comparePrice || null,
+    on_sale: onSale,
+    discount_percent: onSale ? Math.round(((priceVariant.comparePrice - priceVariant.price) / priceVariant.comparePrice) * 100) : 0,
+    available: variants.some((v) => v.available),
+    vendor: product.vendor || null,
+    brand: product.brand?.title || product.vendor || null,
+    category: product.category?.title || null,
+    product_type: product.productType || null,
+    tags: String(product.tags || "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean),
+    created_at: product.createdAt || null,
+    seo_title: product.seoTitle || null,
+    seo_description: product.seoDescription || null,
   };
 }
 

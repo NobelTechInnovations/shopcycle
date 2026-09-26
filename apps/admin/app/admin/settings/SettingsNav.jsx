@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Store, CreditCard, Users, Truck, Percent, Globe } from "lucide-react";
+import { Store, CreditCard, Users, Truck, Percent, Globe, Bell } from "lucide-react";
 
 export const SETTINGS_SECTIONS = [
   { href: "/admin/settings", icon: Store, label: "General", hint: "Name, currency, timezone" },
   { href: "/admin/settings/billing", icon: CreditCard, label: "Plan & billing", hint: "Plan, fees, invoices" },
   { href: "/admin/settings/team", icon: Users, label: "Team", hint: "Staff and permissions" },
+  { href: "/admin/settings/notifications", icon: Bell, label: "Notifications", hint: "Emails, returns, invoices" },
   { href: "/admin/settings/shipping", icon: Truck, label: "Shipping", hint: "Zones and rates" },
   { href: "/admin/settings/taxes", icon: Percent, label: "Taxes", hint: "Tax rates at checkout" },
   { href: "/admin/settings/domains", icon: Globe, label: "Domains", hint: "Your store's address" },

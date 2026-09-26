@@ -3,6 +3,7 @@ const { HttpError } = require("@shopcycle/utils");
 const discountService = require("../discounts/service");
 const shippingService = require("../shipping/service");
 const taxService = require("../taxes/service");
+const giftCards = require("../gift-cards/service");
 
 const CART_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days, refreshed on every write
 
@@ -15,7 +16,7 @@ function generateCartId() {
  * reads as empty rather than erroring: a shopper should never see a
  * broken page because their old cart cookie outlived its cart. */
 async function readRaw(prisma, storeId, cartId) {
-  const empty = { items: [], discountCode: null };
+  const empty = { items: [], discountCode: null, giftCardId: null };
   if (!cartId) return empty;
   const row = await prisma.cartSession.findUnique({ where: { storeId_cartId: { storeId, cartId } } });
   if (!row || row.expiresAt < new Date()) return empty;
@@ -23,12 +24,13 @@ async function readRaw(prisma, storeId, cartId) {
   return {
     items: Array.isArray(data.items) ? data.items : [],
     discountCode: data.discountCode || null,
+    giftCardId: data.giftCardId || null,
   };
 }
 
 async function writeRaw(prisma, storeId, cartId, data) {
   const expiresAt = new Date(Date.now() + CART_TTL_MS);
-  const payload = { items: data.items || [], discountCode: data.discountCode || null };
+  const payload = { items: data.items || [], discountCode: data.discountCode || null, giftCardId: data.giftCardId || null };
   await prisma.cartSession.upsert({
     where: { storeId_cartId: { storeId, cartId } },
     update: { data: payload, expiresAt },
@@ -91,6 +93,7 @@ async function hydrateCart(prisma, storeId, cartId, raw) {
     await writeRaw(prisma, storeId, cartId, {
       items: raw.items.filter((i) => variantsById[i.variantId]),
       discountCode: raw.discountCode,
+      giftCardId: raw.giftCardId,
     });
   }
 
@@ -128,6 +131,15 @@ async function hydrateCart(prisma, storeId, cartId, raw) {
 
   const total = round2(Math.max(subtotal - discountAmount + shippingAmount + taxAmount, 0));
 
+  // A gift card pays for part (or all) of the total — it isn't a discount,
+  // so `total` stays the order value and `due` is what's left to pay.
+  let giftCard = null;
+  if (raw.giftCardId && items.length) {
+    const card = await prisma.giftCard.findFirst({ where: { id: raw.giftCardId, storeId } });
+    const reason = giftCards.unusableReason(card);
+    giftCard = reason ? { last4: card?.last4 || null, amount: 0, error: reason } : giftCards.applied(card, total);
+  }
+
   return {
     cartId,
     item_count,
@@ -137,6 +149,8 @@ async function hydrateCart(prisma, storeId, cartId, raw) {
     shipping,
     tax,
     total,
+    gift_card: giftCard,
+    due: round2(Math.max(total - (giftCard?.amount || 0), 0)),
   };
 }
 
@@ -202,6 +216,27 @@ async function removeDiscountCode(prisma, storeId, cartId, handle) {
   return getCart(prisma, storeId, cartId, handle);
 }
 
+/** Checks a gift card code and attaches the card to the cart. The code
+ * itself is never stored in the cart — only the card's id. */
+async function applyGiftCard(prisma, storeId, cartId, code, handle) {
+  if (!cartId) throw new HttpError(400, "Missing cart");
+  const card = await giftCards.findByCode(prisma, storeId, code);
+  const reason = giftCards.unusableReason(card);
+  if (reason) throw new HttpError(400, reason);
+  const raw = await readRaw(prisma, storeId, cartId);
+  raw.giftCardId = card.id;
+  await writeRaw(prisma, storeId, cartId, raw);
+  return getCart(prisma, storeId, cartId, handle);
+}
+
+async function removeGiftCard(prisma, storeId, cartId, handle) {
+  if (!cartId) throw new HttpError(400, "Missing cart");
+  const raw = await readRaw(prisma, storeId, cartId);
+  raw.giftCardId = null;
+  await writeRaw(prisma, storeId, cartId, raw);
+  return getCart(prisma, storeId, cartId, handle);
+}
+
 /** Called once checkout successfully places a real order — the cart's job
  * is done, and leaving the old items in place would let the same cartId
  * "place" the same order again on a page back-navigation. */
@@ -215,6 +250,8 @@ module.exports = {
   updateItem,
   applyDiscountCode,
   removeDiscountCode,
+  applyGiftCard,
+  removeGiftCard,
   generateCartId,
   clearCart,
   hydrateCart,

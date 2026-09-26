@@ -49,6 +49,9 @@ function startRazorpayMock(port) {
       if ((m = url.match(/^\/v1\/subscriptions\/([^/]+)\/cancel_scheduled_changes$/)) && req.method === "POST") {
         return send(200, { id: m[1], has_scheduled_changes: false });
       }
+      if ((m = url.match(/^\/v1\/payments\/([^/]+)\/refund$/)) && req.method === "POST") {
+        return send(200, { id: id("rfnd"), payment_id: m[1], amount: body.amount, status: "processed" });
+      }
       if ((m = url.match(/^\/v1\/subscriptions\/([^/]+)\/addons$/)) && req.method === "POST") {
         return send(200, { id: id("ao"), subscription_id: m[1], item: body.item, quantity: body.quantity });
       }

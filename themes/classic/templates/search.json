@@ -1,6 +1,0 @@
-{
-  "sections": {
-    "main": { "type": "product-grid", "settings": { "heading": "Search results" } }
-  },
-  "order": ["main"]
-}

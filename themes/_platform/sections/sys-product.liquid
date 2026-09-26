@@ -1,0 +1,156 @@
+{% comment %}
+  Product page — the same layout on every store; the theme supplies fonts
+  and colours. Adding to cart is a plain form POST (works without JS);
+  system.js keeps price, stock and the button in sync with the chosen
+  variant.
+{% endcomment %}
+{% assign current = product.selected_variant | default: product.variants.first %}
+{% assign many = product.variants.size > 1 %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container">
+      <ol class="sys-crumbs" aria-label="Breadcrumb">
+        <li><a href="{{ routes.root_url }}">Home</a></li>
+        {% if product.collection %}<li><a href="{{ product.collection.url }}">{{ product.collection.title }}</a></li>{% endif %}
+        <li aria-current="page">{{ product.title }}</li>
+      </ol>
+
+      <div class="sys-product">
+        <div class="sys-gallery{% if product.images.size < 2 %} sys-gallery--single{% endif %}" data-sys-gallery>
+          <div class="sys-gallery__main">
+            {% if product.images.size > 0 %}
+              <img data-sys-gallery-main src="{{ product.images[0].url }}" alt="{{ product.images[0].altText | default: product.title }}" width="1200" height="1500">
+            {% else %}
+              <span class="sys-placeholder">{% render 'snippets/sys-icon', icon: 'photo' %}</span>
+            {% endif %}
+            {% if product.on_sale and product.available %}
+              <span class="sys-pcard__badges"><span class="sys-badge sys-badge--sale">−{{ product.discount_percent }}%</span></span>
+            {% endif %}
+          </div>
+          {% if product.images.size > 1 %}
+            <div class="sys-gallery__thumbs" role="list">
+              {% for image in product.images %}
+                <button type="button" class="sys-gallery__thumb" data-sys-thumb data-src="{{ image.url }}" data-alt="{{ image.altText | default: product.title }}" aria-label="Show image {{ forloop.index }}" aria-current="{% if forloop.first %}true{% else %}false{% endif %}" role="listitem">
+                  <img src="{{ image.url }}" alt="" loading="lazy" width="160" height="200">
+                </button>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="sys-pinfo">
+          <div class="sys-stack" style="gap:10px">
+            {% if product.brand %}<span class="sys-eyebrow">{{ product.brand }}</span>{% endif %}
+            <h1 class="sys-pinfo__title">{{ product.title }}</h1>
+          </div>
+
+          <div class="sys-price" data-sys-price>
+            {% render 'snippets/sys-price', variant: current, show_save: true %}
+          </div>
+          <p class="sys-pinfo__taxnote">{% if shop.taxes_included %}Inclusive of all taxes{% else %}Taxes calculated at checkout{% endif %}{% if shop.free_shipping_above %} · Free delivery over {{ shop.free_shipping_above | money }}{% endif %}</p>
+
+          <form method="post" action="{{ routes.cart_add_url }}" class="sys-stack" style="gap:20px" data-sys-product>
+            {% if many %}
+              <fieldset class="sys-options">
+                <legend>Option: <span data-sys-selected>{{ current.title }}</span></legend>
+                <div class="sys-swatches">
+                  {% for variant in product.variants %}
+                    <label class="sys-swatch{% unless variant.available %} sys-swatch--unavailable{% endunless %}">
+                      <input type="radio" name="variantId" value="{{ variant.id }}" {% if variant.id == current.id %}checked{% endif %}>
+                      <span>{{ variant.title }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </fieldset>
+            {% else %}
+              <input type="hidden" name="variantId" value="{{ current.id }}">
+            {% endif %}
+
+            {% if current.inventoryQuantity <= 0 %}
+              <p class="sys-stock sys-stock--out" data-sys-stock>Out of stock</p>
+            {% elsif current.inventoryQuantity <= shop.low_stock %}
+              <p class="sys-stock sys-stock--low" data-sys-stock>Only {{ current.inventoryQuantity }} left — order soon</p>
+            {% else %}
+              <p class="sys-stock" data-sys-stock>In stock, ready to ship</p>
+            {% endif %}
+
+            <div class="sys-buy">
+              <div class="sys-qty" data-sys-qty>
+                <button type="button" data-step="-1" aria-label="Decrease quantity">{% render 'snippets/sys-icon', icon: 'minus' %}</button>
+                <input type="number" name="quantity" value="1" min="1" max="99" inputmode="numeric" aria-label="Quantity">
+                <button type="button" data-step="1" aria-label="Increase quantity">{% render 'snippets/sys-icon', icon: 'plus' %}</button>
+              </div>
+              <button type="submit" class="sys-btn sys-btn--lg sys-btn--block" data-sys-add {% unless current.available %}disabled{% endunless %}>
+                {% if current.available %}Add to cart{% else %}Sold out{% endif %}
+              </button>
+            </div>
+          </form>
+
+          <ul class="sys-trust">
+            {% if shop.free_shipping_above %}
+              <li>{% render 'snippets/sys-icon', icon: 'truck' %}<span>Free delivery on orders over {{ shop.free_shipping_above | money }}</span></li>
+            {% else %}
+              <li>{% render 'snippets/sys-icon', icon: 'truck' %}<span>Delivery across India, tracked to your door</span></li>
+            {% endif %}
+            {% if shop.cod_enabled %}<li>{% render 'snippets/sys-icon', icon: 'cash' %}<span>Cash on delivery available</span></li>{% endif %}
+            {% if shop.return_days > 0 %}<li>{% render 'snippets/sys-icon', icon: 'return' %}<span>Easy returns within {{ shop.return_days }} days of delivery</span></li>{% endif %}
+            <li>{% render 'snippets/sys-icon', icon: 'shield' %}<span>Secure checkout</span></li>
+          </ul>
+
+          <div>
+            {% if product.description != blank %}
+              <details class="sys-accordion" open>
+                <summary>Description {% render 'snippets/sys-icon', icon: 'plus' %}</summary>
+                <div class="sys-accordion__body sys-prose">
+                  {% if product.description contains '<' %}{{ product.description }}{% else %}{{ product.description | newline_to_br }}{% endif %}
+                </div>
+              </details>
+            {% endif %}
+            <details class="sys-accordion">
+              <summary>Details {% render 'snippets/sys-icon', icon: 'plus' %}</summary>
+              <div class="sys-accordion__body">
+                <dl>
+                  {% if product.brand %}<dt>Brand</dt><dd>{{ product.brand }}</dd>{% endif %}
+                  {% if product.category %}<dt>Category</dt><dd>{{ product.category }}</dd>{% endif %}
+                  {% if product.product_type %}<dt>Type</dt><dd>{{ product.product_type }}</dd>{% endif %}
+                  {% if current.sku %}<dt>SKU</dt><dd>{{ current.sku }}</dd>{% endif %}
+                  <dt>Sold by</dt><dd>{{ shop.name }}</dd>
+                </dl>
+              </div>
+            </details>
+            <details class="sys-accordion">
+              <summary>Delivery &amp; returns {% render 'snippets/sys-icon', icon: 'plus' %}</summary>
+              <div class="sys-accordion__body sys-stack" style="gap:8px">
+                <p>Orders are packed within 1–2 business days and delivered in 3–7 days depending on your PIN code. You'll get tracking by email as soon as it ships.</p>
+                {% if shop.return_days > 0 %}
+                  <p>Changed your mind? Request a return from your order page within {{ shop.return_days }} days of delivery.</p>
+                {% else %}
+                  <p>For returns, contact us{% if shop.support_email %} at <a class="sys-link" href="mailto:{{ shop.support_email }}">{{ shop.support_email }}</a>{% endif %}.</p>
+                {% endif %}
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+
+      {% if product.related.size > 0 %}
+        <div class="sys-related">
+          <div class="sys-related__head">
+            <h2 class="sys-h2">You may also like</h2>
+            {% if product.collection %}<a class="sys-link sys-small" href="{{ product.collection.url }}">View all</a>{% endif %}
+          </div>
+          <div class="sys-grid">
+            {% for related_product in product.related %}
+              {% render 'snippets/sys-product-card', product: related_product %}
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+<script type="application/json" data-sys-product-json>{{ product.client_json }}</script>
+
+{% schema %}
+{ "name": "Product page", "settings": [] }
+{% endschema %}

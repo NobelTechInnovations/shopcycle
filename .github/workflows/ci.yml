@@ -103,6 +103,11 @@ jobs:
           ADMIN_ORIGIN: http://localhost:3000
         run: node apps/api/test/e2e-billing-modes.js
 
+      - name: Orders, shopper accounts and merchant operations
+        env:
+          ADMIN_ORIGIN: http://localhost:3000
+        run: node apps/api/test/e2e-orders.js
+
       - name: API log on failure
         if: failure()
         run: cat api.log || true

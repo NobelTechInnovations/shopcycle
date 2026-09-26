@@ -1,27 +1,49 @@
-<a href="{{ product.url }}" class="product-card">
-  <div class="product-card__image">
-    {% if product.images.first %}
-      <img src="{{ product.images.first.url }}" alt="{{ product.images.first.altText | default: product.title }}">
+{% comment %}
+  Product card for home page sections. Expects `product` (serialized).
+  Quick add posts the cheapest in-stock variant straight to the cart when
+  the product has a single option; otherwise it links to the product.
+{% endcomment %}
+{% assign pv = product.price_variant | default: product.variants.first %}
+<article class="card">
+  <a class="card__media" href="{{ product.url }}" tabindex="-1" aria-hidden="true">
+    {% if product.images.size > 0 %}
+      <img src="{{ product.images[0].url }}" alt="" loading="lazy" width="800" height="1000">
+      {% if settings.card_hover_image and product.images.size > 1 %}
+        <img class="card__hover" src="{{ product.images[1].url }}" alt="" loading="lazy" width="800" height="1000">
+      {% endif %}
     {% else %}
-      {% render 'snippets/image-placeholder' %}
+      {% render 'snippets/placeholder', kind: 'product' %}
     {% endif %}
-
-    {% comment %} Sale badge is always computed from the product's own
-       compare-at price — every card that renders this snippet gets it for
-       free, never a number a merchant has to type and keep in sync. {% endcomment %}
-    {% assign variant = product.variants.first %}
-    {% if variant.comparePrice and variant.comparePrice > variant.price %}
-      {% assign pct_off = variant.comparePrice | minus: variant.price | times: 100.0 | divided_by: variant.comparePrice | round %}
-      <span class="product-card__badge product-card__badge--sale">-{{ pct_off }}%</span>
+    <span class="card__badges">
+      {% unless product.available %}
+        <span class="badge badge--dark">Sold out</span>
+      {% else %}
+        {% if product.on_sale %}<span class="badge badge--sale">−{{ product.discount_percent }}%</span>{% endif %}
+      {% endunless %}
+    </span>
+  </a>
+  {% if settings.card_quick_add and product.available %}
+    {% if product.variants.size == 1 %}
+      <form class="card__quick" method="post" action="{{ routes.cart_add_url }}">
+        <input type="hidden" name="variantId" value="{{ pv.id }}">
+        <input type="hidden" name="quantity" value="1">
+        <button type="submit" class="card__quick-btn" aria-label="Add {{ product.title }} to cart">{% render 'snippets/icon', icon: 'plus' %}<span>Add</span></button>
+      </form>
+    {% else %}
+      <div class="card__quick"><a class="card__quick-btn" href="{{ product.url }}" aria-label="Choose options for {{ product.title }}">{% render 'snippets/icon', icon: 'plus' %}<span>Options</span></a></div>
     {% endif %}
-  </div>
-  <h3 class="product-card__title">{{ product.title }}</h3>
-  {% render 'snippets/price', variant: product.variants.first %}
-  {% if product.variants.size > 1 %}
-    <div class="product-card__swatches">
-      {% for v in product.variants limit: 4 %}
-        <span class="product-card__swatch" title="{{ v.title }}"></span>
-      {% endfor %}
-    </div>
   {% endif %}
-</a>
+  <div class="card__body">
+    {% if settings.card_show_brand and product.brand %}<span class="card__brand">{{ product.brand }}</span>{% endif %}
+    <h3 class="card__title"><a href="{{ product.url }}">{{ product.title }}</a></h3>
+    <p class="price">
+      {% if product.price_varies %}<span class="price__from">From</span>{% endif %}
+      {% if pv.comparePrice and pv.comparePrice > pv.price %}
+        <span class="price__now price__now--sale">{{ pv.price | money }}</span>
+        <s class="price__was">{{ pv.comparePrice | money }}</s>
+      {% else %}
+        <span class="price__now">{{ pv.price | money }}</span>
+      {% endif %}
+    </p>
+  </div>
+</article>

@@ -3,15 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Table, Button } from "antd";
-import { Plus, ShoppingCart, Search } from "lucide-react";
+import { Table, Button, App } from "antd";
+import { Plus, ShoppingCart, Search, Download } from "lucide-react";
 import { PageHeader, StatusBadge, EmptyState, ListCard, SearchInput } from "@shopcycle/ui";
 import { formatCurrency } from "@shopcycle/utils";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiDownload } from "@/lib/api";
 
 const TABS = [
   { key: "all", label: "All" },
   { key: "unfulfilled", label: "Unfulfilled" },
+  { key: "unpaid", label: "Unpaid" },
   { key: "fulfilled", label: "Fulfilled" },
   { key: "cancelled", label: "Cancelled" },
 ];
@@ -31,6 +32,19 @@ function orderDate(iso) {
 
 export default function OrdersPage() {
   const router = useRouter();
+  const { message } = App.useApp();
+  const [exporting, setExporting] = useState(false);
+
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      await apiDownload("/api/data/exports/orders", "orders.csv");
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setExporting(false);
+    }
+  }
   const [orders, setOrders] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -105,11 +119,16 @@ export default function OrdersPage() {
         title="Orders"
         subtitle={loading ? " " : `${total} ${total === 1 ? "order" : "orders"}${filtered ? " match" : ""}`}
         actions={
-          <Link href="/admin/orders/new">
-            <Button type="primary" icon={<Plus size={15} aria-hidden="true" />}>
-              Create order
+          <>
+            <Button icon={<Download size={15} aria-hidden="true" />} loading={exporting} onClick={exportCsv}>
+              Export
             </Button>
-          </Link>
+            <Link href="/admin/orders/new">
+              <Button type="primary" icon={<Plus size={15} aria-hidden="true" />}>
+                Create order
+              </Button>
+            </Link>
+          </>
         }
       />
 

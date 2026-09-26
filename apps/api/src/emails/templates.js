@@ -100,6 +100,10 @@ function orderSummary(order) {
     summaryRow("Shipping", Number(order.shipping) > 0 ? money(order.shipping, currency) : "Free"),
     Number(order.tax) > 0 ? summaryRow("Tax", money(order.tax, currency)) : "",
     summaryRow("Total", money(order.total, currency), true),
+    Number(order.giftCardAmount) > 0 ? summaryRow("Paid with gift card", `−${money(order.giftCardAmount, currency)}`) : "",
+    Number(order.giftCardAmount) > 0 && Number(order.total) - Number(order.giftCardAmount) > 0
+      ? summaryRow(order.paymentMethod === "cod" ? "To pay on delivery" : "Paid online", money(Number(order.total) - Number(order.giftCardAmount), currency), true)
+      : "",
   ].join("");
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px">${itemRows(order.items || [], currency)}</table>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px">${rows}</table>`;
@@ -286,10 +290,21 @@ function orderCancelled({ store, order, statusUrl, reason }) {
 
 function refundIssued({ store, order, refund, statusUrl }) {
   const currency = order.currency || "INR";
-  const how =
+  const toCard = Number(refund.toGiftCard || 0);
+  const rest = Number(refund.amount) - toCard;
+  const card = `your gift card${refund.giftCardLast4 ? ` ending ${esc(refund.giftCardLast4)}` : ""}`;
+  const restHow =
     refund.method === "razorpay"
-      ? "It's on its way back to your original payment method and usually shows up within 5–7 business days."
-      : `${esc(store.name)} will pay this back to you directly.`;
+      ? "on its way back to your original payment method and usually shows up within 5–7 business days"
+      : `being paid back to you directly by ${esc(store.name)}`;
+  const how =
+    toCard > 0 && rest > 0
+      ? `${money(toCard, currency)} is back on ${card}, ready to spend, and ${money(rest, currency)} is ${restHow}.`
+      : toCard > 0
+        ? `It's back on ${card}, ready to spend.`
+        : refund.method === "razorpay"
+          ? "It's on its way back to your original payment method and usually shows up within 5–7 business days."
+          : `${esc(store.name)} will pay this back to you directly.`;
   return {
     subject: `Refund of ${money(refund.amount, currency)} for order #${order.orderNumber}`,
     html: layout({
@@ -372,7 +387,34 @@ function abandonedCheckout({ store, cart, recoverUrl, customerName }) {
   };
 }
 
+function giftCardIssued({ store, code, amount, recipientName, message, expiresAt, shopUrl }) {
+  const currency = store.currency || "INR";
+  const expiry = expiresAt
+    ? `Use it by ${new Date(expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}.`
+    : "It doesn't expire.";
+  return {
+    subject: `You've received a ${money(amount, currency)} gift card from ${store.name}`,
+    html: layout({
+      brand: store.name,
+      preheader: `A ${money(amount, currency)} gift card to spend at ${store.name}.`,
+      body: [
+        heading(`${recipientName ? `${esc(recipientName.split(" ")[0])}, here's` : "Here's"} a gift for you`),
+        p(`You've received a <strong>${money(amount, currency)}</strong> gift card to spend at ${esc(store.name)}.`),
+        message ? `<p style="margin:0 0 18px;padding:14px 16px;border-left:3px solid ${INK};background:${BG};font:italic 400 15px/1.6 ${FONT};color:${INK}">${esc(message)}</p>` : "",
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 4px;background:${INK};border-radius:14px"><tr><td style="padding:22px;text-align:center">
+  <p style="margin:0 0 6px;font:600 11px ${FONT};letter-spacing:.14em;text-transform:uppercase;color:#a1a1aa">Gift card code</p>
+  <p style="margin:0;font:600 22px ${FONT};letter-spacing:.12em;color:#ffffff">${esc(code)}</p>
+</td></tr></table>`,
+        small(`Enter the code in your cart at checkout. ${expiry} Keep this email safe — anyone with the code can spend it.`),
+        button(shopUrl, "Start shopping"),
+      ].join(""),
+      footer: storeFooter(store),
+    }),
+  };
+}
+
 module.exports = {
+  giftCardIssued,
   esc,
   layout,
   verifyEmail,

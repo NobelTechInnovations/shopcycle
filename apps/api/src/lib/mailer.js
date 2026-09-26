@@ -65,9 +65,12 @@ function htmlToText(html) {
  *   fromName               — display name; defaults to EMAIL_FROM's
  *   replyTo                — e.g. the store's support email
  *   refType, refId         — what it's about, e.g. ("order", order.id)
+ *   logSubject             — what the log records instead of the real
+ *                            subject, for subjects carrying a secret
+ *                            (a sign-in code) that staff shouldn't read
  * @returns {{ status: "sent"|"logged"|"failed", id: string|null, error?: string }}
  */
-async function sendEmail(prisma, { to, subject, html, template, storeId = null, fromName, replyTo, refType, refId, log }) {
+async function sendEmail(prisma, { to, subject, html, template, storeId = null, fromName, replyTo, refType, refId, logSubject, log }) {
   const from = parseFrom(env.EMAIL_FROM);
   const sender = { name: fromName || from.name, address: from.address };
   const smtp = getTransport();
@@ -101,7 +104,7 @@ async function sendEmail(prisma, { to, subject, html, template, storeId = null, 
       data: {
         storeId,
         to,
-        subject,
+        subject: logSubject || subject,
         template: template || "other",
         refType: refType || null,
         refId: refId || null,

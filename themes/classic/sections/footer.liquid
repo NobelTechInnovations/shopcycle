@@ -1,50 +1,66 @@
-<footer class="site-footer">
-  <div class="site-footer__grid">
-    <div class="site-footer__col">
-      <strong>{{ section.settings.col1_heading }}</strong>
-      <p>{{ section.settings.about }}</p>
-      {% if section.settings.phone != blank %}<p class="site-footer__contact">{{ section.settings.phone }}</p>{% endif %}
-      {% if section.settings.email != blank %}<p class="site-footer__contact">{{ section.settings.email }}</p>{% endif %}
-      {% if section.blocks.size > 0 %}
-        <div class="site-footer__social">
-          {% for block in section.blocks %}
-            {% if block.settings.url != blank %}
-              <a href="{{ block.settings.url }}" aria-label="{{ block.settings.platform }}">
-                {% render 'snippets/icon', icon: block.settings.platform, class: 'icon icon--sm' %}
-              </a>
-            {% endif %}
-          {% endfor %}
-        </div>
+{% comment %}
+  Footer: brand column, then link columns / text / newsletter as blocks,
+  social links from Theme settings, and a bottom row with payment methods.
+{% endcomment %}
+<footer class="footer">
+  <div class="container footer__grid">
+    <div class="footer__brand">
+      <a class="footer__logo" href="{{ routes.root_url }}">{{ shop.name }}</a>
+      {% if section.settings.about != blank %}<p class="footer__about">{{ section.settings.about }}</p>{% endif %}
+      {% if shop.support_email or shop.support_phone %}
+        <p class="footer__contact">
+          {% if shop.support_email %}<a href="mailto:{{ shop.support_email }}">{{ shop.support_email }}</a>{% endif %}
+          {% if shop.support_phone %}<a href="tel:{{ shop.support_phone | remove: ' ' }}">{{ shop.support_phone }}</a>{% endif %}
+        </p>
       {% endif %}
+      {% render 'snippets/social-links' %}
     </div>
 
-    <div class="site-footer__col">
-      <strong>{{ section.settings.col2_heading }}</strong>
-      {% for link in linklists[section.settings.menu].links %}
-        <a href="{{ link.url }}">{{ link.title }}</a>
-      {% endfor %}
-    </div>
-
-    <div class="site-footer__col">
-      <strong>{{ section.settings.col3_heading }}</strong>
-      {% for link in linklists[section.settings.categories_menu].links %}
-        <a href="{{ link.url }}">{{ link.title }}</a>
-      {% endfor %}
-    </div>
-
-    <div class="site-footer__col">
-      <strong>{{ section.settings.newsletter_heading }}</strong>
-      <p>{{ section.settings.newsletter_text }}</p>
-      {% render 'snippets/newsletter-form' %}
-    </div>
+    {% for block in section.blocks %}
+      {% case block.type %}
+        {% when 'links' %}
+          {% assign col = linklists[block.settings.menu] %}
+          <div class="footer__col">
+            <h3 class="footer__heading">{{ block.settings.heading | default: col.title | default: 'Links' }}</h3>
+            <ul>
+              {% if col and col.links.size > 0 %}
+                {% for link in col.links %}<li><a href="{{ link.url }}">{{ link.title }}</a></li>{% endfor %}
+              {% elsif forloop.first %}
+                {% render 'snippets/menu-links' %}
+              {% else %}
+                <li><a href="{{ routes.order_lookup_url }}">Track your order</a></li>
+                <li><a href="{{ routes.account_url }}">Your account</a></li>
+                <li><a href="{{ routes.search_url }}">Search</a></li>
+                {% if blog.articles.size > 0 %}<li><a href="{{ routes.blog_url }}">Journal</a></li>{% endif %}
+              {% endif %}
+            </ul>
+          </div>
+        {% when 'text' %}
+          <div class="footer__col">
+            <h3 class="footer__heading">{{ block.settings.heading }}</h3>
+            <p class="footer__text">{{ block.settings.text | newline_to_br }}</p>
+          </div>
+        {% when 'newsletter' %}
+          <div class="footer__col footer__col--wide">
+            <h3 class="footer__heading">{{ block.settings.heading }}</h3>
+            <p class="footer__text">{{ block.settings.text }}</p>
+            <form class="inline-form" method="post" action="{{ routes.newsletter_url }}">
+              <input type="hidden" name="return_to" value="{{ routes.root_url }}">
+              <label class="visually-hidden" for="footer-email-{{ forloop.index }}">Email</label>
+              <input id="footer-email-{{ forloop.index }}" type="email" name="email" required placeholder="Your email" autocomplete="email">
+              <button type="submit" class="btn btn--sm">Subscribe</button>
+            </form>
+          </div>
+      {% endcase %}
+    {% endfor %}
   </div>
 
-  <div class="site-footer__bottom">
-    <p class="site-footer__copyright">© {{ 'now' | date: '%Y' }} {{ section.settings.copyright }}</p>
-    {% if section.settings.payment_icons %}
-      <div class="site-footer__payments">
-        <span>AMEX</span><span>Visa</span><span>Mastercard</span><span>PayPal</span>
-      </div>
+  <div class="container footer__bottom">
+    <p>© {{ 'now' | date: '%Y' }} {{ shop.name }}. {{ section.settings.copyright }}</p>
+    {% if section.settings.show_payments %}
+      <ul class="pay-badges" aria-label="Payment methods">
+        <li>UPI</li><li>Visa</li><li>Mastercard</li><li>RuPay</li>{% if shop.cod_enabled %}<li>Cash on delivery</li>{% endif %}
+      </ul>
     {% endif %}
   </div>
 </footer>
@@ -53,40 +69,29 @@
 {
   "name": "Footer",
   "settings": [
-    { "type": "text", "id": "col1_heading", "label": "Column 1 heading", "default": "Help Customers" },
-    { "type": "textarea", "id": "about", "label": "About text" },
-    { "type": "text", "id": "phone", "label": "Phone" },
-    { "type": "text", "id": "email", "label": "Email" },
-
-    { "type": "text", "id": "col2_heading", "label": "Column 2 heading", "default": "Our Company" },
-    { "type": "menu", "id": "menu", "label": "Column 2 menu", "default": "footer-menu" },
-
-    { "type": "text", "id": "col3_heading", "label": "Column 3 heading", "default": "Shop Categories" },
-    { "type": "menu", "id": "categories_menu", "label": "Column 3 menu", "default": "footer-categories-menu" },
-
-    { "type": "text", "id": "newsletter_heading", "label": "Newsletter heading", "default": "Sign Up to Newsletter" },
-    { "type": "textarea", "id": "newsletter_text", "label": "Newsletter text", "default": "Sign up for 10% off your first purchase and free shipping." },
-
-    { "type": "text", "id": "copyright", "label": "Copyright text", "default": "All rights reserved." },
-    { "type": "checkbox", "id": "payment_icons", "label": "Show payment icons", "default": true }
+    { "type": "textarea", "id": "about", "label": "About your store", "default": "Thoughtfully made essentials, delivered across India." },
+    { "type": "text", "id": "copyright", "label": "Copyright line", "default": "All rights reserved." },
+    { "type": "checkbox", "id": "show_payments", "label": "Show payment methods", "default": true }
   ],
   "blocks": [
-    {
-      "type": "social",
-      "name": "Social icon",
-      "settings": [
-        { "type": "select", "id": "platform", "label": "Platform", "options": [
-          { "value": "facebook", "label": "Facebook" },
-          { "value": "instagram", "label": "Instagram" },
-          { "value": "tiktok", "label": "TikTok" },
-          { "value": "youtube", "label": "YouTube" },
-          { "value": "twitter", "label": "Twitter / X" },
-          { "value": "pinterest", "label": "Pinterest" }
-        ], "default": "instagram" },
-        { "type": "url", "id": "url", "label": "Link" }
-      ]
-    }
+    { "type": "links", "name": "Link list", "settings": [
+      { "type": "text", "id": "heading", "label": "Heading" },
+      { "type": "menu", "id": "menu", "label": "Menu", "default": "footer-menu" }
+    ] },
+    { "type": "text", "name": "Text", "settings": [
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Visit us" },
+      { "type": "textarea", "id": "text", "label": "Text", "default": "Mon–Sat, 10am–7pm" }
+    ] },
+    { "type": "newsletter", "name": "Newsletter", "settings": [
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Join our list" },
+      { "type": "textarea", "id": "text", "label": "Text", "default": "New arrivals and offers, twice a month. No spam." }
+    ] }
   ],
-  "max_blocks": 6
+  "max_blocks": 4,
+  "default_blocks": [
+    { "type": "links", "settings": { "heading": "Shop", "menu": "main-menu" } },
+    { "type": "links", "settings": { "heading": "Help", "menu": "footer-menu" } },
+    { "type": "newsletter", "settings": { "heading": "Join our list", "text": "New arrivals and offers, twice a month. No spam." } }
+  ]
 }
 {% endschema %}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Button, Select, Segmented, Spin, App } from "antd";
-import { ArrowLeft, Undo2, Redo2, Monitor, Smartphone, Settings2, PanelTop } from "lucide-react";
+import { ArrowLeft, Undo2, Redo2, Monitor, Smartphone, Settings2, PanelTop, Lock } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useEditorStore } from "./store";
 import { buildSectionCatalog, defaultSettingsFor, newSectionKey, hydrateTemplateDefaults } from "./schema-utils";
@@ -14,11 +14,32 @@ import { AddSectionModal } from "./AddSectionModal";
 import { ThemeSettingsDrawer } from "./ThemeSettingsDrawer";
 import { GlobalSectionsDrawer } from "./GlobalSectionsDrawer";
 
+// Only the home page is designed in a theme. The rest are Oyklane's own
+// pages (same layout on every store, styled by Theme settings) — listed
+// here as previews so a colour or font change can be checked on them.
 const TEMPLATE_OPTIONS = [
-  { value: "index", label: "Home" },
-  { value: "product", label: "Product" },
-  { value: "collection", label: "Collection" },
+  { value: "index", label: "Home page" },
+  { value: "product", label: "Product page · preview" },
+  { value: "collection", label: "Collection page · preview" },
+  { value: "cart", label: "Cart · preview" },
 ];
+
+function FixedPageNote({ onOpenSettings }) {
+  return (
+    <div className="p-4 flex flex-col gap-3">
+      <span className="w-9 h-9 rounded-md bg-app-bg text-ink-muted flex items-center justify-center">
+        <Lock size={16} aria-hidden="true" />
+      </span>
+      <p className="text-sm font-semibold text-ink m-0">Built-in page</p>
+      <p className="text-[13px] text-ink-muted m-0">
+        This page uses Oyklane's standard layout on every theme, so it stays fast and familiar for shoppers. It follows your theme's fonts and colours.
+      </p>
+      <Button size="small" icon={<Settings2 size={14} aria-hidden="true" />} onClick={onOpenSettings}>
+        Change fonts &amp; colours
+      </Button>
+    </div>
+  );
+}
 
 function getTemplateJson(files, name) {
   const file = files.find((f) => f.path === `templates/${name}.json`);
@@ -65,15 +86,19 @@ export function EditorView({ theme }) {
   const addSection = useEditorStore((s) => s.addSection);
   const markSaved = useEditorStore((s) => s.markSaved);
 
+  const editable = templateName === "index";
+
   const save = useCallback(async () => {
     if (!template) return;
     setSaving(true);
     try {
       await Promise.all([
-        apiFetch(`/api/themes/${theme.id}/files`, {
-          method: "PATCH",
-          body: { path: `templates/${templateName}.json`, content: JSON.stringify(template) },
-        }),
+        // Built-in pages have no theme template to save — only settings.
+        templateName === "index" &&
+          apiFetch(`/api/themes/${theme.id}/files`, {
+            method: "PATCH",
+            body: { path: `templates/${templateName}.json`, content: JSON.stringify(template) },
+          }),
         apiFetch(`/api/themes/${theme.id}/settings`, { method: "PATCH", body: { settingsData } }),
       ]);
       markSaved();
@@ -140,7 +165,7 @@ export function EditorView({ theme }) {
           <span className="text-sm font-semibold">{theme.name}</span>
           <Select
             size="small"
-            className="w-32"
+            className="w-56"
             value={templateName}
             onChange={handleTemplateChange}
             options={TEMPLATE_OPTIONS}
@@ -191,13 +216,21 @@ export function EditorView({ theme }) {
 
       <div className="flex flex-1 min-h-0">
         <div className="w-64 shrink-0 border-r border-app-border bg-app-surface">
-          <SectionList catalog={catalog} onAddSection={() => setAddModalOpen(true)} />
+          {editable ? (
+            <SectionList catalog={catalog} onAddSection={() => setAddModalOpen(true)} />
+          ) : (
+            <FixedPageNote onOpenSettings={() => setSettingsDrawerOpen(true)} />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <PreviewFrame themeId={theme.id} templateName={templateName} previewSlug={previewSlug} device={device} />
         </div>
         <div className="w-80 shrink-0 border-l border-app-border bg-app-surface">
-          <SettingsPanel catalog={catalog} products={products} collections={collections} menus={menus} />
+          {editable ? (
+            <SettingsPanel catalog={catalog} products={products} collections={collections} menus={menus} />
+          ) : (
+            <p className="text-[13px] text-ink-muted p-4 m-0">Pick “Home page” above to edit sections.</p>
+          )}
         </div>
       </div>
 

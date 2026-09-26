@@ -1,10 +1,98 @@
 {
-  "color_primary": "#111111",
-  "color_accent": "#EF4D34",
   "color_background": "#FFFFFF",
-  "color_text": "#1A1A1A",
-  "heading_font": "Inter",
+  "color_text": "#141414",
+  "color_primary": "#141414",
+  "color_accent": "#D2452F",
+  "color_surface": "#F6F3EE",
+  "heading_font": "Jost",
   "body_font": "Inter",
-  "container_width": 1280,
-  "button_radius": 999
+  "heading_weight": "500",
+  "heading_case": "none",
+  "base_size": 15,
+  "container_width": 1320,
+  "section_spacing": "comfortable",
+  "button_radius": 40,
+  "card_radius": 12,
+  "card_image_ratio": "portrait",
+  "card_hover_image": true,
+  "card_show_brand": true,
+  "card_quick_add": true,
+  "social_instagram": "",
+  "social_facebook": "",
+  "social_youtube": "",
+  "social_x": "",
+  "social_pinterest": "",
+  "social_whatsapp": "",
+  "sections": {
+    "announcement-bar": {
+      "settings": {
+        "show": true,
+        "background": "#141414",
+        "text_color": "#FFFFFF"
+      },
+      "blocks": {
+        "m1": {
+          "type": "message",
+          "settings": {
+            "text": "Free delivery on orders over ₹999",
+            "link": ""
+          }
+        },
+        "m2": {
+          "type": "message",
+          "settings": {
+            "text": "Cash on delivery available across India",
+            "link": ""
+          }
+        }
+      },
+      "block_order": [
+        "m1",
+        "m2"
+      ]
+    },
+    "header": {
+      "settings": {
+        "menu": "main-menu",
+        "layout": "left",
+        "sticky": true,
+        "logo_width": 120
+      }
+    },
+    "footer": {
+      "settings": {
+        "about": "Thoughtfully made essentials, delivered across India.",
+        "copyright": "All rights reserved.",
+        "show_payments": true
+      },
+      "blocks": {
+        "f1": {
+          "type": "links",
+          "settings": {
+            "heading": "Shop",
+            "menu": "main-menu"
+          }
+        },
+        "f2": {
+          "type": "links",
+          "settings": {
+            "heading": "Help",
+            "menu": "footer-menu"
+          }
+        },
+        "f3": {
+          "type": "newsletter",
+          "settings": {
+            "heading": "Join our list",
+            "text": "New arrivals and offers, twice a month. No spam."
+          }
+        }
+      },
+      "block_order": [
+        "f1",
+        "f2",
+        "f3"
+      ]
+    }
+  }
 }

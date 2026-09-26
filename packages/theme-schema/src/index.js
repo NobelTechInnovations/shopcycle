@@ -68,7 +68,14 @@ function mergeBlockSettings(schema, block) {
  * (Shopify's JSON-template shape) into an ordered array with defaults
  * applied — this is the array Liquid's `{% for block in section.blocks %}`
  * actually iterates over. */
+/** A section's blocks in order. A section that has never been edited (no
+ * `blocks` key at all) shows its schema's `default_blocks`, so a theme can
+ * ship with sensible content; once edited — even to zero blocks — the
+ * merchant's choice wins. */
 function resolveBlocks(schema, sectionEntry) {
+  if (!sectionEntry.blocks && Array.isArray(schema?.default_blocks)) {
+    return schema.default_blocks.map((b, i) => mergeBlockSettings(schema, { id: `default-${i + 1}`, ...b }));
+  }
   const order = sectionEntry.block_order || [];
   const blocks = sectionEntry.blocks || {};
   return order.filter((id) => blocks[id]).map((id) => mergeBlockSettings(schema, { id, ...blocks[id] }));

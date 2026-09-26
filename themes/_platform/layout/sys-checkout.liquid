@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Checkout · {{ shop.name }}</title>
+  {% if platform.fonts_url %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="{{ platform.fonts_url }}">
+  {% endif %}
+</head>
+<body style="margin:0">
+  <div class="sys sys-checkout-page">
+    <header class="sys-checkout-top">
+      <div class="sys-container">
+        <a class="sys-checkout-top__brand" href="{{ routes.root_url }}">
+          {% if shop.logo %}<img src="{{ shop.logo }}" alt="{{ shop.name }}">{% else %}{{ shop.name }}{% endif %}
+        </a>
+        <div class="sys-row" style="gap:18px">
+          <span class="sys-secure">{% render 'snippets/sys-icon', icon: 'lock' %} Secure checkout</span>
+          <a class="sys-link sys-small" href="{{ routes.cart_url }}">Back to cart</a>
+        </div>
+      </div>
+    </header>
+    {{ content_for_layout }}
+  </div>
+</body>
+</html>

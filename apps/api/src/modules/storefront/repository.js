@@ -25,6 +25,8 @@ function getThemeById(prisma, storeId, themeId) {
 const activeProductInclude = {
   variants: { where: { status: "active" }, orderBy: { createdAt: "asc" } },
   images: { orderBy: { position: "asc" } },
+  brand: { select: { title: true, slug: true } },
+  category: { select: { title: true, slug: true } },
 };
 
 function getAllActiveProducts(prisma, storeId) {

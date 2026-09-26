@@ -1,10 +1,11 @@
-const { HttpError } = require("@shopcycle/utils");
+const { HttpError, formatCurrency } = require("@shopcycle/utils");
 const { adjustStock } = require("../../lib/inventory");
 const { syncOrderCommission } = require("../billing/commission");
 const { addOrderEvent } = require("./events");
 const { itemQuantities, deriveFulfillmentStatus, checkSelection } = require("./quantities");
 const { trackingUrlFor } = require("./couriers");
 const notify = require("./notify");
+const giftCards = require("../gift-cards/service");
 
 /**
  * What a merchant does with an order after it's placed: ship it (all at
@@ -166,6 +167,8 @@ async function cancelOrder(prisma, store, orderId, { reason, restock = true, ref
   }
 
   const quantities = itemQuantities(order);
+  const paid = ["paid", "partially_refunded"].includes(order.paymentStatus);
+  const cardBack = order.giftCardId ? await giftCards.refundableToCard(prisma, order) : 0;
   await prisma.$transaction(async (tx) => {
     if (restock) {
       for (const item of order.items) {
@@ -179,15 +182,26 @@ async function cancelOrder(prisma, store, orderId, { reason, restock = true, ref
       where: { id: orderId },
       data: { fulfillmentStatus: "cancelled", cancelledAt: new Date(), cancelReason: reason || null },
     });
+    // An unpaid order (cash on delivery, or an online payment that never
+    // finished) still spent its gift card at checkout — put that back.
+    // A paid order gets it back through the refund below instead.
+    if (!paid && cardBack > 0) {
+      await giftCards.creditBack(tx, order.giftCardId, orderId, cardBack, { actorName, note: `Order #${order.orderNumber} cancelled` });
+    }
     await addOrderEvent(
       tx,
       orderId,
-      { kind: "cancelled", message: `Order cancelled${reason ? ` — ${reason}` : ""}${restock ? " · items restocked" : ""}`, actorName },
+      {
+        kind: "cancelled",
+        message: `Order cancelled${reason ? ` — ${reason}` : ""}${restock ? " · items restocked" : ""}${
+          !paid && cardBack > 0 ? ` · ${formatCurrency(cardBack, order.currency)} returned to the gift card` : ""
+        }`,
+        actorName,
+      },
       { strict: true }
     );
   });
 
-  const paid = ["paid", "partially_refunded"].includes(order.paymentStatus);
   const outstanding = Number(order.total) - Number(order.refundedAmount);
   if (refund && paid && outstanding > 0) {
     const { createRefund } = require("./refunds");

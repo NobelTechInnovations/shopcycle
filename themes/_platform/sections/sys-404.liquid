@@ -1,0 +1,23 @@
+{% comment %} Page not found. {% endcomment %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container">
+      <div class="sys-empty">
+        <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'compass' %}</span>
+        <span class="sys-eyebrow">404</span>
+        <h1 class="sys-h1">We couldn't find that page</h1>
+        <p>It may have moved, or the link might be old. Try searching instead.</p>
+        <form class="sys-searchbar" method="get" action="{{ routes.search_url }}" role="search" style="width:100%;margin:8px auto">
+          <label class="sys-sr-only" for="sys-404-q">Search products</label>
+          <input class="sys-input" id="sys-404-q" type="search" name="q" placeholder="Search products">
+          <button type="submit" class="sys-btn">Search</button>
+        </form>
+        <a class="sys-link" href="{{ routes.root_url }}">Back to the home page</a>
+      </div>
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{ "name": "404", "settings": [] }
+{% endschema %}

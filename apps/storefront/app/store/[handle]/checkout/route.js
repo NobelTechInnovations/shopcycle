@@ -35,6 +35,7 @@ export async function POST(request, { params }) {
     shippingZip: form.get("shippingZip"),
     shippingCountry: form.get("shippingCountry"),
     paymentMethod: form.get("paymentMethod") || "cod",
+    acceptsMarketing: form.get("acceptsMarketing") === "true",
   };
 
   const res = await fetch(`${API_URL}/api/storefront/${handle}/checkout`, {

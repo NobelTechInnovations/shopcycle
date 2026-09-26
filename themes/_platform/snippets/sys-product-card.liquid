@@ -1,0 +1,33 @@
+{% comment %}
+  Product card for platform pages (collection, search, related). Shows
+  the second photo on hover, a sale badge computed from compare-at price,
+  and "Sold out" when no variant has stock.
+{% endcomment %}
+{% assign card_variant = product.price_variant | default: product.variants.first %}
+<a class="sys-pcard" href="{{ product.url }}">
+  <div class="sys-pcard__media">
+    {% if product.images.size > 0 %}
+      <img src="{{ product.images[0].url }}" alt="{{ product.images[0].altText | default: product.title }}" loading="lazy" width="800" height="1000">
+      {% if product.images.size > 1 %}
+        <img src="{{ product.images[1].url }}" alt="" loading="lazy" width="800" height="1000">
+      {% endif %}
+    {% else %}
+      <span class="sys-placeholder">{% render 'snippets/sys-icon', icon: 'photo' %}</span>
+    {% endif %}
+    <span class="sys-pcard__badges">
+      {% unless product.available %}
+        <span class="sys-badge sys-badge--soldout">Sold out</span>
+      {% else %}
+        {% if product.on_sale %}<span class="sys-badge sys-badge--sale">−{{ product.discount_percent }}%</span>{% endif %}
+      {% endunless %}
+    </span>
+  </div>
+  <div class="sys-pcard__body">
+    {% if product.brand %}<span class="sys-pcard__vendor">{{ product.brand }}</span>{% endif %}
+    <span class="sys-pcard__title">{{ product.title }}</span>
+    <span class="sys-price">
+      {% if product.price_varies %}<span class="sys-muted sys-small">From</span>{% endif %}
+      {% render 'snippets/sys-price', variant: card_variant %}
+    </span>
+  </div>
+</a>

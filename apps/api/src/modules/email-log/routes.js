@@ -16,6 +16,9 @@ const listQuery = z.object({
   q: z.string().trim().max(200).optional(),
 });
 
+/** Emails whose content is a secret for the recipient alone. */
+const PRIVATE_TEMPLATES = new Set(["sign_in_code", "gift_card"]);
+
 const SUMMARY = {
   id: true,
   to: true,
@@ -54,6 +57,8 @@ async function emailLogRoutes(fastify) {
     store.get("/store/:id", async (request, reply) => {
       const email = await fastify.prisma.emailLog.findFirst({ where: { id: request.params.id, storeId: request.store.id } });
       if (!email) throw new HttpError(404, "Email not found");
+      // A shopper's sign-in code would let staff sign in as them.
+      if (PRIVATE_TEMPLATES.has(email.template)) email.html = null;
       reply.send({ email });
     });
   });

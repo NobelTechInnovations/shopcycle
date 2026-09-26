@@ -1,0 +1,87 @@
+{% comment %} Shopper account: orders and saved details. {% endcomment %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container">
+      {% if customer %}
+        <div class="sys-head">
+          <div class="sys-stack" style="gap:6px">
+            <span class="sys-eyebrow">Your account</span>
+            <h1 class="sys-h1">Hi, {{ customer.first_name }}</h1>
+            <span class="sys-muted">{{ customer.email }}</span>
+          </div>
+          <form method="post" action="{{ routes.account_logout_url }}">
+            <button type="submit" class="sys-btn sys-btn--secondary sys-btn--sm">Sign out</button>
+          </form>
+        </div>
+
+        {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
+        {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+
+        <div class="sys-two">
+          <div class="sys-card">
+            <h2 class="sys-card__title">Orders</h2>
+            {% if customer.orders.size > 0 %}
+              <ul class="sys-orders">
+                {% for order in customer.orders %}
+                  <li>
+                    <a class="sys-order" href="{{ order.statusUrl }}">
+                      <span class="sys-stack" style="gap:2px;min-width:0">
+                        <span><strong class="sys-order__name">Order {{ order.name }}</strong> <span class="sys-muted sys-small">· {{ order.date }}</span></span>
+                        <span class="sys-muted sys-small">{{ order.items.size }} item{% if order.items.size != 1 %}s{% endif %}</span>
+                      </span>
+                      <span class="sys-stack" style="gap:6px;align-items:flex-end">
+                        <strong class="sys-num">{{ order.total | money }}</strong>
+                        {% case order.status.key %}
+                          {% when 'delivered' %}<span class="sys-badge sys-badge--success">{{ order.status.label }}</span>
+                          {% when 'shipped', 'partially_shipped' %}<span class="sys-badge sys-badge--info">{{ order.status.label }}</span>
+                          {% when 'cancelled' %}<span class="sys-badge sys-badge--danger">{{ order.status.label }}</span>
+                          {% else %}<span class="sys-badge sys-badge--warning">{{ order.status.label }}</span>
+                        {% endcase %}
+                      </span>
+                    </a>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="sys-empty" style="padding:28px 0">
+                <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'package' %}</span>
+                <p>You haven't placed any orders yet.</p>
+                <a class="sys-btn" href="{{ routes.all_products_url }}">Start shopping</a>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="sys-card">
+            <h2 class="sys-card__title" style="margin-bottom:4px">Your details</h2>
+            <p class="sys-muted sys-small" style="margin-bottom:18px">Checkout fills these in for you.</p>
+            <form method="post" action="{{ routes.account_update_url }}" class="sys-stack" style="gap:14px" data-sys-once>
+              <label class="sys-field"><span class="sys-label">Name</span><input class="sys-input" name="name" required autocomplete="name" value="{{ customer.name }}"></label>
+              <label class="sys-field"><span class="sys-label">Mobile number</span><input class="sys-input" name="phone" type="tel" autocomplete="tel" value="{{ customer.phone }}"></label>
+              <label class="sys-field"><span class="sys-label">Address</span><input class="sys-input" name="address1" autocomplete="address-line1" value="{{ customer.address1 }}"></label>
+              <label class="sys-field"><span class="sys-label">Apartment, landmark</span><input class="sys-input" name="address2" autocomplete="address-line2" value="{{ customer.address2 }}"></label>
+              <div class="sys-fields sys-fields--2">
+                <label class="sys-field"><span class="sys-label">City</span><input class="sys-input" name="city" autocomplete="address-level2" value="{{ customer.city }}"></label>
+                <label class="sys-field"><span class="sys-label">State</span><input class="sys-input" name="province" autocomplete="address-level1" value="{{ customer.province }}"></label>
+                <label class="sys-field"><span class="sys-label">PIN code</span><input class="sys-input" name="zip" inputmode="numeric" autocomplete="postal-code" value="{{ customer.zip }}"></label>
+                <label class="sys-field"><span class="sys-label">Country</span><input class="sys-input" name="country" autocomplete="country" value="{{ customer.country | default: 'IN' }}"></label>
+              </div>
+              <label class="sys-check"><input type="checkbox" name="acceptsEmailMarketing" value="true" {% if customer.accepts_marketing %}checked{% endif %}> <span>Email me about new arrivals and offers</span></label>
+              <button type="submit" class="sys-btn sys-btn--block" data-busy-label="Saving…">Save details</button>
+            </form>
+          </div>
+        </div>
+      {% else %}
+        <div class="sys-auth sys-empty">
+          <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'user' %}</span>
+          <h1 class="sys-h2">Your account</h1>
+          <p>Sign in to see your orders and save your details for checkout.</p>
+          <a class="sys-btn" href="{{ routes.account_login_url }}">Sign in</a>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{ "name": "Customer account", "settings": [] }
+{% endschema %}

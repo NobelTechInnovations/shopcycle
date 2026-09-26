@@ -1,0 +1,38 @@
+{% comment %} Photo grid (e.g. "Shop our Instagram"): images that can link to products. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% if section.settings.handle != blank %}{% assign gallery_link = section.settings.handle_link %}{% endif %}
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, align: 'center', link_url: gallery_link, link_text: section.settings.handle %}
+    <ul class="gallery">
+      {% for block in section.blocks %}
+        <li>
+          <a class="gallery__item" href="{{ block.settings.link | default: gallery_link | default: routes.all_products_url }}">
+            {% if block.settings.image != blank %}<img src="{{ block.settings.image | image_url }}" alt="{{ block.settings.alt }}" loading="lazy" width="600" height="600">{% else %}{% render 'snippets/placeholder', kind: 'collection' %}{% endif %}
+            <span class="gallery__hover">{% render 'snippets/icon', icon: 'instagram' %}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Photo gallery",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Shop our Instagram" },
+    { "type": "text", "id": "handle", "label": "Link text (e.g. @yourstore)", "default": "" },
+    { "type": "url", "id": "handle_link", "label": "Link" },
+    { "type": "checkbox", "id": "surface", "label": "Use alternate background", "default": false }
+  ],
+  "blocks": [
+    { "type": "image", "name": "Photo", "settings": [
+      { "type": "image_picker", "id": "image", "label": "Photo" },
+      { "type": "text", "id": "alt", "label": "Description", "default": "" },
+      { "type": "url", "id": "link", "label": "Link" }
+    ] }
+  ],
+  "max_blocks": 12
+}
+{% endschema %}

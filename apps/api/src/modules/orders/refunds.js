@@ -6,6 +6,14 @@ const { formatCurrency } = require("@shopcycle/utils");
 const { addOrderEvent } = require("./events");
 const { checkSelection, itemQuantities, round2 } = require("./quantities");
 const notify = require("./notify");
+const giftCards = require("../gift-cards/service");
+
+function refundDestination({ toCard, toPayment, method, currency }) {
+  const payment = method === "razorpay" ? "to the original payment method" : "paid back manually";
+  if (toCard > 0 && toPayment > 0) return ` · ${formatCurrency(toCard, currency)} to the gift card, ${formatCurrency(toPayment, currency)} ${payment}`;
+  if (toCard > 0) return " to the gift card";
+  return method === "razorpay" ? ` ${payment}` : ` (${payment})`;
+}
 
 /**
  * Gives money back — for some items, an amount, or both.
@@ -14,6 +22,9 @@ const notify = require("./notify");
  *     shopper's card/UPI/bank. If Razorpay refuses, nothing is recorded.
  *   Cash on delivery / manual → recorded as a manual refund; the merchant
  *     pays the shopper back themselves.
+ *
+ *   Paid partly with a gift card → that part goes back onto the card first,
+ *     and only the rest to the payment method above.
  *
  * Restocking puts refunded items back on sale. The order's paymentStatus
  * becomes partially_refunded or refunded, and a full refund also reverses
@@ -40,15 +51,20 @@ async function createRefund(prisma, store, orderId, input, { actorName, log } = 
     throw new HttpError(400, `You can refund at most ${formatCurrency(refundable, order.currency)} on this order.`);
   }
 
+  // The gift card part of the payment goes back onto the card first.
+  const toCard = order.giftCardId ? round2(Math.min(amount, await giftCards.refundableToCard(prisma, order))) : 0;
+  const toPayment = round2(amount - toCard);
+  const card = toCard > 0 ? await prisma.giftCard.findUnique({ where: { id: order.giftCardId }, select: { last4: true } }) : null;
+
   // Money first: if the gateway says no, nothing else happens.
   let method = "manual";
   let razorpayRefundId = null;
   let status = "processed";
-  if (order.paymentMethod === "razorpay" && order.razorpayPaymentId) {
+  if (toPayment > 0 && order.paymentMethod === "razorpay" && order.razorpayPaymentId) {
     if (!razorpayConfigured()) throw new HttpError(400, "Online refunds need Razorpay keys on this platform.");
     const rz = await razorpayRequest(`/payments/${encodeURIComponent(order.razorpayPaymentId)}/refund`, {
       method: "POST",
-      body: { amount: Math.round(amount * 100), notes: { orderId: order.id, orderNumber: String(order.orderNumber) } },
+      body: { amount: Math.round(toPayment * 100), notes: { orderId: order.id, orderNumber: String(order.orderNumber) } },
     });
     method = "razorpay";
     razorpayRefundId = rz.id || null;
@@ -58,19 +74,16 @@ async function createRefund(prisma, store, orderId, input, { actorName, log } = 
 
   const quantities = itemQuantities(order);
   const refund = await prisma.$transaction(async (tx) => {
-    const created = await tx.refund.create({
-      data: {
-        orderId,
-        storeId: store.id,
-        amount,
-        reason: input.reason?.trim() || null,
-        items,
-        restocked: Boolean(input.restock && items.length),
-        method,
-        razorpayRefundId,
-        status,
-      },
-    });
+    const base = { orderId, storeId: store.id, reason: input.reason?.trim() || null, items, restocked: Boolean(input.restock && items.length) };
+    // One Refund row per destination, so each shows how it was paid back.
+    let created = null;
+    if (toCard > 0) {
+      await giftCards.creditBack(tx, order.giftCardId, orderId, toCard, { actorName, note: `Refund on order #${order.orderNumber}` });
+      created = await tx.refund.create({ data: { ...base, amount: toCard, method: "gift_card", status: "processed" } });
+    }
+    if (toPayment > 0) {
+      created = await tx.refund.create({ data: { ...base, amount: toPayment, method, razorpayRefundId, status } });
+    }
     if (input.restock) {
       for (const row of items) {
         const item = order.items.find((i) => i.id === row.orderItemId);
@@ -93,15 +106,16 @@ async function createRefund(prisma, store, orderId, input, { actorName, log } = 
       orderId,
       {
         kind: "refunded",
-        message: `Refunded ${formatCurrency(amount, order.currency)}${method === "razorpay" ? " to the original payment method" : " (paid back manually)"}${
+        message: `Refunded ${formatCurrency(amount, order.currency)}${refundDestination({ toCard, toPayment, method, currency: order.currency })}${
           input.reason ? ` — ${input.reason.trim()}` : ""
         }${input.restock && items.length ? " · items restocked" : ""}`,
         actorName,
-        meta: { refundId: created.id, razorpayRefundId, status },
+        meta: { refundId: created.id, razorpayRefundId, status, toGiftCard: toCard },
       },
       { strict: true }
     );
-    return created;
+    // What the shopper's email describes: the whole amount, and where it went.
+    return { ...created, amount, method: toPayment > 0 ? method : "gift_card", toGiftCard: toCard, giftCardLast4: card?.last4 || null };
   });
 
   // Unshipped items that were refunded no longer need shipping.

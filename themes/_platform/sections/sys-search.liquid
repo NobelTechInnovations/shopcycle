@@ -1,0 +1,35 @@
+{% comment %} Search results. The query arrives escaped (see storefront/service.js). {% endcomment %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container">
+      <h1 class="sys-h1">{% if search.query != blank %}Results for “{{ search.query }}”{% else %}Search{% endif %}</h1>
+      <form class="sys-searchbar" method="get" action="{{ routes.search_url }}" role="search">
+        <label class="sys-sr-only" for="sys-search-q">Search products</label>
+        <input class="sys-input" id="sys-search-q" type="search" name="q" value="{{ search.query }}" placeholder="Search products" autocomplete="off">
+        <button type="submit" class="sys-btn">{% render 'snippets/sys-icon', icon: 'search' %}<span>Search</span></button>
+      </form>
+      {% if search.query != blank %}
+        <p class="sys-muted sys-small" style="margin-bottom:24px">{{ search.result_count }} result{% if search.result_count != 1 %}s{% endif %}</p>
+      {% endif %}
+
+      {% if search.results.size > 0 %}
+        <div class="sys-grid">
+          {% for item in search.results %}
+            {% render 'snippets/sys-product-card', product: item %}
+          {% endfor %}
+        </div>
+      {% elsif search.query != blank %}
+        <div class="sys-empty">
+          <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'search' %}</span>
+          <h2 class="sys-h2">No matches</h2>
+          <p>Check the spelling, or try a broader word like a category name.</p>
+          <a class="sys-btn sys-btn--secondary" href="{{ routes.all_products_url }}">Browse all products</a>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{ "name": "Search results", "settings": [] }
+{% endschema %}

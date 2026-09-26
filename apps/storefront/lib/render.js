@@ -43,6 +43,12 @@ export async function proxyRender(handle, template, extraParams = {}, request = 
   if (visitorId) params.set("visitorId", visitorId);
   if (request) {
     params.set("path", request.nextUrl.pathname);
+    // Flash messages from a form's POST/redirect/GET (newsletter signups,
+    // account forms) reach whichever page the visitor lands back on.
+    for (const key of ["notice", "formError"]) {
+      const value = request.nextUrl.searchParams.get(key);
+      if (value && !params.has(key)) params.set(key, value.slice(0, 300));
+    }
     for (const key of UTM_PARAMS) {
       const value = request.nextUrl.searchParams.get(key);
       if (value) params.set(key, value);

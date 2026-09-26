@@ -78,7 +78,8 @@ export function CustomerDetailView({ customer }) {
 
   const stats = useMemo(() => {
     const orders = customer.orders || [];
-    const counted = orders.filter((o) => o.paymentStatus === "paid" && o.fulfillmentStatus !== "cancelled");
+    // Same rule as the API's amount spent: paid (or partly refunded), not cancelled.
+    const counted = orders.filter((o) => ["paid", "partially_refunded"].includes(o.paymentStatus) && o.fulfillmentStatus !== "cancelled");
     const spent = Number(customer.totalSpent ?? 0);
     return {
       orderCount: orders.length,

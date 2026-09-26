@@ -1,0 +1,6 @@
+{
+  "sections": {
+    "main": { "type": "sys-search", "settings": {} }
+  },
+  "order": ["main"]
+}

@@ -384,6 +384,8 @@ model Store {
   emailLogs            EmailLog[]
   shopperOtps          ShopperOtp[]
   inventoryAdjustments InventoryAdjustment[]
+  articles             Article[]
+  giftCards            GiftCard[]
 
   @@map("stores")
 }
@@ -819,6 +821,10 @@ model Order {
   confirmationSentAt DateTime?
   /// Private note for the store's staff; never shown to the shopper.
   note               String?   @db.Text
+  /// Part of `total` paid with a gift card (see GiftCard). The rest —
+  /// total − giftCardAmount — is what the shopper pays by COD or online.
+  giftCardAmount     Decimal   @default(0) @db.Decimal(10, 2)
+  giftCardId         String?
 
   /// GST tax invoice to the shopper (Premium): a per-store serial issued
   /// once, when the order first ships or on request — see orders/invoice.js.
@@ -1417,4 +1423,86 @@ model PlatformCustomer {
 
   @@index([email])
   @@map("platform_customers")
+}
+
+// ─────────────────────────────────────────────
+// Growth (Phase 6) — blog and gift cards
+// ─────────────────────────────────────────────
+
+/// A blog post on the storefront (/blog, /blog/<slug>). One blog per
+/// store; `body` is the merchant's HTML (or plain text with line breaks).
+model Article {
+  id             String    @id @default(cuid())
+  storeId        String
+  title          String
+  slug           String
+  excerpt        String?   @db.Text
+  body           String?   @db.Text
+  image          String?
+  imageAlt       String?
+  author         String?
+  /// Comma-separated, e.g. "guides, skincare".
+  tags           String?
+  /// "draft" | "published"
+  status         String    @default("draft")
+  publishedAt    DateTime?
+  seoTitle       String?
+  seoDescription String?   @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, slug])
+  @@index([storeId, status, publishedAt])
+  @@map("articles")
+}
+
+/// A store gift card. Its code is shown in full once — when issued (and
+/// in the recipient's email) — and stored only as a hash plus the last 4
+/// characters, so a database copy can't be spent. The balance moves only
+/// through GiftCardTransaction rows.
+model GiftCard {
+  id             String    @id @default(cuid())
+  storeId        String
+  codeHash       String    @unique
+  last4          String
+  initialValue   Decimal   @db.Decimal(10, 2)
+  balance        Decimal   @db.Decimal(10, 2)
+  currency       String    @default("INR")
+  /// "active" | "disabled"
+  status         String    @default("active")
+  expiresAt      DateTime?
+  recipientName  String?
+  recipientEmail String?
+  note           String?   @db.Text
+  createdBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  store        Store                 @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  transactions GiftCardTransaction[]
+
+  @@index([storeId, createdAt])
+  @@map("gift_cards")
+}
+
+/// Every change to a gift card's balance: issued (+), redeemed on an order
+/// (−), refunded back from an order (+), or adjusted by staff (±).
+model GiftCardTransaction {
+  id         String   @id @default(cuid())
+  giftCardId String
+  orderId    String?
+  amount     Decimal  @db.Decimal(10, 2)
+  /// "issued" | "redeemed" | "refunded" | "adjusted"
+  kind       String
+  note       String?
+  actorName  String?
+  createdAt  DateTime @default(now())
+
+  giftCard GiftCard @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
+
+  @@index([giftCardId, createdAt])
+  @@index([orderId])
+  @@map("gift_card_transactions")
 }

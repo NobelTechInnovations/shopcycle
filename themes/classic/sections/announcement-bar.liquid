@@ -1,14 +1,34 @@
-<div class="announcement-bar" style="background: {{ section.settings.background }}; color: {{ section.settings.text_color }};">
-  <p>{{ section.settings.text }}</p>
+{% comment %} Thin bar above the header. Several messages rotate; each can link somewhere. {% endcomment %}
+{% if section.settings.show and section.blocks.size > 0 %}
+<div class="announce" style="--announce-bg: {{ section.settings.background }}; --announce-fg: {{ section.settings.text_color }};" data-announce>
+  <div class="container announce__inner">
+    {% for block in section.blocks %}
+      <p class="announce__msg{% if forloop.first %} is-active{% endif %}" data-announce-msg>
+        {% if block.settings.link != blank %}<a href="{{ block.settings.link }}">{{ block.settings.text }}</a>{% else %}{{ block.settings.text }}{% endif %}
+      </p>
+    {% endfor %}
+  </div>
 </div>
+{% endif %}
 
 {% schema %}
 {
   "name": "Announcement bar",
   "settings": [
-    { "type": "text", "id": "text", "label": "Message", "default": "Free shipping on orders over ₹999" },
-    { "type": "color", "id": "background", "label": "Background", "default": "#1F2937" },
-    { "type": "color", "id": "text_color", "label": "Text color", "default": "#FFFFFF" }
+    { "type": "checkbox", "id": "show", "label": "Show announcement bar", "default": true },
+    { "type": "color", "id": "background", "label": "Background", "default": "#141414" },
+    { "type": "color", "id": "text_color", "label": "Text", "default": "#FFFFFF" }
+  ],
+  "blocks": [
+    { "type": "message", "name": "Message", "settings": [
+      { "type": "text", "id": "text", "label": "Text", "default": "Free delivery on orders over ₹999" },
+      { "type": "url", "id": "link", "label": "Link" }
+    ] }
+  ],
+  "max_blocks": 4,
+  "default_blocks": [
+    { "type": "message", "settings": { "text": "Free delivery on orders over ₹999" } },
+    { "type": "message", "settings": { "text": "Cash on delivery available across India" } }
   ]
 }
 {% endschema %}

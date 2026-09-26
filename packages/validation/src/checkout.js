@@ -13,6 +13,8 @@ const checkoutSchema = z.object({
   shippingZip: z.string().min(1, "ZIP/postal code is required"),
   shippingCountry: z.string().min(1, "Country is required"),
   paymentMethod: z.enum(["cod", "razorpay"]).default("cod"),
+  // The unticked-by-default "email me offers" box — explicit consent only.
+  acceptsMarketing: z.boolean().default(false),
 });
 
 const verifyRazorpayPaymentSchema = z.object({

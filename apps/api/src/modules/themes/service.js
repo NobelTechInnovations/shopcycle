@@ -5,18 +5,44 @@ const { validateThemeFileContent } = require("@shopcycle/theme-engine");
 const { THEMES_ROOT } = require("../../config/paths");
 const { loadThemePackage } = require("./file-loader");
 
+/** The built-in themes. `version` goes up with each release; a store's
+ * copy keeps the version it was installed at, so the Themes page can offer
+ * "a newer version is available" — added as a separate theme, never
+ * overwriting the merchant's customised live one. */
 const MASTER_THEMES = {
-  classic: { name: "Classic", description: "General ecommerce / fashion / grocery / lifestyle." },
-  modern: { name: "Modern", description: "Premium D2C / modern brands." },
+  classic: {
+    name: "Classic",
+    version: "2.0.0",
+    description: "Clean and versatile — slideshow, collections, product rows, offers, reviews and a journal. Suits fashion, home, beauty and gifting.",
+  },
+  modern: {
+    name: "Modern",
+    version: "1.1.0",
+    description: "Warm editorial look for premium D2C brands.",
+  },
 };
+
+/** "2.0.0" > "1.0.0" */
+function isNewer(a, b) {
+  const pa = String(a || "0").split(".").map(Number);
+  const pb = String(b || "0").split(".").map(Number);
+  for (let i = 0; i < 3; i += 1) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  }
+  return false;
+}
 
 const EXT_TO_TYPE = { liquid: "liquid", json: "json", css: "css", js: "js" };
 const REVISION_THROTTLE_MS = 30_000;
 
-function listThemes(prisma, storeId) {
-  return prisma.theme.findMany({
+async function listThemes(prisma, storeId) {
+  const themes = await prisma.theme.findMany({
     where: { storeId },
     orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
+  });
+  return themes.map((t) => {
+    const master = MASTER_THEMES[t.handle];
+    return { ...t, latestVersion: master?.version || null, updateAvailable: Boolean(master && isNewer(master.version, t.version)) };
   });
 }
 
@@ -68,8 +94,9 @@ async function installTheme(prisma, storeId, handle) {
   return prisma.theme.create({
     data: {
       storeId,
-      name: master.name,
+      name: existingThemeCount > 0 && (await prisma.theme.count({ where: { storeId, handle } })) > 0 ? `${master.name} ${master.version.split(".").slice(0, 2).join(".")}` : master.name,
       handle,
+      version: master.version,
       description: master.description,
       status: "installed",
       isActive: existingThemeCount === 0, // first theme a store installs goes live automatically
@@ -203,7 +230,17 @@ async function restoreFileRevision(prisma, storeId, themeId, fileId, revisionId)
   return prisma.themeFile.update({ where: { id: fileId }, data: { content: revision.content } });
 }
 
+/** Removes an unpublished theme and its files. The live theme can't be
+ * deleted — publish another one first. */
+async function deleteTheme(prisma, storeId, id) {
+  const theme = await assertThemeOwnership(prisma, storeId, id);
+  if (theme.isActive) throw new HttpError(400, "This theme is live on your store. Publish another theme before deleting it.");
+  await prisma.theme.delete({ where: { id } });
+}
+
 module.exports = {
+  deleteTheme,
+  isNewer,
   MASTER_THEMES,
   listThemes,
   getTheme,

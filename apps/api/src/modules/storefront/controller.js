@@ -1,5 +1,6 @@
 const service = require("./service");
 const analyticsService = require("../analytics/service");
+const platform = require("./platform");
 
 async function renderHandler(request, reply) {
   const { handle, template } = request.params;
@@ -19,6 +20,12 @@ async function renderHandler(request, reply) {
     loginEmail,
     formError,
     notice,
+    sort,
+    in_stock: inStock,
+    variant,
+    page,
+    tag,
+    returnTo,
     utm_source: utmSource,
     utm_medium: utmMedium,
     utm_campaign: utmCampaign,
@@ -50,6 +57,12 @@ async function renderHandler(request, reply) {
     loginEmail,
     formError: typeof formError === "string" ? formError.slice(0, 300) : undefined,
     notice: typeof notice === "string" ? notice.slice(0, 300) : undefined,
+    sort: typeof sort === "string" ? sort : undefined,
+    inStock: inStock === "1",
+    variant: typeof variant === "string" ? variant : undefined,
+    page: Number(page) || 1,
+    tag: typeof tag === "string" ? tag : undefined,
+    returnTo: returnTo === "checkout" || returnTo === "cart" ? returnTo : undefined,
   });
 
   reply.header("content-type", "text/html; charset=utf-8");
@@ -89,6 +102,19 @@ async function assetHandler(request, reply) {
   reply.send(content);
 }
 
+/** The platform pages' shared CSS/JS. Versioned URLs (?v=<hash>) are
+ * cached for a year; the hash changes whenever the file does. */
+async function platformAssetHandler(request, reply) {
+  const file = await platform.asset(request.params.file);
+  if (!file) {
+    reply.code(404).send({ error: "Not found" });
+    return;
+  }
+  reply.header("content-type", `${file.contentType}; charset=utf-8`);
+  reply.header("cache-control", request.query.v === file.version ? "public, max-age=31536000, immutable" : "public, max-age=300");
+  reply.send(file.content);
+}
+
 async function resolveDomainHandler(request, reply) {
   const domain = String(request.query.domain || "").toLowerCase();
   const result = domain ? await service.resolveDomain(request.server.prisma, domain) : null;
@@ -99,4 +125,4 @@ async function resolveDomainHandler(request, reply) {
   reply.send(result);
 }
 
-module.exports = { renderHandler, assetHandler, resolveDomainHandler };
+module.exports = { renderHandler, assetHandler, resolveDomainHandler, platformAssetHandler };

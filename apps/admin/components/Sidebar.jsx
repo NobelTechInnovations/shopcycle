@@ -23,6 +23,9 @@ import {
   Megaphone,
   FileBarChart,
   Grid3x3,
+  Boxes,
+  ShoppingBag,
+  RotateCcw,
 } from "lucide-react";
 
 // Mirrors the full target IA (not just what's wired in Phase 1) so the shell
@@ -58,9 +61,26 @@ const NAV_ITEMS = [
     ],
   },
   {
-    key: "/admin/orders",
+    key: "orders-group",
     icon: <ShoppingCart size={16} aria-hidden="true" />,
     label: <Link href="/admin/orders">Orders</Link>,
+    children: [
+      {
+        key: "/admin/orders",
+        icon: <ShoppingCart size={14} aria-hidden="true" />,
+        label: <Link href="/admin/orders">All orders</Link>,
+      },
+      {
+        key: "/admin/orders/returns",
+        icon: <RotateCcw size={14} aria-hidden="true" />,
+        label: <Link href="/admin/orders/returns">Returns</Link>,
+      },
+      {
+        key: "/admin/orders/abandoned",
+        icon: <ShoppingBag size={14} aria-hidden="true" />,
+        label: <Link href="/admin/orders/abandoned">Abandoned checkouts</Link>,
+      },
+    ],
   },
   {
     key: "products-group",
@@ -71,6 +91,11 @@ const NAV_ITEMS = [
         key: "/admin/products",
         icon: <Package size={14} aria-hidden="true" />,
         label: <Link href="/admin/products">All products</Link>,
+      },
+      {
+        key: "/admin/products/inventory",
+        icon: <Boxes size={14} aria-hidden="true" />,
+        label: <Link href="/admin/products/inventory">Inventory</Link>,
       },
       {
         key: "/admin/products/brands",
@@ -165,6 +190,7 @@ export function SidebarNav() {
   if (pathname.startsWith("/admin/online-store")) openKeys.push("online-store-group");
   if (pathname.startsWith("/admin/analytics")) openKeys.push("analytics-group");
   if (pathname.startsWith("/admin/products")) openKeys.push("products-group");
+  if (pathname.startsWith("/admin/orders")) openKeys.push("orders-group");
 
   return (
     <>

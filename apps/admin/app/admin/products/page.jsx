@@ -3,11 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Table, Button } from "antd";
-import { Plus, Package, Search } from "lucide-react";
+import { Table, Button, Dropdown, App } from "antd";
+import { Plus, Package, Search, Upload, Download, ChevronDown } from "lucide-react";
 import { PageHeader, StatusBadge, EmptyState, ListCard, Thumb, SearchInput, DeleteIconButton, useConfirmDialog } from "@shopcycle/ui";
 import { formatCurrency } from "@shopcycle/utils";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiDownload } from "@/lib/api";
+import { ProductImportModal } from "@/components/ProductImportModal";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -48,6 +49,8 @@ export default function ProductsPage() {
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("all");
   const [page, setPage] = useState(1);
+  const [importOpen, setImportOpen] = useState(false);
+  const { message } = App.useApp();
   const pageSize = 20;
 
   const load = useCallback(async () => {
@@ -129,13 +132,34 @@ export default function ProductsPage() {
         title="Products"
         subtitle={loading ? " " : `${total} ${total === 1 ? "product" : "products"}${filtered ? " match" : ""}`}
         actions={
-          <Link href="/admin/products/new">
-            <Button type="primary" icon={<Plus size={15} aria-hidden="true" />}>
-              Add product
-            </Button>
-          </Link>
+          <>
+            <Dropdown
+              trigger={["click"]}
+              menu={{
+                items: [
+                  { key: "import", icon: <Upload size={14} />, label: "Import from CSV", onClick: () => setImportOpen(true) },
+                  {
+                    key: "export",
+                    icon: <Download size={14} />,
+                    label: "Export to CSV",
+                    onClick: () => apiDownload("/api/data/exports/products", "products.csv").catch((err) => message.error(err.message)),
+                  },
+                ],
+              }}
+            >
+              <Button>
+                Import / export <ChevronDown size={14} aria-hidden="true" />
+              </Button>
+            </Dropdown>
+            <Link href="/admin/products/new">
+              <Button type="primary" icon={<Plus size={15} aria-hidden="true" />}>
+                Add product
+              </Button>
+            </Link>
+          </>
         }
       />
+      <ProductImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={load} />
 
       <ListCard
         tabs={TABS}

@@ -44,7 +44,18 @@ export default function LoginPage() {
         <Form.Item label="Email" name="email" rules={[{ required: true, type: "email", message: "Enter a valid email" }]}>
           <Input autoComplete="email" placeholder="you@company.com" autoFocus />
         </Form.Item>
-        <Form.Item label="Password" name="password" rules={[{ required: true, message: "Password is required" }]}>
+        <Form.Item
+          label={
+            <span className="flex w-full items-center justify-between gap-4">
+              Password
+              <a href="/forgot-password" className="text-[13px] font-normal text-ink-muted underline underline-offset-4 decoration-ink/20 hover:text-ink">
+                Forgot password?
+              </a>
+            </span>
+          }
+          name="password"
+          rules={[{ required: true, message: "Password is required" }]}
+        >
           <Input.Password autoComplete="current-password" placeholder="••••••••" />
         </Form.Item>
         <Button type="primary" htmlType="submit" block loading={loading} className="!h-11 !mt-2">
