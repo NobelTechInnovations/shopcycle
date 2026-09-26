@@ -241,7 +241,7 @@ export function DomainSettings({ canEdit = true }) {
                 message="One more record to prove the domain is yours"
                 description="Your domain was used on another site before, so the hosting asks for this extra record. Add it at your domain provider, then press Check again."
               />
-            ) : info.stage === "hosting" && info.hosting.notAdded && !info.hosting.managed ? (
+            ) : info.stage === "hosting" && info.hosting.notAdded ? (
               <Alert
                 type="warning"
                 showIcon
@@ -250,8 +250,13 @@ export function DomainSettings({ canEdit = true }) {
                   <>
                     Your records are correct — nothing more to do on your side. The domain still has to be added on the platform, which is what issues its
                     security certificate (HTTPS). Your free address keeps working meanwhile.
-                    <details className="mt-2 text-xs">
+                    <details className="mt-2 text-xs" open={Boolean(info.hosting.error)}>
                       <summary className="cursor-pointer">For the platform team</summary>
+                      {info.hosting.error && (
+                        <p className="m-0 my-1 text-[#A11B1B]">
+                          Adding it automatically failed: {info.hosting.error}
+                        </p>
+                      )}
                       Add <code>{info.domain}</code>
                       {info.kind === "apex" ? (
                         <>

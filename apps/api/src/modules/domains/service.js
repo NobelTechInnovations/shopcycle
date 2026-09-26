@@ -58,13 +58,14 @@ function dnsRecords(domain) {
 // ── Vercel (optional) ──────────────────────────────────────────────
 const vercelOn = () => Boolean(env.VERCEL_TOKEN && env.VERCEL_STOREFRONT_PROJECT_ID);
 
-async function vercel(method, path, body) {
+async function vercelRaw(method, path, body, teamId) {
   const sep = path.includes("?") ? "&" : "?";
-  const url = `https://api.vercel.com${path}${env.VERCEL_TEAM_ID ? `${sep}teamId=${encodeURIComponent(env.VERCEL_TEAM_ID)}` : ""}`;
+  const url = `https://api.vercel.com${path}${teamId ? `${sep}teamId=${encodeURIComponent(teamId)}` : ""}`;
   const res = await fetch(url, {
     method,
     headers: { authorization: `Bearer ${env.VERCEL_TOKEN}`, ...(body && { "content-type": "application/json" }) },
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(15000),
   });
   let data = null;
   try {
@@ -75,19 +76,42 @@ async function vercel(method, path, body) {
   return { ok: res.ok, status: res.status, data };
 }
 
+/** Which Vercel team (if any) owns the storefront project. VERCEL_TEAM_ID
+ * wins; otherwise it's found once — the personal scope first, then each
+ * team the token can see — and remembered. Projects under a team (even a
+ * Hobby one) can't be reached without it. */
+let teamScope; // undefined = not looked up yet; null = personal account
+async function projectTeam() {
+  if (env.VERCEL_TEAM_ID) return env.VERCEL_TEAM_ID;
+  if (teamScope !== undefined) return teamScope;
+  const project = encodeURIComponent(env.VERCEL_STOREFRONT_PROJECT_ID);
+  if ((await vercelRaw("GET", `/v9/projects/${project}`)).ok) return (teamScope = null);
+  const teams = await vercelRaw("GET", "/v2/teams?limit=50");
+  if (!teams.ok) throw new Error(`Vercel refused the token (${teams.data?.error?.message || teams.status}) — create a new one with access to the team that owns the storefront project.`);
+  for (const t of teams.data?.teams || []) {
+    if ((await vercelRaw("GET", `/v9/projects/${project}`, null, t.id)).ok) return (teamScope = t.id);
+  }
+  throw new Error("The storefront project wasn't found with this Vercel token — check VERCEL_STOREFRONT_PROJECT_ID and the token's scope.");
+}
+
+async function vercel(method, path, body) {
+  return vercelRaw(method, path, body, await projectTeam());
+}
+
+const vercelMessage = (r) => r.data?.error?.message || `HTTP ${r.status}`;
+
 async function addToVercel(domain) {
   if (!vercelOn()) return { added: false };
   const project = encodeURIComponent(env.VERCEL_STOREFRONT_PROJECT_ID);
   const names = isApex(domain) ? [domain, `www.${domain}`] : [domain];
   for (const name of names) {
     const r = await vercel("POST", `/v10/projects/${project}/domains`, { name });
-    // Already on this project is fine; anything else is a real problem.
-    if (!r.ok && r.data?.error?.code !== "domain_already_in_use_by_project" && r.status !== 409) {
-      throw new HttpError(502, `Couldn't add ${name} to hosting: ${r.data?.error?.message || r.status}`);
-    }
-    if (!r.ok && r.status === 409 && r.data?.error?.code !== "domain_already_in_use_by_project") {
-      throw new HttpError(409, `${name} is already connected to another site on our hosting. Remove it there first.`);
-    }
+    if (r.ok) continue;
+    // Already on our project is fine; anywhere else is a real problem.
+    const mine = await vercel("GET", `/v9/projects/${project}/domains/${encodeURIComponent(name)}`);
+    if (mine.ok) continue;
+    if (r.status === 409) throw new HttpError(409, `${name} is already connected to another site on our hosting. It has to be removed there first.`);
+    throw new HttpError(502, `Couldn't add ${name} to hosting: ${vercelMessage(r)}`);
   }
   return { added: true };
 }
@@ -149,11 +173,14 @@ async function probeHosting(domain) {
 async function ensureOnVercel(domain) {
   const project = encodeURIComponent(env.VERCEL_STOREFRONT_PROJECT_ID);
   let r = await vercel("GET", `/v9/projects/${project}/domains/${encodeURIComponent(domain)}`);
+  let error = null;
   if (r.status === 404) {
-    await addToVercel(domain).catch(() => {});
+    await addToVercel(domain).catch((err) => {
+      error = err.message;
+    });
     r = await vercel("GET", `/v9/projects/${project}/domains/${encodeURIComponent(domain)}`);
   }
-  if (!r.ok) return { added: false, verification: [] };
+  if (!r.ok) return { added: false, verification: [], error: error || `Hosting lookup failed: ${vercelMessage(r)}` };
   const verification = (r.data?.verification || []).map((v) => ({
     type: v.type,
     name: String(v.domain || "").replace(new RegExp(`\\.?${domain.replace(/\./g, "\\.")}$`), "") || "@",
@@ -174,8 +201,8 @@ async function status(prisma, store) {
   let hosting = { managed: vercelOn(), notAdded: false, verification: [] };
   if (domain && dnsOk && !live) {
     if (vercelOn()) {
-      const v = await ensureOnVercel(domain).catch(() => ({ added: false, verification: [] }));
-      hosting = { managed: true, notAdded: !v.added, verification: v.verification || [] };
+      const v = await ensureOnVercel(domain).catch((err) => ({ added: false, verification: [], error: err.message }));
+      hosting = { managed: true, notAdded: !v.added, verification: v.verification || [], error: v.error || null };
     } else {
       hosting = { managed: false, ...(await probeHosting(domain)), verification: [] };
     }
