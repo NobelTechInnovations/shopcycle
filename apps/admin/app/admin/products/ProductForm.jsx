@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Form, Input, InputNumber, Select, Button, Card, Upload, App } from "antd";
-import { Plus, Trash2, UploadCloud } from "lucide-react";
+import { Plus, Trash2, UploadCloud, Images } from "lucide-react";
+import { MediaLibraryModal } from "@/components/MediaLibraryModal";
 import { PageHeader, StatusBadge, SaveBar } from "@shopcycle/ui";
 import { apiFetch, apiUpload } from "@/lib/api";
 import { IMAGE_ACCEPT } from "@/lib/uploads";
@@ -25,6 +26,7 @@ export function ProductForm({ product }) {
     product ? product.images.map((img) => ({ uid: img.id, url: img.url })) : []
   );
   const [uploading, setUploading] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
   const [form] = Form.useForm();
@@ -207,7 +209,24 @@ export function ProductForm({ product }) {
                   </div>
                 )}
               </Upload>
-              <p className="text-xs text-ink-muted mt-2 mb-0">JPEG, PNG, WebP, GIF, or SVG — up to 8MB, {MAX_IMAGES} images.</p>
+              <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
+                <p className="text-xs text-ink-muted m-0">JPEG, PNG, WebP or GIF — up to 8MB, {MAX_IMAGES} images.</p>
+                {images.length < MAX_IMAGES && (
+                  <Button size="small" icon={<Images size={13} aria-hidden="true" />} onClick={() => setLibraryOpen(true)}>
+                    Choose from Files
+                  </Button>
+                )}
+              </div>
+              <MediaLibraryModal
+                open={libraryOpen}
+                multiple
+                max={MAX_IMAGES - images.length}
+                onClose={() => setLibraryOpen(false)}
+                onSelect={(urls) => {
+                  setImages((list) => [...list, ...urls.map((url) => ({ uid: `lib-${url}-${Math.random().toString(36).slice(2)}`, url }))]);
+                  setDirty(true);
+                }}
+              />
             </Card>
 
             <Card size="small" title="SEO">

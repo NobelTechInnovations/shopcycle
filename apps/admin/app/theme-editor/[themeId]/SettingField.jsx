@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Input, InputNumber, Select, Slider, Switch, ColorPicker, Upload, Button, App } from "antd";
-import { Upload as UploadIcon, X } from "lucide-react";
+import { Upload as UploadIcon, X, Images } from "lucide-react";
 import { apiUpload } from "@/lib/api";
 import { IMAGE_ACCEPT } from "@/lib/uploads";
+import { MediaLibraryModal } from "@/components/MediaLibraryModal";
 
 // Google Fonts that read well for Indian storefronts (Latin + good
 // numerals for ₹ prices). Sans first, then serif/display.
@@ -19,6 +20,8 @@ const FONT_OPTIONS = [
 function ImagePickerField({ value, onChange }) {
   const { message } = App.useApp();
   const [uploading, setUploading] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const library = <MediaLibraryModal open={libraryOpen} onClose={() => setLibraryOpen(false)} onSelect={(url) => onChange(url)} />;
 
   async function handleUpload(file) {
     setUploading(true);
@@ -35,7 +38,8 @@ function ImagePickerField({ value, onChange }) {
 
   if (value) {
     return (
-      <div className="relative inline-block">
+      <div className="flex flex-col gap-2">
+      <div className="relative inline-block self-start">
         <img src={value} alt="" className="w-full max-w-[160px] rounded-md border border-app-border object-cover" style={{ aspectRatio: "1" }} />
         <button
           type="button"
@@ -46,15 +50,26 @@ function ImagePickerField({ value, onChange }) {
           <X size={12} />
         </button>
       </div>
+      <Button size="small" className="self-start" icon={<Images size={13} aria-hidden="true" />} onClick={() => setLibraryOpen(true)}>
+        Change
+      </Button>
+      {library}
+      </div>
     );
   }
 
   return (
-    <Upload accept={IMAGE_ACCEPT} showUploadList={false} beforeUpload={handleUpload} disabled={uploading}>
-      <Button icon={<UploadIcon size={14} aria-hidden="true" />} loading={uploading}>
-        Upload image
+    <div className="flex flex-wrap gap-2">
+      <Upload accept={IMAGE_ACCEPT} showUploadList={false} beforeUpload={handleUpload} disabled={uploading}>
+        <Button icon={<UploadIcon size={14} aria-hidden="true" />} loading={uploading}>
+          Upload
+        </Button>
+      </Upload>
+      <Button icon={<Images size={14} aria-hidden="true" />} onClick={() => setLibraryOpen(true)}>
+        Choose from Files
       </Button>
-    </Upload>
+      {library}
+    </div>
   );
 }
 

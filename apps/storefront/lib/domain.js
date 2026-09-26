@@ -18,6 +18,7 @@ export const ROOT_DOMAIN = (process.env.STOREFRONT_ROOT_DOMAIN || "localhost").t
 export const RESERVED_HANDLES = [
   "www", "store", "admin", "api", "app", "assets", "cdn", "static",
   "mail", "smtp", "ftp", "blog", "help", "support", "status", "docs",
+  "superadmin", "platform", "console", "dashboard", "login", "account", "checkout",
 ];
 
 const PLATFORM_HOSTS = (process.env.STOREFRONT_PLATFORM_HOSTS || "")

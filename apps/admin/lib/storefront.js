@@ -1,5 +1,11 @@
 const STOREFRONT_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL || "http://localhost:3002";
-const ROOT_DOMAIN = process.env.NEXT_PUBLIC_STOREFRONT_ROOT_DOMAIN || "localhost";
+// A bare domain; tolerates a pasted URL ("https://oyklane.com/").
+const ROOT_DOMAIN =
+  (process.env.NEXT_PUBLIC_STOREFRONT_ROOT_DOMAIN || "localhost")
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z]+:\/\//, "")
+    .split(/[/:]/)[0] || "localhost";
 
 /** Where a store's live storefront is — the merchant's own connected domain
  * if they have one, else their free {handle}.<root> subdomain, else (local

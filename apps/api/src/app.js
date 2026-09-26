@@ -45,6 +45,7 @@ const shopperRoutes = require("./modules/shopper/routes");
 const blogRoutes = require("./modules/blog/routes");
 const giftCardRoutes = require("./modules/gift-cards/routes");
 const searchRoutes = require("./modules/search/routes");
+const domainRoutes = require("./modules/domains/routes");
 const inventoryRoutes = require("./modules/inventory/routes");
 const exportRoutes = require("./modules/exports/routes");
 const emailLogRoutes = require("./modules/email-log/routes");
@@ -154,6 +155,7 @@ function buildApp() {
   app.register(blogRoutes, { prefix: "/api/blog" });
   app.register(giftCardRoutes, { prefix: "/api/gift-cards" });
   app.register(searchRoutes, { prefix: "/api/search" });
+  app.register(domainRoutes, { prefix: "/api/store/domain" });
   app.register(menuRoutes, { prefix: "/api/menus" });
   app.register(uploadRoutes, { prefix: "/api/files" });
   app.register(teamRoutes, { prefix: "/api/team" });

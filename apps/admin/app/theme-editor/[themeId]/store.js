@@ -62,11 +62,14 @@ export const useEditorStore = create((set, get) => ({
       t.sections[key].settings[settingId] = value;
     }),
 
-  addSection: (key, type, defaultSettings) =>
+  addSection: (key, type, defaultSettings, blocks = {}, blockOrder = [], atIndex = null) => {
     get()._commit((t) => {
-      t.sections[key] = { type, settings: defaultSettings, blocks: {}, block_order: [] };
-      t.order.push(key);
-    }),
+      t.sections[key] = { type, settings: defaultSettings, blocks, block_order: blockOrder };
+      if (atIndex === null || atIndex >= t.order.length) t.order.push(key);
+      else t.order.splice(atIndex, 0, key);
+    });
+    set({ selectedSectionKey: key });
+  },
 
   removeSection: (key) =>
     get()._commit((t) => {

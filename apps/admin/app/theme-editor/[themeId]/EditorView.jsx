@@ -6,7 +6,7 @@ import { Button, Select, Segmented, Spin, App } from "antd";
 import { ArrowLeft, Undo2, Redo2, Monitor, Smartphone, Settings2, PanelTop, Lock } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useEditorStore } from "./store";
-import { buildSectionCatalog, defaultSettingsFor, newSectionKey, hydrateTemplateDefaults } from "./schema-utils";
+import { buildSectionCatalog, defaultSettingsFor, newSectionKey, hydrateTemplateDefaults, materializeDefaultBlocks } from "./schema-utils";
 import { SectionList } from "./SectionList";
 import { PreviewFrame } from "./PreviewFrame";
 import { SettingsPanel } from "./SettingsPanel";
@@ -110,11 +110,12 @@ export function EditorView({ theme }) {
   }, [template, settingsData, templateName, theme.id, markSaved, message]);
 
   useEffect(() => {
-    apiFetch("/api/products?pageSize=100").then((d) => setProducts(d.products.filter((p) => p.status === "active")));
-    apiFetch("/api/collections?pageSize=100").then((d) =>
-      setCollections(d.collections.filter((c) => c.status === "active"))
-    );
-    apiFetch("/api/menus").then((d) => setMenus(d.menus));
+    // Pickers still work (empty) if one of these fails.
+    apiFetch("/api/products?pageSize=100").then((d) => setProducts(d.products.filter((p) => p.status === "active"))).catch(() => {});
+    apiFetch("/api/collections?pageSize=100")
+      .then((d) => setCollections(d.collections.filter((c) => c.status === "active")))
+      .catch(() => {});
+    apiFetch("/api/menus").then((d) => setMenus(d.menus)).catch(() => {});
   }, []);
 
   // Initial load and every template switch.
@@ -140,8 +141,13 @@ export function EditorView({ theme }) {
     setTemplateName(next);
   }
 
+  // New sections come with their default blocks, right after the selected
+  // section (or at the end).
   function handleAddSection(type) {
-    addSection(newSectionKey(type), type, defaultSettingsFor(catalog, type));
+    const { blocks, block_order } = materializeDefaultBlocks(catalog[type]);
+    const selected = useEditorStore.getState().selectedSectionKey;
+    const at = selected ? template.order.indexOf(selected) + 1 : null;
+    addSection(newSectionKey(type), type, defaultSettingsFor(catalog, type), blocks, block_order, at);
   }
 
   const previewSlug =
@@ -163,6 +169,7 @@ export function EditorView({ theme }) {
             <ArrowLeft size={16} aria-hidden="true" />
           </Link>
           <span className="text-sm font-semibold">{theme.name}</span>
+          <span className="text-xs text-ink-muted hidden md:inline">Page</span>
           <Select
             size="small"
             className="w-56"
@@ -200,10 +207,10 @@ export function EditorView({ theme }) {
           <Button size="small" icon={<Undo2 size={14} aria-hidden="true" />} aria-label="Undo" disabled={history.length === 0} onClick={undo} />
           <Button size="small" icon={<Redo2 size={14} aria-hidden="true" />} aria-label="Redo" disabled={future.length === 0} onClick={redo} />
           <Button size="small" icon={<PanelTop size={14} aria-hidden="true" />} onClick={() => setGlobalSectionsOpen(true)}>
-            Global sections
+            Header &amp; footer
           </Button>
           <Button size="small" icon={<Settings2 size={14} aria-hidden="true" />} onClick={() => setSettingsDrawerOpen(true)}>
-            Theme settings
+            Colours &amp; fonts
           </Button>
           <span className="text-xs text-ink-muted w-16 text-center" aria-live="polite">
             {saving ? "Saving…" : dirty ? "Unsaved" : "Saved"}
@@ -217,17 +224,31 @@ export function EditorView({ theme }) {
       <div className="flex flex-1 min-h-0">
         <div className="w-64 shrink-0 border-r border-app-border bg-app-surface">
           {editable ? (
-            <SectionList catalog={catalog} onAddSection={() => setAddModalOpen(true)} />
+            <SectionList catalog={catalog} onAddSection={() => setAddModalOpen(true)} onOpenGlobal={() => setGlobalSectionsOpen(true)} />
           ) : (
             <FixedPageNote onOpenSettings={() => setSettingsDrawerOpen(true)} />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <PreviewFrame themeId={theme.id} templateName={templateName} previewSlug={previewSlug} device={device} />
+          <PreviewFrame
+            themeId={theme.id}
+            templateName={templateName}
+            previewSlug={previewSlug}
+            device={device}
+            selectable={editable}
+            labels={Object.fromEntries(template.order.map((k) => [k, catalog[template.sections[k]?.type]?.name || template.sections[k]?.type]))}
+          />
         </div>
         <div className="w-80 shrink-0 border-l border-app-border bg-app-surface">
           {editable ? (
-            <SettingsPanel catalog={catalog} products={products} collections={collections} menus={menus} />
+            <SettingsPanel
+              catalog={catalog}
+              products={products}
+              collections={collections}
+              menus={menus}
+              onOpenSettings={() => setSettingsDrawerOpen(true)}
+              onOpenGlobal={() => setGlobalSectionsOpen(true)}
+            />
           ) : (
             <p className="text-[13px] text-ink-muted p-4 m-0">Pick “Home page” above to edit sections.</p>
           )}

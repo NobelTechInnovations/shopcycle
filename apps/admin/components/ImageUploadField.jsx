@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { Upload, Button, App } from "antd";
-import { Upload as UploadIcon, X } from "lucide-react";
+import { Upload as UploadIcon, X, Images } from "lucide-react";
 import { apiUpload } from "@/lib/api";
 import { IMAGE_ACCEPT } from "@/lib/uploads";
+import { MediaLibraryModal } from "./MediaLibraryModal";
 
 /** An image picked by uploading it to the Files library — for antd Form
  * items (value = the image URL, "" when none). `aspect` sets the preview
@@ -12,6 +13,8 @@ import { IMAGE_ACCEPT } from "@/lib/uploads";
 export function ImageUploadField({ value, onChange, aspect = "16 / 9", label = "Upload image" }) {
   const { message } = App.useApp();
   const [uploading, setUploading] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const library = <MediaLibraryModal open={libraryOpen} onClose={() => setLibraryOpen(false)} onSelect={(url) => onChange?.(url)} />;
 
   async function handleUpload(file) {
     setUploading(true);
@@ -36,15 +39,20 @@ export function ImageUploadField({ value, onChange, aspect = "16 / 9", label = "
               Replace
             </Button>
           </Upload>
+          <Button size="small" icon={<Images size={14} aria-hidden="true" />} onClick={() => setLibraryOpen(true)}>
+            Library
+          </Button>
           <Button size="small" type="text" icon={<X size={14} aria-hidden="true" />} onClick={() => onChange?.("")}>
             Remove
           </Button>
         </div>
+        {library}
       </div>
     );
   }
 
   return (
+    <div className="flex flex-col gap-2">
     <Upload.Dragger accept={IMAGE_ACCEPT} showUploadList={false} beforeUpload={handleUpload} disabled={uploading} className="!bg-app-bg">
       <div className="flex flex-col items-center gap-2 py-4">
         <UploadIcon size={18} className="text-ink-muted" aria-hidden="true" />
@@ -52,5 +60,10 @@ export function ImageUploadField({ value, onChange, aspect = "16 / 9", label = "
         <span className="text-xs text-ink-muted">PNG, JPG, WebP or GIF</span>
       </div>
     </Upload.Dragger>
+      <Button size="small" icon={<Images size={14} aria-hidden="true" />} onClick={() => setLibraryOpen(true)}>
+        Choose from Files
+      </Button>
+      {library}
+    </div>
   );
 }

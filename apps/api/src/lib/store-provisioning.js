@@ -11,6 +11,7 @@ const { GRACE_DAYS_BEFORE_PLAN_REQUIRED } = require("../modules/billing/access")
 const RESERVED_HANDLES = new Set([
   "www", "store", "admin", "api", "app", "assets", "cdn", "static",
   "mail", "smtp", "ftp", "blog", "help", "support", "status", "docs",
+  "superadmin", "platform", "console", "dashboard", "login", "account", "checkout",
 ]);
 
 /**

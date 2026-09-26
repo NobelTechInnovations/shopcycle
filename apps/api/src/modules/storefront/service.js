@@ -149,7 +149,11 @@ async function loadStoreOrThrow(prisma, handle) {
  * example.com/ into the same /store/:handle route every other request
  * already goes through, with zero special-casing anywhere else. */
 async function resolveDomain(prisma, domain) {
-  const store = await repository.getStoreByDomain(prisma, domain);
+  const host = String(domain || "").toLowerCase().replace(/\.$/, "");
+  // A connected apex domain also answers on its www. twin.
+  const store =
+    (await repository.getStoreByDomain(prisma, host)) ||
+    (host.startsWith("www.") ? await repository.getStoreByDomain(prisma, host.slice(4)) : null);
   if (!store) return null;
   return { handle: store.handle };
 }

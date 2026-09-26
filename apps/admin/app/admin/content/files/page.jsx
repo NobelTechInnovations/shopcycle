@@ -121,21 +121,18 @@ export default function ContentFilesPage() {
                 </p>
                 <p className="text-[11px] text-ink-muted m-0">{formatBytes(file.size)}</p>
               </div>
-              {/* Always visible on touch screens; on desktop, shown on hover
-                  AND on keyboard focus, so it's never mouse-only. */}
-              <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
+              <div className="flex border-t border-app-border">
                 <button
                   type="button"
-                  className="w-7 h-7 rounded-md bg-app-surface/95 border border-app-border text-ink-muted hover:text-ink flex items-center justify-center cursor-pointer"
+                  className="flex-1 h-8 inline-flex items-center justify-center gap-1.5 text-xs text-ink-muted hover:text-ink hover:bg-app-bg bg-transparent border-0 cursor-pointer"
                   aria-label={`Copy link to ${file.name}`}
-                  title="Copy link"
                   onClick={() => copyLink(file)}
                 >
-                  <Link2 size={13} aria-hidden="true" />
+                  <Link2 size={13} aria-hidden="true" /> Copy link
                 </button>
                 <button
                   type="button"
-                  className="w-7 h-7 rounded-md bg-app-surface/95 border border-app-border text-ink-muted hover:text-status-danger flex items-center justify-center cursor-pointer"
+                  className="w-10 h-8 inline-flex items-center justify-center border-0 border-l border-solid border-app-border text-ink-muted hover:text-status-danger hover:bg-app-bg bg-transparent cursor-pointer"
                   aria-label={`Delete ${file.name}`}
                   title="Delete"
                   onClick={() => handleDelete(file)}

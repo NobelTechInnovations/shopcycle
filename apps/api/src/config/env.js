@@ -39,7 +39,20 @@ const envSchema = z.object({
   // reject a merchant trying to "connect" a domain that's actually part of
   // that reserved namespace (see stores/controller.js); the storefront
   // app has its own copy of this same value for actual request routing.
-  STOREFRONT_ROOT_DOMAIN: z.string().default("localhost"),
+  // A bare domain ("oyklane.com"). Tolerates a pasted URL or a leading dot.
+  STOREFRONT_ROOT_DOMAIN: z
+    .string()
+    .default("localhost")
+    .transform((v) => v.trim().toLowerCase().replace(/^[a-z]+:\/\//, "").split(/[/:]/)[0].replace(/^\.+|\.+$/g, "") || "localhost"),
+  // Custom domains: where merchants point their DNS, and (optional) a Vercel
+  // token so connecting a domain also adds it to the storefront project —
+  // Vercel then issues its SSL certificate. Without the token the platform
+  // operator adds each domain to the Vercel project by hand.
+  STOREFRONT_CNAME_TARGET: z.string().default("cname.vercel-dns.com"),
+  STOREFRONT_APEX_IP: z.string().default("76.76.21.21"),
+  VERCEL_TOKEN: z.string().optional(),
+  VERCEL_STOREFRONT_PROJECT_ID: z.string().optional(),
+  VERCEL_TEAM_ID: z.string().optional(),
   NODE_ENV: z.string().default("development"),
   // Optional — online payments at checkout are only offered when both are
   // set (see checkout/service.js). Cash on Delivery works either way.
@@ -153,6 +166,27 @@ if (!parsed.success) {
 if (parsed.data.BILLING_SANDBOX && parsed.data.NODE_ENV === "production") {
   console.error("BILLING_SANDBOX=true is not allowed when NODE_ENV=production. Remove it and set the Razorpay keys.");
   process.exit(1);
+}
+
+// Sessions are cookies set by the API and read by the admin's own server.
+// With the API and the admin on different hosts (api. vs store.), the
+// cookie must be scoped to the shared parent domain, or every sign-in
+// bounces straight back to /login.
+{
+  const host = (url) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return "";
+    }
+  };
+  const d = parsed.data;
+  if (d.NODE_ENV === "production" && !d.COOKIE_DOMAIN && host(d.ADMIN_ORIGIN) !== host(d.API_PUBLIC_URL)) {
+    console.warn(
+      `COOKIE_DOMAIN is not set, but the admin (${d.ADMIN_ORIGIN}) and the API (${d.API_PUBLIC_URL}) are on different hosts — ` +
+        "sign-ins won't stick. Set COOKIE_DOMAIN to the shared parent domain, e.g. .oyklane.com."
+    );
+  }
 }
 
 module.exports = { env: parsed.data };

@@ -15,11 +15,68 @@ const LOADING_HTML =
  * `srcDoc` replaces the iframe's content in one shot with no navigation,
  * which is what keeps this from ever showing a blank-page flash.
  */
-export function PreviewFrame({ themeId, templateName, previewSlug, device }) {
+// Injected into the preview: hovering outlines a section and shows its
+// name, clicking selects it in the editor; links don't navigate away.
+const PICKER = `<style>
+[data-section-id]{position:relative}
+[data-section-id].oy-hover{outline:2px dashed #7c5cff;outline-offset:-2px;cursor:pointer}
+[data-section-id].oy-selected{outline:2px solid #7c5cff;outline-offset:-2px}
+.oy-tag{position:absolute;top:8px;left:8px;z-index:9999;background:#7c5cff;color:#fff;font:600 11px/1 system-ui,sans-serif;padding:5px 8px;border-radius:4px;pointer-events:none}
+</style><script>(function(){
+var cur=null;
+function sec(t){return t&&t.closest?t.closest('[data-section-id]'):null}
+document.addEventListener('mouseover',function(e){var s=sec(e.target);if(s===cur)return;if(cur){cur.classList.remove('oy-hover');var t=cur.querySelector(':scope>.oy-tag');if(t)t.remove();}cur=s;if(s){s.classList.add('oy-hover');var tag=document.createElement('span');tag.className='oy-tag';tag.textContent=s.getAttribute('data-section-label')||'Section';s.appendChild(tag);}});
+document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a,button,form');if(a)e.preventDefault();var s=sec(e.target);if(s)parent.postMessage({oyEditor:'select',key:s.getAttribute('data-section-id')},'*');},true);
+document.addEventListener('submit',function(e){e.preventDefault()},true);
+window.addEventListener('message',function(e){if(!e.data||e.data.oyEditor!=='highlight')return;document.querySelectorAll('.oy-selected').forEach(function(n){n.classList.remove('oy-selected')});var s=e.data.key&&document.querySelector('[data-section-id="'+e.data.key+'"]');if(s){s.classList.add('oy-selected');if(e.data.scroll)s.scrollIntoView({behavior:'smooth',block:'start'});}});
+parent.postMessage({oyEditor:'ready'},'*');
+})();<\/script>`;
+
+function withPicker(html, labels) {
+  let out = html;
+  for (const [key, label] of Object.entries(labels)) {
+    out = out.replace(`data-section-id="${key}"`, `data-section-id="${key}" data-section-label="${String(label).replace(/"/g, "&quot;")}"`);
+  }
+  return out.includes("</body>") ? out.replace("</body>", `${PICKER}</body>`) : out + PICKER;
+}
+
+export function PreviewFrame({ themeId, templateName, previewSlug, device, selectable = false, labels = {} }) {
   const template = useEditorStore((s) => s.template);
   const settingsData = useEditorStore((s) => s.settingsData);
+  const selectedSectionKey = useEditorStore((s) => s.selectedSectionKey);
+  const selectSection = useEditorStore((s) => s.selectSection);
   const [srcDoc, setSrcDoc] = useState(LOADING_HTML);
   const timeoutRef = useRef(null);
+  const frameRef = useRef(null);
+  const lastScrolled = useRef(null);
+
+  // Clicks in the preview select sections.
+  useEffect(() => {
+    if (!selectable) return;
+    function onMessage(e) {
+      if (e.source !== frameRef.current?.contentWindow || !e.data?.oyEditor) return;
+      if (e.data.oyEditor === "select" && e.data.key) {
+        lastScrolled.current = e.data.key; // already in view — don't jump
+        selectSection(e.data.key);
+      }
+      if (e.data.oyEditor === "ready") highlight(false);
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  });
+
+  function highlight(scroll) {
+    frameRef.current?.contentWindow?.postMessage({ oyEditor: "highlight", key: selectedSectionKey, scroll }, "*");
+  }
+
+  // Picking a section in the list scrolls the preview to it.
+  useEffect(() => {
+    if (!selectable) return;
+    const scroll = selectedSectionKey && lastScrolled.current !== selectedSectionKey;
+    lastScrolled.current = selectedSectionKey;
+    highlight(scroll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSectionKey, selectable]);
 
   useEffect(() => {
     if (!template) return;
@@ -35,7 +92,7 @@ export function PreviewFrame({ themeId, templateName, previewSlug, device }) {
             settingsOverride: settingsData,
           },
         });
-        setSrcDoc(html);
+        setSrcDoc(selectable ? withPicker(html, labels) : html);
       } catch (err) {
         setSrcDoc(
           `<p style="font-family:system-ui,sans-serif;padding:24px;color:#b91c1c">Preview error: ${err.message}</p>`
@@ -43,13 +100,15 @@ export function PreviewFrame({ themeId, templateName, previewSlug, device }) {
       }
     }, 400);
     return () => clearTimeout(timeoutRef.current);
-  }, [template, settingsData, themeId, templateName, previewSlug]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [template, settingsData, themeId, templateName, previewSlug, selectable]);
 
   const width = device === "mobile" ? 390 : "100%";
 
   return (
     <div className="h-full flex justify-center bg-app-bg overflow-auto py-4">
       <iframe
+        ref={frameRef}
         title="Theme preview"
         srcDoc={srcDoc}
         style={{

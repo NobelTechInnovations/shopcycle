@@ -47,6 +47,10 @@ export function hydrateTemplateDefaults(catalog, template) {
     const schema = catalog[entry.type];
     const settings = mergeSettings(schema, entry.settings || {});
 
+    if (!entry.blocks && schema?.default_blocks) {
+      sections[key] = { ...entry, settings, ...materializeDefaultBlocks(schema) };
+      continue;
+    }
     const blockOrder = entry.block_order || [];
     const blocksIn = entry.blocks || {};
     const blocks = {};
@@ -70,6 +74,7 @@ export function hydrateTemplateDefaults(catalog, template) {
 export function hydrateGlobalSectionDefaults(catalog, sectionType, entry) {
   const schema = catalog[sectionType];
   const settings = mergeSettings(schema, entry?.settings ?? entry ?? {});
+  if (!entry?.blocks && schema?.default_blocks) return { settings, ...materializeDefaultBlocks(schema) };
 
   const blockOrder = entry?.block_order || [];
   const blocksIn = entry?.blocks || {};
@@ -83,6 +88,26 @@ export function hydrateGlobalSectionDefaults(catalog, sectionType, entry) {
 
   return { settings, blocks, block_order: blockOrder };
 }
+
+/** A section that has never been edited shows its schema's
+ * `default_blocks` on the storefront. The editor turns those into real
+ * blocks (with ids) so they appear in the panel and can be edited —
+ * otherwise adding one block would silently replace all the defaults. */
+export function materializeDefaultBlocks(schema) {
+  const blocks = {};
+  const block_order = [];
+  for (const b of schema?.default_blocks || []) {
+    const id = newBlockId();
+    const blockSchema = (schema.blocks || []).find((x) => x.type === b.type);
+    blocks[id] = { type: b.type, settings: mergeSettings(blockSchema, b.settings || {}) };
+    block_order.push(id);
+  }
+  return { blocks, block_order };
+}
+
+// Sections the layout renders on every page — edited under "Header &
+// footer", never added to a page's section list.
+export const GLOBAL_SECTION_TYPES = ["announcement-bar", "header", "footer"];
 
 export function newSectionKey(type) {
   return `${type}-${Math.random().toString(36).slice(2, 8)}`;
