@@ -3,15 +3,22 @@ const jwt = require("@fastify/jwt");
 const cookie = require("@fastify/cookie");
 const { env } = require("../config/env");
 const { computeAccessState, isAdminBlocked } = require("../modules/billing/access");
+const { applyDuePendingPlan } = require("../modules/billing/plan-change");
+
+/** Which console a session token was issued for. Both consoles share one
+ * signing secret, so without this a token is valid wherever it's presented
+ * — e.g. a super admin's *seller* session (no 2FA) copied into the platform
+ * cookie would open the platform console, skipping its second factor. */
+const AUDIENCE = { seller: "seller", platform: "platform" };
 
 /**
- * Cookie-based JWT session. The token payload carries { userId, storeId }
- * — `storeId` is which of the account's (possibly several, see Phase 7
- * multi-store) stores this session is currently "in," set at login/
- * register and changed only by switching stores (re-issues the token).
- * Everything else (role, the store row itself) is re-fetched from the DB
- * per request via loadStoreContext, so a permission change takes effect
- * on the next request instead of waiting for a token to expire.
+ * Cookie-based JWT session. The token payload carries
+ * { userId, storeId, tv, aud } — `storeId` is which of the account's
+ * (possibly several) stores this session is currently "in"; `tv` is the
+ * user's tokenVersion at sign-in (bumped to revoke every session at once);
+ * `aud` is the console it belongs to. Everything else (role, the store row
+ * itself) is re-fetched from the DB per request, so a permission change
+ * takes effect on the next request instead of when a token expires.
  */
 async function jwtAuthPlugin(fastify) {
   await fastify.register(cookie);
@@ -21,43 +28,68 @@ async function jwtAuthPlugin(fastify) {
     sign: { expiresIn: env.JWT_EXPIRES_IN },
   });
 
-  fastify.decorate("authenticate", async function authenticate(request, reply) {
-    try {
-      await request.jwtVerify();
-    } catch (err) {
-      reply.code(401).send({ error: "Unauthorized" });
-    }
+  /** Signs a session token for one console. Every sign-in path goes
+   * through here so no token is ever issued without `tv` and `aud`. */
+  fastify.decorate("signSession", function signSession(user, { audience, storeId = null }) {
+    return fastify.jwt.sign({ userId: user.id, storeId, tv: user.tokenVersion ?? 0, aud: audience });
   });
 
-  /** The platform-admin panel's own auth check — deliberately reads a
-   * completely different cookie (SUPER_ADMIN_COOKIE_NAME) than
-   * `authenticate` does, so a seller's session and a platform admin's
-   * session can never be confused for each other even though both cookies
-   * now live under the same Domain=.oyklane.com (see auth/controller.js).
-   * `request.jwtVerify()` can't be reused here — it's hard-wired to
-   * @fastify/jwt's configured cookie name — so this verifies the token
-   * manually from the specific cookie instead. */
-  fastify.decorate("authenticateSuperAdmin", async function authenticateSuperAdmin(request, reply) {
-    const token = request.cookies?.[env.SUPER_ADMIN_COOKIE_NAME];
-    if (!token) {
+  /** Returns the verified payload, or null for anything that shouldn't be
+   * treated as a live session: bad signature/expired, a short-lived
+   * challenge token (see auth 2FA — those carry `purpose` and are never
+   * sessions), a token for the other console, a disabled user, or a token
+   * minted before the user's sessions were revoked. Sets request.authUser
+   * so later hooks don't re-query the same row. */
+  async function verifySession(request, token, audience) {
+    if (!token) return null;
+    let payload;
+    try {
+      payload = fastify.jwt.verify(token);
+    } catch {
+      return null;
+    }
+    if (payload.purpose) return null;
+    if (audience === AUDIENCE.platform && payload.aud !== AUDIENCE.platform) return null;
+    // Seller tokens issued before `aud` existed have none — still honored
+    // until they expire (≤7 days), so nobody is logged out by this deploy.
+    if (audience === AUDIENCE.seller && payload.aud && payload.aud !== AUDIENCE.seller) return null;
+
+    const user = await fastify.prisma.user.findUnique({ where: { id: payload.userId } });
+    if (!user || user.status === "disabled") return null;
+    if ((payload.tv ?? 0) !== user.tokenVersion) return null;
+
+    request.authUser = user;
+    return payload;
+  }
+
+  fastify.decorate("authenticate", async function authenticate(request, reply) {
+    const payload = await verifySession(request, request.cookies?.[env.COOKIE_NAME], AUDIENCE.seller);
+    if (!payload) {
       reply.code(401).send({ error: "Unauthorized" });
       return;
     }
-    try {
-      request.user = fastify.jwt.verify(token);
-    } catch {
-      reply.code(401).send({ error: "Unauthorized" });
-    }
+    request.user = payload;
   });
 
-  /** Attaches request.user and request.storeUser/request.store.
+  /** The platform-admin panel's own auth check — reads a completely
+   * different cookie (SUPER_ADMIN_COOKIE_NAME) than `authenticate`, and
+   * only accepts tokens minted for the platform console. */
+  fastify.decorate("authenticateSuperAdmin", async function authenticateSuperAdmin(request, reply) {
+    const payload = await verifySession(request, request.cookies?.[env.SUPER_ADMIN_COOKIE_NAME], AUDIENCE.platform);
+    if (!payload) {
+      reply.code(401).send({ error: "Unauthorized" });
+      return;
+    }
+    request.user = payload;
+  });
+
+  /** Attaches request.currentUser, request.storeRole, request.store.
    * Run this after `authenticate`. Kept separate so routes that only need
-   * "is this a logged-in user" (e.g. account settings, switching stores,
-   * the super-admin panel) don't pay for — or fail over — a store lookup
-   * they don't need. */
+   * "is this a logged-in user" (e.g. switching stores) don't pay for — or
+   * fail over — a store lookup they don't need. */
   fastify.decorate("loadStoreContext", async function loadStoreContext(request, reply) {
-    const user = await fastify.prisma.user.findUnique({ where: { id: request.user.userId } });
-    if (!user || user.status === "disabled") {
+    const user = request.authUser;
+    if (!user) {
       reply.code(401).send({ error: "Unauthorized" });
       return;
     }
@@ -90,12 +122,18 @@ async function jwtAuthPlugin(fastify) {
       return;
     }
 
+    // Fallback for a downgrade whose renewal webhook never arrived: once
+    // the paid period is over, the store moves to the scheduled plan.
+    const store = resolved.store.pendingPlanId
+      ? await applyDuePendingPlan(fastify.prisma, resolved.store)
+      : resolved.store;
+
     request.currentUser = user;
     request.storeRole = resolved.role;
-    request.store = resolved.store;
+    request.store = store;
     // Computed fresh on every request from timestamps (see billing/access.js)
     // — never stale, and never needs a background job to keep it current.
-    request.accessState = computeAccessState(resolved.store);
+    request.accessState = computeAccessState(store);
   });
 
   /** Blocks everything except the billing screens themselves once a store's
@@ -116,13 +154,32 @@ async function jwtAuthPlugin(fastify) {
     }
   });
 
+  /** Premium-only features, enforced server-side — hiding a button in the
+   * admin isn't a lock. `flag` is one of the Plan booleans (hasMetaAds,
+   * hasWhatsappIntegration, hasCsvExport, hasApiAccess, ...). A store with
+   * no plan yet gets none of them: its free month starts only once it
+   * picks a plan, and it may well pick Starter. Returns a hook; use as
+   * `fastify.addHook("preHandler", fastify.requirePlanFeature("hasMetaAds"))`
+   * after loadStoreContext. An array means "any of these" — for shared
+   * plumbing (the Meta connection) that more than one feature relies on. */
+  fastify.decorate("requirePlanFeature", function requirePlanFeature(flags) {
+    const required = Array.isArray(flags) ? flags : [flags];
+    return async function planFeatureGate(request, reply) {
+      if (required.some((flag) => request.store?.plan?.[flag])) return;
+      reply.code(403).send({
+        error: "This feature is part of the Premium plan. Upgrade in Settings › Billing to use it.",
+        code: "plan_upgrade_required",
+        feature: required[0],
+      });
+    };
+  });
+
   /** Platform-level gate for /api/super-admin/* — deliberately independent
    * of loadStoreContext (a super admin manages every store, not "the
-   * current one," and may have zero stores of their own — see the seeded
-   * Platform Admin account, which owns no store at all). */
+   * current one," and may have zero stores of their own). */
   fastify.decorate("requireSuperAdmin", async function requireSuperAdmin(request, reply) {
-    const user = await fastify.prisma.user.findUnique({ where: { id: request.user.userId } });
-    if (!user || user.status === "disabled" || !user.isSuperAdmin) {
+    const user = request.authUser;
+    if (!user || !user.isSuperAdmin) {
       reply.code(403).send({ error: "Super admin access required" });
       return;
     }
@@ -131,3 +188,4 @@ async function jwtAuthPlugin(fastify) {
 }
 
 module.exports = fp(jwtAuthPlugin, { name: "jwt-auth", dependencies: ["prisma"] });
+module.exports.AUDIENCE = AUDIENCE;

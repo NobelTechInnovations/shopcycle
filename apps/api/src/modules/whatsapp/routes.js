@@ -5,6 +5,8 @@ async function whatsappRoutes(fastify) {
   fastify.addHook("preHandler", fastify.authenticate);
   fastify.addHook("preHandler", fastify.loadStoreContext);
   fastify.addHook("preHandler", fastify.requireActiveSubscription);
+  // Premium-only — enforced here, not just hidden in the admin UI.
+  fastify.addHook("preHandler", fastify.requirePlanFeature("hasWhatsappIntegration"));
   fastify.addHook("preHandler", async (request) => {
     await appsService.assertInstalled(request.server.prisma, request.store.id, "whatsapp");
   });

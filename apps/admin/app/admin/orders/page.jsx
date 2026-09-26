@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Table, Tabs, Button } from "antd";
-import { Plus, ShoppingCart } from "lucide-react";
-import { PageHeader, StatusBadge, EmptyState } from "@shopcycle/ui";
+import { Table, Button } from "antd";
+import { Plus, ShoppingCart, Search } from "lucide-react";
+import { PageHeader, StatusBadge, EmptyState, ListCard, SearchInput } from "@shopcycle/ui";
 import { formatCurrency } from "@shopcycle/utils";
 import { apiFetch } from "@/lib/api";
 
@@ -16,12 +16,26 @@ const TABS = [
   { key: "cancelled", label: "Cancelled" },
 ];
 
+/** "Today, 4:12 pm" / "Yesterday, 9:03 am" / "12 Sep, 2:40 pm" — how a
+ * merchant scans an order list, instead of a bare date. */
+function orderDate(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const dayDiff = Math.floor((new Date(now.toDateString()) - new Date(d.toDateString())) / 86_400_000);
+  if (dayDiff === 0) return `Today, ${time}`;
+  if (dayDiff === 1) return `Yesterday, ${time}`;
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return `${d.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) })}, ${time}`;
+}
+
 export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("all");
+  const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 20;
 
@@ -29,13 +43,14 @@ export default function OrdersPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ status, page: String(page), pageSize: String(pageSize) });
+      if (q) params.set("q", q);
       const data = await apiFetch(`/api/orders?${params.toString()}`);
       setOrders(data.orders);
       setTotal(data.total);
     } finally {
       setLoading(false);
     }
-  }, [status, page]);
+  }, [status, q, page]);
 
   useEffect(() => {
     load();
@@ -45,57 +60,100 @@ export default function OrdersPage() {
     {
       title: "Order",
       dataIndex: "orderNumber",
-      render: (n, row) => <Link href={`/admin/orders/${row.id}`}>{`#${n}`}</Link>,
+      width: 110,
+      render: (n, row) => (
+        <Link href={`/admin/orders/${row.id}`} className="font-semibold text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
+          #{n}
+        </Link>
+      ),
     },
-    { title: "Customer", render: (_, row) => row.customer?.name || "Guest" },
-    { title: "Date", dataIndex: "createdAt", render: (d) => new Date(d).toLocaleDateString() },
-    { title: "Total", dataIndex: "total", render: (v) => formatCurrency(v) },
-    { title: "Payment", dataIndex: "paymentStatus", render: (s) => <StatusBadge status={s} /> },
-    { title: "Fulfillment", dataIndex: "fulfillmentStatus", render: (s) => <StatusBadge status={s} /> },
+    {
+      title: "Date",
+      responsive: ["lg"],
+      dataIndex: "createdAt",
+      width: 170,
+      render: (d) => <span className="text-[13px] text-ink-muted">{orderDate(d)}</span>,
+    },
+    {
+      title: "Customer",
+      render: (_, row) =>
+        row.customer ? (
+          <div className="min-w-0">
+            <div className="text-ink truncate">{row.customer.name}</div>
+            <div className="text-xs text-ink-muted truncate">{row.customer.email}</div>
+          </div>
+        ) : (
+          <span className="text-ink-muted">Guest</span>
+        ),
+    },
+    { title: "Payment", responsive: ["md"], dataIndex: "paymentStatus", width: 130, render: (s) => <StatusBadge status={s} /> },
+    { title: "Fulfillment", responsive: ["sm"], dataIndex: "fulfillmentStatus", width: 140, render: (s) => <StatusBadge status={s} /> },
+    {
+      title: "Total",
+      dataIndex: "total",
+      width: 130,
+      align: "right",
+      render: (v) => <span className="font-medium tabular-nums">{formatCurrency(v)}</span>,
+    },
   ];
+
+  const filtered = Boolean(q) || status !== "all";
 
   return (
     <div>
       <PageHeader
         title="Orders"
+        subtitle={loading ? " " : `${total} ${total === 1 ? "order" : "orders"}${filtered ? " match" : ""}`}
         actions={
           <Link href="/admin/orders/new">
-            <Button type="primary" icon={<Plus size={14} aria-hidden="true" />}>
+            <Button type="primary" icon={<Plus size={15} aria-hidden="true" />}>
               Create order
             </Button>
           </Link>
         }
       />
 
-      <Tabs
-        activeKey={status}
-        items={TABS}
-        onChange={(key) => {
+      <ListCard
+        tabs={TABS}
+        activeTab={status}
+        onTabChange={(key) => {
           setPage(1);
           setStatus(key);
         }}
-      />
-
-      <div className="bg-app-surface border border-app-border rounded-md">
+        toolbar={
+          <SearchInput
+            placeholder="Order # or customer"
+            onSearch={(v) => {
+              setPage(1);
+              setQ(v);
+            }}
+          />
+        }
+      >
         <Table
           rowKey="id"
+          scroll={{ x: "max-content" }}
           loading={loading}
           columns={columns}
           dataSource={orders}
-          pagination={{ current: page, pageSize, total, onChange: setPage, showSizeChanger: false }}
+          rowClassName="oy-row-link"
+          onRow={(row) => ({ onClick: () => router.push(`/admin/orders/${row.id}`) })}
+          pagination={total > pageSize && { current: page, pageSize, total, onChange: setPage, showSizeChanger: false }}
           locale={{
-            emptyText: (
+            emptyText: filtered ? (
+              <EmptyState icon={<Search />} title="No orders match" description="Try a different search or another tab." />
+            ) : (
               <EmptyState
-                icon={<ShoppingCart size={32} strokeWidth={1.5} />}
-                title="No orders here"
-                description="Orders placed on your storefront will show up in this list."
+                icon={<ShoppingCart />}
+                title="No orders yet"
+                description="Orders placed on your storefront show up here. You can also create one by hand for a phone or in-person sale."
                 actionLabel="Create order"
                 onAction={() => router.push("/admin/orders/new")}
               />
             ),
           }}
         />
-      </div>
+      </ListCard>
     </div>
   );
 }

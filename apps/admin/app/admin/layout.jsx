@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { serverApiFetch } from "@/lib/api";
-import { Sidebar } from "@/components/Sidebar";
-import { Topbar } from "@/components/Topbar";
+import { AdminShell } from "@/components/AdminShell";
 
 // Mirrors apps/api/src/modules/billing/access.js#isAdminBlocked — kept as a
 // tiny duplicate rather than a cross-app import (the admin app has no
@@ -52,12 +51,8 @@ export default async function AdminLayout({ children }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-app-bg">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Topbar user={me.user} store={me.store} />
-        <main className="flex-1 p-6 max-w-6xl w-full mx-auto">{children}</main>
-      </div>
-    </div>
+    <AdminShell user={me.user} store={me.store}>
+      {children}
+    </AdminShell>
   );
 }

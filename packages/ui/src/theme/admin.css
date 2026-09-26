@@ -1,0 +1,96 @@
+/*
+ * Shared admin polish for both consoles (admin + super-admin), imported from
+ * each app's root layout. Plain CSS on purpose: these style AntD's own
+ * markup, which Tailwind classes can't reach, and apply to every page
+ * without touching each one.
+ */
+
+html,
+body {
+  background: #f7f7f8;
+  color: #111114;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Brand focus ring — visible on every interactive element, never removed. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #7c5cff;
+  outline-offset: 2px;
+}
+
+/* ── Cards: one elevation everywhere, matching the dashboard ── */
+.ant-card {
+  box-shadow: 0 1px 2px 0 rgba(17, 17, 20, 0.04), 0 1px 3px 0 rgba(17, 17, 20, 0.04);
+}
+.ant-card .ant-card-head {
+  min-height: 48px;
+  border-bottom-color: #eeeef1;
+}
+.ant-card .ant-card-head-title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ── Tables: quieter header, clear row hover, comfortable edges ── */
+.ant-table-wrapper .ant-table-thead > tr > th {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b6b76;
+  background: #fafafb;
+}
+.ant-table-wrapper .ant-table-thead > tr > th::before {
+  display: none; /* column divider ticks */
+}
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  border-bottom-color: #f0f0f3;
+}
+.ant-table-wrapper .ant-table-tbody > tr.ant-table-row:hover > td {
+  background: #fafafb;
+}
+.ant-table-wrapper .ant-table-tbody > tr:last-child > td {
+  border-bottom: none;
+}
+
+/* Tables inside a ListCard sit flush with the card edges. */
+.oy-list-card .ant-table {
+  border-radius: 0;
+}
+.oy-list-card .ant-table-wrapper .ant-table-thead > tr > th:first-child,
+.oy-list-card .ant-table-wrapper .ant-table-tbody > tr > td:first-child {
+  padding-left: 16px;
+}
+.oy-list-card .ant-table-wrapper .ant-table-thead > tr > th:last-child,
+.oy-list-card .ant-table-wrapper .ant-table-tbody > tr > td:last-child {
+  padding-right: 16px;
+}
+.oy-list-card .ant-table-wrapper .ant-table-pagination.ant-pagination {
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid #f0f0f3;
+}
+.oy-list-card .ant-table-container,
+.oy-list-card .ant-table-container table > thead > tr:first-child > *:first-child,
+.oy-list-card .ant-table-container table > thead > tr:first-child > *:last-child {
+  border-radius: 0 !important;
+}
+
+/* Rows that open something show it. */
+.oy-row-link {
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

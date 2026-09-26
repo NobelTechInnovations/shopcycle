@@ -1,0 +1,51 @@
+{% render 'snippets/oy-customer-styles' %}
+<section class="oy-page">
+  {% if login.step == "code" %}
+    <p class="oy-eyebrow">{{ shop.name }}</p>
+    <h1 class="oy-title">Check your email</h1>
+    <p class="oy-lede">We sent a 6-digit code to <strong>{{ login.email }}</strong>. It expires in 10 minutes.</p>
+
+    <div class="oy-card">
+      {% if form_error %}<p class="oy-alert oy-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+      {% if notice %}<p class="oy-alert oy-alert--ok" role="status">{{ notice }}</p>{% endif %}
+      <form method="post" action="{{ routes.account_login_url }}">
+        <input type="hidden" name="intent" value="verify">
+        <label class="oy-field">
+          <span>Sign-in code</span>
+          <input class="oy-input oy-code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus placeholder="••••••">
+        </label>
+        <button type="submit" class="oy-btn oy-btn--block">Sign in</button>
+      </form>
+      <form method="post" action="{{ routes.account_login_url }}" class="oy-small oy-muted" style="margin-top:16px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <input type="hidden" name="intent" value="resend">
+        <span>Didn't get it? Check spam, or <button type="submit" class="oy-link">send a new code</button>.</span>
+        <a class="oy-link" href="{{ routes.account_login_url }}?change=1">Use a different email</a>
+      </form>
+    </div>
+  {% else %}
+    <p class="oy-eyebrow">{{ shop.name }}</p>
+    <h1 class="oy-title">Sign in</h1>
+    <p class="oy-lede">Enter your email and we'll send you a code — no password needed. You'll see your orders, and checkout remembers your address.</p>
+
+    <div class="oy-card">
+      {% if form_error %}<p class="oy-alert oy-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+      {% if notice %}<p class="oy-alert oy-alert--ok" role="status">{{ notice }}</p>{% endif %}
+      <form method="post" action="{{ routes.account_login_url }}">
+        <input type="hidden" name="intent" value="request">
+        <label class="oy-field">
+          <span>Email</span>
+          <input class="oy-input" type="email" name="email" autocomplete="email" required autofocus value="{{ login.email }}" placeholder="you@example.com">
+        </label>
+        <button type="submit" class="oy-btn oy-btn--block">Email me a code</button>
+      </form>
+    </div>
+    <p class="oy-small oy-muted" style="margin-top:20px">Looking for an order you placed as a guest? <a class="oy-link" href="{{ routes.order_lookup_url }}">Find your order</a></p>
+  {% endif %}
+</section>
+
+{% schema %}
+{
+  "name": "Customer sign in",
+  "settings": []
+}
+{% endschema %}

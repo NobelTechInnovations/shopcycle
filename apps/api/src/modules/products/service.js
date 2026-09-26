@@ -23,17 +23,17 @@ async function getProduct(prisma, storeId, id) {
   return product;
 }
 
-async function createProduct(prisma, store, input) {
+async function createProduct(prisma, store, input, { actorName } = {}) {
   const productCount = await repository.count(prisma, store.id);
   assertWithinPlanLimit(store.plan, productCount, "productLimit", "products");
   const slug = await uniqueSlug(prisma, store.id, input.title);
-  return repository.create(prisma, store.id, input, slug);
+  return repository.create(prisma, store.id, input, slug, { actorName });
 }
 
-async function updateProduct(prisma, storeId, id, input) {
+async function updateProduct(prisma, storeId, id, input, { actorName } = {}) {
   await getProduct(prisma, storeId, id); // 404s if not found or not owned by this store
   const slug = input.title ? await uniqueSlug(prisma, storeId, input.title, id) : undefined;
-  return repository.update(prisma, id, input, slug);
+  return repository.update(prisma, id, input, slug, { storeId, actorName });
 }
 
 async function deleteProduct(prisma, storeId, id) {
@@ -41,4 +41,4 @@ async function deleteProduct(prisma, storeId, id) {
   await repository.remove(prisma, id);
 }
 
-module.exports = { listProducts, getProduct, createProduct, updateProduct, deleteProduct };
+module.exports = { listProducts, getProduct, createProduct, updateProduct, deleteProduct, uniqueSlug };

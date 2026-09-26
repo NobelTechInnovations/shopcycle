@@ -5,6 +5,8 @@ async function metaAdsRoutes(fastify) {
   fastify.addHook("preHandler", fastify.authenticate);
   fastify.addHook("preHandler", fastify.loadStoreContext);
   fastify.addHook("preHandler", fastify.requireActiveSubscription);
+  // Premium-only — enforced here, not just hidden in the admin UI.
+  fastify.addHook("preHandler", fastify.requirePlanFeature("hasMetaAds"));
   // Distinct from requireActiveSubscription — this is "did the merchant
   // actually install this specific app," checked per request rather than
   // once at install time so uninstalling it takes effect immediately.

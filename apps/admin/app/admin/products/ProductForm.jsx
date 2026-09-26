@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Form, Input, InputNumber, Select, Button, Card, Upload, App } from "antd";
 import { Plus, Trash2, UploadCloud } from "lucide-react";
-import { PageHeader } from "@shopcycle/ui";
+import { PageHeader, StatusBadge, SaveBar } from "@shopcycle/ui";
 import { apiFetch, apiUpload } from "@/lib/api";
+import { IMAGE_ACCEPT } from "@/lib/uploads";
 
 const STATUS_OPTIONS = [
   { value: "draft", label: "Draft" },
@@ -19,6 +20,7 @@ export function ProductForm({ product }) {
   const router = useRouter();
   const { message } = App.useApp();
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [images, setImages] = useState(
     product ? product.images.map((img) => ({ uid: img.id, url: img.url })) : []
   );
@@ -48,7 +50,9 @@ export function ProductForm({ product }) {
         categoryId: product.categoryId,
         seoTitle: product.seoTitle,
         seoDescription: product.seoDescription,
+        hsnCode: product.hsnCode,
         variants: product.variants.map((v) => ({
+          id: v.id,
           title: v.title,
           sku: v.sku,
           price: Number(v.price),
@@ -66,6 +70,7 @@ export function ProductForm({ product }) {
     try {
       const { file: uploaded } = await apiUpload("/api/files/upload", file);
       setImages((prev) => [...prev, { uid: uploaded.id, url: uploaded.url }]);
+      setDirty(true); // images live outside the form's own values
     } catch (err) {
       message.error(err.message);
     } finally {
@@ -76,12 +81,19 @@ export function ProductForm({ product }) {
 
   function removeImage(uid) {
     setImages((prev) => prev.filter((img) => img.uid !== uid));
+    setDirty(true);
   }
 
   async function handleSubmit(values) {
     setSaving(true);
     try {
-      const payload = { ...values, images: images.map((img) => ({ url: img.url })) };
+      // Stock is only sent when it was changed here — otherwise the save
+      // would overwrite any sales made while this page was open.
+      const loadedStock = Object.fromEntries((product?.variants || []).map((v) => [v.id, v.inventoryQuantity]));
+      const variants = (values.variants || []).map((v) =>
+        v.id && loadedStock[v.id] === v.inventoryQuantity ? { ...v, inventoryQuantity: undefined } : v
+      );
+      const payload = { ...values, variants, images: images.map((img) => ({ url: img.url })) };
       if (isEdit) {
         await apiFetch(`/api/products/${product.id}`, { method: "PATCH", body: payload });
       } else {
@@ -101,10 +113,11 @@ export function ProductForm({ product }) {
     <div>
       <PageHeader
         title={isEdit ? product.title : "Add product"}
-        breadcrumb={<a href="/admin/products">Products</a>}
+        backHref="/admin/products"
+        meta={isEdit ? <StatusBadge status={product.status} /> : null}
       />
 
-      <Form form={form} layout="vertical" initialValues={initialValues} onFinish={handleSubmit} requiredMark={false}>
+      <Form form={form} layout="vertical" initialValues={initialValues} onFinish={handleSubmit} onValuesChange={() => setDirty(true)} requiredMark={false}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 flex flex-col gap-6">
             <Card size="small" title="Title & description">
@@ -122,6 +135,9 @@ export function ProductForm({ product }) {
                   <div className="flex flex-col gap-4">
                     {fields.map(({ key, name, ...restField }) => (
                       <div key={key} className="border border-app-border rounded-md p-3">
+                        <Form.Item {...restField} name={[name, "id"]} hidden>
+                          <Input />
+                        </Form.Item>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <Form.Item {...restField} name={[name, "title"]} label="Title" className="mb-0">
                             <Input placeholder="Default" />
@@ -182,7 +198,7 @@ export function ProductForm({ product }) {
                 fileList={images.map((img) => ({ uid: img.uid, url: img.url, status: "done", name: "image" }))}
                 beforeUpload={handleImageUpload}
                 onRemove={(file) => removeImage(file.uid)}
-                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                accept={IMAGE_ACCEPT}
               >
                 {images.length < MAX_IMAGES && (
                   <div className="flex flex-col items-center text-xs text-ink-muted">
@@ -243,16 +259,28 @@ export function ProductForm({ product }) {
                 <Input />
               </Form.Item>
             </Card>
+            <Card size="small" title="Tax">
+              <Form.Item
+                name="hsnCode"
+                label="HSN code"
+                className="mb-0"
+                extra="Printed on GST invoices. 4–8 digits, e.g. 6109 for cotton T-shirts."
+                rules={[{ pattern: /^\d{4,8}$/, message: "HSN codes are 4 to 8 digits" }]}
+              >
+                <Input inputMode="numeric" placeholder="6109" />
+              </Form.Item>
+            </Card>
           </div>
         </div>
 
         {/* Sticky action bar, per the "sticky action areas" pattern used across the admin. */}
-        <div className="sticky bottom-0 -mx-6 mt-6 bg-app-surface border-t border-app-border px-6 py-3 flex justify-end gap-2">
-          <Button onClick={() => router.push("/admin/products")}>Discard</Button>
-          <Button type="primary" htmlType="submit" loading={saving}>
-            {isEdit ? "Save" : "Add product"}
-          </Button>
-        </div>
+        <SaveBar
+          dirty={dirty}
+          isNew={!isEdit}
+          saving={saving}
+          saveLabel={isEdit ? "Save" : "Add product"}
+          onDiscard={() => router.push("/admin/products")}
+        />
       </Form>
     </div>
   );

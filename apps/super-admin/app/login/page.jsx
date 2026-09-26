@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Form, Input, Button, Typography, Alert } from "antd";
+import { Form, Input, Button, Alert } from "antd";
 import { ShieldCheck } from "lucide-react";
+import { AuthShell } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 const ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3000";
@@ -12,21 +13,33 @@ const ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3000";
  * The platform operator's own sign-in — a completely separate app/domain
  * from a store owner's /login, with its own cookie and its own login
  * endpoint (/api/auth/super-admin-login) — never the seller's /api/auth/login.
- * A non-super-admin account is rejected server-side, in the API itself,
- * rather than logged in here and immediately logged back out.
+ * A non-super-admin account is rejected server-side, in the API itself.
+ *
+ * Two steps when the account has an authenticator app enabled: the
+ * password step returns a short-lived challenge (not a session), and only
+ * the code step below turns it into a session.
  */
 export default function SuperAdminLoginPage() {
   const router = useRouter();
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [challengeToken, setChallengeToken] = useState(null);
 
-  async function onFinish(values) {
+  function signedIn() {
+    router.push("/companies");
+    router.refresh();
+  }
+
+  async function submitPassword(values) {
     setError(null);
     setLoading(true);
     try {
-      await apiFetch("/api/auth/super-admin-login", { method: "POST", body: values });
-      router.push("/companies");
-      router.refresh();
+      const res = await apiFetch("/api/auth/super-admin-login", { method: "POST", body: values });
+      if (res.requiresTwoFactor) {
+        setChallengeToken(res.challengeToken);
+      } else {
+        signedIn();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -34,45 +47,79 @@ export default function SuperAdminLoginPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0B0F19] px-4">
-      <div className="w-full max-w-sm bg-[#131826] border border-[#232B3D] rounded-lg shadow-card p-8">
-        <div className="flex items-center gap-2 mb-1">
-          <ShieldCheck size={20} className="text-white" aria-hidden="true" />
-          <Typography.Title level={4} className="!mb-0 !text-white">
-            Platform Admin
-          </Typography.Title>
+  async function submitCode({ code }) {
+    setError(null);
+    setLoading(true);
+    try {
+      await apiFetch("/api/auth/super-admin-login/verify", { method: "POST", body: { challengeToken, code } });
+      signedIn();
+    } catch (err) {
+      setError(err.message);
+      // An expired challenge can't be retried with another code — send
+      // them back to the password step instead of a dead end.
+      if (/expired/i.test(err.message)) setChallengeToken(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const footer = (
+    <>
+      Running a store?{" "}
+      <a href={ADMIN_URL} className="text-ink font-medium underline underline-offset-4 decoration-ink/20 hover:decoration-ink">
+        Go to store sign in
+      </a>
+    </>
+  );
+
+  if (challengeToken) {
+    return (
+      <AuthShell variant="platform" title="Two-step verification" subtitle="Enter the 6-digit code from your authenticator app." footer={footer}>
+        {error && <Alert type="error" message={error} showIcon className="mb-5" />}
+        <div className="mb-6 w-12 h-12 rounded-lg bg-accent-soft text-accent flex items-center justify-center">
+          <ShieldCheck size={24} strokeWidth={1.75} aria-hidden="true" />
         </div>
-        <Typography.Text className="!text-gray-400">
-          Manage every company, plan, and app on ShopCycle
-        </Typography.Text>
-
-        {error && <Alert type="error" message={error} showIcon className="mt-4" />}
-
-        <Form layout="vertical" onFinish={onFinish} className="mt-6" requiredMark={false}>
+        <Form layout="vertical" onFinish={submitCode} requiredMark={false} size="large">
           <Form.Item
-            label={<span className="text-gray-300">Email</span>}
-            name="email"
-            rules={[{ required: true, type: "email", message: "Enter a valid email" }]}
+            label="Authentication code"
+            name="code"
+            rules={[{ required: true, pattern: /^\d{6}$/, message: "Enter the 6-digit code" }]}
           >
-            <Input autoComplete="email" size="large" />
+            <Input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="123456"
+              autoFocus
+              className="tracking-[0.4em] font-mono"
+            />
           </Form.Item>
-          <Form.Item
-            label={<span className="text-gray-300">Password</span>}
-            name="password"
-            rules={[{ required: true, message: "Password is required" }]}
-          >
-            <Input.Password autoComplete="current-password" size="large" />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" block size="large" loading={loading}>
-            Sign in
+          <Button type="primary" htmlType="submit" block loading={loading} className="!h-11 !mt-2">
+            Verify and sign in
+          </Button>
+          <Button type="link" block className="!mt-2" onClick={() => { setChallengeToken(null); setError(null); }}>
+            Use a different account
           </Button>
         </Form>
+      </AuthShell>
+    );
+  }
 
-        <p className="text-sm text-gray-500 mt-4 text-center">
-          Store owner? <a href={ADMIN_URL} className="text-gray-300 font-medium">Go to store sign in</a>
-        </p>
-      </div>
-    </div>
+  return (
+    <AuthShell variant="platform" title="Platform sign in" subtitle="Restricted to Oyklane operators." footer={footer}>
+      {error && <Alert type="error" message={error} showIcon className="mb-5" />}
+
+      <Form layout="vertical" onFinish={submitPassword} requiredMark={false} size="large">
+        <Form.Item label="Email" name="email" rules={[{ required: true, type: "email", message: "Enter a valid email" }]}>
+          <Input autoComplete="email" placeholder="operator@oyklane.com" autoFocus />
+        </Form.Item>
+        <Form.Item label="Password" name="password" rules={[{ required: true, message: "Password is required" }]}>
+          <Input.Password autoComplete="current-password" placeholder="••••••••" />
+        </Form.Item>
+        <Button type="primary" htmlType="submit" block loading={loading} className="!h-11 !mt-2">
+          Sign in
+        </Button>
+      </Form>
+    </AuthShell>
   );
 }

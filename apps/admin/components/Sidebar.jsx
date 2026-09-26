@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "antd";
+import { BrandMark } from "@shopcycle/ui";
 import {
   Home,
   ShoppingCart,
@@ -155,7 +156,9 @@ function selectedKeyFor(pathname) {
   return matches[0] ? [matches[0]] : [];
 }
 
-export function Sidebar() {
+/** The navigation itself — brand + menu. Rendered in the fixed desktop
+ * sidebar and, below `lg`, inside the slide-out drawer (see AdminShell). */
+export function SidebarNav() {
   const pathname = usePathname();
   const openKeys = [];
   if (pathname.startsWith("/admin/content")) openKeys.push("content-group");
@@ -164,17 +167,26 @@ export function Sidebar() {
   if (pathname.startsWith("/admin/products")) openKeys.push("products-group");
 
   return (
-    <aside className="w-60 shrink-0 border-r border-app-border bg-app-surface h-screen sticky top-0 overflow-y-auto">
-      <div className="h-14 flex items-center px-4 border-b border-app-border">
-        <span className="font-semibold text-ink">ShopCycle</span>
-      </div>
+    <>
+      <Link href="/admin" className="h-14 flex items-center px-5 shrink-0" aria-label="Oyklane admin home">
+        <BrandMark size={24} label="Admin" />
+      </Link>
       <Menu
         mode="inline"
         items={NAV_ITEMS}
         selectedKeys={selectedKeyFor(pathname)}
         defaultOpenKeys={openKeys}
-        style={{ border: "none", paddingTop: 8 }}
+        style={{ border: "none", paddingTop: 4, background: "transparent" }}
       />
+    </>
+  );
+}
+
+/** Desktop sidebar — hidden below `lg`, where the drawer takes over. */
+export function Sidebar() {
+  return (
+    <aside className="print:hidden hidden lg:flex w-60 shrink-0 border-r border-app-border bg-app-surface h-screen sticky top-0 overflow-y-auto flex-col">
+      <SidebarNav />
     </aside>
   );
 }

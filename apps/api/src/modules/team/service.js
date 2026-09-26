@@ -95,7 +95,7 @@ async function acceptInvitation(prisma, { token, name, password }) {
   let user = await repository.findUserByEmail(prisma, invitation.email);
   if (!user) {
     const passwordHash = await bcrypt.hash(password, 10);
-    user = await prisma.user.create({ data: { name, email: invitation.email, passwordHash } });
+    user = await prisma.user.create({ data: { name, email: invitation.email.trim().toLowerCase(), passwordHash } });
   }
 
   const alreadyMember = await repository.findMemberByUserId(prisma, invitation.storeId, user.id);

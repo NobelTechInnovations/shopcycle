@@ -2,28 +2,10 @@ const crypto = require("crypto");
 const { HttpError } = require("@shopcycle/utils");
 const { env } = require("../../config/env");
 const { GRACE_DAYS_BEFORE_PLAN_REQUIRED, computeAccessState } = require("./access");
-
-function razorpayConfigured() {
-  return Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
-}
-
-function authHeader() {
-  const auth = Buffer.from(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`).toString("base64");
-  return { authorization: `Basic ${auth}` };
-}
-
-async function razorpayRequest(path, { method = "GET", body } = {}) {
-  const res = await fetch(`https://api.razorpay.com/v1${path}`, {
-    method,
-    headers: { "content-type": "application/json", ...authHeader() },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new HttpError(502, data?.error?.description || `Razorpay request failed: ${res.status}`);
-  }
-  return data;
-}
+const { safeEqual } = require("../../lib/crypto");
+const { razorpayConfigured, billingMode, razorpayRequest, fetchSubscription } = require("./razorpay");
+const { scheduleAccruedFees } = require("./commission");
+const { issueRenewalInvoice } = require("./invoices");
 
 /** Every plan needs a matching Razorpay Plan before a merchant can
  * subscribe to it — created once, lazily, on whichever store subscribes
@@ -60,8 +42,15 @@ async function ensureRazorpayPlan(prisma, plan) {
  * monthly cycles (10 years) is used as a practical stand-in for "ongoing,"
  * renewable the same way if it's ever actually reached. */
 async function createSubscription(prisma, store, plan) {
-  if (!razorpayConfigured()) {
-    throw new HttpError(400, "Payments aren't configured on this platform yet.");
+  const mode = billingMode();
+  if (mode === "sandbox") {
+    // No mandate to authorize — the free trial starts right here.
+    const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const updated = await activateSubscription(prisma, store, plan, { subscriptionId: null, trialEndsAt });
+    return { sandbox: true, store: updated, trialEndsAt };
+  }
+  if (mode === "unconfigured") {
+    throw new HttpError(503, "Plan billing isn't switched on for Oyklane yet. Please try again later.");
   }
 
   const razorpayPlanId = await ensureRazorpayPlan(prisma, plan);
@@ -92,7 +81,25 @@ function verifySubscriptionSignature({ razorpay_payment_id, razorpay_subscriptio
     .createHmac("sha256", env.RAZORPAY_KEY_SECRET)
     .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
     .digest("hex");
-  return expected === razorpay_signature;
+  return safeEqual(expected, razorpay_signature);
+}
+
+/** Which plan a verified mandate is actually for — read from Razorpay's
+ * own record of the subscription, never from the browser. The signature
+ * only proves the payment/subscription pair is genuine; without this a
+ * merchant could authorize a ₹999 Starter mandate and then report Premium
+ * as the plan, getting Premium while being charged for Starter. Also
+ * refuses a subscription created for a different store. */
+async function resolveMandatePlan(prisma, store, subscriptionId) {
+  const subscription = await fetchSubscription(subscriptionId);
+  if (subscription?.notes?.storeId !== store.id) {
+    throw new HttpError(400, "This subscription doesn't belong to your store.");
+  }
+  const plan = await prisma.plan.findUnique({ where: { id: String(subscription.notes.planId || "") } });
+  if (!plan || (plan.razorpayPlanId && subscription.plan_id && plan.razorpayPlanId !== subscription.plan_id)) {
+    throw new HttpError(400, "Couldn't match this subscription to a plan.");
+  }
+  return plan;
 }
 
 /** Called once the checkout widget's handler confirms the mandate was
@@ -113,12 +120,54 @@ async function activateSubscription(prisma, store, plan, { subscriptionId, trial
   });
 }
 
-/** Handles the four webhook events that actually change a store's
- * billing state — everything else (subscription.pending, invoice.*, ...)
- * is ignored on purpose rather than mapped to a state that doesn't exist
- * here yet. See access.js for what past_due actually does to admin/
- * storefront access over the following days. */
-async function handleWebhookEvent(prisma, event) {
+const fromUnix = (s) => (s ? new Date(Number(s) * 1000) : null);
+
+/** A successful renewal charge — the heart of platform billing:
+ *   1. a downgrade scheduled for this renewal takes effect (Razorpay has
+ *      already switched the plan at cycle end, so the store follows)
+ *   2. the store is active again, with its new billing period recorded
+ *   3. the GST invoice for this charge is issued (idempotent per payment),
+ *      itemising the platform fees that were scheduled onto it
+ *   4. fees accrued since the last renewal are scheduled onto the next one
+ * Step 4 failing (Razorpay unreachable) must not fail the webhook — the
+ * fees simply stay accrued and are picked up at the next renewal. */
+async function handleCharged(prisma, store, event, log) {
+  const subscription = event.payload?.subscription?.entity || {};
+  const payment = event.payload?.payment?.entity || {};
+
+  const updated = await prisma.store.update({
+    where: { id: store.id },
+    data: {
+      subscriptionStatus: "active",
+      paymentFailedAt: null,
+      currentPeriodEnd: fromUnix(subscription.current_end) || store.currentPeriodEnd,
+      ...(store.pendingPlanId && { planId: store.pendingPlanId, pendingPlanId: null }),
+    },
+    include: { plan: true },
+  });
+
+  if (payment.id && payment.amount) {
+    await issueRenewalInvoice(prisma, updated, {
+      paymentId: payment.id,
+      total: Number(payment.amount) / 100,
+      periodStart: fromUnix(subscription.current_start),
+      periodEnd: fromUnix(subscription.current_end),
+      planName: updated.plan?.name,
+    });
+  }
+
+  try {
+    await scheduleAccruedFees(prisma, updated);
+  } catch (err) {
+    log?.warn({ err, storeId: store.id }, "billing: could not schedule platform fees; they stay accrued");
+  }
+}
+
+/** Handles the webhook events that change a store's billing state —
+ * everything else (subscription.pending, invoice.*, ...) is acknowledged
+ * and ignored. See access.js for what past_due does to admin/storefront
+ * access over the following days. */
+async function handleWebhookEvent(prisma, event, log) {
   const subscriptionId =
     event.payload?.subscription?.entity?.id || event.payload?.payment?.entity?.subscription_id;
   if (!subscriptionId) return;
@@ -127,10 +176,7 @@ async function handleWebhookEvent(prisma, event) {
   if (!store) return; // not one of ours, or already unlinked — nothing to do
 
   if (event.event === "subscription.charged") {
-    await prisma.store.update({
-      where: { id: store.id },
-      data: { subscriptionStatus: "active", paymentFailedAt: null },
-    });
+    await handleCharged(prisma, store, event, log);
   } else if (event.event === "payment.failed" || event.event === "subscription.halted") {
     await prisma.store.update({
       where: { id: store.id },
@@ -147,24 +193,43 @@ async function handleWebhookEvent(prisma, event) {
 function verifyWebhookSignature(rawBody, signature) {
   if (!env.RAZORPAY_WEBHOOK_SECRET) return false;
   const expected = crypto.createHmac("sha256", env.RAZORPAY_WEBHOOK_SECRET).update(rawBody).digest("hex");
-  return expected === signature;
+  return safeEqual(expected, signature);
 }
 
 function serializeBillingStatus(store) {
+  const mode = billingMode();
   return {
+    mode,
+    // A pointer for whoever runs a dev/staging copy — never shown to
+    // merchants on production, where it would only be noise.
+    setupHint:
+      mode === "unconfigured" && env.NODE_ENV !== "production"
+        ? "Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env, or set BILLING_SANDBOX=true to test plans locally, then restart the API."
+        : null,
     subscriptionStatus: store.subscriptionStatus,
     accessState: computeAccessState(store),
     mandateDeadline: store.mandateDeadline,
     trialEndsAt: store.trialEndsAt,
     paymentFailedAt: store.paymentFailedAt,
+    currentPeriodEnd: store.currentPeriodEnd,
+    pendingPlanId: store.pendingPlanId,
     graceDays: GRACE_DAYS_BEFORE_PLAN_REQUIRED,
+    billingDetails: {
+      billingName: store.billingName,
+      gstin: store.gstin,
+      billingAddress: store.billingAddress,
+      billingState: store.billingState,
+    },
   };
 }
 
 module.exports = {
   razorpayConfigured,
+  billingMode,
+  ensureRazorpayPlan,
   createSubscription,
   verifySubscriptionSignature,
+  resolveMandatePlan,
   activateSubscription,
   handleWebhookEvent,
   verifyWebhookSignature,

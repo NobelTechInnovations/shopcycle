@@ -10,6 +10,11 @@ async function listCompanies(prisma) {
     domain: s.domain,
     status: s.status,
     plan: s.plan ? { id: s.plan.id, name: s.plan.name } : null,
+    // Billing state for the platform console's tabs and badges — what an
+    // operator scans for (who's trialing, who's paying, who's behind).
+    subscriptionStatus: s.subscriptionStatus,
+    trialEndsAt: s.trialEndsAt,
+    paymentFailedAt: s.paymentFailedAt,
     owner: s.storeUsers[0]?.user || null,
     orderCount: s._count.orders,
     productCount: s._count.products,

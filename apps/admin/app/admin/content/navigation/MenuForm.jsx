@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Form, Input, Select, Button, Card } from "antd";
 import { Plus, Trash2 } from "lucide-react";
-import { PageHeader } from "@shopcycle/ui";
+import { PageHeader, SaveBar } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 // The handles a theme actually looks for — see header.liquid / footer.liquid's
@@ -89,6 +89,7 @@ export function MenuForm({ menu }) {
   const router = useRouter();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [collections, setCollections] = useState([]);
   const [products, setProducts] = useState([]);
   const [pages, setPages] = useState([]);
@@ -130,9 +131,9 @@ export function MenuForm({ menu }) {
 
   return (
     <div>
-      <PageHeader title={isEdit ? menu.title : "Add menu"} breadcrumb={<a href="/admin/content/navigation">Navigation</a>} />
+      <PageHeader title={isEdit ? menu.title : "Add menu"} backHref="/admin/content/navigation" />
 
-      <Form form={form} layout="vertical" initialValues={initialValues} onFinish={handleSubmit} requiredMark={false}>
+      <Form form={form} layout="vertical" initialValues={initialValues} onFinish={handleSubmit} onValuesChange={() => setDirty(true)} requiredMark={false}>
         <div className="max-w-3xl flex flex-col gap-6">
           <Card size="small" title="Menu">
             <Form.Item name="title" label="Title" rules={[{ required: true, message: "Title is required" }]}>
@@ -172,12 +173,13 @@ export function MenuForm({ menu }) {
           </Card>
         </div>
 
-        <div className="sticky bottom-0 -mx-6 mt-6 bg-app-surface border-t border-app-border px-6 py-3 flex justify-end gap-2 max-w-3xl">
-          <Button onClick={() => router.push("/admin/content/navigation")}>Discard</Button>
-          <Button type="primary" htmlType="submit" loading={saving}>
-            {isEdit ? "Save" : "Add menu"}
-          </Button>
-        </div>
+        <SaveBar
+          dirty={dirty}
+          isNew={!isEdit}
+          saving={saving}
+          saveLabel={isEdit ? "Save" : "Add menu"}
+          onDiscard={() => router.push("/admin/content/navigation")}
+        />
       </Form>
     </div>
   );

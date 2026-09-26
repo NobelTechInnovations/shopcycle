@@ -1,11 +1,13 @@
 /**
- * Optional dev convenience seed — NOT the theme installer (that lives in
- * apps/api/src/modules/themes, since installing a theme for a real store is
- * a product feature, not a fixture). This just gives you something to look
- * at in the admin without registering + clicking through forms by hand.
+ * Optional dev convenience seed — gives you something to look at in the
+ * admin without registering + clicking through forms by hand. Theme
+ * installation is delegated to the API's real installer (the same code a
+ * merchant's "Install theme" click runs) rather than copied here, so the
+ * demo store always gets exactly what a real store would.
  */
 const { prisma } = require("../src/client");
 const bcrypt = require("bcryptjs");
+const themesService = require("../../../apps/api/src/modules/themes/service");
 
 async function main() {
   // Billing plans (Phase 9) — exactly two, seeded fixtures, not
@@ -233,6 +235,18 @@ async function main() {
         },
       },
     });
+  }
+
+  // The store is created directly above (not via provisionStore) so it skips
+  // the 2-day plan deadline a real signup gets — a dev fixture shouldn't
+  // lock itself out of its own admin. That also skipped the theme install,
+  // which left the demo storefront a 404; install both master themes here
+  // instead (Classic goes live as the first install). Guarded so re-running
+  // the seed never piles up duplicate theme copies.
+  const themeCount = await prisma.theme.count({ where: { storeId: store.id } });
+  if (themeCount === 0) {
+    await themesService.installTheme(prisma, store.id, "classic");
+    await themesService.installTheme(prisma, store.id, "modern");
   }
 
   console.log("Seeded:", { user: user.email, store: store.handle });

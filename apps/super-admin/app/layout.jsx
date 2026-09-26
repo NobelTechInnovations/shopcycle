@@ -1,11 +1,12 @@
 import { Inter } from "next/font/google";
 import { AntdProvider } from "@shopcycle/ui";
+import "@shopcycle/ui/src/theme/admin.css";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata = {
-  title: "ShopCycle Platform Admin",
+  title: "Oyklane Platform",
   description: "Manage every company, plan, and app on ShopCycle",
 };
 

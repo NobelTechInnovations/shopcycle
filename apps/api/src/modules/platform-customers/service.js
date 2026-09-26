@@ -1,4 +1,5 @@
 const { normalizePhone } = require("../../lib/phone");
+const { amountSpent, SPEND_ORDER_SELECT } = require("../customers/spend");
 
 /**
  * Resolves (or creates) the PlatformCustomer a store's Customer row should
@@ -28,9 +29,12 @@ async function linkCustomer(prisma, existingPlatformCustomerId, { phone, email }
   }
 
   if (email) {
-    const byEmail = await prisma.platformCustomer.findFirst({ where: { email } });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const byEmail = await prisma.platformCustomer.findFirst({
+      where: { email: { equals: normalizedEmail, mode: "insensitive" } },
+    });
     if (byEmail) return byEmail.id;
-    const created = await prisma.platformCustomer.create({ data: { email } });
+    const created = await prisma.platformCustomer.create({ data: { email: normalizedEmail } });
     return created.id;
   }
 
@@ -44,9 +48,9 @@ async function search(prisma, { q, page = 1, pageSize = 25 }) {
   const where = q
     ? {
         OR: [
-          { phone: { contains: normalizePhone(q) || q } },
-          { email: { contains: q } },
-          { name: { contains: q } },
+          { phone: { contains: normalizePhone(q) || q, mode: "insensitive" } },
+          { email: { contains: q, mode: "insensitive" } },
+          { name: { contains: q, mode: "insensitive" } },
         ],
       }
     : {};
@@ -77,7 +81,7 @@ async function getById(prisma, id) {
       customers: {
         include: {
           store: { select: { id: true, name: true, handle: true } },
-          orders: { select: { id: true, total: true, createdAt: true }, orderBy: { createdAt: "desc" } },
+          orders: { select: { ...SPEND_ORDER_SELECT, createdAt: true }, orderBy: { createdAt: "desc" } },
         },
       },
     },
@@ -94,7 +98,7 @@ function serialize(row) {
     name: c.name,
     email: c.email,
     orderCount: c.orders?.length ?? undefined,
-    totalSpent: c.orders ? c.orders.reduce((sum, o) => sum + Number(o.total), 0) : undefined,
+    totalSpent: c.orders ? amountSpent(c.orders) : undefined,
   }));
   return {
     id: row.id,

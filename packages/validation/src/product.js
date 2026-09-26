@@ -7,7 +7,10 @@ const variantSchema = z.object({
   price: z.coerce.number().nonnegative(),
   comparePrice: z.coerce.number().nonnegative().optional().nullable(),
   cost: z.coerce.number().nonnegative().optional().nullable(),
-  inventoryQuantity: z.coerce.number().int().nonnegative().default(0),
+  // Optional on purpose: an edit that leaves stock alone omits it, so the
+  // save can't overwrite sales made while the form was open. New variants
+  // default to 0 in the repository.
+  inventoryQuantity: z.coerce.number().int().optional(),
   status: z.enum(["active", "draft"]).default("active"),
 });
 
@@ -20,6 +23,13 @@ const imageSchema = z.object({
 
 const createProductSchema = z.object({
   title: z.string().min(1, "Title is required").max(255),
+  hsnCode: z
+    .string()
+    .trim()
+    .regex(/^\d{4,8}$/, "HSN codes are 4 to 8 digits")
+    .optional()
+    .nullable()
+    .or(z.literal("").transform(() => null)),
   description: z.string().optional().nullable(),
   status: z.enum(["active", "draft", "archived"]).default("draft"),
   vendor: z.string().optional().nullable(),

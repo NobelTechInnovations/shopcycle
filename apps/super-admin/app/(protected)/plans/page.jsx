@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Card, Button, Modal, Form, Input, InputNumber, App } from "antd";
 import { Plus, Pencil, Trash2 } from "lucide-react";
-import { PageHeader, useConfirmDialog } from "@shopcycle/ui";
+import { PageHeader, useConfirmDialog, useHasMounted } from "@shopcycle/ui";
 import { formatCurrency } from "@shopcycle/utils";
 import { apiFetch } from "@/lib/api";
 
 export default function PlansPage() {
+  const mounted = useHasMounted();
   const { message } = App.useApp();
   const { confirmDialog } = useConfirmDialog();
   const [plans, setPlans] = useState([]);
@@ -102,32 +103,34 @@ export default function PlansPage() {
         ))}
       </Card>
 
-      <Modal
-        title={editing?.id ? "Edit plan" : "New plan"}
-        open={Boolean(editing)}
-        onCancel={() => setEditing(null)}
-        onOk={() => form.submit()}
-        okText={editing?.id ? "Save" : "Create"}
-        forceRender
-      >
-        <Form layout="vertical" form={form} onFinish={handleSubmit} requiredMark={false}>
-          <Form.Item name="name" label="Name" rules={[{ required: true, message: "Required" }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="priceMonthly" label="Price / month" rules={[{ required: true, message: "Required" }]}>
-            <InputNumber min={0} className="w-full" prefix="₹" />
-          </Form.Item>
-          <Form.Item name="productLimit" label="Product limit" rules={[{ required: true, message: "Required" }]}>
-            <InputNumber min={1} className="w-full" />
-          </Form.Item>
-          <Form.Item name="staffLimit" label="Staff limit" rules={[{ required: true, message: "Required" }]}>
-            <InputNumber min={1} className="w-full" />
-          </Form.Item>
-          <Form.Item name="description" label="Description" className="mb-0">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-        </Form>
-      </Modal>
+      {mounted && (
+        <Modal
+          title={editing?.id ? "Edit plan" : "New plan"}
+          open={Boolean(editing)}
+          onCancel={() => setEditing(null)}
+          onOk={() => form.submit()}
+          okText={editing?.id ? "Save" : "Create"}
+          forceRender
+        >
+          <Form layout="vertical" form={form} onFinish={handleSubmit} requiredMark={false}>
+            <Form.Item name="name" label="Name" rules={[{ required: true, message: "Required" }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="priceMonthly" label="Price / month" rules={[{ required: true, message: "Required" }]}>
+              <InputNumber min={0} className="w-full" prefix="₹" />
+            </Form.Item>
+            <Form.Item name="productLimit" label="Product limit" rules={[{ required: true, message: "Required" }]}>
+              <InputNumber min={1} className="w-full" />
+            </Form.Item>
+            <Form.Item name="staffLimit" label="Staff limit" rules={[{ required: true, message: "Required" }]}>
+              <InputNumber min={1} className="w-full" />
+            </Form.Item>
+            <Form.Item name="description" label="Description" className="mb-0">
+              <Input.TextArea rows={2} />
+            </Form.Item>
+          </Form>
+        </Modal>
+      )}
     </div>
   );
 }

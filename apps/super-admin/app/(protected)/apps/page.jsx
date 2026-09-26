@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Card, Button, Modal, Form, Input, Select, App } from "antd";
 import { Plus, Pencil, Trash2 } from "lucide-react";
-import { PageHeader, useConfirmDialog, AppIcon, APP_ICON_OPTIONS } from "@shopcycle/ui";
+import { PageHeader, useConfirmDialog, AppIcon, APP_ICON_OPTIONS, useHasMounted } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 const CATEGORY_OPTIONS = [
@@ -20,6 +20,7 @@ const FIELD_TYPE_OPTIONS = [
 ];
 
 export default function SuperAdminAppsPage() {
+  const mounted = useHasMounted();
   const { message } = App.useApp();
   const { confirmDialog } = useConfirmDialog();
   const [apps, setApps] = useState([]);
@@ -119,69 +120,71 @@ export default function SuperAdminAppsPage() {
         ))}
       </Card>
 
-      <Modal
-        title={editing?.id ? "Edit app" : "New app"}
-        open={Boolean(editing)}
-        onCancel={() => setEditing(null)}
-        onOk={() => form.submit()}
-        okText={editing?.id ? "Save" : "Create"}
-        forceRender
-        width={560}
-      >
-        <Form layout="vertical" form={form} onFinish={handleSubmit} requiredMark={false}>
-          <Form.Item name="key" label="Key" rules={[{ required: true, message: "Required" }]}>
-            <Input placeholder="my-app" disabled={Boolean(editing?.id)} />
-          </Form.Item>
-          <Form.Item name="name" label="Name" rules={[{ required: true, message: "Required" }]}>
-            <Input placeholder="My App" />
-          </Form.Item>
-          <Form.Item name="iconKey" label="Icon" rules={[{ required: true, message: "Required" }]}>
-            <Select
-              className="w-40"
-              options={APP_ICON_OPTIONS.map((key) => ({
-                value: key,
-                label: (
-                  <span className="flex items-center gap-2">
-                    <AppIcon iconKey={key} size={14} /> {key}
-                  </span>
-                ),
-              }))}
-            />
-          </Form.Item>
-          <Form.Item name="category" label="Category">
-            <Select options={CATEGORY_OPTIONS} />
-          </Form.Item>
-          <Form.Item name="description" label="Description">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.List name="settingsSchema">
-            {(fields, { add, remove }) => (
-              <div className="flex flex-col gap-2 mb-3">
-                <label className="text-sm">Install settings fields</label>
-                {fields.map((field) => (
-                  <div key={field.key} className="flex gap-2 items-start border border-app-border rounded-md p-2">
-                    <Form.Item name={[field.name, "id"]} className="mb-0 flex-1" rules={[{ required: true, message: "Required" }]}>
-                      <Input placeholder="fieldId" size="small" />
-                    </Form.Item>
-                    <Form.Item name={[field.name, "label"]} className="mb-0 flex-1" rules={[{ required: true, message: "Required" }]}>
-                      <Input placeholder="Label" size="small" />
-                    </Form.Item>
-                    <Form.Item name={[field.name, "type"]} className="mb-0" initialValue="text">
-                      <Select options={FIELD_TYPE_OPTIONS} size="small" style={{ width: 100 }} />
-                    </Form.Item>
-                    <Button size="small" danger onClick={() => remove(field.name)}>
-                      ×
-                    </Button>
-                  </div>
-                ))}
-                <Button size="small" onClick={() => add({ type: "text" })}>
-                  + Add field
-                </Button>
-              </div>
-            )}
-          </Form.List>
-        </Form>
-      </Modal>
+      {mounted && (
+        <Modal
+          title={editing?.id ? "Edit app" : "New app"}
+          open={Boolean(editing)}
+          onCancel={() => setEditing(null)}
+          onOk={() => form.submit()}
+          okText={editing?.id ? "Save" : "Create"}
+          forceRender
+          width={560}
+        >
+          <Form layout="vertical" form={form} onFinish={handleSubmit} requiredMark={false}>
+            <Form.Item name="key" label="Key" rules={[{ required: true, message: "Required" }]}>
+              <Input placeholder="my-app" disabled={Boolean(editing?.id)} />
+            </Form.Item>
+            <Form.Item name="name" label="Name" rules={[{ required: true, message: "Required" }]}>
+              <Input placeholder="My App" />
+            </Form.Item>
+            <Form.Item name="iconKey" label="Icon" rules={[{ required: true, message: "Required" }]}>
+              <Select
+                className="w-40"
+                options={APP_ICON_OPTIONS.map((key) => ({
+                  value: key,
+                  label: (
+                    <span className="flex items-center gap-2">
+                      <AppIcon iconKey={key} size={14} /> {key}
+                    </span>
+                  ),
+                }))}
+              />
+            </Form.Item>
+            <Form.Item name="category" label="Category">
+              <Select options={CATEGORY_OPTIONS} />
+            </Form.Item>
+            <Form.Item name="description" label="Description">
+              <Input.TextArea rows={2} />
+            </Form.Item>
+            <Form.List name="settingsSchema">
+              {(fields, { add, remove }) => (
+                <div className="flex flex-col gap-2 mb-3">
+                  <label className="text-sm">Install settings fields</label>
+                  {fields.map((field) => (
+                    <div key={field.key} className="flex gap-2 items-start border border-app-border rounded-md p-2">
+                      <Form.Item name={[field.name, "id"]} className="mb-0 flex-1" rules={[{ required: true, message: "Required" }]}>
+                        <Input placeholder="fieldId" size="small" />
+                      </Form.Item>
+                      <Form.Item name={[field.name, "label"]} className="mb-0 flex-1" rules={[{ required: true, message: "Required" }]}>
+                        <Input placeholder="Label" size="small" />
+                      </Form.Item>
+                      <Form.Item name={[field.name, "type"]} className="mb-0" initialValue="text">
+                        <Select options={FIELD_TYPE_OPTIONS} size="small" style={{ width: 100 }} />
+                      </Form.Item>
+                      <Button size="small" danger onClick={() => remove(field.name)}>
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                  <Button size="small" onClick={() => add({ type: "text" })}>
+                    + Add field
+                  </Button>
+                </div>
+              )}
+            </Form.List>
+          </Form>
+        </Modal>
+      )}
     </div>
   );
 }

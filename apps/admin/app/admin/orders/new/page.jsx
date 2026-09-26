@@ -43,7 +43,7 @@ export default function NewOrderPage() {
 
   return (
     <div>
-      <PageHeader title="Create order" breadcrumb={<a href="/admin/orders">Orders</a>} />
+      <PageHeader title="Create order" backHref="/admin/orders" />
 
       <Form
         layout="vertical"

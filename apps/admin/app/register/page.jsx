@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Form, Input, Button, Typography, Alert } from "antd";
+import { Form, Input, Button, Alert } from "antd";
+import { AuthShell } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 export default function RegisterPage() {
@@ -25,56 +26,42 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-app-bg px-4">
-      <div className="w-full max-w-sm bg-app-surface border border-app-border rounded-lg shadow-card p-8">
-        <Typography.Title level={4} className="!mb-1">
-          Create your store
-        </Typography.Title>
-        <Typography.Text type="secondary">Start with a store name and an owner account</Typography.Text>
-
-        {error && <Alert type="error" message={error} showIcon className="mt-4" />}
-
-        <Form layout="vertical" onFinish={onFinish} className="mt-6" requiredMark={false}>
-          <Form.Item
-            label="Store name"
-            name="storeName"
-            rules={[{ required: true, min: 2, message: "Store name is too short" }]}
-          >
-            <Input size="large" placeholder="Demo Store" />
-          </Form.Item>
-          <Form.Item
-            label="Your name"
-            name="name"
-            rules={[{ required: true, min: 2, message: "Name is too short" }]}
-          >
-            <Input size="large" />
-          </Form.Item>
-          <Form.Item
-            label="Email"
-            name="email"
-            rules={[{ required: true, type: "email", message: "Enter a valid email" }]}
-          >
-            <Input autoComplete="email" size="large" />
-          </Form.Item>
-          <Form.Item
-            label="Password"
-            name="password"
-            rules={[{ required: true, min: 8, message: "At least 8 characters" }]}
-          >
-            <Input.Password autoComplete="new-password" size="large" />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" block size="large" loading={loading}>
-            Create store
-          </Button>
-        </Form>
-
-        <p className="text-sm text-ink-muted mt-4 text-center">
-          Already have a store?{" "}
-          <a href="/login" className="text-brand font-medium">
+    <AuthShell
+      title="Create your store"
+      subtitle="Free for 2 days, then a 1-month free trial on any plan."
+      footer={
+        <>
+          Already selling on Oyklane?{" "}
+          <a href="/login" className="text-ink font-medium underline underline-offset-4 decoration-ink/20 hover:decoration-ink">
             Sign in
           </a>
-        </p>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {error && <Alert type="error" message={error} showIcon className="mb-5" />}
+
+      <Form layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
+        <Form.Item label="Store name" name="storeName" rules={[{ required: true, min: 2, message: "Store name is too short" }]}>
+          <Input placeholder="Aurora Goods" autoFocus />
+        </Form.Item>
+        <Form.Item label="Your name" name="name" rules={[{ required: true, min: 2, message: "Name is too short" }]}>
+          <Input autoComplete="name" placeholder="Priya Sharma" />
+        </Form.Item>
+        <Form.Item label="Email" name="email" rules={[{ required: true, type: "email", message: "Enter a valid email" }]}>
+          <Input autoComplete="email" placeholder="you@company.com" />
+        </Form.Item>
+        <Form.Item
+          label="Password"
+          name="password"
+          extra="At least 8 characters."
+          rules={[{ required: true, min: 8, message: "At least 8 characters" }]}
+        >
+          <Input.Password autoComplete="new-password" placeholder="••••••••" />
+        </Form.Item>
+        <Button type="primary" htmlType="submit" block loading={loading} className="!h-11 !mt-2">
+          Create store
+        </Button>
+      </Form>
+    </AuthShell>
   );
 }

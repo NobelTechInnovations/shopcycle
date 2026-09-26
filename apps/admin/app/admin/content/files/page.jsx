@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Upload, App } from "antd";
-import { UploadCloud, Trash2, Folder } from "lucide-react";
-import { PageHeader, EmptyState, useConfirmDialog } from "@shopcycle/ui";
+import { Button, Upload, App, Skeleton } from "antd";
+import { UploadCloud, Trash2, Link2, ImagePlus } from "lucide-react";
+import { PageHeader, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch, apiUpload } from "@/lib/api";
+import { IMAGE_ACCEPT } from "@/lib/uploads";
 
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -17,7 +18,7 @@ export default function ContentFilesPage() {
   const { confirmDialog } = useConfirmDialog();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState(0); // files in flight
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -34,22 +35,31 @@ export default function ContentFilesPage() {
   }, [load]);
 
   async function handleUpload(file) {
-    setUploading(true);
+    setUploading((n) => n + 1);
     try {
       await apiUpload("/api/files/upload", file);
       await load();
     } catch (err) {
-      message.error(err.message);
+      message.error(`${file.name}: ${err.message}`);
     } finally {
-      setUploading(false);
+      setUploading((n) => n - 1);
     }
-    return false;
+    return false; // we upload ourselves; stop AntD's own request
+  }
+
+  async function copyLink(file) {
+    try {
+      await navigator.clipboard.writeText(file.url);
+      message.success("Link copied");
+    } catch {
+      message.info(file.url);
+    }
   }
 
   function handleDelete(file) {
     confirmDialog({
       title: `Delete "${file.name}"?`,
-      description: "This can't be undone. Any product still referencing this image will show a broken image.",
+      description: "Any product or theme section still using this image will show it as missing. This can't be undone.",
       okText: "Delete",
       danger: true,
       onConfirm: async () => {
@@ -59,48 +69,80 @@ export default function ContentFilesPage() {
     });
   }
 
+  const uploadProps = { multiple: true, showUploadList: false, beforeUpload: handleUpload, accept: IMAGE_ACCEPT };
+
   return (
     <div>
       <PageHeader
         title="Files"
+        subtitle={loading ? " " : `${files.length} ${files.length === 1 ? "image" : "images"} · JPEG, PNG, WebP, or GIF up to 8 MB`}
         actions={
-          <Upload showUploadList={false} beforeUpload={handleUpload} accept="image/*">
-            <Button type="primary" loading={uploading} icon={<UploadCloud size={14} aria-hidden="true" />}>
+          <Upload {...uploadProps}>
+            <Button type="primary" loading={uploading > 0} icon={<UploadCloud size={15} aria-hidden="true" />}>
               Upload
             </Button>
           </Upload>
         }
       />
 
-      {!loading && files.length === 0 && (
-        <div className="bg-app-surface border border-app-border rounded-md">
-          <EmptyState
-            icon={<Folder size={32} strokeWidth={1.5} />}
-            title="No files yet"
-            description="Upload images to use across products, collections, and theme sections."
-          />
+      <Upload.Dragger {...uploadProps} className="!block mb-5 [&_.ant-upload-drag]:!rounded-[14px] [&_.ant-upload-drag]:!bg-app-surface">
+        <div className="flex flex-col items-center gap-2 py-4">
+          <span className="w-11 h-11 rounded-xl bg-app-bg border border-app-border text-ink-muted flex items-center justify-center">
+            <ImagePlus size={20} aria-hidden="true" />
+          </span>
+          <p className="text-sm text-ink m-0">
+            <span className="font-medium">Drop images here</span> or click to choose
+          </p>
+          <p className="text-xs text-ink-muted m-0">{uploading > 0 ? `Uploading ${uploading}…` : "You can add several at once"}</p>
+        </div>
+      </Upload.Dragger>
+
+      {loading && files.length === 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton.Image key={i} active className="!w-full !h-auto !aspect-square" />
+          ))}
         </div>
       )}
 
       {files.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
           {files.map((file) => (
-            <div key={file.id} className="group relative border border-app-border rounded-md overflow-hidden bg-app-surface">
-              <div className="aspect-square bg-app-bg flex items-center justify-center overflow-hidden">
-                <img src={file.url} alt={file.name} className="object-cover w-full h-full" />
+            <div
+              key={file.id}
+              className="group relative border border-app-border rounded-xl overflow-hidden bg-app-surface shadow-card"
+            >
+              <div className="aspect-square bg-app-bg overflow-hidden">
+                <img src={file.url} alt={file.name} className="object-cover w-full h-full" loading="lazy" />
               </div>
-              <div className="p-2">
-                <p className="text-xs truncate m-0" title={file.name}>{file.name}</p>
+              <div className="px-2.5 py-2">
+                <p className="text-xs font-medium text-ink truncate m-0" title={file.name}>
+                  {file.name}
+                </p>
                 <p className="text-[11px] text-ink-muted m-0">{formatBytes(file.size)}</p>
               </div>
-              <button
-                type="button"
-                className="absolute top-1 right-1 bg-app-surface border border-app-border rounded-md p-1 opacity-0 group-hover:opacity-100 text-status-danger"
-                aria-label={`Delete ${file.name}`}
-                onClick={() => handleDelete(file)}
-              >
-                <Trash2 size={13} aria-hidden="true" />
-              </button>
+              {/* Always visible on touch screens; on desktop, shown on hover
+                  AND on keyboard focus, so it's never mouse-only. */}
+              <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
+                <button
+                  type="button"
+                  className="w-7 h-7 rounded-md bg-app-surface/95 border border-app-border text-ink-muted hover:text-ink flex items-center justify-center cursor-pointer"
+                  aria-label={`Copy link to ${file.name}`}
+                  title="Copy link"
+                  onClick={() => copyLink(file)}
+                >
+                  <Link2 size={13} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="w-7 h-7 rounded-md bg-app-surface/95 border border-app-border text-ink-muted hover:text-status-danger flex items-center justify-center cursor-pointer"
+                  aria-label={`Delete ${file.name}`}
+                  title="Delete"
+                  onClick={() => handleDelete(file)}
+                >
+                  <Trash2 size={13} aria-hidden="true" />
+                </button>
+              </div>
             </div>
           ))}
         </div>

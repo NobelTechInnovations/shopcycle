@@ -34,6 +34,9 @@ export async function proxyRender(handle, template, extraParams = {}, request = 
   const cookieStore = await cookies();
   const cartId = cookieStore.get(CART_COOKIE)?.value;
   const visitorId = cookieStore.get(VISITOR_COOKIE)?.value;
+  // The signed-in shopper (lib/shopper.js). Sent as a header, never in the
+  // URL, so it can't end up in logs or a shared link.
+  const shopperSession = cookieStore.get("sc_customer")?.value;
 
   const params = new URLSearchParams(extraParams);
   if (cartId) params.set("cartId", cartId);
@@ -54,6 +57,7 @@ export async function proxyRender(handle, template, extraParams = {}, request = 
   try {
     res = await fetch(`${API_URL}/api/storefront/${handle}/render/${template}?${params}`, {
       cache: "no-store",
+      headers: shopperSession ? { "x-shopper-token": shopperSession } : {},
     });
   } catch {
     return new Response(errorPage(503, "The storefront service is unavailable right now."), {

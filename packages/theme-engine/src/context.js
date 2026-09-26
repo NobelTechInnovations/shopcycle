@@ -29,6 +29,13 @@ function buildRoutes(handle, { rootless = false } = {}) {
     pages_url: `${root}/pages`,
     checkout_url: `${root}/checkout`,
     search_url: `${root}/search`,
+    // Shopper accounts and order status (Phase 4).
+    account_url: `${root}/account`,
+    account_login_url: `${root}/account/login`,
+    account_logout_url: `${root}/account/logout`,
+    account_update_url: `${root}/account/update`,
+    order_lookup_url: `${root}/orders/lookup`,
+    orders_url: `${root}/orders`,
   };
 }
 

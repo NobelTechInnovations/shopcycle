@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Form, Input, Select, Button, Card } from "antd";
-import { PageHeader } from "@shopcycle/ui";
+import { PageHeader, SaveBar } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 export function CollectionForm({ collection }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [products, setProducts] = useState([]);
   const isEdit = Boolean(collection);
 
@@ -44,10 +45,10 @@ export function CollectionForm({ collection }) {
     <div>
       <PageHeader
         title={isEdit ? collection.title : "Create collection"}
-        breadcrumb={<a href="/admin/collections">Collections</a>}
+        backHref="/admin/collections"
       />
 
-      <Form layout="vertical" initialValues={initialValues} onFinish={handleSubmit} requiredMark={false}>
+      <Form layout="vertical" initialValues={initialValues} onFinish={handleSubmit} onValuesChange={() => setDirty(true)} requiredMark={false}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 flex flex-col gap-6">
             <Card size="small" title="Title & description">
@@ -83,12 +84,13 @@ export function CollectionForm({ collection }) {
           </Card>
         </div>
 
-        <div className="sticky bottom-0 -mx-6 mt-6 bg-app-surface border-t border-app-border px-6 py-3 flex justify-end gap-2">
-          <Button onClick={() => router.push("/admin/collections")}>Discard</Button>
-          <Button type="primary" htmlType="submit" loading={saving}>
-            {isEdit ? "Save" : "Create collection"}
-          </Button>
-        </div>
+        <SaveBar
+          dirty={dirty}
+          isNew={!isEdit}
+          saving={saving}
+          saveLabel={isEdit ? "Save" : "Create collection"}
+          onDiscard={() => router.push("/admin/collections")}
+        />
       </Form>
     </div>
   );

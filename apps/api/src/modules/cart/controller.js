@@ -20,7 +20,7 @@ const removeDiscountSchema = z.object({
 async function getHandler(request, reply) {
   const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
   const cartId = request.query.cartId;
-  const cart = await cartService.getCart(request.server.prisma, request.server.redis, store.id, cartId, store.handle);
+  const cart = await cartService.getCart(request.server.prisma, store.id, cartId, store.handle);
   reply.send({ cart });
 }
 
@@ -29,7 +29,6 @@ async function addHandler(request, reply) {
   const { cartId, variantId, quantity } = mutateSchema.parse(request.body);
   const cart = await cartService.addItem(
     request.server.prisma,
-    request.server.redis,
     store.id,
     cartId,
     variantId,
@@ -44,7 +43,6 @@ async function updateHandler(request, reply) {
   const { cartId, variantId, quantity } = mutateSchema.parse(request.body);
   const cart = await cartService.updateItem(
     request.server.prisma,
-    request.server.redis,
     store.id,
     cartId,
     variantId,
@@ -59,7 +57,6 @@ async function applyDiscountHandler(request, reply) {
   const { cartId, code } = discountSchema.parse(request.body);
   const cart = await cartService.applyDiscountCode(
     request.server.prisma,
-    request.server.redis,
     store.id,
     cartId,
     code,
@@ -71,7 +68,7 @@ async function applyDiscountHandler(request, reply) {
 async function removeDiscountHandler(request, reply) {
   const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
   const { cartId } = removeDiscountSchema.parse(request.body);
-  const cart = await cartService.removeDiscountCode(request.server.prisma, request.server.redis, store.id, cartId, store.handle);
+  const cart = await cartService.removeDiscountCode(request.server.prisma, store.id, cartId, store.handle);
   reply.send({ cart });
 }
 

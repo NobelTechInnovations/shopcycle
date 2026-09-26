@@ -25,7 +25,10 @@ const updateOrderStatusSchema = z.object({
 });
 
 const listOrdersQuerySchema = z.object({
-  status: z.enum(["all", "unfulfilled", "fulfilled", "cancelled"]).default("all"),
+  // "unfulfilled" also includes partly shipped orders — both still need work.
+  status: z.enum(["all", "unfulfilled", "fulfilled", "cancelled", "unpaid"]).default("all"),
+  // Order number ("1001" or "#1001") or part of the customer's name/email.
+  q: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });

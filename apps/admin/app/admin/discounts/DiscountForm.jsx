@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Form, Input, InputNumber, Select, Button, Card } from "antd";
-import { PageHeader } from "@shopcycle/ui";
+import { PageHeader, SaveBar } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 export function DiscountForm({ discount }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const isEdit = Boolean(discount);
 
   const initialValues = discount
@@ -39,9 +40,9 @@ export function DiscountForm({ discount }) {
 
   return (
     <div>
-      <PageHeader title={isEdit ? discount.code : "Create discount"} breadcrumb={<a href="/admin/discounts">Discounts</a>} />
+      <PageHeader title={isEdit ? discount.code : "Create discount"} backHref="/admin/discounts" />
 
-      <Form layout="vertical" initialValues={initialValues} onFinish={handleSubmit} requiredMark={false} className="max-w-lg">
+      <Form layout="vertical" initialValues={initialValues} onFinish={handleSubmit} onValuesChange={() => setDirty(true)} requiredMark={false} className="max-w-lg">
         <Card size="small" title="Discount" className="mb-6">
           <Form.Item name="code" label="Code" rules={[{ required: true, message: "Code is required" }]}>
             <Input placeholder="WELCOME10" style={{ textTransform: "uppercase" }} />
@@ -78,12 +79,13 @@ export function DiscountForm({ discount }) {
           </Form.Item>
         </Card>
 
-        <div className="mt-6 flex justify-end gap-2">
-          <Button onClick={() => router.push("/admin/discounts")}>Discard</Button>
-          <Button type="primary" htmlType="submit" loading={saving}>
-            {isEdit ? "Save" : "Create discount"}
-          </Button>
-        </div>
+        <SaveBar
+          dirty={dirty}
+          isNew={!isEdit}
+          saving={saving}
+          saveLabel={isEdit ? "Save" : "Create discount"}
+          onDiscard={() => router.push("/admin/discounts")}
+        />
       </Form>
     </div>
   );

@@ -3,9 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Table, Input, Button } from "antd";
-import { Plus, Trash2, Layers } from "lucide-react";
-import { PageHeader, StatusBadge, EmptyState, useConfirmDialog } from "@shopcycle/ui";
+import { Table, Button } from "antd";
+import { Plus, Layers, Search } from "lucide-react";
+import {
+  PageHeader,
+  StatusBadge,
+  EmptyState,
+  ListCard,
+  Thumb,
+  SearchInput,
+  DeleteIconButton,
+  useConfirmDialog,
+} from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 export default function CollectionsPage() {
@@ -52,23 +61,35 @@ export default function CollectionsPage() {
     {
       title: "Collection",
       dataIndex: "title",
-      render: (title, row) => <Link href={`/admin/collections/${row.id}`}>{title}</Link>,
+      render: (title, row) => (
+        <div className="flex items-center gap-3 min-w-0">
+          <Thumb src={row.image} icon={<Layers size={16} strokeWidth={1.75} aria-hidden="true" />} />
+          <div className="min-w-0">
+            <Link
+              href={`/admin/collections/${row.id}`}
+              className="font-medium text-ink hover:underline block truncate"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {title}
+            </Link>
+            <span className="text-xs text-ink-muted font-mono">/collections/{row.slug}</span>
+          </div>
+        </div>
+      ),
     },
-    { title: "Status", dataIndex: "status", render: (s) => <StatusBadge status={s} /> },
-    { title: "Products", render: (_, row) => row.products.length },
+    {
+      title: "Products",
+      responsive: ["sm"],
+      width: 120,
+      align: "right",
+      render: (_, row) => <span className="tabular-nums">{row.products.length}</span>,
+    },
+    { title: "Status", dataIndex: "status", width: 130, render: (s) => <StatusBadge status={s} /> },
     {
       title: "",
-      width: 48,
-      render: (_, row) => (
-        <Button
-          type="text"
-          danger
-          size="small"
-          icon={<Trash2 size={14} aria-hidden="true" />}
-          aria-label={`Delete ${row.title}`}
-          onClick={() => handleDelete(row)}
-        />
-      ),
+      width: 56,
+      align: "right",
+      render: (_, row) => <DeleteIconButton label={`Delete ${row.title}`} onClick={() => handleDelete(row)} />,
     },
   ];
 
@@ -76,47 +97,53 @@ export default function CollectionsPage() {
     <div>
       <PageHeader
         title="Collections"
+        subtitle={
+          loading ? " " : `${total} ${total === 1 ? "collection" : "collections"}${q ? " match" : ""} · group products for menus and category pages`
+        }
         actions={
           <Link href="/admin/collections/new">
-            <Button type="primary" icon={<Plus size={14} aria-hidden="true" />}>
+            <Button type="primary" icon={<Plus size={15} aria-hidden="true" />}>
               Create collection
             </Button>
           </Link>
         }
       />
 
-      <div className="mb-4">
-        <Input.Search
-          placeholder="Search collections"
-          allowClear
-          className="max-w-xs"
-          onSearch={(v) => {
-            setPage(1);
-            setQ(v);
-          }}
-        />
-      </div>
-
-      <div className="bg-app-surface border border-app-border rounded-md">
+      <ListCard
+        toolbar={
+          <SearchInput
+            placeholder="Search collections"
+            onSearch={(v) => {
+              setPage(1);
+              setQ(v);
+            }}
+          />
+        }
+      >
         <Table
           rowKey="id"
+          scroll={{ x: "max-content" }}
           loading={loading}
           columns={columns}
           dataSource={collections}
-          pagination={{ current: page, pageSize, total, onChange: setPage, showSizeChanger: false }}
+          rowClassName="oy-row-link"
+          onRow={(row) => ({ onClick: () => router.push(`/admin/collections/${row.id}`) })}
+          pagination={total > pageSize && { current: page, pageSize, total, onChange: setPage, showSizeChanger: false }}
           locale={{
-            emptyText: (
+            emptyText: q ? (
+              <EmptyState icon={<Search />} title="No collections match" description="Try a different search." />
+            ) : (
               <EmptyState
-                icon={<Layers size={32} strokeWidth={1.5} />}
+                icon={<Layers />}
                 title="No collections yet"
-                description="Group products together to power your storefront's category pages."
+                description="Group products together — they power your storefront's menu, homepage sections, and category pages."
                 actionLabel="Create collection"
                 onAction={() => router.push("/admin/collections/new")}
               />
             ),
           }}
         />
-      </div>
+      </ListCard>
     </div>
   );
 }

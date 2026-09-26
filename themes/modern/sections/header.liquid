@@ -20,7 +20,7 @@
         <button type="submit" aria-label="Search">{% render 'snippets/icon', icon: 'search', class: 'icon icon--sm' %}</button>
       </form>
     {% endif %}
-    <a href="{{ routes.root_url }}" class="site-header__icon-link" aria-label="Account">
+    <a href="{{ routes.account_url | default: routes.root_url }}" class="site-header__icon-link" aria-label="Account">
       {% render 'snippets/icon', icon: 'user', class: 'icon icon--sm' %}
     </a>
     <a href="{{ routes.root_url }}" class="site-header__icon-link" aria-label="Wishlist, 0 items">

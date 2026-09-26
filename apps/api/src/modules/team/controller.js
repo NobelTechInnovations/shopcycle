@@ -1,15 +1,8 @@
 const { HttpError } = require("@shopcycle/utils");
 const { inviteTeamMemberSchema, updateTeamMemberRoleSchema, acceptInvitationSchema } = require("@shopcycle/validation");
-const { env } = require("../../config/env");
+const { setSellerSession } = require("../../lib/session");
 const service = require("./service");
 
-const cookieOptions = {
-  httpOnly: true,
-  sameSite: "lax",
-  secure: env.NODE_ENV === "production",
-  path: "/",
-  maxAge: 60 * 60 * 24 * 7,
-};
 
 function assertCanManageTeam(request) {
   if (request.storeRole === "staff") {
@@ -51,8 +44,7 @@ async function cancelInvitationHandler(request, reply) {
 async function acceptInvitationHandler(request, reply) {
   const body = acceptInvitationSchema.parse(request.body);
   const { user } = await service.acceptInvitation(request.server.prisma, body);
-  const token = request.server.jwt.sign({ userId: user.id });
-  reply.setCookie(env.COOKIE_NAME, token, cookieOptions);
+  setSellerSession(reply, request.server, user, null);
   reply.code(201).send({ user: { id: user.id, name: user.name, email: user.email } });
 }
 

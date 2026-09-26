@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, Button, Modal, Form, Input, InputNumber, Select, Switch, Tag, App } from "antd";
-import { Plus, Trash2 } from "lucide-react";
-import { useConfirmDialog, PageHeader, AppIcon } from "@shopcycle/ui";
+import { Plus, Trash2, Crown, Lock } from "lucide-react";
+import { useConfirmDialog, PageHeader, AppIcon, useHasMounted } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 // A handful of apps have a full dedicated panel (Connect flow, campaign
@@ -112,6 +112,7 @@ function SettingsField({ field }) {
 }
 
 export default function AppsPage() {
+  const mounted = useHasMounted();
   const { message } = App.useApp();
   const { confirmDialog } = useConfirmDialog();
   const [apps, setApps] = useState([]);
@@ -139,10 +140,13 @@ export default function AppsPage() {
     form.setFieldsValue(app.settings || {});
   }
 
-  async function handleInstall(values) {
+  // `app` defaults to the one open in the Configure modal; apps with no
+  // settings (Meta Ads, WhatsApp) install straight from their card and
+  // pass themselves in — there's no modal, so `configuring` is null then.
+  async function handleInstall(values, app = configuring) {
     try {
-      await apiFetch(`/api/apps/${configuring.key}/install`, { method: "POST", body: { settings: values } });
-      message.success(`${configuring.name} installed`);
+      await apiFetch(`/api/apps/${app.key}/install`, { method: "POST", body: { settings: values } });
+      message.success(`${app.name} installed`);
       setConfiguring(null);
       form.resetFields();
       load();
@@ -167,43 +171,60 @@ export default function AppsPage() {
   return (
     <div>
       <PageHeader title="Apps" />
+      <p className="text-sm text-ink-muted -mt-3 mb-6">
+        Add features to your store. Premium apps are included with the Premium plan.
+      </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {apps.map((app) => (
-          <Card key={app.id} size="small" loading={loading}>
-            <div className="flex items-start justify-between mb-2">
-              <div className="w-9 h-9 rounded-md bg-app-bg border border-app-border flex items-center justify-center">
-                <AppIcon iconKey={app.iconKey} size={18} className="text-ink" />
+          <Card
+            key={app.id}
+            size="small"
+            loading={loading}
+            className="!shadow-card hover:!shadow-raised transition-shadow"
+            styles={{ body: { padding: 18, height: "100%", display: "flex", flexDirection: "column" } }}
+          >
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-app-bg border border-app-border flex items-center justify-center">
+                <AppIcon iconKey={app.iconKey} size={19} className="text-ink" />
               </div>
-              {app.installed && <Tag color="green">Installed</Tag>}
+              <div className="flex gap-1.5">
+                {app.premium && (
+                  <Tag className="!mr-0 !border-0 !bg-accent-soft !text-accent inline-flex items-center gap-1">
+                    <Crown size={11} aria-hidden="true" /> Premium
+                  </Tag>
+                )}
+                {app.installed && (
+                  <Tag color="success" className="!mr-0">
+                    Installed
+                  </Tag>
+                )}
+              </div>
             </div>
-            <p className="font-medium m-0">{app.name}</p>
-            <p className="text-sm text-ink-muted mt-1 mb-3">{app.description}</p>
-            <div className="flex gap-2">
-              {app.installed ? (
+            <p className="font-semibold text-[15px] text-ink m-0">{app.name}</p>
+            <p className="text-[13px] text-ink-muted mt-1 mb-4 leading-relaxed line-clamp-3">{app.description}</p>
+            <div className="flex gap-2 mt-auto">
+              {app.locked && !app.installed ? (
+                <Link href="/admin/settings/billing">
+                  <Button icon={<Lock size={13} aria-hidden="true" />}>Upgrade to install</Button>
+                </Link>
+              ) : app.installed ? (
                 <>
                   {DEDICATED_PANELS[app.key] ? (
                     <Link href={DEDICATED_PANELS[app.key]}>
-                      <Button size="small" type="primary">
-                        Manage
-                      </Button>
+                      <Button type="primary">Open</Button>
                     </Link>
                   ) : (
-                    app.settingsSchema.length > 0 && (
-                      <Button size="small" onClick={() => openConfigure(app)}>
-                        Configure
-                      </Button>
-                    )
+                    app.settingsSchema.length > 0 && <Button onClick={() => openConfigure(app)}>Configure</Button>
                   )}
-                  <Button size="small" danger onClick={() => handleUninstall(app)}>
+                  <Button danger type="text" onClick={() => handleUninstall(app)}>
                     Remove
                   </Button>
                 </>
               ) : (
                 <Button
-                  size="small"
                   type="primary"
-                  onClick={() => (app.settingsSchema.length > 0 ? openConfigure(app) : handleInstall({}))}
+                  onClick={() => (app.settingsSchema.length > 0 ? openConfigure(app) : handleInstall({}, app))}
                 >
                   Install
                 </Button>
@@ -213,20 +234,22 @@ export default function AppsPage() {
         ))}
       </div>
 
-      <Modal
-        title={configuring ? `Configure ${configuring.name}` : ""}
-        open={Boolean(configuring)}
-        onCancel={() => setConfiguring(null)}
-        onOk={() => form.submit()}
-        okText={configuring?.installed ? "Save" : "Install"}
-        forceRender
-      >
-        <Form layout="vertical" form={form} onFinish={handleInstall} requiredMark={false}>
-          {configuring?.settingsSchema.map((field) => (
-            <SettingsField key={field.id} field={field} />
-          ))}
-        </Form>
-      </Modal>
+      {mounted && (
+        <Modal
+          title={configuring ? `Configure ${configuring.name}` : ""}
+          open={Boolean(configuring)}
+          onCancel={() => setConfiguring(null)}
+          onOk={() => form.submit()}
+          okText={configuring?.installed ? "Save" : "Install"}
+          forceRender
+        >
+          <Form layout="vertical" form={form} onFinish={handleInstall} requiredMark={false}>
+            {configuring?.settingsSchema.map((field) => (
+              <SettingsField key={field.id} field={field} />
+            ))}
+          </Form>
+        </Modal>
+      )}
     </div>
   );
 }

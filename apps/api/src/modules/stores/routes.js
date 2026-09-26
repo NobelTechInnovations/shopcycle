@@ -14,6 +14,9 @@ async function storeRoutes(fastify) {
   fastify.get("/billing", controller.getBillingHandler);
   fastify.post("/subscribe", controller.subscribeHandler);
   fastify.post("/subscribe/verify", controller.subscribeVerifyHandler);
+  fastify.delete("/plan/pending", controller.cancelPendingPlanHandler);
+  fastify.patch("/billing/details", controller.updateBillingDetailsHandler);
+  fastify.get("/invoices/:id", controller.getInvoiceHandler);
 }
 
 module.exports = storeRoutes;

@@ -62,8 +62,11 @@ function deleteInvitation(prisma, id) {
   return prisma.invitation.delete({ where: { id } });
 }
 
+/** Case-insensitive, same as login (auth/service.js) — inviting
+ * "Bob@x.com" must find the existing "bob@x.com" account instead of
+ * creating a duplicate. */
 function findUserByEmail(prisma, email) {
-  return prisma.user.findUnique({ where: { email } });
+  return prisma.user.findFirst({ where: { email: { equals: String(email).trim().toLowerCase(), mode: "insensitive" } } });
 }
 
 module.exports = {

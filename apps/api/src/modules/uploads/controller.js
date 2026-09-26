@@ -7,7 +7,6 @@ async function uploadHandler(request, reply) {
   const buffer = await data.toBuffer();
   const file = await service.saveUpload(request.server.prisma, request.store.id, {
     filename: data.filename,
-    mimetype: data.mimetype,
     buffer,
   });
   reply.code(201).send({ file });

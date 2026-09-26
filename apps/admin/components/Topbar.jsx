@@ -2,11 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Input, Dropdown, Avatar, Modal, Form, App } from "antd";
-import { Search, LogOut, User as UserIcon, Store, Plus, ShieldCheck, Check } from "lucide-react";
+import { Input, Dropdown, Modal, Form, App, Button } from "antd";
+import {
+  Search,
+  LogOut,
+  Store,
+  Plus,
+  ShieldCheck,
+  Check,
+  ChevronsUpDown,
+  ExternalLink,
+  MonitorSmartphone,
+  Menu,
+} from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { storefrontUrlFor, initials } from "@/lib/storefront";
 
-export function Topbar({ user, store }) {
+export function Topbar({ user, store, onOpenNav }) {
   const router = useRouter();
   const { message } = App.useApp();
   const [stores, setStores] = useState([]);
@@ -23,6 +35,20 @@ export function Topbar({ user, store }) {
     await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
+  }
+
+  function handleLogoutEverywhere() {
+    Modal.confirm({
+      title: "Sign out of all devices?",
+      content: "Every session on your account ends — on this browser, your phone, and anywhere else you're signed in.",
+      okText: "Sign out everywhere",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await apiFetch("/api/auth/logout-everywhere", { method: "POST" });
+        router.push("/login");
+        router.refresh();
+      },
+    });
   }
 
   async function handleSwitch(storeId) {
@@ -64,6 +90,17 @@ export function Topbar({ user, store }) {
   ];
 
   const accountMenuItems = [
+    {
+      key: "who",
+      disabled: true,
+      label: (
+        <div className="py-0.5">
+          <div className="text-sm font-medium text-ink">{user?.name}</div>
+          <div className="text-xs text-ink-muted">{user?.email}</div>
+        </div>
+      ),
+    },
+    { type: "divider" },
     ...(user?.isSuperAdmin
       ? [
           {
@@ -77,33 +114,64 @@ export function Topbar({ user, store }) {
         ]
       : []),
     { key: "logout", label: "Log out", icon: <LogOut size={14} aria-hidden="true" />, onClick: handleLogout },
+    {
+      key: "logout-all",
+      label: "Sign out of all devices",
+      icon: <MonitorSmartphone size={14} aria-hidden="true" />,
+      onClick: handleLogoutEverywhere,
+    },
   ];
 
   return (
-    <header className="h-14 border-b border-app-border bg-app-surface flex items-center justify-between px-4 sticky top-0 z-10">
-      <div className="flex items-center gap-2 flex-1 max-w-md text-ink-muted">
-        <Search size={16} aria-hidden="true" />
-        <Input variant="borderless" placeholder="Search" aria-label="Search" />
-      </div>
-      <div className="flex items-center gap-3">
+    <header className="print:hidden h-14 border-b border-app-border bg-app-surface/85 backdrop-blur flex items-center justify-between gap-3 px-3 sm:px-6 sticky top-0 z-10">
+      {onOpenNav && (
+        <button
+          type="button"
+          onClick={onOpenNav}
+          aria-label="Open menu"
+          className="lg:hidden w-10 h-10 -ml-1 rounded-md flex items-center justify-center text-ink bg-transparent border-0 cursor-pointer hover:bg-app-bg"
+        >
+          <Menu size={20} aria-hidden="true" />
+        </button>
+      )}
+      <label className="hidden sm:flex items-center gap-2 flex-1 max-w-md h-9 px-3 rounded-md bg-app-bg border border-transparent text-ink-muted focus-within:border-accent/40 focus-within:bg-app-surface transition-colors">
+        <Search size={15} aria-hidden="true" />
+        <Input variant="borderless" placeholder="Search" aria-label="Search" className="!px-0" />
+      </label>
+      <div className="flex items-center gap-2">
+        {store && (
+          <Button
+            href={storefrontUrlFor(store)}
+            target="_blank"
+            rel="noopener noreferrer"
+            icon={<ExternalLink size={14} aria-hidden="true" />}
+            className="hidden md:inline-flex"
+          >
+            View store
+          </Button>
+        )}
         {store && (
           <Dropdown menu={{ items: storeMenuItems }} placement="bottomRight" trigger={["click"]}>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-sm text-ink-muted cursor-pointer hover:text-ink"
+              className="flex items-center gap-2 h-9 pl-1.5 pr-2.5 rounded-md border border-app-border bg-app-surface text-sm text-ink cursor-pointer hover:bg-app-bg transition-colors"
+              aria-label={`Current store: ${store.name}. Switch store`}
             >
-              <Store size={14} aria-hidden="true" />
-              <span className="hidden sm:inline">{store.name}</span>
+              <span className="w-6 h-6 rounded-[7px] bg-brand-gradient text-white text-[11px] font-semibold flex items-center justify-center">
+                {initials(store.name)}
+              </span>
+              <span className="hidden sm:inline max-w-[140px] truncate font-medium">{store.name}</span>
+              <ChevronsUpDown size={14} className="text-ink-subtle" aria-hidden="true" />
             </button>
           </Dropdown>
         )}
         <Dropdown menu={{ items: accountMenuItems }} placement="bottomRight" trigger={["click"]}>
           <button
             type="button"
-            className="flex items-center gap-2 cursor-pointer rounded-full"
+            className="w-9 h-9 rounded-full bg-ink text-white text-xs font-semibold flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
             aria-label={`Account menu for ${user?.name || "account"}`}
           >
-            <Avatar size={28} icon={<UserIcon size={14} aria-hidden="true" />} />
+            {initials(user?.name)}
           </button>
         </Dropdown>
       </div>

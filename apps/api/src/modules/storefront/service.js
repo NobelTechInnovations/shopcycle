@@ -7,12 +7,101 @@ const {
   serializeProduct,
   serializeCollection,
 } = require("@shopcycle/theme-engine");
+const path = require("path");
 const { env } = require("../../config/env");
+const { THEMES_ROOT } = require("../../config/paths");
+const { loadThemePackage } = require("../themes/file-loader");
 const repository = require("./repository");
 const cartService = require("../cart/service");
 const checkoutService = require("../checkout/service");
 const appsService = require("../apps/service");
 const { computeAccessState, isStorefrontBlocked } = require("../billing/access");
+const shopperService = require("../shopper/service");
+const { FULL_INCLUDE } = require("../orders/operations");
+const { publicOrder } = require("../orders/public");
+const { ensureStatusToken } = require("../orders/notify");
+const { esc } = require("../../emails/templates");
+
+/**
+ * LiquidJS doesn't HTML-escape output (Shopify's Liquid doesn't either —
+ * themes print raw HTML on purpose). So anything that came from a URL or
+ * from a shopper is escaped HERE, before it enters the page context:
+ * error/notice messages and search terms arrive in the query string, and
+ * without this a crafted link like ?checkoutError=<script>… would run
+ * script on the store's own domain.
+ */
+const safe = (value) => (value === null || value === undefined || value === "" ? value || null : esc(value));
+
+/**
+ * Each store has its own editable copy of its theme, made when the theme
+ * was installed. Pages added to the platform later (account, sign-in,
+ * order status) aren't in older copies — so any file a store's copy lacks
+ * is taken from the master theme it came from. A merchant can still
+ * override any of them by adding the file in the code editor.
+ */
+const masterCache = new Map();
+async function masterFiles(handle) {
+  if (!/^[a-z0-9-]+$/.test(handle || "")) return {};
+  if (!masterCache.has(handle)) {
+    masterCache.set(
+      handle,
+      loadThemePackage(path.join(THEMES_ROOT, handle))
+        .then(filesArrayToMap)
+        .catch(() => ({}))
+    );
+  }
+  return masterCache.get(handle);
+}
+
+function serializeCustomer(customer) {
+  if (!customer) return null;
+  // Everything here was typed by the shopper — escaped for the page.
+  return {
+    id: customer.id,
+    name: safe(customer.name),
+    first_name: safe(String(customer.name || "").split(" ")[0]),
+    email: safe(customer.email),
+    phone: safe(customer.phone),
+    address1: safe(customer.address1),
+    address2: safe(customer.address2),
+    city: safe(customer.city),
+    province: safe(customer.province),
+    zip: safe(customer.zip),
+    country: safe(customer.country),
+    accepts_marketing: customer.acceptsEmailMarketing,
+  };
+}
+
+/** Theme-independent checkout helpers, added to whatever checkout page
+ * the store's theme renders: fills in a signed-in shopper's saved details,
+ * and records the email as it's typed so an abandoned checkout can be
+ * followed up (see checkout/abandoned.js). Progressive enhancement — the
+ * checkout works the same without it. */
+function checkoutEnhancements(routes, customer) {
+  const data = {
+    contactUrl: `${routes.checkout_url}/contact`,
+    prefill: customer
+      ? {
+          email: customer.email,
+          phone: customer.phone,
+          shippingName: customer.name,
+          shippingAddress1: customer.address1,
+          shippingAddress2: customer.address2,
+          shippingCity: customer.city,
+          shippingProvince: customer.province,
+          shippingZip: customer.zip,
+          shippingCountry: customer.country,
+        }
+      : {},
+  };
+  const json = JSON.stringify(data).replace(/</g, "\\u003c");
+  return `<script>(function(){var d=${json};var f=document.querySelector('form[action$="/checkout"]')||document.querySelector("form");if(!f)return;
+Object.keys(d.prefill).forEach(function(k){var v=d.prefill[k];var el=f.elements[k];if(!v||!el||el.value)return;if(el.tagName==="SELECT"){for(var i=0;i<el.options.length;i++){if(el.options[i].value===v){el.value=v;}}}else{el.value=v;}});
+var sent="";function capture(){var e=f.elements.email;if(!e)return;var v=(e.value||"").trim();if(!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(v)||v===sent)return;sent=v;var n=f.elements.shippingName;
+try{fetch(d.contactUrl,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:v,name:n?n.value:""}),keepalive:true});}catch(err){}}
+if(f.elements.email){f.elements.email.addEventListener("change",capture);f.elements.email.addEventListener("blur",capture);capture();}
+if(f.elements.shippingName){f.elements.shippingName.addEventListener("change",function(){sent="";capture();});}})();</script>`;
+}
 
 async function loadStoreOrThrow(prisma, handle) {
   const store = await repository.getStoreByHandle(prisma, handle);
@@ -77,11 +166,11 @@ function buildLinklists(menus, routes) {
  * of which template is being rendered — cheap enough at this store's scale
  * (see the repository functions' doc note on eager-loading), and it keeps
  * this function the single place that knows the full storefront data shape. */
-async function buildGlobalContext(prisma, redis, store, { slug, cartId, discountError, checkoutError, rootless } = {}) {
+async function buildGlobalContext(prisma, store, { slug, cartId, discountError, checkoutError, rootless, customer = null } = {}) {
   const [products, collections, cart, menus, apps] = await Promise.all([
     repository.getAllActiveProducts(prisma, store.id),
     repository.getAllActiveCollections(prisma, store.id),
-    cartService.getCart(prisma, redis, store.id, cartId, store.handle),
+    cartService.getCart(prisma, store.id, cartId, store.handle),
     repository.getMenus(prisma, store.id),
     appsService.getInstalledAppsContext(prisma, store.id),
   ]);
@@ -103,16 +192,23 @@ async function buildGlobalContext(prisma, redis, store, { slug, cartId, discount
   const routes = buildRoutes(store.handle, { rootless });
 
   return {
-    shop: { name: store.name, handle: store.handle, currency: store.currency, locale: "en" },
+    shop: {
+      name: store.name,
+      handle: store.handle,
+      currency: store.currency,
+      locale: "en",
+      support_email: store.supportEmail || null,
+      support_phone: store.supportPhone || null,
+    },
     routes,
     all_products,
     collections: collectionsMap,
     cart,
-    customer: null,
+    customer: serializeCustomer(customer),
     linklists: buildLinklists(menus, routes),
     page_title: store.name,
-    discount_error: discountError || null,
-    checkout_error: checkoutError || null,
+    discount_error: safe(discountError),
+    checkout_error: safe(checkoutError),
     payment_methods: checkoutService.availablePaymentMethods(),
     apps,
   };
@@ -120,7 +216,6 @@ async function buildGlobalContext(prisma, redis, store, { slug, cartId, discount
 
 async function renderPage(
   prisma,
-  redis,
   {
     handle,
     templateName,
@@ -135,22 +230,37 @@ async function renderPage(
     orderId,
     searchQuery,
     rootless,
+    // Phase 4 — shopper accounts and order status.
+    fastify,
+    shopperToken,
+    orderToken,
+    loginStep,
+    loginEmail,
+    formError,
+    notice,
   }
 ) {
   const store = await loadStoreOrThrow(prisma, handle);
   const theme = await resolveTheme(prisma, store, themeId);
-  // Code-editor live preview: unsaved file edits merge over the persisted
-  // theme files. This is what makes editing a section's .liquid source
-  // (not just template.json structure) show up in the preview instantly.
-  const filesByPath = { ...filesArrayToMap(theme.files), ...(filesOverride || {}) };
+  // Master theme files fill in anything this store's copy lacks (see
+  // masterFiles); then the store's own files; then, for the code editor's
+  // live preview, unsaved edits over the top.
+  const filesByPath = { ...(await masterFiles(theme.handle)), ...filesArrayToMap(theme.files), ...(filesOverride || {}) };
 
-  const globalContext = await buildGlobalContext(prisma, redis, store, {
+  const customer = fastify && shopperToken ? await shopperService.customerFromToken(fastify, store, shopperToken) : null;
+  // (The checkout prefill below uses the raw record: it goes into JSON and
+  // input values, where HTML-escaping would show "&amp;" to the shopper.)
+
+  const globalContext = await buildGlobalContext(prisma, store, {
     slug,
     cartId,
     discountError,
     checkoutError,
     rootless,
+    customer,
   });
+  globalContext.form_error = safe(formError);
+  globalContext.notice = safe(notice);
 
   if (templateName === "product") {
     if (!slug) throw new HttpError(400, "Missing product slug");
@@ -173,8 +283,58 @@ async function renderPage(
   }
   if (templateName === "order-confirmation") {
     if (!orderId) throw new HttpError(400, "Missing order");
-    globalContext.order = await checkoutService.getOrderForConfirmation(prisma, store.id, orderId);
+    const placed = await checkoutService.getOrderForConfirmation(prisma, store.id, orderId);
+    globalContext.order = {
+      ...placed,
+      shippingName: safe(placed.shippingName),
+      shippingAddress1: safe(placed.shippingAddress1),
+      shippingAddress2: safe(placed.shippingAddress2),
+      shippingCity: safe(placed.shippingCity),
+      shippingProvince: safe(placed.shippingProvince),
+      shippingZip: safe(placed.shippingZip),
+      shippingCountry: safe(placed.shippingCountry),
+      email: safe(placed.email),
+      phone: safe(placed.phone),
+    };
     globalContext.page_title = "Order confirmed";
+  }
+  if (templateName === "order-status") {
+    const order = orderToken
+      ? await prisma.order.findFirst({ where: { storeId: store.id, statusToken: String(orderToken) }, include: FULL_INCLUDE })
+      : null;
+    if (!order) throw new HttpError(404, "We couldn't find that order. Check the link in your email.");
+    const base = `${globalContext.routes.orders_url}/${order.statusToken}`;
+    globalContext.order = publicOrder(store, order, { statusUrl: base, invoiceUrl: `${base}/invoice` });
+    globalContext.order.return_url = `${base}/return`;
+    globalContext.page_title = `Order #${order.orderNumber}`;
+  }
+  if (templateName === "order-lookup") {
+    globalContext.page_title = "Find your order";
+  }
+  if (templateName === "account-login") {
+    globalContext.login = {
+      step: loginStep === "code" ? "code" : "email",
+      email: safe(loginEmail) || "",
+    };
+    globalContext.page_title = "Sign in";
+  }
+  if (templateName === "account") {
+    if (customer) {
+      const orders = await prisma.order.findMany({
+        where: { storeId: store.id, OR: [{ customerId: customer.id }, { email: { equals: customer.email, mode: "insensitive" } }] },
+        include: FULL_INCLUDE,
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+      const list = [];
+      for (const o of orders) {
+        const token = await ensureStatusToken(prisma, o);
+        list.push(publicOrder(store, o, { statusUrl: `${globalContext.routes.orders_url}/${token}` }));
+      }
+      globalContext.customer.orders = list;
+      globalContext.customer.orders_count = list.length;
+    }
+    globalContext.page_title = "Your account";
   }
   if (templateName === "search") {
     // No separate index to query — `all_products` is already every active
@@ -184,14 +344,14 @@ async function renderPage(
     const matches = q
       ? Object.values(globalContext.all_products).filter((p) => p.title.toLowerCase().includes(q.toLowerCase()))
       : [];
-    globalContext.search = { query: q, results: matches, result_count: matches.length };
+    globalContext.search = { query: safe(q) || "", results: matches, result_count: matches.length };
     // Reuses templates/search.json -> sections/product-grid.liquid, which
     // reads `collection.products` when it has no collection setting of its
     // own — a synthetic "collection" is the whole mechanism, no changes
     // needed to that section for search to work.
     globalContext.collection = {
       id: "search",
-      title: q ? `Search results for "${q}"` : "Search",
+      title: q ? `Search results for "${esc(q)}"` : "Search",
       slug: "search",
       products: matches,
     };
@@ -214,6 +374,10 @@ async function renderPage(
   // other, so unsaved JS previews only after Save — a limitation, not a bug.
   if (filesOverride?.["assets/theme.css"]) {
     html = html.replace("</head>", `<style>${filesOverride["assets/theme.css"]}</style></head>`);
+  }
+  if (templateName === "checkout" && !templateOverride) {
+    const script = checkoutEnhancements(globalContext.routes, customer);
+    html = html.includes("</body>") ? html.replace("</body>", `${script}</body>`) : html + script;
   }
 
   return { html, cartId: globalContext.cart.cartId };

@@ -6,6 +6,7 @@
   "scripts": {
     "generate": "dotenv -e ../../.env -- prisma generate --schema=prisma/schema.prisma",
     "migrate": "dotenv -e ../../.env -- prisma migrate dev --schema=prisma/schema.prisma",
+    "push": "dotenv -e ../../.env -- prisma db push --schema=prisma/schema.prisma",
     "studio": "dotenv -e ../../.env -- prisma studio --schema=prisma/schema.prisma",
     "seed": "dotenv -e ../../.env -- node prisma/seed.js"
   },

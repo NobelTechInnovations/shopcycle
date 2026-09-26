@@ -1,0 +1,71 @@
+{% render 'snippets/oy-customer-styles' %}
+<section class="oy-page oy-page--wide">
+  {% if customer %}
+    <div class="oy-head">
+      <div>
+        <p class="oy-eyebrow">Your account</p>
+        <h1 class="oy-title" style="margin:0">Hi, {{ customer.first_name }}</h1>
+        <p class="oy-muted" style="margin:6px 0 0">{{ customer.email }}</p>
+      </div>
+      <form method="post" action="{{ routes.account_logout_url }}">
+        <button type="submit" class="oy-btn oy-btn--ghost">Sign out</button>
+      </form>
+    </div>
+
+    {% if notice %}<p class="oy-alert oy-alert--ok" role="status">{{ notice }}</p>{% endif %}
+    {% if form_error %}<p class="oy-alert oy-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+
+    <div class="oy-grid">
+      <div class="oy-card">
+        <h2>Orders</h2>
+        {% if customer.orders.size > 0 %}
+          {% for order in customer.orders %}
+            <a class="oy-order-link" href="{{ order.statusUrl }}">
+              <div style="min-width:0">
+                <div><strong class="oy-order-name">Order {{ order.name }}</strong> <span class="oy-muted oy-small">· {{ order.date }}</span></div>
+                <div class="oy-muted oy-small" style="margin-top:2px">{{ order.items.size }} item{% if order.items.size != 1 %}s{% endif %}</div>
+              </div>
+              <div style="text-align:right">
+                <div class="oy-num"><strong>{{ order.total | money }}</strong></div>
+                <span class="oy-pill oy-pill--{{ order.status.key }}" style="margin-top:4px">{{ order.status.label }}</span>
+              </div>
+            </a>
+          {% endfor %}
+        {% else %}
+          <p class="oy-muted" style="margin:0 0 16px">You haven't placed any orders yet.</p>
+          <a class="oy-btn" href="{{ routes.all_products_url }}">Start shopping</a>
+        {% endif %}
+      </div>
+
+      <div class="oy-card">
+        <h2>Your details</h2>
+        <p class="oy-muted oy-small" style="margin:-6px 0 16px">Checkout fills these in for you.</p>
+        <form method="post" action="{{ routes.account_update_url }}">
+          <label class="oy-field"><span>Name</span><input class="oy-input" name="name" required autocomplete="name" value="{{ customer.name }}"></label>
+          <label class="oy-field"><span>Phone</span><input class="oy-input" name="phone" type="tel" autocomplete="tel" value="{{ customer.phone }}"></label>
+          <label class="oy-field"><span>Address</span><input class="oy-input" name="address1" autocomplete="address-line1" value="{{ customer.address1 }}"></label>
+          <label class="oy-field"><span>Apartment, suite, etc.</span><input class="oy-input" name="address2" autocomplete="address-line2" value="{{ customer.address2 }}"></label>
+          <div class="oy-grid-2">
+            <label class="oy-field"><span>City</span><input class="oy-input" name="city" autocomplete="address-level2" value="{{ customer.city }}"></label>
+            <label class="oy-field"><span>State</span><input class="oy-input" name="province" autocomplete="address-level1" value="{{ customer.province }}"></label>
+            <label class="oy-field"><span>PIN code</span><input class="oy-input" name="zip" inputmode="numeric" autocomplete="postal-code" value="{{ customer.zip }}"></label>
+            <label class="oy-field"><span>Country</span><input class="oy-input" name="country" autocomplete="country" value="{{ customer.country | default: 'IN' }}"></label>
+          </div>
+          <label class="oy-check"><input type="checkbox" name="acceptsEmailMarketing" value="true" {% if customer.accepts_marketing %}checked{% endif %}> Email me about new arrivals and offers</label>
+          <button type="submit" class="oy-btn oy-btn--block">Save details</button>
+        </form>
+      </div>
+    </div>
+  {% else %}
+    <h1 class="oy-title">Your account</h1>
+    <p class="oy-lede">Sign in to see your orders and save your details for checkout.</p>
+    <a class="oy-btn" href="{{ routes.account_login_url }}">Sign in</a>
+  {% endif %}
+</section>
+
+{% schema %}
+{
+  "name": "Customer account",
+  "settings": []
+}
+{% endschema %}

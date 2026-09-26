@@ -14,6 +14,11 @@ async function renderHandler(request, reply) {
     path,
     q,
     domainMode,
+    orderToken,
+    loginStep,
+    loginEmail,
+    formError,
+    notice,
     utm_source: utmSource,
     utm_medium: utmMedium,
     utm_campaign: utmCampaign,
@@ -21,7 +26,7 @@ async function renderHandler(request, reply) {
     utm_content: utmContent,
   } = request.query;
 
-  const { html, cartId: resolvedCartId } = await service.renderPage(request.server.prisma, request.server.redis, {
+  const { html, cartId: resolvedCartId } = await service.renderPage(request.server.prisma, {
     handle,
     templateName: template,
     slug,
@@ -36,6 +41,15 @@ async function renderHandler(request, reply) {
     // internal /store/:handle preview path — every generated link should
     // then be root-relative, never leaking that internal path.
     rootless: domainMode === "1",
+    // The signed-in shopper, if any — forwarded by the storefront server
+    // from its HttpOnly cookie (see apps/storefront/lib/render.js).
+    fastify: request.server,
+    shopperToken: request.headers["x-shopper-token"],
+    orderToken,
+    loginStep,
+    loginEmail,
+    formError: typeof formError === "string" ? formError.slice(0, 300) : undefined,
+    notice: typeof notice === "string" ? notice.slice(0, 300) : undefined,
   });
 
   reply.header("content-type", "text/html; charset=utf-8");

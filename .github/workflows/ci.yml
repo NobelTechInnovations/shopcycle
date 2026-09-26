@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shopcycle
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d shopcycle"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6380:6379"]
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/shopcycle
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/shopcycle
+      REDIS_URL: redis://localhost:6380
+      API_PORT: 4100
+      # CI-only throwaway values — never used outside this job.
+      JWT_SECRET: ci-only-secret-not-used-anywhere-else-0123456789
+      DATA_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The package scripts load ../../.env via dotenv-cli; CI supplies the
+      # same variables through `env:` above, so an empty file satisfies it.
+      - name: Prepare env file
+        run: touch .env
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Syntax-check the API
+        run: find apps/api/src -name "*.js" -print0 | xargs -0 -n1 node --check
+
+      - name: Build web apps
+        run: pnpm build
+
+      - name: Create schema and seed
+        run: |
+          pnpm db:push
+          pnpm db:seed
+
+      - name: Smoke-test the API
+        env:
+          ADMIN_ORIGIN: http://localhost:3000
+          SUPER_ADMIN_ORIGIN: http://localhost:3003
+        run: |
+          node apps/api/src/server.js > api.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:4100/health && break; sleep 1; done
+          curl -sf http://localhost:4100/health
+          # Seeded store owner and platform admin can both sign in.
+          curl -sf -X POST http://localhost:4100/api/auth/login \
+            -H 'content-type: application/json' \
+            -d '{"email":"owner@shopcycle.test","password":"password123"}' > /dev/null
+          curl -sf -X POST http://localhost:4100/api/auth/super-admin-login \
+            -H 'content-type: application/json' \
+            -d '{"email":"admin@shopcycle.platform","password":"superadmin123"}' > /dev/null
+          echo "API smoke test passed"
+          # Security + checkout end-to-end checks (uploads, CSRF, lockout,
+          # rate limits, 2FA, session revocation, plan gating, cart/order).
+          bash apps/api/test/e2e-security.sh http://localhost:4100
+
+      # Platform billing against a mock Razorpay: subscribe, plan changes,
+      # commission, renewals, GST invoices, refunds, payment binding.
+      - name: Billing end-to-end checks
+        env:
+          ADMIN_ORIGIN: http://localhost:3000
+        run: node apps/api/test/e2e-billing.js
+
+      - name: Billing without Razorpay keys (test mode, production guard)
+        env:
+          ADMIN_ORIGIN: http://localhost:3000
+        run: node apps/api/test/e2e-billing-modes.js
+
+      - name: API log on failure
+        if: failure()
+        run: cat api.log || true

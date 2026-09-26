@@ -91,7 +91,7 @@ async function restoreRevisionHandler(request, reply) {
  * currently-saved state without requiring it to be active. */
 async function renderDraftHandler(request, reply) {
   const body = renderDraftSchema.parse(request.body);
-  const { html } = await storefrontService.renderPage(request.server.prisma, request.server.redis, {
+  const { html } = await storefrontService.renderPage(request.server.prisma, {
     handle: request.store.handle,
     themeId: request.params.id,
     templateName: body.template,

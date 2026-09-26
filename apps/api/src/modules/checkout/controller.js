@@ -6,7 +6,6 @@ async function getHandler(request, reply) {
   const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
   const context = await service.getCheckoutContext(
     request.server.prisma,
-    request.server.redis,
     store.id,
     request.query.cartId,
     store.handle
@@ -17,14 +16,10 @@ async function getHandler(request, reply) {
 async function placeOrderHandler(request, reply) {
   const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
   const body = checkoutSchema.parse(request.body);
-  const result = await service.placeOrder(
-    request.server.prisma,
-    request.server.redis,
-    store.id,
-    body.cartId,
-    store.handle,
-    body
-  );
+  const result = await service.placeOrder(request.server.prisma, store.id, body.cartId, store.handle, body, {
+    store,
+    log: request.log,
+  });
   reply.code(201).send(result);
 }
 
@@ -36,7 +31,7 @@ async function getOrderHandler(request, reply) {
 
 async function verifyHandler(request, reply) {
   const body = verifyRazorpayPaymentSchema.parse(request.body);
-  const order = await service.verifyRazorpayPayment(request.server.prisma, body);
+  const order = await service.verifyRazorpayPayment(request.server.prisma, body, { log: request.log });
   reply.send({ order });
 }
 

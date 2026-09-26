@@ -5,7 +5,12 @@ const billingService = require("../billing/service");
  * never by anything else in the request. Always replies 200 once the
  * signature checks out, even if the event itself is one we ignore
  * (see handleWebhookEvent) — Razorpay retries on anything but 2xx, and
- * retrying an event we intentionally don't act on would just be noise. */
+ * retrying an event we intentionally don't act on would just be noise.
+ *
+ * Razorpay also retries events it isn't sure were delivered, so each event
+ * id is recorded once handled and a repeat is acknowledged without being
+ * processed again. The record is written only after handling succeeds, so
+ * a crash mid-way leaves the event retryable rather than lost. */
 async function razorpayWebhookHandler(request, reply) {
   const signature = request.headers["x-razorpay-signature"];
   if (!signature || !billingService.verifyWebhookSignature(request.rawBody, signature)) {
@@ -13,7 +18,20 @@ async function razorpayWebhookHandler(request, reply) {
     return;
   }
 
-  await billingService.handleWebhookEvent(request.server.prisma, request.body);
+  const { prisma } = request.server;
+  const eventId = request.headers["x-razorpay-event-id"];
+  if (eventId && (await prisma.processedWebhookEvent.findUnique({ where: { id: eventId } }))) {
+    reply.send({ ok: true, duplicate: true });
+    return;
+  }
+
+  await billingService.handleWebhookEvent(prisma, request.body, request.log);
+
+  if (eventId) {
+    await prisma.processedWebhookEvent
+      .create({ data: { id: eventId, event: String(request.body?.event || "unknown") } })
+      .catch(() => {}); // a concurrent delivery recorded it first — fine
+  }
   reply.send({ ok: true });
 }
 

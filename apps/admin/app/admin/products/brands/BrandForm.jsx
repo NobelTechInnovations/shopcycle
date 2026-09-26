@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Form, Input, Button, Card } from "antd";
-import { PageHeader } from "@shopcycle/ui";
+import { PageHeader, SaveBar } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 export function BrandForm({ brand }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const isEdit = Boolean(brand);
 
   const initialValues = brand ? { title: brand.title, image: brand.image } : {};
@@ -32,10 +33,10 @@ export function BrandForm({ brand }) {
     <div>
       <PageHeader
         title={isEdit ? brand.title : "Add brand"}
-        breadcrumb={<a href="/admin/products/brands">Brands</a>}
+        backHref="/admin/products/brands"
       />
 
-      <Form layout="vertical" initialValues={initialValues} onFinish={handleSubmit} requiredMark={false}>
+      <Form layout="vertical" initialValues={initialValues} onFinish={handleSubmit} onValuesChange={() => setDirty(true)} requiredMark={false}>
         <div className="max-w-xl">
           <Card size="small" title="Brand details">
             <Form.Item name="title" label="Title" rules={[{ required: true, message: "Title is required" }]}>
@@ -47,12 +48,13 @@ export function BrandForm({ brand }) {
           </Card>
         </div>
 
-        <div className="sticky bottom-0 -mx-6 mt-6 bg-app-surface border-t border-app-border px-6 py-3 flex justify-end gap-2">
-          <Button onClick={() => router.push("/admin/products/brands")}>Discard</Button>
-          <Button type="primary" htmlType="submit" loading={saving}>
-            {isEdit ? "Save" : "Add brand"}
-          </Button>
-        </div>
+        <SaveBar
+          dirty={dirty}
+          isNew={!isEdit}
+          saving={saving}
+          saveLabel={isEdit ? "Save" : "Add brand"}
+          onDiscard={() => router.push("/admin/products/brands")}
+        />
       </Form>
     </div>
   );

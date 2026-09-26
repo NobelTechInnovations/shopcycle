@@ -4,33 +4,41 @@ const discountService = require("../discounts/service");
 const shippingService = require("../shipping/service");
 const taxService = require("../taxes/service");
 
-const CART_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
-
-function redisKey(storeId, cartId) {
-  return `cart:${storeId}:${cartId}`;
-}
+const CART_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days, refreshed on every write
 
 function generateCartId() {
   return crypto.randomUUID();
 }
 
-async function readRaw(redis, storeId, cartId) {
-  if (!cartId) return { items: [], discountCode: null };
-  const raw = await redis.get(redisKey(storeId, cartId));
-  if (!raw) return { items: [], discountCode: null };
-  try {
-    const parsed = JSON.parse(raw);
-    return {
-      items: Array.isArray(parsed.items) ? parsed.items : [],
-      discountCode: parsed.discountCode || null,
-    };
-  } catch {
-    return { items: [], discountCode: null };
-  }
+/** Carts live in Postgres (CartSession) — see its doc comment in
+ * schema.prisma for why not Redis. A missing, expired, or unreadable cart
+ * reads as empty rather than erroring: a shopper should never see a
+ * broken page because their old cart cookie outlived its cart. */
+async function readRaw(prisma, storeId, cartId) {
+  const empty = { items: [], discountCode: null };
+  if (!cartId) return empty;
+  const row = await prisma.cartSession.findUnique({ where: { storeId_cartId: { storeId, cartId } } });
+  if (!row || row.expiresAt < new Date()) return empty;
+  const data = row.data || {};
+  return {
+    items: Array.isArray(data.items) ? data.items : [],
+    discountCode: data.discountCode || null,
+  };
 }
 
-function writeRaw(redis, storeId, cartId, data) {
-  return redis.set(redisKey(storeId, cartId), JSON.stringify(data), "EX", CART_TTL_SECONDS);
+async function writeRaw(prisma, storeId, cartId, data) {
+  const expiresAt = new Date(Date.now() + CART_TTL_MS);
+  const payload = { items: data.items || [], discountCode: data.discountCode || null };
+  await prisma.cartSession.upsert({
+    where: { storeId_cartId: { storeId, cartId } },
+    update: { data: payload, expiresAt },
+    create: { storeId, cartId, data: payload, expiresAt },
+  });
+  // Lazy sweep of abandoned carts — a handful of rows at a time on ~1% of
+  // writes keeps the table bounded without needing a scheduled job.
+  if (Math.random() < 0.01) {
+    prisma.cartSession.deleteMany({ where: { expiresAt: { lt: new Date() } } }).catch(() => {});
+  }
 }
 
 // Floating-point arithmetic on percentages (e.g. 299 * 0.1) produces
@@ -48,7 +56,7 @@ function round2(n) {
  * crashing the cart. Also resolves discount/shipping/tax against the
  * store's current configuration — see the ShippingZone/TaxRate model doc
  * comments for the "no checkout address yet" simplification this rests on. */
-async function hydrateCart(prisma, redis, storeId, cartId, raw) {
+async function hydrateCart(prisma, storeId, cartId, raw) {
   const variantIds = raw.items.map((i) => i.variantId);
   const variants = variantIds.length
     ? await prisma.productVariant.findMany({
@@ -80,7 +88,7 @@ async function hydrateCart(prisma, redis, storeId, cartId, raw) {
   }
 
   if (changed) {
-    await writeRaw(redis, storeId, cartId, {
+    await writeRaw(prisma, storeId, cartId, {
       items: raw.items.filter((i) => variantsById[i.variantId]),
       discountCode: raw.discountCode,
     });
@@ -132,10 +140,10 @@ async function hydrateCart(prisma, redis, storeId, cartId, raw) {
   };
 }
 
-async function getCart(prisma, redis, storeId, cartId, handle) {
+async function getCart(prisma, storeId, cartId, handle) {
   const id = cartId || generateCartId();
-  const raw = await readRaw(redis, storeId, id);
-  const cart = await hydrateCart(prisma, redis, storeId, id, raw);
+  const raw = await readRaw(prisma, storeId, id);
+  const cart = await hydrateCart(prisma, storeId, id, raw);
   if (handle) cart.items.forEach((i) => (i.url = i.url.replace("__handle__", handle)));
   return cart;
 }
@@ -148,20 +156,20 @@ async function assertVariantBelongsToStore(prisma, storeId, variantId) {
   return variant;
 }
 
-async function addItem(prisma, redis, storeId, cartId, variantId, quantity, handle) {
+async function addItem(prisma, storeId, cartId, variantId, quantity, handle) {
   await assertVariantBelongsToStore(prisma, storeId, variantId);
   const id = cartId || generateCartId();
-  const raw = await readRaw(redis, storeId, id);
+  const raw = await readRaw(prisma, storeId, id);
   const existing = raw.items.find((i) => i.variantId === variantId);
   if (existing) existing.quantity += quantity;
   else raw.items.push({ variantId, quantity });
-  await writeRaw(redis, storeId, id, raw);
-  return getCart(prisma, redis, storeId, id, handle);
+  await writeRaw(prisma, storeId, id, raw);
+  return getCart(prisma, storeId, id, handle);
 }
 
-async function updateItem(prisma, redis, storeId, cartId, variantId, quantity, handle) {
+async function updateItem(prisma, storeId, cartId, variantId, quantity, handle) {
   if (!cartId) throw new HttpError(400, "Missing cart");
-  const raw = await readRaw(redis, storeId, cartId);
+  const raw = await readRaw(prisma, storeId, cartId);
   const idx = raw.items.findIndex((i) => i.variantId === variantId);
   if (quantity <= 0) {
     if (idx >= 0) raw.items.splice(idx, 1);
@@ -170,35 +178,35 @@ async function updateItem(prisma, redis, storeId, cartId, variantId, quantity, h
   } else {
     raw.items.push({ variantId, quantity });
   }
-  await writeRaw(redis, storeId, cartId, raw);
-  return getCart(prisma, redis, storeId, cartId, handle);
+  await writeRaw(prisma, storeId, cartId, raw);
+  return getCart(prisma, storeId, cartId, handle);
 }
 
-async function applyDiscountCode(prisma, redis, storeId, cartId, code, handle) {
+async function applyDiscountCode(prisma, storeId, cartId, code, handle) {
   if (!cartId) throw new HttpError(400, "Missing cart");
-  const raw = await readRaw(redis, storeId, cartId);
+  const raw = await readRaw(prisma, storeId, cartId);
   // Validate against the real current subtotal before saving, so an
   // invalid code never silently "applies."
-  const cartPreview = await hydrateCart(prisma, redis, storeId, cartId, raw);
+  const cartPreview = await hydrateCart(prisma, storeId, cartId, raw);
   await discountService.resolveApplicableDiscount(prisma, storeId, code, cartPreview.subtotal);
   raw.discountCode = code.toUpperCase().trim();
-  await writeRaw(redis, storeId, cartId, raw);
-  return getCart(prisma, redis, storeId, cartId, handle);
+  await writeRaw(prisma, storeId, cartId, raw);
+  return getCart(prisma, storeId, cartId, handle);
 }
 
-async function removeDiscountCode(prisma, redis, storeId, cartId, handle) {
+async function removeDiscountCode(prisma, storeId, cartId, handle) {
   if (!cartId) throw new HttpError(400, "Missing cart");
-  const raw = await readRaw(redis, storeId, cartId);
+  const raw = await readRaw(prisma, storeId, cartId);
   raw.discountCode = null;
-  await writeRaw(redis, storeId, cartId, raw);
-  return getCart(prisma, redis, storeId, cartId, handle);
+  await writeRaw(prisma, storeId, cartId, raw);
+  return getCart(prisma, storeId, cartId, handle);
 }
 
 /** Called once checkout successfully places a real order — the cart's job
  * is done, and leaving the old items in place would let the same cartId
  * "place" the same order again on a page back-navigation. */
-function clearCart(redis, storeId, cartId) {
-  return redis.del(redisKey(storeId, cartId));
+function clearCart(prisma, storeId, cartId) {
+  return prisma.cartSession.deleteMany({ where: { storeId, cartId } });
 }
 
 module.exports = {

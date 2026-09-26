@@ -4,9 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Table, Button } from "antd";
-import { Plus, Trash2, Navigation as NavigationIcon } from "lucide-react";
-import { PageHeader, EmptyState, useConfirmDialog } from "@shopcycle/ui";
+import { Plus, Navigation as NavigationIcon } from "lucide-react";
+import { PageHeader, EmptyState, ListCard, DeleteIconButton, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+
+// The handles themes look up by default — shown as a hint so a merchant
+// knows which menu drives which part of their store.
+const WHERE_USED = {
+  "main-menu": "Store header",
+  "footer-menu": "Store footer",
+  footer: "Store footer",
+};
 
 export default function ContentNavigationPage() {
   const router = useRouter();
@@ -31,7 +39,7 @@ export default function ContentNavigationPage() {
   function handleDelete(menu) {
     confirmDialog({
       title: `Delete "${menu.title}"?`,
-      description: "Any theme section pointing at this menu's handle will just show no links.",
+      description: "Any part of your theme using this menu will show no links until you pick another.",
       okText: "Delete",
       danger: true,
       onConfirm: async () => {
@@ -42,22 +50,47 @@ export default function ContentNavigationPage() {
   }
 
   const columns = [
-    { title: "Menu", dataIndex: "title", render: (t, row) => <Link href={`/admin/content/navigation/${row.id}`}>{t}</Link> },
-    { title: "Handle", dataIndex: "handle", render: (h) => <code className="text-xs">{h}</code> },
-    { title: "Items", render: (_, row) => row.items.length },
+    {
+      title: "Menu",
+      dataIndex: "title",
+      render: (t, row) => (
+        <div className="min-w-0">
+          <Link
+            href={`/admin/content/navigation/${row.id}`}
+            className="font-medium text-ink hover:underline block truncate"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {t}
+          </Link>
+          <span className="text-xs text-ink-muted">
+            {row.items.length === 0
+              ? "No links yet"
+              : row.items
+                  .slice(0, 4)
+                  .map((i) => i.label)
+                  .join(", ") + (row.items.length > 4 ? `, +${row.items.length - 4} more` : "")}
+          </span>
+        </div>
+      ),
+    },
+    {
+      title: "Handle",
+      responsive: ["sm"],
+      dataIndex: "handle",
+      width: 170,
+      render: (h) => <code className="text-xs bg-app-bg rounded px-1.5 py-0.5">{h}</code>,
+    },
+    {
+      title: "Shown in",
+      responsive: ["md"],
+      width: 150,
+      render: (_, row) => <span className="text-[13px] text-ink-muted">{WHERE_USED[row.handle] || "—"}</span>,
+    },
     {
       title: "",
-      width: 48,
-      render: (_, row) => (
-        <Button
-          type="text"
-          danger
-          size="small"
-          icon={<Trash2 size={14} aria-hidden="true" />}
-          aria-label={`Delete ${row.title}`}
-          onClick={() => handleDelete(row)}
-        />
-      ),
+      width: 56,
+      align: "right",
+      render: (_, row) => <DeleteIconButton label={`Delete ${row.title}`} onClick={() => handleDelete(row)} />,
     },
   ];
 
@@ -65,35 +98,39 @@ export default function ContentNavigationPage() {
     <div>
       <PageHeader
         title="Navigation"
+        subtitle="Menus for your store's header, footer, and anywhere else your theme shows links."
         actions={
           <Link href="/admin/content/navigation/new">
-            <Button type="primary" icon={<Plus size={14} aria-hidden="true" />}>
+            <Button type="primary" icon={<Plus size={15} aria-hidden="true" />}>
               Add menu
             </Button>
           </Link>
         }
       />
 
-      <div className="bg-app-surface border border-app-border rounded-md">
+      <ListCard>
         <Table
           rowKey="id"
+          scroll={{ x: "max-content" }}
           loading={loading}
           columns={columns}
           dataSource={menus}
+          rowClassName="oy-row-link"
+          onRow={(row) => ({ onClick: () => router.push(`/admin/content/navigation/${row.id}`) })}
           pagination={false}
           locale={{
             emptyText: (
               <EmptyState
-                icon={<NavigationIcon size={32} strokeWidth={1.5} />}
+                icon={<NavigationIcon />}
                 title="No menus yet"
-                description={'Themes reference a menu by "handle" — e.g. main-menu for the header, footer-menu for the footer.'}
+                description='Create a menu with the handle "main-menu" for your header and "footer-menu" for your footer.'
                 actionLabel="Add menu"
                 onAction={() => router.push("/admin/content/navigation/new")}
               />
             ),
           }}
         />
-      </div>
+      </ListCard>
     </div>
   );
 }

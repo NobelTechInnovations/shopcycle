@@ -4,24 +4,29 @@ const crypto = require("crypto");
 const { HttpError } = require("@shopcycle/utils");
 const { UPLOADS_ROOT } = require("../../config/paths");
 const { env } = require("../../config/env");
+const { detectImageType } = require("../../lib/file-type");
 
-const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"]);
 const MAX_SIZE_BYTES = 8 * 1024 * 1024; // 8MB
 
 /** Local-disk storage under apps/api/uploads/<storeId>/ — a real, working
  * upload (not a URL-paste placeholder), scoped per store. A production
  * deployment would swap this for S3/R2 behind the same saveUpload()
- * signature; nothing above this layer needs to know which one is used. */
-async function saveUpload(prisma, storeId, { filename, mimetype, buffer }) {
-  if (!ALLOWED_MIME.has(mimetype)) {
-    throw new HttpError(400, `Unsupported file type: ${mimetype}. Allowed: JPEG, PNG, WebP, GIF, SVG.`);
-  }
+ * signature; nothing above this layer needs to know which one is used.
+ *
+ * `mimetype` (browser-reported) and `filename` (uploader-chosen) are both
+ * ignored for anything security-relevant: the real type comes from the
+ * file's own bytes, and the stored extension comes from that detected type,
+ * never from the original name — see lib/file-type.js for why. */
+async function saveUpload(prisma, storeId, { filename, buffer }) {
   if (buffer.length > MAX_SIZE_BYTES) {
     throw new HttpError(400, "File is too large (max 8MB).");
   }
+  const detected = detectImageType(buffer);
+  if (!detected) {
+    throw new HttpError(400, "Unsupported file. Upload a JPEG, PNG, WebP, or GIF image.");
+  }
 
-  const ext = path.extname(filename) || "";
-  const safeName = `${crypto.randomUUID()}${ext}`;
+  const safeName = `${crypto.randomUUID()}${detected.ext}`;
   const storeDir = path.join(UPLOADS_ROOT, storeId);
   await fs.mkdir(storeDir, { recursive: true });
   await fs.writeFile(path.join(storeDir, safeName), buffer);
@@ -29,7 +34,15 @@ async function saveUpload(prisma, storeId, { filename, mimetype, buffer }) {
   const url = `${env.API_PUBLIC_URL}/uploads/${storeId}/${safeName}`;
 
   return prisma.file.create({
-    data: { storeId, name: filename, url, mimeType: mimetype, size: buffer.length },
+    data: {
+      storeId,
+      // Display name only (rendered escaped by React) — capped so a huge
+      // filename can't bloat the row.
+      name: String(filename || "image").slice(0, 200),
+      url,
+      mimeType: detected.mime,
+      size: buffer.length,
+    },
   });
 }
 

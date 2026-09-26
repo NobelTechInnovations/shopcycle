@@ -1,11 +1,12 @@
 const { HttpError } = require("@shopcycle/utils");
 const repository = require("./repository");
+const { amountSpent } = require("./spend");
 
 async function listCustomers(prisma, storeId, query) {
   const [customers, total] = await repository.list(prisma, storeId, query);
   const withTotals = customers.map((c) => ({
     ...c,
-    totalSpent: c.orders.reduce((sum, o) => sum + Number(o.total), 0),
+    totalSpent: amountSpent(c.orders),
     orderCount: c.orders.length,
   }));
   return { customers: withTotals, total, page: query.page, pageSize: query.pageSize };
@@ -14,7 +15,7 @@ async function listCustomers(prisma, storeId, query) {
 async function getCustomer(prisma, storeId, id) {
   const customer = await repository.findById(prisma, storeId, id);
   if (!customer) throw new HttpError(404, "Customer not found");
-  return customer;
+  return { ...customer, totalSpent: amountSpent(customer.orders), orderCount: customer.orders.length };
 }
 
 async function createCustomer(prisma, storeId, input) {

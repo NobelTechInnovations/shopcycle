@@ -8,6 +8,8 @@ async function metaRoutes(fastify) {
   fastify.addHook("preHandler", fastify.authenticate);
   fastify.addHook("preHandler", fastify.loadStoreContext);
   fastify.addHook("preHandler", fastify.requireActiveSubscription);
+  // Premium-only — enforced here, not just hidden in the admin UI.
+  fastify.addHook("preHandler", fastify.requirePlanFeature(["hasMetaAds", "hasWhatsappIntegration"]));
 
   fastify.get("/status", controller.statusHandler);
   fastify.get("/authorize-url", controller.authorizeUrlHandler);

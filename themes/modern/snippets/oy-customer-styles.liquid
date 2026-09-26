@@ -1,0 +1,66 @@
+{% comment %}
+  Shared styles for the platform's shopper pages (sign in, account, order
+  status, order lookup). Built on the theme's own custom properties
+  (--color-primary, --color-text, --button-radius) so they match whichever
+  theme a store uses. Everything is prefixed "oy-" to stay out of the
+  theme's way.
+{% endcomment %}
+<style>
+  .oy-page{max-width:560px;margin:0 auto;padding:48px 20px 80px;color:var(--color-text,#1a1a1a)}
+  .oy-page--wide{max-width:1040px}
+  .oy-eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin:0 0 10px}
+  .oy-title{font-size:30px;line-height:1.15;margin:0 0 10px;letter-spacing:-.02em}
+  .oy-lede{color:#6b7280;margin:0 0 28px;font-size:15px;line-height:1.6}
+  .oy-card{background:#fff;border:1px solid #e7e7ea;border-radius:16px;padding:24px;box-shadow:0 1px 2px rgba(17,17,20,.04)}
+  .oy-card + .oy-card{margin-top:16px}
+  .oy-card h2{font-size:16px;margin:0 0 14px;letter-spacing:-.01em}
+  .oy-field{display:block;margin:0 0 16px}
+  .oy-field > span{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+  .oy-input,.oy-select,.oy-textarea{width:100%;box-sizing:border-box;border:1px solid #d4d4d8;border-radius:10px;padding:12px 14px;font:inherit;font-size:15px;background:#fff;color:inherit;min-height:46px}
+  .oy-textarea{min-height:90px;resize:vertical}
+  .oy-input:focus,.oy-select:focus,.oy-textarea:focus{outline:2px solid var(--color-primary,#111);outline-offset:1px;border-color:transparent}
+  .oy-code{letter-spacing:.45em;text-align:center;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+  .oy-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--color-primary,#111);color:#fff;border:1px solid var(--color-primary,#111);border-radius:min(var(--button-radius,10px),12px);padding:12px 22px;font:inherit;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;min-height:46px;line-height:1.2}
+  .oy-btn:hover{opacity:.92}
+  .oy-btn--block{width:100%}
+  .oy-btn--ghost{background:transparent;color:inherit;border-color:#d4d4d8}
+  .oy-link{color:inherit;text-decoration:underline;text-underline-offset:3px;background:none;border:0;padding:0;font:inherit;cursor:pointer}
+  .oy-alert{border-radius:10px;padding:12px 14px;font-size:14px;margin:0 0 18px;line-height:1.5}
+  .oy-alert--error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+  .oy-alert--ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+  .oy-muted{color:#6b7280}
+  .oy-small{font-size:13px}
+  .oy-pill{display:inline-flex;align-items:center;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:#f4f4f5;color:#3f3f46;white-space:nowrap}
+  .oy-pill--delivered{background:#dcfce7;color:#166534}
+  .oy-pill--shipped,.oy-pill--partially_shipped{background:#dbeafe;color:#1e40af}
+  .oy-pill--processing{background:#fef3c7;color:#92400e}
+  .oy-pill--cancelled{background:#fee2e2;color:#991b1b}
+  .oy-row{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:10px 0;border-bottom:1px solid #f0f0f2;font-size:14px}
+  .oy-row:last-child{border-bottom:0}
+  .oy-row--total{font-weight:700;font-size:16px;border-top:1px solid #e7e7ea;border-bottom:0;margin-top:4px;padding-top:12px}
+  .oy-num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .oy-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:20px;align-items:start}
+  .oy-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+  .oy-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:24px}
+  .oy-steps{display:flex;gap:0;margin:4px 0 8px;list-style:none;padding:0}
+  .oy-step{flex:1;position:relative;padding-top:22px;font-size:13px;min-width:0}
+  .oy-step::before{content:"";position:absolute;top:6px;left:0;right:0;height:3px;background:#e7e7ea}
+  .oy-step:first-child::before{left:6px}
+  .oy-step:last-child::before{right:auto;width:6px}
+  .oy-step::after{content:"";position:absolute;top:1px;left:0;width:13px;height:13px;border-radius:50%;background:#fff;border:2px solid #d4d4d8;box-sizing:border-box}
+  .oy-step.is-done::before{background:var(--color-primary,#111)}
+  .oy-step.is-done::after{background:var(--color-primary,#111);border-color:var(--color-primary,#111)}
+  .oy-step strong{display:block;font-size:13px}
+  .oy-step span{color:#6b7280;font-size:12px}
+  .oy-order-link{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid #f0f0f2;color:inherit;text-decoration:none}
+  .oy-order-link:last-child{border-bottom:0}
+  .oy-order-link:hover .oy-order-name{text-decoration:underline}
+  .oy-check{display:flex;align-items:center;gap:10px;font-size:14px;margin:4px 0 18px}
+  .oy-check input{width:18px;height:18px}
+  details.oy-details summary{cursor:pointer;font-weight:600;list-style:none}
+  details.oy-details summary::-webkit-details-marker{display:none}
+  details.oy-details summary::after{content:" +";color:#6b7280}
+  details.oy-details[open] summary::after{content:" –"}
+  @media (max-width:760px){.oy-grid{grid-template-columns:1fr}.oy-title{font-size:26px}.oy-page{padding-top:32px}}
+  @media (max-width:480px){.oy-grid-2{grid-template-columns:1fr}.oy-step span{display:none}}
+</style>

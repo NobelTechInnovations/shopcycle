@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Form, Input, Button, Typography, Alert } from "antd";
+import { Form, Input, Button, Alert } from "antd";
+import { AuthShell } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 export default function LoginPage() {
@@ -25,42 +26,31 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-app-bg px-4">
-      <div className="w-full max-w-sm bg-app-surface border border-app-border rounded-lg shadow-card p-8">
-        <Typography.Title level={4} className="!mb-1">
-          Sign in
-        </Typography.Title>
-        <Typography.Text type="secondary">Welcome back to ShopCycle</Typography.Text>
-
-        {error && <Alert type="error" message={error} showIcon className="mt-4" />}
-
-        <Form layout="vertical" onFinish={onFinish} className="mt-6" requiredMark={false}>
-          <Form.Item
-            label="Email"
-            name="email"
-            rules={[{ required: true, type: "email", message: "Enter a valid email" }]}
-          >
-            <Input autoComplete="email" size="large" />
-          </Form.Item>
-          <Form.Item
-            label="Password"
-            name="password"
-            rules={[{ required: true, message: "Password is required" }]}
-          >
-            <Input.Password autoComplete="current-password" size="large" />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" block size="large" loading={loading}>
-            Sign in
-          </Button>
-        </Form>
-
-        <p className="text-sm text-ink-muted mt-4 text-center">
-          New here?{" "}
-          <a href="/register" className="text-brand font-medium">
+    <AuthShell
+      title="Welcome back"
+      subtitle="Sign in to manage your store."
+      footer={
+        <>
+          New to Oyklane?{" "}
+          <a href="/register" className="text-ink font-medium underline underline-offset-4 decoration-ink/20 hover:decoration-ink">
             Create a store
           </a>
-        </p>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {error && <Alert type="error" message={error} showIcon className="mb-5" />}
+
+      <Form layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
+        <Form.Item label="Email" name="email" rules={[{ required: true, type: "email", message: "Enter a valid email" }]}>
+          <Input autoComplete="email" placeholder="you@company.com" autoFocus />
+        </Form.Item>
+        <Form.Item label="Password" name="password" rules={[{ required: true, message: "Password is required" }]}>
+          <Input.Password autoComplete="current-password" placeholder="••••••••" />
+        </Form.Item>
+        <Button type="primary" htmlType="submit" block loading={loading} className="!h-11 !mt-2">
+          Sign in
+        </Button>
+      </Form>
+    </AuthShell>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Input, InputNumber, Select, Slider, Switch, ColorPicker, Upload, Button, App } from "antd";
 import { Upload as UploadIcon, X } from "lucide-react";
 import { apiUpload } from "@/lib/api";
+import { IMAGE_ACCEPT } from "@/lib/uploads";
 
 const FONT_OPTIONS = ["Inter", "Fira Sans", "Playfair Display", "Poppins", "Space Grotesk"].map((f) => ({
   value: f,
@@ -47,7 +48,7 @@ function ImagePickerField({ value, onChange }) {
   }
 
   return (
-    <Upload accept="image/*" showUploadList={false} beforeUpload={handleUpload} disabled={uploading}>
+    <Upload accept={IMAGE_ACCEPT} showUploadList={false} beforeUpload={handleUpload} disabled={uploading}>
       <Button icon={<UploadIcon size={14} aria-hidden="true" />} loading={uploading}>
         Upload image
       </Button>

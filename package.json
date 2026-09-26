@@ -15,6 +15,7 @@
     "lint": "turbo run lint",
     "db:generate": "pnpm --filter @shopcycle/database run generate",
     "db:migrate": "pnpm --filter @shopcycle/database run migrate",
+    "db:push": "pnpm --filter @shopcycle/database run push",
     "db:studio": "pnpm --filter @shopcycle/database run studio",
     "db:seed": "pnpm --filter @shopcycle/database run seed",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",

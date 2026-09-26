@@ -1,15 +1,16 @@
 const platformCustomersService = require("../platform-customers/service");
+const { SPEND_ORDER_SELECT } = require("./spend");
 
 function list(prisma, storeId, { q, page, pageSize }) {
   const where = {
     storeId,
-    ...(q ? { OR: [{ name: { contains: q } }, { email: { contains: q } }] } : {}),
+    ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }] } : {}),
   };
 
   return Promise.all([
     prisma.customer.findMany({
       where,
-      include: { orders: { select: { id: true, total: true } } },
+      include: { orders: { select: SPEND_ORDER_SELECT } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -25,9 +26,16 @@ function findById(prisma, storeId, id) {
   });
 }
 
+/** Case-insensitive: "Priya@x.com" at checkout and "priya@x.com" at
+ * sign-in are the same shopper. */
 function findByEmail(prisma, storeId, email, excludeId) {
   return prisma.customer.findFirst({
-    where: { storeId, email, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    where: {
+      storeId,
+      email: { equals: String(email || "").trim(), mode: "insensitive" },
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    orderBy: { createdAt: "asc" },
   });
 }
 

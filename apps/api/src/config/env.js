@@ -52,6 +52,58 @@ const envSchema = z.object({
   // (Settings ▸ Webhooks) — required to trust a webhook call actually came
   // from Razorpay rather than anyone who finds the URL.
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  // Only ever changed to point the billing flows at a local mock in tests.
+  RAZORPAY_API_URL: z.string().default("https://api.razorpay.com/v1"),
+  // Local development only: with no Razorpay keys, "true" lets a merchant
+  // pick a plan without a mandate (the free trial just starts) so the
+  // billing screens and Premium features can be tried. Ignored whenever
+  // Razorpay keys are set, and the API refuses to boot with it in
+  // production — see the check at the bottom of this file.
+  BILLING_SANDBOX: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
+
+  // Outgoing email over SMTP — every provider offers it (Resend, Brevo,
+  // Amazon SES, Zoho, Gmail), so switching provider is a config change.
+  // With SMTP_HOST unset nothing is sent: each email is kept in the email
+  // log (platform console ▸ Emails) so local development needs no account.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  // "true" for implicit TLS on port 465; leave false for STARTTLS on 587.
+  SMTP_SECURE: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
+  // The address everything is sent from. Store emails go out as
+  // "<Store name> <this address>" with Reply-To set to the store's own
+  // support email, so shoppers' replies reach the merchant.
+  EMAIL_FROM: z.string().default("Oyklane <no-reply@oyklane.com>"),
+
+  // Background jobs (jobs.js): abandoned-checkout reminders. A shopper who
+  // reached checkout and left their email gets one reminder this many
+  // minutes later if they haven't ordered.
+  ABANDONED_CHECKOUT_DELAY_MINUTES: z.coerce.number().int().min(0).default(60),
+  JOBS_INTERVAL_SECONDS: z.coerce.number().int().min(10).default(300),
+  JOBS_DISABLED: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
+
+  // Oyklane's own details, printed as the seller on every GST invoice to
+  // merchants (billing/invoices.js). PLATFORM_STATE decides CGST+SGST vs
+  // IGST: a merchant in the same state is charged CGST+SGST, anyone else
+  // IGST. Leave PLATFORM_GSTIN empty until registered — invoices then say
+  // so instead of printing a made-up number.
+  PLATFORM_LEGAL_NAME: z.string().default("Oyklane"),
+  PLATFORM_GSTIN: z.string().optional(),
+  PLATFORM_ADDRESS: z.string().optional(),
+  PLATFORM_STATE: z.string().default("Maharashtra"),
+  // SAC (services accounting code) printed on invoices — confirm the right
+  // code for your registration with your CA; the column is hidden until set.
+  PLATFORM_SAC: z.string().optional(),
 
   // Meta (Facebook) Login for Business — one OAuth app backs both the
   // "Meta Ads" and "WhatsApp" integrations (see MetaConnection's doc
@@ -70,12 +122,36 @@ const envSchema = z.object({
   // Pinned rather than left to "latest" so a Graph API version bump
   // upstream can't silently change response shapes under us.
   META_GRAPH_API_VERSION: z.string().default("v21.0"),
+
+  // AES-256 key (64 hex chars) for encrypting third-party secrets at rest —
+  // e.g. each store's Meta access token (see lib/crypto.js). Optional so
+  // dev works without setup; production should always set its own.
+  DATA_ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/, "DATA_ENCRYPTION_KEY must be 64 hex characters (32 bytes)")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  // Behind a reverse proxy (Hostinger's LiteSpeed, Vercel, a load
+  // balancer) every request arrives from the proxy's own IP, so per-IP rate
+  // limits would lump all users together. "true" makes Fastify read the
+  // real client IP from X-Forwarded-For. Leave off when the API is exposed
+  // directly — then that header is attacker-controlled.
+  TRUST_PROXY: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
 });
 
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
   console.error("Invalid environment configuration:", parsed.error.flatten().fieldErrors);
+  process.exit(1);
+}
+
+// Free plans for everyone is not a mistake a production deploy gets to make.
+if (parsed.data.BILLING_SANDBOX && parsed.data.NODE_ENV === "production") {
+  console.error("BILLING_SANDBOX=true is not allowed when NODE_ENV=production. Remove it and set the Razorpay keys.");
   process.exit(1);
 }
 

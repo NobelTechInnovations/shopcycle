@@ -1,10 +1,15 @@
 const crypto = require("crypto");
 const { HttpError } = require("@shopcycle/utils");
 const { env } = require("../../config/env");
+const { safeEqual } = require("../../lib/crypto");
+const { syncOrderCommission } = require("../billing/commission");
 const cartService = require("../cart/service");
 const discountService = require("../discounts/service");
 const customersRepository = require("../customers/repository");
 const ordersRepository = require("../orders/repository");
+const { adjustStock } = require("../../lib/inventory");
+const { addOrderEvent } = require("../orders/events");
+const notify = require("../orders/notify");
 
 function razorpayConfigured() {
   return Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
@@ -20,15 +25,15 @@ function availablePaymentMethods() {
   return methods;
 }
 
-async function getCheckoutContext(prisma, redis, storeId, cartId, handle) {
-  const cart = await cartService.getCart(prisma, redis, storeId, cartId, handle);
+async function getCheckoutContext(prisma, storeId, cartId, handle) {
+  const cart = await cartService.getCart(prisma, storeId, cartId, handle);
   return { cart, paymentMethods: availablePaymentMethods() };
 }
 
 async function createRazorpayOrder(amountInRupees, receipt) {
   const amountPaise = Math.round(amountInRupees * 100);
   const auth = Buffer.from(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`).toString("base64");
-  const res = await fetch("https://api.razorpay.com/v1/orders", {
+  const res = await fetch(`${env.RAZORPAY_API_URL}/orders`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Basic ${auth}` },
     body: JSON.stringify({ amount: amountPaise, currency: "INR", receipt }),
@@ -44,9 +49,10 @@ async function createRazorpayOrder(amountInRupees, receipt) {
  * (never trusting client-submitted totals) so the price/discount/shipping/
  * tax actually charged is always what the store's current configuration
  * says it should be, not whatever the checkout form happened to render. */
-async function placeOrder(prisma, redis, storeId, cartId, handle, input) {
-  const raw = await cartService.readRaw(redis, storeId, cartId);
-  const cart = await cartService.hydrateCart(prisma, redis, storeId, cartId, raw);
+async function placeOrder(prisma, storeId, cartId, handle, input, { store, log } = {}) {
+  input = { ...input, email: String(input.email).trim().toLowerCase() };
+  const raw = await cartService.readRaw(prisma, storeId, cartId);
+  const cart = await cartService.hydrateCart(prisma, storeId, cartId, raw);
   if (cart.items.length === 0) throw new HttpError(400, "Your cart is empty");
   if (cart.discount?.error) throw new HttpError(400, cart.discount.error);
   if (input.paymentMethod === "razorpay" && !razorpayConfigured()) {
@@ -111,28 +117,37 @@ async function placeOrder(prisma, redis, storeId, cartId, handle, input) {
     sessionId: session?.id || null,
   };
 
-  const orderNumber = await ordersRepository.nextOrderNumber(prisma, storeId);
-
   // Decrement inventory and create the order in one transaction — an order
   // that exists without the stock move (or vice versa) is worse than a
-  // checkout that fails outright and lets the shopper retry.
-  const order = await prisma.$transaction(async (tx) => {
-    for (const item of orderItems) {
-      if (!item.variantId) continue;
-      // Not erroring on insufficient stock: there's no reservation/lock
-      // step before checkout in this model, so — same tradeoff most small
-      // storefronts make — let the sale through and leave a backorder for
-      // the merchant to handle rather than losing it at the last step.
-      await tx.productVariant.updateMany({
-        where: { id: item.variantId },
-        data: { inventoryQuantity: { decrement: item.quantity } },
-      });
-    }
-    return tx.order.create({
+  // checkout that fails outright. If a simultaneous checkout takes the same
+  // order number, the whole transaction rolls back and retries with the
+  // next one, so stock is never decremented twice.
+  const order = await ordersRepository.withNextOrderNumber(prisma, storeId, (orderNumber) => prisma.$transaction(async (tx) => {
+    const created = await tx.order.create({
       data: { ...orderData, storeId, orderNumber, items: { create: orderItems } },
       include: { customer: true, items: true },
     });
-  });
+    // Not erroring on insufficient stock: there's no reservation/lock step
+    // before checkout in this model, so — same tradeoff most small
+    // storefronts make — let the sale through and leave a backorder for
+    // the merchant to handle rather than losing it at the last step. Each
+    // move is recorded in the inventory history (lib/inventory.js).
+    for (const item of created.items) {
+      if (!item.variantId) continue;
+      await adjustStock(tx, { storeId, variantId: item.variantId, delta: -item.quantity, reason: "sold", orderId: created.id });
+    }
+    await addOrderEvent(
+      tx,
+      created.id,
+      {
+        kind: "placed",
+        message: `Order placed on the online store · ${input.paymentMethod === "cod" ? "cash on delivery" : "paying online"}`,
+        actorName: "Customer",
+      },
+      { strict: true }
+    );
+    return created;
+  }));
 
   if (cart.discount?.code) {
     const discountRecord = await discountService
@@ -159,7 +174,13 @@ async function placeOrder(prisma, redis, storeId, cartId, handle, input) {
   // Razorpay order already exists server-side even if the shopper abandons
   // the payment modal next (their order sits pending, same as any real
   // gateway checkout that gets interrupted after the order is created).
-  await cartService.clearCart(redis, storeId, cartId);
+  await cartService.clearCart(prisma, storeId, cartId);
+
+  // Cash on delivery is final now; an online order is confirmed (and
+  // emailed) once its payment is verified.
+  if (input.paymentMethod === "cod" && store) {
+    await notify.sendOrderPlaced(prisma, store, order, log).catch((err) => log?.error({ err }, "checkout: confirmation email failed"));
+  }
 
   return { order, razorpay };
 }
@@ -174,19 +195,42 @@ async function getOrderForConfirmation(prisma, storeId, id) {
  * scheme — the only trustworthy signal that a payment actually succeeded
  * (the client-side "handler" callback firing is not, by itself, proof of
  * anything: it can be forged by anyone who can call this endpoint). */
-async function verifyRazorpayPayment(prisma, { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature }) {
+async function verifyRazorpayPayment(prisma, { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature }, { log } = {}) {
   if (!razorpayConfigured()) throw new HttpError(400, "Online payment isn't configured");
   const expected = crypto
     .createHmac("sha256", env.RAZORPAY_KEY_SECRET)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest("hex");
-  if (expected !== razorpay_signature) throw new HttpError(400, "Payment verification failed");
+  if (!safeEqual(expected, razorpay_signature)) throw new HttpError(400, "Payment verification failed");
 
-  return prisma.order.update({
-    where: { id: orderId },
+  // The signature proves a real payment happened for `razorpay_order_id` —
+  // it says nothing about OUR order `orderId`. Without this check, a valid
+  // signature from paying for a cheap order could be replayed to mark any
+  // other (expensive) order as paid. Our order must be the one Razorpay
+  // order was created for at checkout.
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order || !order.razorpayOrderId || !safeEqual(order.razorpayOrderId, razorpay_order_id)) {
+    throw new HttpError(400, "Payment verification failed");
+  }
+  if (order.paymentStatus === "paid") {
+    // Already confirmed (a double-submitted callback) — nothing to change.
+    return prisma.order.findUnique({ where: { id: orderId }, include: { customer: true, items: true } });
+  }
+
+  // Conditional on still pending, so a double-submitted callback can't
+  // record the payment (or send the confirmation) twice.
+  const { count } = await prisma.order.updateMany({
+    where: { id: orderId, paymentStatus: "pending" },
     data: { paymentStatus: "paid", razorpayPaymentId: razorpay_payment_id },
-    include: { customer: true, items: true },
   });
+  const paid = await prisma.order.findUnique({ where: { id: orderId }, include: { customer: true, items: true } });
+  if (count === 1) {
+    await addOrderEvent(prisma, orderId, { kind: "paid", message: `Payment received online (Razorpay ${razorpay_payment_id})` });
+    await syncOrderCommission(prisma, paid.id);
+    const store = await prisma.store.findUnique({ where: { id: paid.storeId }, include: { plan: true } });
+    await notify.sendOrderPlaced(prisma, store, paid, log).catch((err) => log?.error({ err }, "checkout: confirmation email failed"));
+  }
+  return paid;
 }
 
 module.exports = {

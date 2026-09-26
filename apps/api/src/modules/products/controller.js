@@ -18,13 +18,15 @@ async function getHandler(request, reply) {
 
 async function createHandler(request, reply) {
   const body = createProductSchema.parse(request.body);
-  const product = await service.createProduct(request.server.prisma, request.store, body);
+  const product = await service.createProduct(request.server.prisma, request.store, body, { actorName: request.authUser?.name });
   reply.code(201).send({ product });
 }
 
 async function updateHandler(request, reply) {
   const body = updateProductSchema.parse(request.body);
-  const product = await service.updateProduct(request.server.prisma, request.store.id, request.params.id, body);
+  const product = await service.updateProduct(request.server.prisma, request.store.id, request.params.id, body, {
+    actorName: request.authUser?.name,
+  });
   reply.send({ product });
 }
 

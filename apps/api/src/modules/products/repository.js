@@ -1,3 +1,5 @@
+const { adjustStock } = require("../../lib/inventory");
+
 const include = {
   variants: { orderBy: { createdAt: "asc" } },
   images: { orderBy: { position: "asc" } },
@@ -10,7 +12,7 @@ function list(prisma, storeId, { q, status, page, pageSize }) {
   const where = {
     storeId,
     ...(status ? { status } : {}),
-    ...(q ? { title: { contains: q } } : {}),
+    ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
   };
 
   return Promise.all([
@@ -39,26 +41,90 @@ function findBySlug(prisma, storeId, slug, excludeId) {
   });
 }
 
-function create(prisma, storeId, { variants, images, collectionIds, ...data }, slug) {
-  return prisma.product.create({
-    data: {
-      ...data,
-      storeId,
-      slug,
-      variants: { create: variants },
-      images: { create: images },
-      collectionProducts: {
-        create: collectionIds.map((collectionId) => ({ collectionId })),
+/** Opening stock is recorded like any other stock change, so a variant's
+ * history starts from its first unit (see lib/inventory.js). */
+async function recordOpeningStock(tx, storeId, variants, actorName) {
+  for (const v of variants) {
+    if (v.inventoryQuantity) {
+      await tx.inventoryAdjustment.create({
+        data: {
+          storeId,
+          variantId: v.id,
+          delta: v.inventoryQuantity,
+          quantityAfter: v.inventoryQuantity,
+          reason: "received",
+          note: "Opening stock",
+          actorName: actorName || null,
+        },
+      });
+    }
+  }
+}
+
+function create(prisma, storeId, { variants, images, collectionIds, ...data }, slug, { actorName } = {}) {
+  return prisma.$transaction(async (tx) => {
+    const product = await tx.product.create({
+      data: {
+        ...data,
+        storeId,
+        slug,
+        variants: { create: variants.map(({ id, ...v }) => ({ ...v, inventoryQuantity: v.inventoryQuantity ?? 0 })) },
+        images: { create: images },
+        collectionProducts: {
+          create: collectionIds.map((collectionId) => ({ collectionId })),
+        },
       },
-    },
-    include,
+      include,
+    });
+    await recordOpeningStock(tx, storeId, product.variants, actorName);
+    return product;
   });
 }
 
-async function update(prisma, id, { variants, images, collectionIds, ...data }, slug) {
+/**
+ * Brings a product's variants in line with the form: existing variants
+ * (matched by id) are updated in place, new ones created, and only the
+ * ones the merchant removed are deleted. Recreating them all (as this
+ * used to) would unlink every past order line from its variant, empty the
+ * product out of shoppers' carts, and wipe its stock history.
+ *
+ * A variant's stock only changes when the form sends inventoryQuantity —
+ * it's left out when unchanged, so a save doesn't overwrite sales made
+ * while the page was open. A change is recorded as a stock correction.
+ */
+async function syncVariants(tx, storeId, productId, variants, actorName) {
+  const existing = await tx.productVariant.findMany({ where: { productId } });
+  const byId = Object.fromEntries(existing.map((v) => [v.id, v]));
+  const keep = new Set(variants.filter((v) => v.id && byId[v.id]).map((v) => v.id));
+
+  const removed = existing.filter((v) => !keep.has(v.id)).map((v) => v.id);
+  if (removed.length) await tx.productVariant.deleteMany({ where: { id: { in: removed } } });
+
+  for (const { id, inventoryQuantity, ...fields } of variants) {
+    const current = id && byId[id];
+    if (!current) {
+      const created = await tx.productVariant.create({ data: { ...fields, productId, inventoryQuantity: inventoryQuantity ?? 0 } });
+      await recordOpeningStock(tx, storeId, [created], actorName);
+      continue;
+    }
+    await tx.productVariant.update({ where: { id }, data: fields });
+    if (inventoryQuantity !== undefined && inventoryQuantity !== current.inventoryQuantity) {
+      await adjustStock(tx, {
+        storeId,
+        variantId: id,
+        delta: inventoryQuantity - current.inventoryQuantity,
+        reason: "correction",
+        note: "Edited on the product page",
+        actorName,
+      });
+    }
+  }
+}
+
+async function update(prisma, id, { variants, images, collectionIds, ...data }, slug, { storeId, actorName } = {}) {
   return prisma.$transaction(async (tx) => {
     if (variants) {
-      await tx.productVariant.deleteMany({ where: { productId: id } });
+      await syncVariants(tx, storeId, id, variants, actorName);
     }
     if (images) {
       await tx.productImage.deleteMany({ where: { productId: id } });
@@ -72,7 +138,6 @@ async function update(prisma, id, { variants, images, collectionIds, ...data }, 
       data: {
         ...data,
         ...(slug ? { slug } : {}),
-        ...(variants ? { variants: { create: variants } } : {}),
         ...(images ? { images: { create: images } } : {}),
         ...(collectionIds
           ? { collectionProducts: { create: collectionIds.map((collectionId) => ({ collectionId })) } }

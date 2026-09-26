@@ -1,7 +1,7 @@
 import { serverApiFetch } from "@/lib/api";
-import { SettingsForm } from "./SettingsForm";
+import { GeneralSettings } from "./GeneralSettings";
 
-export default async function SettingsPage() {
+export default async function SettingsGeneralPage() {
   const { store } = await serverApiFetch("/api/store");
-  return <SettingsForm store={store} />;
+  return <GeneralSettings store={store} />;
 }

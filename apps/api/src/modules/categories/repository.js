@@ -1,12 +1,14 @@
 function list(prisma, storeId, { q, page, pageSize }) {
   const where = {
     storeId,
-    ...(q ? { title: { contains: q } } : {}),
+    ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
   };
 
   return Promise.all([
     prisma.category.findMany({
       where,
+      // Product count per row, for the list page — a count, not the rows.
+      include: { _count: { select: { products: true } } },
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,

@@ -5,7 +5,7 @@ const include = {
 function list(prisma, storeId, { q, page, pageSize }) {
   const where = {
     storeId,
-    ...(q ? { title: { contains: q } } : {}),
+    ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
   };
 
   return Promise.all([
