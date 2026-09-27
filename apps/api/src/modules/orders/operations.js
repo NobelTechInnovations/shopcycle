@@ -90,7 +90,7 @@ async function createFulfillment(prisma, store, orderId, input, { actorName, log
 
   // Shipping is the moment of supply for GST — issue the invoice now if
   // the store's plan includes GST invoicing. Never blocks the shipment.
-  if (store.plan?.hasGstSoftware) {
+  if (await require("../billing/entitlements").storeHas(prisma, store, "gst_invoices")) {
     const { issueInvoice } = require("./invoice");
     await issueInvoice(prisma, store, order).catch((err) => log?.warn({ err }, "invoice: could not issue on fulfillment"));
   }

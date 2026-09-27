@@ -413,7 +413,27 @@ function giftCardIssued({ store, code, amount, recipientName, message, expiresAt
   };
 }
 
+/** A billing notice to a seller (billing/notifications.js): heading, a
+ * few lines, an optional amount table and a button to the billing page. */
+function billingNotice({ storeName, title, lines = [], rows = [], cta, ctaUrl }) {
+  const table = rows.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 10px;border-top:1px solid ${LINE}">${rows
+        .map(([k, v, bold]) => summaryRow(esc(k), esc(v), bold))
+        .join("")}</table>`
+    : "";
+  return {
+    subject: `${title} — ${storeName}`,
+    html: layout({
+      brand: "Oyklane",
+      preheader: lines[0] || title,
+      body: `${heading(esc(title))}${lines.map((l) => p(esc(l))).join("")}${table}${cta && ctaUrl ? button(ctaUrl, cta) : ""}`,
+      footer: `You're receiving this because you run ${esc(storeName)} on Oyklane. Billing questions? Reply to this email.`,
+    }),
+  };
+}
+
 module.exports = {
+  billingNotice,
   giftCardIssued,
   esc,
   layout,

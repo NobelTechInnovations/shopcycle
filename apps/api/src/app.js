@@ -53,6 +53,7 @@ const publicApiRoutes = require("./modules/developer/public-routes");
 const inventoryRoutes = require("./modules/inventory/routes");
 const exportRoutes = require("./modules/exports/routes");
 const emailLogRoutes = require("./modules/email-log/routes");
+const billingRoutes = require("./modules/billing/routes");
 
 // The browser origins allowed to call this API with credentials. Every
 // shopper-facing request reaches the API server-to-server (the storefront
@@ -131,6 +132,7 @@ function buildApp() {
 
   app.register(authRoutes, { prefix: "/api/auth" });
   app.register(storeRoutes, { prefix: "/api/store" });
+  app.register(billingRoutes, { prefix: "/api/billing" });
   app.register(dashboardRoutes, { prefix: "/api/dashboard" });
   app.register(productRoutes, { prefix: "/api/products" });
   app.register(collectionRoutes, { prefix: "/api/collections" });

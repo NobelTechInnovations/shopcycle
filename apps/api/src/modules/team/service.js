@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const { HttpError } = require("@shopcycle/utils");
 const repository = require("./repository");
+const entitlements = require("../billing/entitlements");
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -27,17 +28,18 @@ async function inviteMember(prisma, store, input) {
   const existingInvite = await repository.findInvitationByEmail(prisma, store.id, input.email);
   if (existingInvite) throw new HttpError(409, "An invitation is already pending for this email");
 
-  if (store.plan) {
-    const [memberCount, invitations] = await Promise.all([
-      repository.countMembers(prisma, store.id),
-      repository.listInvitations(prisma, store.id),
-    ]);
-    if (memberCount + invitations.length >= store.plan.staffLimit) {
-      throw new HttpError(
-        400,
-        `Your ${store.plan.name} plan allows up to ${store.plan.staffLimit} staff accounts. Upgrade to invite more.`
-      );
-    }
+  // Staff accounts (the owner doesn't count): 2 on Starter, 10 on Growth,
+  // 30 on Pro; beyond that the seller asks for a higher limit
+  // (Settings ▸ Plan & billing), which the platform grants per store.
+  const [ent, used] = await Promise.all([entitlements.forStore(prisma, store.id), entitlements.staffUsage(prisma, store.id)]);
+  const limit = ent.limits.staff;
+  if (input.role !== "owner" && limit != null && used >= limit) {
+    const top = ent.plan?.key === "pro";
+    throw new HttpError(
+      400,
+      `Your ${ent.plan?.name || "current"} plan includes ${limit} staff account${limit === 1 ? "" : "s"}. ${top ? "Request a higher limit" : "Upgrade your plan or request a higher limit"} in Settings ▸ Plan & billing.`,
+      { code: "staff_limit", limit, used }
+    );
   }
 
   if (existingUser) {

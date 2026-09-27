@@ -2,6 +2,7 @@ function listCompanies(prisma) {
   return prisma.store.findMany({
     include: {
       plan: true,
+      subscription: { select: { status: true, trialEndsAt: true, lastFailureAt: true, nextBillingAt: true, interval: true, plan: { select: { id: true, name: true } } } },
       storeUsers: { where: { role: "owner" }, include: { user: { select: { name: true, email: true } } }, take: 1 },
       _count: { select: { orders: true, products: true } },
     },

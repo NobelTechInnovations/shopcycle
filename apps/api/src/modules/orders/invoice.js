@@ -1,3 +1,4 @@
+const entitlements = require("../billing/entitlements");
 const { HttpError } = require("@shopcycle/utils");
 const { formatCurrency } = require("@shopcycle/utils");
 const { storeSettings } = require("../../lib/store-settings");
@@ -7,7 +8,8 @@ const { addOrderEvent } = require("./events");
 const { round2 } = require("./quantities");
 
 /**
- * GST tax invoices from a store to its shoppers (Premium — Plan.hasGstSoftware).
+ * GST tax invoices from a store to its shoppers (Growth and Pro — the
+ * "gst_invoices" feature, billing/entitlements.js).
  *
  * Numbering: one gap-free serial per store, issued once per order and
  * never reused, formatted with the Indian financial year, e.g.
@@ -36,8 +38,8 @@ function formatNumber(prefix, seq, date) {
 }
 
 async function issueInvoice(prisma, store, order) {
-  if (!store.plan?.hasGstSoftware) {
-    throw new HttpError(403, "GST invoices are part of the Premium plan. Upgrade in Settings ▸ Plan & billing.");
+  if (!(await entitlements.storeHas(prisma, store, "gst_invoices"))) {
+    throw new HttpError(403, "GST invoices aren't part of your plan. Upgrade to Growth or Pro in Settings ▸ Plan & billing.");
   }
   if (order.invoiceNumber) return order;
   if (order.paymentStatus === "pending" && !["fulfilled", "partially_fulfilled"].includes(order.fulfillmentStatus)) {

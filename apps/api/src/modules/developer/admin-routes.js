@@ -12,10 +12,12 @@ async function developerAdminRoutes(fastify) {
   fastify.addHook("preHandler", async (request) => {
     if (request.storeRole === "staff") throw new HttpError(403, "Only the store owner or an admin can manage API keys and webhooks.");
   });
+  // Listing stays open (to see and revoke old keys); creating needs Pro.
+  const proOnly = { preHandler: fastify.requirePlanFeature("api_access") };
   const db = fastify.prisma;
 
   fastify.get("/keys", async (request) => keys.list(db, request.store.id));
-  fastify.post("/keys", async (request, reply) => {
+  fastify.post("/keys", proOnly, async (request, reply) => {
     const body = z.object({ name: z.string().trim().min(1, "Name the key").max(80), scopes: z.array(z.string()).min(1).max(20) }).parse(request.body);
     reply.header("cache-control", "no-store");
     reply.code(201).send(await keys.create(db, request.store.id, body, { actorName: actorNameFrom(request) }));
@@ -26,7 +28,7 @@ async function developerAdminRoutes(fastify) {
   });
 
   fastify.get("/webhooks", async (request) => webhooks.list(db, request.store.id));
-  fastify.post("/webhooks", async (request, reply) => {
+  fastify.post("/webhooks", proOnly, async (request, reply) => {
     const body = z.object({ url: z.string().trim().max(500), events: z.array(z.string()).min(1).max(20) }).parse(request.body);
     reply.header("cache-control", "no-store");
     reply.code(201).send(await webhooks.create(db, request.store.id, body));

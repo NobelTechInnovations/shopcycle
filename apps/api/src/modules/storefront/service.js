@@ -15,7 +15,7 @@ const repository = require("./repository");
 const cartService = require("../cart/service");
 const checkoutService = require("../checkout/service");
 const appsService = require("../apps/service");
-const { computeAccessState, isStorefrontBlocked } = require("../billing/access");
+const { computeAccess } = require("../billing/access");
 const shopperService = require("../shopper/service");
 const paymentsService = require("../payments/service");
 const metafieldService = require("../metafields/service");
@@ -131,18 +131,50 @@ if(f.elements.email){f.elements.email.addEventListener("change",capture);f.eleme
 if(f.elements.shippingName){f.elements.shippingName.addEventListener("change",function(){sent="";capture();});}})();</script>`;
 }
 
+/**
+ * One-Click Checkout (the app of that name, installed from Apps): the cart
+ * drawer's checkout button opens a single-step popup instead of the full
+ * checkout page. "native" is Oyklane's own form; `provider` leaves room for
+ * a third-party express checkout later. The popup posts to the same
+ * checkout route as the full page, flagged `oneClick`, so the order records
+ * that the app was used (and its fee) — the API checks the app really is
+ * installed before honouring it.
+ */
+function oneClickConfig(ctx, customer, store) {
+  const app = ctx.apps?.["one-click-checkout"];
+  if (!app || !ctx.payment_methods?.length) return null;
+  const fields = storeSettings(store).checkout;
+  return {
+    provider: app.provider || "native",
+    fields: { phone: fields.phone, address2: fields.address2, company: fields.company, country: fields.country },
+    methods: ctx.payment_methods.map((m) => ({ value: m.value, label: m.label, testMode: Boolean(m.testMode) })),
+    states: INDIAN_STATES.map((st) => st.name),
+    // A signed-in shopper's saved details; otherwise the popup uses what
+    // this device remembered from the last one-click order, if anything.
+    prefill: customer
+      ? {
+          email: customer.email || "",
+          phone: customer.phone || "",
+          shippingName: customer.name || "",
+          shippingAddress1: customer.address1 || "",
+          shippingAddress2: customer.address2 || "",
+          shippingCity: customer.city || "",
+          shippingProvince: customer.province || "",
+          shippingZip: customer.zip || "",
+        }
+      : null,
+  };
+}
+
 async function loadStoreOrThrow(prisma, handle) {
-  const store = await repository.getStoreByHandle(prisma, handle);
-  if (!store) throw new HttpError(404, `Store not found: ${handle}`);
-  if (store.status === "suspended") throw new HttpError(503, "This store is currently unavailable");
-  // Distinct from the manual "suspended" status above: this is the
-  // automatic 15-day-unpaid shutoff (see billing/access.js). A merchant
-  // who's simply behind on a plan still gets to run their admin (blocked
-  // there separately by requireActiveSubscription) right up until this
-  // point — shoppers only stop seeing the storefront once it's been
-  // unpaid long enough that continuing to serve it stops making sense.
-  if (isStorefrontBlocked(computeAccessState(store))) {
-    throw new HttpError(503, "This store is currently unavailable");
+  const found = await repository.getStoreByHandle(prisma, handle);
+  if (!found) throw new HttpError(404, `Store not found: ${handle}`);
+  const { subscription, ...store } = found;
+  // Offline when the platform suspended the store, or billing did (unpaid
+  // cycles — billing/access.js). Shoppers get a friendly page and checkout
+  // is closed; the merchant's dashboard shows how to bring it back.
+  if (store.status === "suspended" || !computeAccess(subscription, { storeStatus: store.status }).storefront) {
+    throw new HttpError(503, `${store.name} is temporarily unavailable. Please check back soon.`, { code: "store_unavailable" });
   }
   return store;
 }
@@ -725,6 +757,7 @@ async function renderPage(
         root: routes.root_url,
         currency: store.currency,
         freeShippingAbove: globalContext.shop.free_shipping_above,
+        oneClick: oneClickConfig(globalContext, customer, store),
       }
     : null;
   const head = `${await platform.headTags(themeSettings, { system, drawer, assetBase })}${seoTags(seo)}`;

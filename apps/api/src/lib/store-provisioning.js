@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { slugify } = require("@shopcycle/utils");
 const themesService = require("../modules/themes/service");
-const { GRACE_DAYS_BEFORE_PLAN_REQUIRED } = require("../modules/billing/access");
+const subscriptions = require("../modules/billing/subscriptions");
 
 // A store's handle doubles as its default storefront subdomain —
 // {handle}.<root domain> (see apps/storefront/lib/domain.js) — so none of
@@ -25,13 +25,9 @@ const RESERVED_HANDLES = new Set([
  * so this store is live the moment registration (or "add another store")
  * completes.
  *
- * No plan is assigned here and no trial starts yet — there is no more Free
- * plan (see seed.js's Starter/Premium catalog). A brand-new store starts
- * `subscriptionStatus: "no_plan"` with a `mandateDeadline` a couple of days
- * out; the admin stays usable until that deadline passes (see
- * billing/access.js), which is the window for the owner to pick a plan and
- * authorize the Razorpay mandate (POST /api/store/subscribe) — only that
- * call ever sets a trialEndsAt, and it's the real one-month free trial.
+ * Billing is per store: every new store — a second one by the same owner
+ * included — starts its own free trial here (billing/subscriptions.js),
+ * then the ₹99 first month and the regular price, like any other store.
  */
 async function provisionStore(tx, { name, ownerId, role = "owner" }) {
   // The handle is the store's free address ({handle}.<root>). If the name
@@ -48,14 +44,12 @@ async function provisionStore(tx, { name, ownerId, role = "owner" }) {
     data: {
       name,
       handle,
-      planId: null,
-      subscriptionStatus: "no_plan",
-      mandateDeadline: new Date(Date.now() + GRACE_DAYS_BEFORE_PLAN_REQUIRED * 24 * 60 * 60 * 1000),
       storeUsers: { create: { userId: ownerId, role } },
     },
   });
 
   await themesService.installTheme(tx, store.id, "classic");
+  await subscriptions.createForStore(tx, store);
 
   return store;
 }

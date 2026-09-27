@@ -60,9 +60,9 @@ const SETUP_STEPS = [
   {
     key: "hasPlan",
     icon: CreditCard,
-    title: "Choose a plan",
-    text: "Your first month is free on any plan — you won't be charged until it ends.",
-    cta: "See plans",
+    title: "Set up your subscription",
+    text: "Pick a plan and turn on autopay before your free trial ends — your first month after the trial is just ₹99.",
+    cta: "Set up billing",
     href: "/admin/settings/billing",
   },
   {

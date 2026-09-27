@@ -1,6 +1,19 @@
 const { HttpError } = require("@shopcycle/utils");
 const repository = require("./repository");
 
+// The console's older status tabs, from the billing engine's statuses.
+const LEGACY_STATUS = {
+  TRIALING: "trialing",
+  ACTIVE: "active",
+  CANCEL_SCHEDULED: "active",
+  GRACE_PERIOD: "past_due",
+  PAST_DUE: "past_due",
+  PENDING_PAYMENT: "no_plan",
+  SUSPENDED: "past_due",
+  EXPIRED: "cancelled",
+  CANCELLED: "cancelled",
+};
+
 async function listCompanies(prisma) {
   const stores = await repository.listCompanies(prisma);
   return stores.map((s) => ({
@@ -9,12 +22,14 @@ async function listCompanies(prisma) {
     handle: s.handle,
     domain: s.domain,
     status: s.status,
-    plan: s.plan ? { id: s.plan.id, name: s.plan.name } : null,
+    plan: s.subscription?.plan || (s.plan ? { id: s.plan.id, name: s.plan.name } : null),
     // Billing state for the platform console's tabs and badges — what an
     // operator scans for (who's trialing, who's paying, who's behind).
-    subscriptionStatus: s.subscriptionStatus,
-    trialEndsAt: s.trialEndsAt,
-    paymentFailedAt: s.paymentFailedAt,
+    billingStatus: s.subscription?.status || null,
+    subscriptionStatus: LEGACY_STATUS[s.subscription?.status] || "no_plan",
+    trialEndsAt: s.subscription?.trialEndsAt || null,
+    paymentFailedAt: s.subscription?.lastFailureAt || null,
+    nextBillingAt: s.subscription?.nextBillingAt || null,
     owner: s.storeUsers[0]?.user || null,
     orderCount: s._count.orders,
     productCount: s._count.products,

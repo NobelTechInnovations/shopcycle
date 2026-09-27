@@ -3,7 +3,11 @@ const { z } = require("zod");
 const { registerSchema, loginSchema, createStoreSchema, switchStoreSchema } = require("@shopcycle/validation");
 const { HttpError } = require("@shopcycle/utils");
 const { provisionStore } = require("../../lib/store-provisioning");
-const { computeAccessState } = require("../billing/access");
+const { computeAccess } = require("../billing/access");
+const { activeMandate } = require("../billing/charges");
+const entitlements = require("../billing/entitlements");
+
+const ME_STORE_INCLUDE = { plan: true, subscription: { include: { plan: { include: { features: true } } } } };
 const { setSellerSession, setPlatformSession, clearSellerSession, clearPlatformSession } = require("../../lib/session");
 const loginGuard = require("../../lib/login-guard");
 const { recordAudit } = require("../../lib/audit");
@@ -151,24 +155,38 @@ async function meHandler(request, reply) {
   const storeUser =
     (await request.server.prisma.storeUser.findFirst({
       where,
-      include: { store: { include: { plan: true } } },
+      include: { store: { include: ME_STORE_INCLUDE } },
     })) ||
     (await request.server.prisma.storeUser.findFirst({
       where: { userId: user.id },
-      include: { store: { include: { plan: true } } },
+      include: { store: { include: ME_STORE_INCLUDE } },
       orderBy: { createdAt: "asc" },
     }));
+  const sub = storeUser?.store?.subscription;
+  // A trial past its end with autopay set up stays open until the first
+  // charge settles (billing/access.js).
+  const mandateActive =
+    sub?.status === "TRIALING" && sub.trialEndsAt && new Date(sub.trialEndsAt) <= new Date()
+      ? Boolean(await activeMandate(request.server.prisma, sub.id))
+      : false;
+  const access = storeUser?.store ? computeAccess(sub, { storeStatus: storeUser.store.status, mandateActive }) : null;
+  // What the plan includes, so the admin can show or hide features (the
+  // API enforces the same thing on every request).
+  const ent = storeUser?.store ? entitlements.compute(sub?.plan || null, await entitlements.activeGrants(request.server.prisma, storeUser.store.id)) : null;
 
   reply.send({
     user: service.serializeUser(user),
     store: storeUser?.store
-      ? { ...storeUser.store, publicUrl: storefrontBaseUrl(storeUser.store), oyklaneUrl: oyklaneAddress(storeUser.store) }
+      ? { ...storeUser.store, subscription: undefined, publicUrl: storefrontBaseUrl(storeUser.store), oyklaneUrl: oyklaneAddress(storeUser.store) }
       : null,
     role: storeUser?.role || null,
-    // Lets the admin app's own layout gate to the billing screen without a
-    // second round trip — same computation loadStoreContext does per
-    // request for every other route (see billing/access.js).
-    accessState: storeUser?.store ? computeAccessState(storeUser.store) : null,
+    billingStatus: sub?.status || null,
+    entitlements: ent,
+    // Lets the admin's layout send a locked store to the billing page
+    // without a second round trip — the same decision loadStoreContext
+    // enforces on every API request (billing/access.js).
+    access,
+    accessState: access?.accessState || null,
   });
 }
 

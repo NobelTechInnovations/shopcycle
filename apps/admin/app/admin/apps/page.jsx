@@ -186,7 +186,7 @@ export default function AppsPage() {
     <div>
       <PageHeader title="Apps" />
       <p className="text-sm text-ink-muted -mt-3 mb-6">
-        Add features to your store. Premium apps are included with the Premium plan.
+        Add features to your store. Marketing apps come with the Growth and Pro plans.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -205,7 +205,7 @@ export default function AppsPage() {
               <div className="flex gap-1.5">
                 {app.premium && (
                   <Tag className="!mr-0 !border-0 !bg-accent-soft !text-accent inline-flex items-center gap-1">
-                    <Crown size={11} aria-hidden="true" /> Premium
+                    <Crown size={11} aria-hidden="true" /> Growth+
                   </Tag>
                 )}
                 {app.installed && (

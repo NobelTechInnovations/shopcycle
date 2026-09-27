@@ -8,84 +8,14 @@
 const { prisma } = require("../src/client");
 const bcrypt = require("bcryptjs");
 const themesService = require("../../../apps/api/src/modules/themes/service");
+const { seedCatalog } = require("../../../apps/api/src/modules/billing/bootstrap");
 
 async function main() {
-  // Billing plans (Phase 9) — exactly two, seeded fixtures, not
-  // merchant-created. The old 3-tier Free/Starter/Growth lineup is
-  // retired: every store on one of those has its planId nulled out
-  // (Store.plan's onDelete: SetNull) and lands back in the no_plan
-  // billing state, same as a brand-new store — correct, since "no real
-  // plan chosen yet" is exactly what those old fixture plans were.
-  await prisma.plan.deleteMany({ where: { name: { in: ["Free", "Growth"] } } });
-  await prisma.plan.upsert({
-    where: { name: "Starter" },
-    update: {
-      priceMonthly: "999.00",
-      productLimit: 1000,
-      staffLimit: 5,
-      description: "Full store access, pay-as-you-grow on ads and paid apps.",
-      commissionPercent: "2.50",
-      hasGstSoftware: false,
-      hasAdsManagerIncluded: false,
-      hasMetaAds: false,
-      paidAppsIncluded: false,
-      premiumThemesIncluded: false,
-      hasWhatsappIntegration: false,
-      hasSocialMediaManager: false,
-      prioritySupport: false,
-      cartCustomizable: false,
-      hasApiAccess: false,
-      hasCsvExport: false,
-    },
-    create: {
-      name: "Starter",
-      priceMonthly: "999.00",
-      productLimit: 1000,
-      staffLimit: 5,
-      description: "Full store access, pay-as-you-grow on ads and paid apps.",
-      commissionPercent: "2.50",
-    },
-  });
-  await prisma.plan.upsert({
-    where: { name: "Premium" },
-    update: {
-      priceMonthly: "2299.00",
-      productLimit: 100000,
-      staffLimit: 25,
-      description: "Everything included — ads, apps, themes, GST, and priority support.",
-      commissionPercent: "1.50",
-      hasGstSoftware: true,
-      hasAdsManagerIncluded: true,
-      hasMetaAds: true,
-      paidAppsIncluded: true,
-      premiumThemesIncluded: true,
-      hasWhatsappIntegration: true,
-      hasSocialMediaManager: true,
-      prioritySupport: true,
-      cartCustomizable: true,
-      hasApiAccess: true,
-      hasCsvExport: true,
-    },
-    create: {
-      name: "Premium",
-      priceMonthly: "2299.00",
-      productLimit: 100000,
-      staffLimit: 25,
-      description: "Everything included — ads, apps, themes, GST, and priority support.",
-      commissionPercent: "1.50",
-      hasGstSoftware: true,
-      hasAdsManagerIncluded: true,
-      hasMetaAds: true,
-      paidAppsIncluded: true,
-      premiumThemesIncluded: true,
-      hasWhatsappIntegration: true,
-      hasSocialMediaManager: true,
-      prioritySupport: true,
-      cartCustomizable: true,
-      hasApiAccess: true,
-      hasCsvExport: true,
-    },
-  });
+  // Billing catalog — Starter / Growth / Pro, their features, the billing
+  // settings and the One-Click Checkout app. The API does the same at
+  // start-up (modules/billing/bootstrap.js); it only fills in what's
+  // missing, so running the seed never undoes the super admin's edits.
+  await seedCatalog(prisma);
 
   const GA_DESCRIPTION =
     "Google Analytics 4 on every page, checkout included — with product views, add to cart, checkout and purchase events.";

@@ -28,7 +28,13 @@ function Party({ label, party }) {
 export function InvoiceView({ invoice }) {
   const { seller, buyer, lines } = invoice;
   const showSac = Boolean(seller.sac);
+  // Billing-engine invoices store amounts before tax and the GST split;
+  // older ones were GST-inclusive.
+  const exclusive = invoice.subtotal != null;
+  const rate = Number(invoice.taxRate ?? 18);
   const half = Math.round((Number(invoice.taxAmount) / 2) * 100) / 100;
+  const cgst = exclusive ? Number(invoice.cgst) : half;
+  const sgst = exclusive ? Number(invoice.sgst) : Number(invoice.taxAmount) - half;
   const cgstSgst = invoice.taxType === "cgst_sgst";
   const placeOfSupply = buyer.state || seller.state;
 
@@ -85,7 +91,7 @@ export function InvoiceView({ invoice }) {
                   <th className="font-medium py-2 pr-3 w-8">#</th>
                   <th className="font-medium py-2 pr-3">Description</th>
                   {showSac && <th className="font-medium py-2 pr-3">SAC</th>}
-                  <th className="font-medium py-2 text-right">Amount (incl. GST)</th>
+                  <th className="font-medium py-2 text-right">{exclusive ? "Amount" : "Amount (incl. GST)"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,14 +113,14 @@ export function InvoiceView({ invoice }) {
               <dd className="m-0 text-right tabular-nums">{formatCurrency(invoice.taxableValue)}</dd>
               {cgstSgst ? (
                 <>
-                  <dt className="text-ink-muted">CGST @ 9%</dt>
-                  <dd className="m-0 text-right tabular-nums">{formatCurrency(half)}</dd>
-                  <dt className="text-ink-muted">SGST @ 9%</dt>
-                  <dd className="m-0 text-right tabular-nums">{formatCurrency(Number(invoice.taxAmount) - half)}</dd>
+                  <dt className="text-ink-muted">CGST @ {rate / 2}%</dt>
+                  <dd className="m-0 text-right tabular-nums">{formatCurrency(cgst)}</dd>
+                  <dt className="text-ink-muted">SGST @ {rate / 2}%</dt>
+                  <dd className="m-0 text-right tabular-nums">{formatCurrency(sgst)}</dd>
                 </>
               ) : (
                 <>
-                  <dt className="text-ink-muted">IGST @ 18%</dt>
+                  <dt className="text-ink-muted">IGST @ {rate}%</dt>
                   <dd className="m-0 text-right tabular-nums">{formatCurrency(invoice.taxAmount)}</dd>
                 </>
               )}
@@ -128,8 +134,10 @@ export function InvoiceView({ invoice }) {
         </section>
 
         <footer className="pt-6 border-t border-app-border text-xs text-ink-muted leading-relaxed">
-          {invoice.status === "paid" && <p className="m-0">Paid by automatic debit via Razorpay{invoice.razorpayPaymentId ? ` (${invoice.razorpayPaymentId})` : ""}.</p>}
-          <p className="m-0">Amounts include GST at 18%. This is a computer-generated invoice and needs no signature.</p>
+          {invoice.status === "paid" && <p className="m-0">Paid via Razorpay{invoice.razorpayPaymentId ? ` (${invoice.razorpayPaymentId})` : ""}.</p>}
+          <p className="m-0">
+            {exclusive ? `Line amounts are before GST; GST at ${rate}% is shown separately.` : "Amounts include GST at 18%."} This is a computer-generated invoice and needs no signature.
+          </p>
         </footer>
       </article>
     </div>

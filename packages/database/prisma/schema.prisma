@@ -174,9 +174,21 @@ model PlatformInvoice {
   /// Razorpay payment that settled this invoice — also what makes webhook
   /// retries idempotent (a second event for the same payment is a no-op).
   razorpayPaymentId String?   @unique
+  /// subscription | fees | proration | manual (billing engine invoices).
+  kind              String    @default("subscription")
+  /// The BillingPayment that settled it, and the cycle it bills.
+  paymentId         String?   @unique
+  cycleId           String?   @unique
+  /// Before tax, and the rate applied (GST is added on top, not included).
+  subtotal          Decimal?  @db.Decimal(12, 2)
+  taxRate           Decimal?  @db.Decimal(5, 2)
+  cgst              Decimal?  @db.Decimal(12, 2)
+  sgst              Decimal?  @db.Decimal(12, 2)
+  igst              Decimal?  @db.Decimal(12, 2)
   periodStart       DateTime?
   periodEnd         DateTime?
-  /// [{ description, amount }] — amounts GST-inclusive.
+  /// [{ description, amount }] — `amount` before tax on engine invoices
+  /// (kind set); GST-inclusive on the older renewal invoices.
   lines             Json
   taxableValue      Decimal   @db.Decimal(10, 2)
   /// "cgst_sgst" (same state) or "igst" (inter-state).
@@ -397,6 +409,19 @@ model Store {
   metafieldDefinitions MetafieldDefinition[]
   productReviews       ProductReview[]
 
+  // Billing engine (modules/billing) — one subscription per store.
+  subscription           Subscription?
+  billingCycles          BillingCycle[]
+  mandates               Mandate[]
+  billingPayments        BillingPayment[]
+  commissionTransactions CommissionTransaction[]
+  commissionSummaries    CommissionSummary[]
+  billingFailures        BillingFailure[]
+  subscriptionEvents     SubscriptionEvent[]
+  billingNotifications   BillingNotification[]
+  entitlementGrants      EntitlementGrant[]
+  limitRequests          LimitRequest[]
+
   @@map("stores")
 }
 
@@ -408,10 +433,16 @@ model Store {
 /// gate for when they do, not a claim that they're built.
 model Plan {
   id           String   @id @default(cuid())
+  /// Stable code — "starter" | "growth" | "pro" (billing/bootstrap.js).
+  key          String?  @unique
   name         String   @unique
   priceMonthly Decimal  @db.Decimal(10, 2)
-  productLimit Int
+  /// Null = unlimited (every plan since the Starter/Growth/Pro relaunch).
+  productLimit Int?
   staffLimit   Int
+  sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
+  tagline      String?
   description  String?  @db.Text
   createdAt    DateTime @default(now())
 
@@ -443,7 +474,9 @@ model Plan {
   /// plan (see billing/service.js), then reused for every subscription.
   razorpayPlanId         String? @unique
 
-  stores Store[]
+  stores        Store[]
+  features      PlanFeature[]
+  subscriptions Subscription[]
 
   @@map("plans")
 }
@@ -849,6 +882,15 @@ model Order {
   confirmationSentAt DateTime?
   /// Private note for the store's staff; never shown to the shopper.
   note               String?   @db.Text
+  /// Oyklane's fees on this order, fixed when it was placed through the
+  /// storefront checkout (billing/commission.js) — later plan or app
+  /// changes never re-price an old order. Null rate = no fee (orders the
+  /// seller entered by hand).
+  feePlanId          String?
+  feeCommissionRate  Decimal?  @db.Decimal(5, 2)
+  feeOneClickRate    Decimal?  @db.Decimal(5, 2)
+  /// Placed with the One-Click Checkout app on.
+  oneClickCheckout   Boolean   @default(false)
   /// From the checkout form, when the store asks for them (Settings ▸
   /// Checkout): the shopper's note ("leave with the guard"), and a
   /// business buyer's company name and GSTIN (printed on the GST invoice).
@@ -1677,4 +1719,516 @@ model ProductReview {
 
   @@index([storeId, status])
   @@index([productId, status])
+}
+
+
+// ─────────────────────────────────────────────
+// Billing engine — subscriptions, mandates, payments, fees, tax
+// (apps/api/src/modules/billing). Every money movement and state change
+// leaves an immutable row (SubscriptionEvent, BillingPayment, invoices,
+// CommissionTransaction, TaxTransaction).
+// ─────────────────────────────────────────────
+
+enum BillingStatus {
+  TRIALING
+  PENDING_PAYMENT
+  ACTIVE
+  PAST_DUE
+  GRACE_PERIOD
+  CANCEL_SCHEDULED
+  CANCELLED
+  SUSPENDED
+  EXPIRED
+}
+
+enum BillingInterval {
+  month
+  year
+}
+
+/// Platform-wide billing knobs, editable in the super admin (tax rate,
+/// trial days, grace days, reminder schedule…). Key → JSON value.
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
+/// The catalog of things a plan can include ("advanced analytics", "API
+/// access", "staff accounts"). Which plan gets what is PlanFeature.
+model Feature {
+  key         String   @id
+  name        String
+  category    String
+  description String?
+  /// "boolean" (on/off) or "limit" (a number, e.g. staff accounts).
+  kind        String   @default("boolean")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  plans PlanFeature[]
+
+  @@map("features")
+}
+
+model PlanFeature {
+  planId     String
+  featureKey String
+  enabled    Boolean @default(true)
+  /// For "limit" features: the number; null = unlimited.
+  limitValue Int?
+
+  plan    Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  feature Feature @relation(fields: [featureKey], references: [key], onDelete: Cascade)
+
+  @@id([planId, featureKey])
+  @@map("plan_features")
+}
+
+/// A store's subscription — exactly one per store for its whole life; a
+/// cancelled or lapsed store that pays again reuses it (no duplicates).
+model Subscription {
+  id                  String           @id @default(cuid())
+  storeId             String           @unique
+  planId              String
+  interval            BillingInterval  @default(month)
+  status              BillingStatus
+  /// Off once the seller cancels — the paid period still runs to its end.
+  autoRenew           Boolean          @default(true)
+  trialStartedAt      DateTime?
+  trialEndsAt         DateTime?
+  /// When the one-time introductory first month was charged.
+  introUsedAt         DateTime?
+  /// subscription_start_date — the first paid period's start.
+  startedAt           DateTime?
+  currentPeriodStart  DateTime?
+  currentPeriodEnd    DateTime?
+  nextBillingAt       DateTime?
+  /// A downgrade / yearly→monthly switch waiting for the period's end.
+  pendingPlanId       String?
+  pendingInterval     BillingInterval?
+  cancelRequestedAt   DateTime?
+  cancelReason        String?
+  cancelledAt         DateTime?
+  expiredAt           DateTime?
+  /// Payment failed or period expired: full access until this moment.
+  graceEndsAt         DateTime?
+  /// Dashboard locked since (grace over, unpaid).
+  lockedAt            DateTime?
+  suspendedAt         DateTime?
+  /// Billing cycles in a row that went unpaid (3 → suspended).
+  consecutiveFailures Int              @default(0)
+  lastFailureAt       DateTime?
+  /// Next automatic retry of the unpaid charge (inside the grace period).
+  nextRetryAt         DateTime?
+  /// While unpaid: when the next unpaid cycle is counted.
+  dunningNextAt       DateTime?
+  /// Checkout fees collected up to here (monthly settlement on yearly plans).
+  feesSettledThrough  DateTime?
+  /// Admin: full access regardless of billing until this moment.
+  accessGrantedUntil  DateTime?
+  /// Admin promotional price (before tax) for the next N regular periods.
+  promoPrice          Decimal?         @db.Decimal(10, 2)
+  promoCyclesLeft     Int?
+  promoNote           String?
+  provider            String           @default("razorpay")
+  providerCustomerId  String?
+  /// Engine claim — one process works on a subscription at a time.
+  processingAt        DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  store    Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  plan     Plan                @relation(fields: [planId], references: [id])
+  items    SubscriptionItem[]
+  cycles   BillingCycle[]
+  mandates Mandate[]
+  payments BillingPayment[]
+  events   SubscriptionEvent[]
+  failures BillingFailure[]
+
+  @@index([status])
+  @@index([nextBillingAt])
+  @@map("subscriptions")
+}
+
+/// What a subscription bills each period (today: the plan).
+model SubscriptionItem {
+  id             String          @id @default(cuid())
+  subscriptionId String
+  kind           String
+  code           String
+  description    String
+  unitAmount     Decimal         @db.Decimal(10, 2)
+  quantity       Int             @default(1)
+  interval       BillingInterval
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, kind])
+  @@map("subscription_items")
+}
+
+/// One charge the engine owes itself: the intro month, a renewal, an
+/// upgrade's proration, or a checkout-fee settlement. Amounts before tax,
+/// tax, and total are fixed when the cycle is created.
+model BillingCycle {
+  id             String           @id @default(cuid())
+  storeId        String
+  subscriptionId String
+  /// intro | regular | proration | fees | reactivation
+  kind           String
+  planId         String?
+  interval       BillingInterval?
+  periodStart    DateTime
+  periodEnd      DateTime
+  dueAt          DateTime
+  planAmount     Decimal          @db.Decimal(12, 2)
+  feesAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  creditAmount   Decimal          @default(0) @db.Decimal(12, 2)
+  subtotal       Decimal          @db.Decimal(12, 2)
+  taxRate        Decimal          @db.Decimal(5, 2)
+  taxAmount      Decimal          @db.Decimal(12, 2)
+  total          Decimal          @db.Decimal(12, 2)
+  /// due | processing | paid | failed | waived | void
+  status         String           @default("due")
+  attempts       Int              @default(0)
+  lastAttemptAt  DateTime?
+  paidAt         DateTime?
+  failedAt       DateTime?
+  failureReason  String?
+  invoiceId      String?
+  /// Guarantees the engine never creates the same charge twice.
+  idempotencyKey String           @unique
+  meta           Json             @default("{}")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  store        Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  subscription Subscription     @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  payments     BillingPayment[]
+
+  @@index([subscriptionId, status])
+  @@index([storeId, createdAt])
+  @@map("billing_cycles")
+}
+
+/// A recurring-payment authorisation (e-mandate / UPI AutoPay / card) held
+/// by the payment provider. Only the provider's references are stored —
+/// never card or bank details.
+model Mandate {
+  id                 String    @id @default(cuid())
+  storeId            String
+  subscriptionId     String
+  provider           String    @default("razorpay")
+  providerCustomerId String
+  /// mandate_id — the provider's recurring token.
+  providerTokenId    String?   @unique
+  /// The authorisation order the seller completed.
+  providerOrderId    String?   @unique
+  /// upi | card | emandate
+  method             String
+  /// created | pending | active | rejected | cancelled | paused | expired
+  status             String    @default("created")
+  maxAmount          Decimal   @db.Decimal(12, 2)
+  frequency          String    @default("as_presented")
+  /// Created with live keys (false: Razorpay test mode or the sandbox).
+  /// Test and production share a database — the engine only charges a
+  /// mandate made in its own mode.
+  livemode           Boolean   @default(true)
+  expiresAt          DateTime?
+  failureReason      String?
+  createdAt          DateTime  @default(now())
+  activatedAt        DateTime?
+  cancelledAt        DateTime?
+  updatedAt          DateTime  @updatedAt
+
+  store         Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  subscription  Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod?
+
+  @@index([subscriptionId, status])
+  @@map("mandates")
+}
+
+/// How the seller pays, for display only (masked): "UPI · ka***@okhdfc".
+model PaymentMethod {
+  id        String   @id @default(cuid())
+  storeId   String
+  mandateId String   @unique
+  /// upi | card | netbanking
+  type      String
+  label     String
+  brand     String?
+  last4     String?
+  bank      String?
+  createdAt DateTime @default(now())
+
+  mandate Mandate @relation(fields: [mandateId], references: [id], onDelete: Cascade)
+
+  @@map("payment_methods")
+}
+
+/// Every attempt to take money from a seller — mandate authorisation,
+/// automatic charge, or a manual "pay now".
+model BillingPayment {
+  id                String        @id @default(cuid())
+  storeId           String
+  subscriptionId    String
+  cycleId           String?
+  mandateId         String?
+  /// mandate_setup | charge | manual
+  purpose           String
+  provider          String        @default("razorpay")
+  providerOrderId   String?       @unique
+  providerPaymentId String?       @unique
+  /// Total asked for, tax included.
+  amount            Decimal       @db.Decimal(12, 2)
+  currency          String        @default("INR")
+  /// created | pending | captured | failed | refunded | partially_refunded
+  status            String        @default("created")
+  method            String?
+  failureCode       String?
+  failureReason     String?
+  refundedAmount    Decimal       @default(0) @db.Decimal(12, 2)
+  attemptedAt       DateTime      @default(now())
+  capturedAt        DateTime?
+  failedAt          DateTime?
+  raw               Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  store        Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  subscription Subscription    @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  cycle        BillingCycle?   @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  refunds      BillingRefund[]
+
+  @@index([storeId, createdAt])
+  @@index([status, attemptedAt])
+  @@map("billing_payments")
+}
+
+model BillingRefund {
+  id               String   @id @default(cuid())
+  storeId          String
+  paymentId        String
+  providerRefundId String?  @unique
+  amount           Decimal  @db.Decimal(12, 2)
+  reason           String?
+  /// pending | processed | failed
+  status           String   @default("pending")
+  createdBy        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  payment BillingPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("billing_refunds")
+}
+
+/// One unpaid billing cycle (a failed charge, or a trial/period that ended
+/// without payment). Resolved when paid.
+model BillingFailure {
+  id             String    @id @default(cuid())
+  storeId        String
+  subscriptionId String
+  cycleId        String?
+  paymentId      String?
+  /// Which failure in a row this was (1, 2, 3…).
+  failureNumber  Int
+  reason         String
+  occurredAt     DateTime  @default(now())
+  graceEndsAt    DateTime?
+  resolvedAt     DateTime?
+  resolution     String?
+
+  store        Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, occurredAt])
+  @@map("billing_failures")
+}
+
+/// Append-only history of every subscription change and who made it.
+model SubscriptionEvent {
+  id             String   @id @default(cuid())
+  storeId        String
+  subscriptionId String
+  type           String
+  fromStatus     String?
+  toStatus       String?
+  /// system | seller | admin | provider
+  actorType      String   @default("system")
+  actorId        String?
+  data           Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  store        Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, createdAt])
+  @@map("subscription_events")
+}
+
+/// Oyklane's fee on one order (plan commission + One-Click fee), with GST
+/// kept separate. The rates are the order's own snapshot.
+model CommissionTransaction {
+  id               String   @id @default(cuid())
+  storeId          String
+  orderId          String
+  orderNumber      Int
+  planId           String?
+  /// accrual (+) or reversal (−) — at most one of each per order.
+  kind             String   @default("accrual")
+  orderAmount      Decimal  @db.Decimal(12, 2)
+  commissionRate   Decimal  @db.Decimal(5, 2)
+  oneClickActive   Boolean  @default(false)
+  oneClickRate     Decimal  @default(0) @db.Decimal(5, 2)
+  commissionAmount Decimal  @db.Decimal(12, 2)
+  oneClickAmount   Decimal  @default(0) @db.Decimal(12, 2)
+  baseFee          Decimal  @db.Decimal(12, 2)
+  taxRate          Decimal  @db.Decimal(5, 2)
+  taxAmount        Decimal  @db.Decimal(12, 2)
+  totalFee         Decimal  @db.Decimal(12, 2)
+  currency         String   @default("INR")
+  /// accrued | billed | paid | void
+  status           String   @default("accrued")
+  cycleId          String?
+  invoiceId        String?
+  /// "2026-10" — the month it counts toward (CommissionSummary).
+  periodMonth      String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, kind])
+  @@index([storeId, status])
+  @@index([storeId, periodMonth])
+  @@map("commission_transactions")
+}
+
+/// Monthly totals per store, kept in step with CommissionTransaction.
+model CommissionSummary {
+  id               String   @id @default(cuid())
+  storeId          String
+  month            String
+  orders           Int      @default(0)
+  orderAmount      Decimal  @default(0) @db.Decimal(14, 2)
+  commissionAmount Decimal  @default(0) @db.Decimal(12, 2)
+  oneClickAmount   Decimal  @default(0) @db.Decimal(12, 2)
+  baseFee          Decimal  @default(0) @db.Decimal(12, 2)
+  taxAmount        Decimal  @default(0) @db.Decimal(12, 2)
+  totalFee         Decimal  @default(0) @db.Decimal(12, 2)
+  updatedAt        DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, month])
+  @@map("commission_summaries")
+}
+
+/// GST on each invoice Oyklane issues, split CGST+SGST or IGST.
+model TaxTransaction {
+  id            String   @id @default(cuid())
+  storeId       String
+  invoiceId     String   @unique
+  taxableAmount Decimal  @db.Decimal(12, 2)
+  rate          Decimal  @db.Decimal(5, 2)
+  /// cgst_sgst | igst
+  taxType       String
+  cgst          Decimal  @default(0) @db.Decimal(12, 2)
+  sgst          Decimal  @default(0) @db.Decimal(12, 2)
+  igst          Decimal  @default(0) @db.Decimal(12, 2)
+  taxAmount     Decimal  @db.Decimal(12, 2)
+  createdAt     DateTime @default(now())
+
+  @@index([storeId, createdAt])
+  @@map("tax_transactions")
+}
+
+/// Every webhook from a payment provider, once — its event id is unique,
+/// so a retried delivery is recognised and not processed twice.
+model PaymentWebhookEvent {
+  id              String    @id @default(cuid())
+  provider        String
+  providerEventId String    @unique
+  eventType       String
+  payload         Json
+  processed       Boolean   @default(false)
+  processedAt     DateTime?
+  attempts        Int       @default(0)
+  error           String?
+  receivedAt      DateTime  @default(now())
+
+  @@index([processed, receivedAt])
+  @@map("payment_webhook_events")
+}
+
+/// Billing notices for the seller (dashboard banner + email). `dedupeKey`
+/// makes each reminder go out once.
+model BillingNotification {
+  id        String    @id @default(cuid())
+  storeId   String
+  type      String
+  dedupeKey String    @unique
+  title     String
+  body      String
+  /// info | success | warning | danger
+  severity  String    @default("info")
+  emailed   Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+  @@map("billing_notifications")
+}
+
+/// A per-store exception to its plan: a feature switched on, or a higher
+/// limit (e.g. "limit.staff" → 50), optionally until a date.
+model EntitlementGrant {
+  id        String    @id @default(cuid())
+  storeId   String
+  key       String
+  value     Json
+  reason    String?
+  grantedBy String?
+  expiresAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, key])
+  @@map("entitlement_grants")
+}
+
+/// A seller asking for more than their plan allows (more staff accounts
+/// than Pro's 30); approving it creates an EntitlementGrant.
+model LimitRequest {
+  id           String    @id @default(cuid())
+  storeId      String
+  key          String
+  currentLimit Int
+  requested    Int
+  reason       String?
+  /// pending | approved | rejected
+  status       String    @default("pending")
+  decidedBy    String?
+  decidedAt    DateTime?
+  note         String?
+  createdAt    DateTime  @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@map("limit_requests")
 }

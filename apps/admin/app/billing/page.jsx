@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import { serverApiFetch } from "@/lib/api";
-import { PlanChooser } from "./PlanChooser";
+import { CompleteSubscription } from "./CompleteSubscription";
 
-// Deliberately a top-level route (sibling of /login, /register), not nested
-// under /admin — admin/layout.jsx redirects every blocked store here, so
-// this page must live outside that layout's own redirect check or a
-// blocked store could never reach it at all.
+// A top-level route (a sibling of /login), not under /admin: the admin
+// layout sends every locked store here, so this page must sit outside that
+// layout's own lock check. Everything shown — amounts, what's locked — is
+// the billing engine's answer (GET /api/billing).
 export default async function BillingPage() {
   let me;
   try {
@@ -15,7 +15,6 @@ export default async function BillingPage() {
   }
   if (!me.store) redirect("/admin");
 
-  const { plans, billing } = await serverApiFetch("/api/store/billing");
-
-  return <PlanChooser plans={plans} billing={billing} storeName={me.store.name} currentPlanId={me.store.planId} />;
+  const billing = await serverApiFetch("/api/billing");
+  return <CompleteSubscription initial={billing} storeName={me.store.name} role={me.role} />;
 }

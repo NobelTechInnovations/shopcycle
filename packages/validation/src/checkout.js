@@ -26,6 +26,9 @@ const checkoutSchema = z.object({
   returnBase: z.string().url().max(500).optional(),
   // The unticked-by-default "email me offers" box — explicit consent only.
   acceptsMarketing: z.boolean().default(false),
+  // Placed through the One-Click Checkout popup (the app must be
+  // installed — the API checks; the order records it and its fee).
+  oneClick: z.boolean().default(false),
 });
 
 const verifyRazorpayPaymentSchema = z.object({

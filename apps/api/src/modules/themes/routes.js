@@ -11,12 +11,23 @@ async function themeRoutes(fastify) {
   fastify.post("/:id/activate", controller.activateHandler);
   fastify.delete("/:id", controller.deleteHandler);
   fastify.patch("/:id/settings", controller.updateSettingsHandler);
-  fastify.patch("/:id/files", controller.upsertFileHandler);
-  fastify.post("/:id/files", controller.createFileHandler);
-  fastify.delete("/:id/files/:fileId", controller.deleteFileHandler);
-  fastify.patch("/:id/files/:fileId/rename", controller.renameFileHandler);
+  // Editing theme code is part of Growth and Pro ("theme_advanced"). The
+  // visual editor saves only JSON (templates, settings), which every plan
+  // can do.
+  const codeGate = fastify.requirePlanFeature("theme_advanced");
+  const codeOnly = { preHandler: codeGate };
+  const codeUnlessJson = {
+    preHandler: async (request, reply) => {
+      if (/\.json$/i.test(String(request.body?.path || ""))) return;
+      return codeGate(request, reply);
+    },
+  };
+  fastify.patch("/:id/files", codeUnlessJson, controller.upsertFileHandler);
+  fastify.post("/:id/files", codeOnly, controller.createFileHandler);
+  fastify.delete("/:id/files/:fileId", codeOnly, controller.deleteFileHandler);
+  fastify.patch("/:id/files/:fileId/rename", codeOnly, controller.renameFileHandler);
   fastify.get("/:id/files/:fileId/revisions", controller.listRevisionsHandler);
-  fastify.post("/:id/files/:fileId/revisions/:revisionId/restore", controller.restoreRevisionHandler);
+  fastify.post("/:id/files/:fileId/revisions/:revisionId/restore", codeOnly, controller.restoreRevisionHandler);
   fastify.post("/:id/render-draft", controller.renderDraftHandler);
 }
 

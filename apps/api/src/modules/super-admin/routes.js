@@ -2,6 +2,7 @@ const controller = require("./controller");
 const security = require("./security");
 const { overview } = require("./overview");
 const { recordAudit } = require("../../lib/audit");
+const billingAdmin = require("./billing");
 
 // Human-readable audit action names for platform mutations. Anything
 // mutating that isn't listed still gets logged, under "METHOD /route" — a
@@ -15,6 +16,23 @@ const AUDIT_ACTIONS = {
   "POST /apps": "app.create",
   "PATCH /apps/:id": "app.update",
   "DELETE /apps/:id": "app.delete",
+  "POST /billing/subscriptions/:storeId/suspend": "billing.suspend",
+  "POST /billing/subscriptions/:storeId/restore": "billing.restore",
+  "POST /billing/subscriptions/:storeId/access": "billing.grant_access",
+  "POST /billing/subscriptions/:storeId/extend-trial": "billing.extend_trial",
+  "POST /billing/subscriptions/:storeId/plan": "billing.change_plan",
+  "POST /billing/subscriptions/:storeId/promo": "billing.promo",
+  "POST /billing/subscriptions/:storeId/remind": "billing.remind",
+  "POST /billing/subscriptions/:storeId/retry": "billing.retry",
+  "POST /billing/subscriptions/:storeId/cancel": "billing.cancel",
+  "POST /billing/subscriptions/:storeId/cycles/:cycleId/waive": "billing.waive",
+  "POST /billing/subscriptions/:storeId/payments/:paymentId/refund": "billing.refund",
+  "POST /billing/subscriptions/:storeId/entitlements": "billing.entitlement_grant",
+  "DELETE /billing/subscriptions/:storeId/entitlements/:grantId": "billing.entitlement_revoke",
+  "POST /billing/limit-requests/:id": "billing.limit_request",
+  "PATCH /billing/settings": "billing.settings",
+  "PATCH /billing/plans/:id": "billing.plan_update",
+  "PUT /billing/plans/:id/features": "billing.plan_features",
 };
 
 async function superAdminRoutes(fastify) {
@@ -35,7 +53,7 @@ async function superAdminRoutes(fastify) {
       scope: "platform",
       actor: request.currentUser,
       action: AUDIT_ACTIONS[key] || key,
-      storeId: route.startsWith("/companies/") ? request.params?.id : undefined,
+      storeId: route.startsWith("/companies/") ? request.params?.id : request.params?.storeId,
       targetType: route.split("/")[1] || undefined,
       targetId: request.params?.id,
       metadata: { body: request.body || {} },
@@ -50,6 +68,9 @@ async function superAdminRoutes(fastify) {
   fastify.post("/plans", controller.createPlanHandler);
   fastify.patch("/plans/:id", controller.updatePlanHandler);
   fastify.delete("/plans/:id", controller.deletePlanHandler);
+
+  // Billing engine controls (billing/admin.js).
+  fastify.register(billingAdmin, { prefix: "/billing" });
 
   fastify.get("/apps", controller.listAppsHandler);
   fastify.post("/apps", controller.createAppHandler);

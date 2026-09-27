@@ -183,7 +183,7 @@ export function NotificationSettings({ store, settings, canEdit, hasGstInvoices 
             <Form.Item
               name="invoicePrefix"
               label="Invoice prefix"
-              extra={hasGstInvoices ? "Invoices are numbered like INV-2627-0001." : "For GST invoices (Premium)."}
+              extra={hasGstInvoices ? "Invoices are numbered like INV-2627-0001." : "For GST invoices (Growth and Pro plans)."}
               rules={[{ pattern: /^[A-Za-z0-9]{1,5}$/, message: "1 to 5 letters or numbers" }]}
             >
               <Input maxLength={5} />

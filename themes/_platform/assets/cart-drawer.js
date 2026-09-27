@@ -138,9 +138,13 @@
     foot.innerHTML =
       rows +
       '<p class="oy-drawer__fine">Delivery and taxes are calculated at checkout.</p>' +
-      '<a class="oy-btn oy-btn--block" href="' + esc(cfg.checkout) + '">' + ICON.lock + " Checkout · " + money(cart.total) + "</a>" +
+      (cfg.oneClick
+        ? '<button type="button" class="oy-btn oy-btn--block" data-oy-oneclick>' + ICON.lock + " Checkout · " + money(cart.total) + "</button>"
+        : '<a class="oy-btn oy-btn--block" href="' + esc(cfg.checkout) + '">' + ICON.lock + " Checkout · " + money(cart.total) + "</a>") +
       '<a class="oy-btn oy-btn--ghost oy-btn--block" href="' + esc(cfg.cart) + '" data-oy-full>View cart</a>';
+    lastCart = cart;
   }
+  var lastCart = null;
 
   // ── Open / close ───────────────────────────────────────
   function open() {
@@ -168,7 +172,7 @@
     if (e.target.closest("[data-oy-close]")) close();
   });
   document.addEventListener("keydown", function (e) {
-    if (root.hidden) return;
+    if (root.hidden || sheet) return; // the one-click popup handles its own keys
     if (e.key === "Escape") return close();
     if (e.key !== "Tab") return;
     // Keep focus inside the drawer while it's open.
@@ -485,6 +489,155 @@
     },
     true
   );
+
+  // ── One-Click Checkout ─────────────────────────────────
+  // With the One-Click Checkout app installed, "Checkout" opens a single
+  // popup — contact, address and payment on one screen, filled in from the
+  // shopper's account or from this device — that posts to the store's
+  // normal checkout route (flagged oneClick). Without JavaScript, or on any
+  // error, the full checkout page still works.
+  var ONE = cfg.oneClick;
+  var REMEMBER_KEY = "oy_1click_" + (cfg.root || "").replace(/[^a-z0-9]/gi, "");
+  function remembered() {
+    try {
+      return JSON.parse(localStorage.getItem(REMEMBER_KEY) || "null");
+    } catch (e) {
+      return null;
+    }
+  }
+  function field(name, label, attrs, value, full) {
+    return (
+      '<label class="oy-1c__field' + (full ? " oy-1c__field--full" : "") + '"><span>' + label + "</span>" +
+      '<input class="oy-1c__input" name="' + name + '" value="' + esc(value || "") + '" ' + attrs + "></label>"
+    );
+  }
+  var METHOD_TEXT = {
+    cod: ["Cash on delivery", "Pay by cash or UPI when it arrives"],
+    razorpay: ["Pay online", "UPI, cards, net banking · Razorpay"],
+    cashfree: ["Pay online", "UPI, cards, net banking · Cashfree"],
+    payu: ["Pay online", "UPI, cards, EMI · PayU"],
+    stripe: ["Card", "Credit and debit cards · Stripe"],
+    paypal: ["PayPal", "PayPal or card"],
+  };
+  var sheet = null;
+  function closeSheet() {
+    if (!sheet) return;
+    sheet.classList.remove("is-open");
+    var s = sheet;
+    sheet = null;
+    setTimeout(function () {
+      s.remove();
+    }, 220);
+  }
+  function openSheet() {
+    if (!ONE || ONE.provider !== "native") {
+      location.href = cfg.checkout;
+      return;
+    }
+    var v = ONE.prefill || remembered() || {};
+    var f = ONE.fields || {};
+    var methods = ONE.methods || [];
+    var total = lastCart ? money(lastCart.total) : "";
+    var list = "oy-1c-states";
+    var html =
+      '<div class="oy-1c__scrim" data-oy-1c-close></div>' +
+      '<form class="oy-1c__panel" method="post" action="' + esc(cfg.checkout) + '" role="dialog" aria-modal="true" aria-labelledby="oy-1c-title" novalidate>' +
+      '<header class="oy-1c__head"><div><h2 id="oy-1c-title">Express checkout</h2><p>One step — we\'ll confirm your order right away.</p></div>' +
+      '<button type="button" class="oy-drawer__close" data-oy-1c-close aria-label="Close">' + ICON.x + "</button></header>" +
+      '<div class="oy-1c__body">' +
+      '<p class="oy-1c__error" role="alert" hidden></p>' +
+      '<fieldset><legend>Contact</legend><div class="oy-1c__grid">' +
+      field("email", "Email", 'type="email" required autocomplete="email" placeholder="you@example.com"', v.email, f.phone === "hidden") +
+      (f.phone === "hidden" ? "" : field("phone", "Mobile" + (f.phone === "required" ? "" : " (optional)"), 'type="tel" inputmode="tel" autocomplete="tel" pattern="[0-9+ ]{10,15}" ' + (f.phone === "required" ? "required" : ""), v.phone)) +
+      "</div></fieldset>" +
+      '<fieldset><legend>Deliver to</legend><div class="oy-1c__grid">' +
+      field("shippingName", "Full name", 'required autocomplete="name"', v.shippingName, true) +
+      field("shippingAddress1", "Address", 'required autocomplete="address-line1" placeholder="House number, street, area"', v.shippingAddress1, true) +
+      (f.address2 === "required" ? field("shippingAddress2", "Landmark", 'required autocomplete="address-line2"', v.shippingAddress2, true) : "") +
+      (f.company === "required" ? field("company", "Company", 'required autocomplete="organization" maxlength="120"', v.company, true) : "") +
+      field("shippingCity", "City", 'required autocomplete="address-level2"', v.shippingCity) +
+      field("shippingProvince", "State", 'required autocomplete="address-level1" list="' + list + '"', v.shippingProvince) +
+      field("shippingZip", "PIN code", 'required inputmode="numeric" autocomplete="postal-code" pattern="[0-9]{6}" maxlength="6"', v.shippingZip) +
+      '<datalist id="' + list + '">' + (ONE.states || []).map(function (st) { return '<option value="' + esc(st) + '">'; }).join("") + "</datalist>" +
+      "</div>" +
+      (f.country === "show" ? '<p class="oy-1c__note">Shipping outside India? <a href="' + esc(cfg.checkout) + '">Use the full checkout</a>.</p>' : "") +
+      '<input type="hidden" name="shippingCountry" value="IN"><input type="hidden" name="oneClick" value="1"></fieldset>' +
+      '<fieldset><legend>Payment</legend><div class="oy-1c__pay" role="radiogroup">' +
+      methods.map(function (m, i) {
+        var t = METHOD_TEXT[m.value] || [m.label, ""];
+        return '<label class="oy-1c__opt"><input type="radio" name="paymentMethod" value="' + esc(m.value) + '"' + (i === 0 ? " checked" : "") + '>' +
+          "<span><strong>" + esc(t[0]) + "</strong>" + (t[1] ? "<small>" + esc(t[1]) + "</small>" : "") + (m.testMode ? '<small class="oy-1c__test">Test mode</small>' : "") + "</span></label>";
+      }).join("") +
+      "</div></fieldset>" +
+      '<label class="oy-1c__remember"><input type="checkbox" data-oy-1c-remember' + (ONE.prefill ? "" : " checked") + "> Remember my details on this device</label>" +
+      "</div>" +
+      '<footer class="oy-1c__foot"><button type="submit" class="oy-btn oy-btn--block">' + ICON.lock + ' <span data-oy-1c-label>Place order · ' + esc(total) + "</span></button>" +
+      '<a class="oy-1c__full" href="' + esc(cfg.checkout) + '">Use the full checkout instead</a></footer>' +
+      "</form>";
+    sheet = document.createElement("div");
+    sheet.className = "oy-1c";
+    sheet.innerHTML = html;
+    document.body.appendChild(sheet);
+    var form = sheet.querySelector("form");
+    var label = sheet.querySelector("[data-oy-1c-label]");
+    function syncLabel() {
+      var m = form.querySelector('input[name="paymentMethod"]:checked');
+      label.textContent = (m && m.value !== "cod" ? "Pay " : "Place order · ") + total;
+    }
+    syncLabel();
+    form.addEventListener("change", syncLabel);
+    sheet.addEventListener("click", function (e) {
+      if (e.target.closest("[data-oy-1c-close]")) closeSheet();
+    });
+    form.addEventListener("submit", function (e) {
+      var err = sheet.querySelector(".oy-1c__error");
+      if (!form.checkValidity()) {
+        e.preventDefault();
+        var bad = form.querySelector(":invalid");
+        err.hidden = false;
+        err.textContent = bad ? (bad.closest("label") ? bad.closest("label").querySelector("span").textContent + ": " : "") + (bad.validationMessage || "Please check this field.") : "Please check the form.";
+        if (bad) bad.focus();
+        return;
+      }
+      if (!methods.length) {
+        e.preventDefault();
+        return;
+      }
+      var keep = sheet.querySelector("[data-oy-1c-remember]");
+      try {
+        if (keep && keep.checked) {
+          var saved = {};
+          ["email", "phone", "shippingName", "shippingAddress1", "shippingAddress2", "company", "shippingCity", "shippingProvince", "shippingZip"].forEach(function (k) {
+            if (form.elements[k]) saved[k] = form.elements[k].value;
+          });
+          localStorage.setItem(REMEMBER_KEY, JSON.stringify(saved));
+        } else {
+          localStorage.removeItem(REMEMBER_KEY);
+        }
+      } catch (x) {}
+      var btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      label.textContent = "Placing your order…";
+      try {
+        window.dispatchEvent(new CustomEvent("oy:checkout", { detail: { oneClick: true, total: lastCart && lastCart.total } }));
+      } catch (x) {}
+    });
+    requestAnimationFrame(function () {
+      sheet.classList.add("is-open");
+      var first = form.querySelector("input:not([type=hidden]):not([value]), input:invalid") || form.querySelector("input");
+      if (first) first.focus();
+    });
+  }
+  if (ONE) {
+    foot.addEventListener("click", function (e) {
+      if (!e.target.closest("[data-oy-oneclick]")) return;
+      e.preventDefault();
+      openSheet();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (sheet && e.key === "Escape") closeSheet();
+    });
+  }
 
   // Quantity buttons inside the drawer.
   body.addEventListener("click", function (e) {

@@ -2,14 +2,6 @@ import { redirect } from "next/navigation";
 import { serverApiFetch } from "@/lib/api";
 import { AdminShell } from "@/components/AdminShell";
 
-// Mirrors apps/api/src/modules/billing/access.js#isAdminBlocked — kept as a
-// tiny duplicate rather than a cross-app import (the admin app has no
-// access to the API's source tree at runtime). `me.accessState` itself is
-// computed server-side by GET /api/auth/me from the same access.js.
-function isAdminBlocked(accessState) {
-  return accessState === "needs_plan" || accessState === "admin_blocked" || accessState === "storefront_blocked";
-}
-
 export default async function AdminLayout({ children }) {
   let me;
   try {
@@ -28,12 +20,12 @@ export default async function AdminLayout({ children }) {
     redirect(process.env.NEXT_PUBLIC_SUPER_ADMIN_URL || "http://localhost:3003");
   }
 
-  // No plan chosen yet, or billing has lapsed long enough to lock the
-  // admin out — the billing screen itself (a top-level route, outside
-  // this layout) is the only way out, so send every other /admin/* page
-  // there. Keep the storefront running regardless (see storefront/
-  // service.js's separate, later storefront_blocked cutoff).
-  if (me.store && isAdminBlocked(me.accessState)) {
+  // The billing engine decides whether the dashboard is open (GET
+  // /api/auth/me → access, from billing/access.js — the same answer the
+  // API enforces on every request). A locked store goes to the billing
+  // page, a top-level route outside this layout; its storefront keeps
+  // running unless billing took it offline too.
+  if (me.store && me.access && me.access.dashboard === false) {
     redirect("/billing");
   }
 

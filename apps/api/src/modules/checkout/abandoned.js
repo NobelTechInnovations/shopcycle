@@ -3,7 +3,7 @@ const { HttpError } = require("@shopcycle/utils");
 const { sendEmail } = require("../../lib/mailer");
 const { storefrontUrl } = require("../../lib/storefront-url");
 const { storeSettings } = require("../../lib/store-settings");
-const { computeAccessState, isStorefrontBlocked } = require("../billing/access");
+const { computeAccess } = require("../billing/access");
 const templates = require("../../emails/templates");
 const cartService = require("../cart/service");
 
@@ -94,7 +94,7 @@ async function sweepAbandonedCheckouts(prisma, { delayMinutes = DEFAULT_DELAY_MI
       expiresAt: { gt: new Date(now) },
       checkoutStartedAt: { lte: new Date(now - delayMinutes * 60 * 1000), gte: new Date(now - MAX_AGE_DAYS * 24 * 60 * 60 * 1000) },
     },
-    include: { store: true },
+    include: { store: { include: { subscription: true } } },
     take: 100,
   });
 
@@ -108,7 +108,7 @@ async function sweepAbandonedCheckouts(prisma, { delayMinutes = DEFAULT_DELAY_MI
 
     const store = row.store;
     if (!storeSettings(store).notifications.abandonedCheckout) continue;
-    if (store.status !== "active" || isStorefrontBlocked(computeAccessState(store))) continue;
+    if (store.status !== "active" || !computeAccess(store.subscription, { storeStatus: store.status }).storefront) continue;
     // They may have ordered with a different cart since — don't nag.
     const ordered = await prisma.order.findFirst({
       where: { storeId: store.id, email: { equals: row.email, mode: "insensitive" }, createdAt: { gte: row.checkoutStartedAt } },

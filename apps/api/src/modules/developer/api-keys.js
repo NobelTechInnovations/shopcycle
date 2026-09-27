@@ -1,4 +1,6 @@
 const crypto = require("crypto");
+const entitlements = require("../billing/entitlements");
+const { computeAccess } = require("../billing/access");
 const { HttpError } = require("@shopcycle/utils");
 
 /**
@@ -51,9 +53,23 @@ function requireScope(fastify, scope) {
     const header = String(request.headers.authorization || "");
     const token = header.startsWith("Bearer ") ? header.slice(7).trim() : String(request.headers["x-oyklane-key"] || "").trim();
     if (!token.startsWith("oyk_")) return reply.code(401).send({ error: "Missing API key. Send it as: Authorization: Bearer oyk_…" });
-    const key = await fastify.prisma.apiKey.findUnique({ where: { keyHash: hash(token) }, include: { store: true } });
+    const key = await fastify.prisma.apiKey.findUnique({
+      where: { keyHash: hash(token) },
+      include: { store: { include: { subscription: { include: { plan: { include: { features: true } } } } } } },
+    });
     if (!key || key.revokedAt) return reply.code(401).send({ error: "This API key isn't valid (it may have been revoked)." });
     if (key.store.status === "suspended") return reply.code(403).send({ error: "This store is suspended." });
+    // The API is part of Pro (billing/catalog.js) and closes with the
+    // dashboard when billing is overdue.
+    const { subscription, ...store } = key.store;
+    if (!computeAccess(subscription, { storeStatus: store.status }).dashboard) {
+      return reply.code(402).send({ error: "This store's Oyklane subscription is overdue — the API is paused until it's paid." });
+    }
+    const ent = entitlements.compute(subscription?.plan || null, await entitlements.activeGrants(fastify.prisma, store.id));
+    if (!entitlements.has(ent, "api_access")) {
+      return reply.code(403).send({ error: "API access is part of the Pro plan. Upgrade in Settings ▸ Plan & billing.", code: "plan_upgrade_required" });
+    }
+    key.store = store;
     if (scope && !key.scopes.includes(scope)) return reply.code(403).send({ error: `This key doesn't have the ${scope} permission.` });
     request.apiKey = key;
     request.store = key.store;

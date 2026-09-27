@@ -1,5 +1,9 @@
+// The subscription fields billing/access.js needs to decide whether the
+// storefront is online — read in the same query as the store.
+const BILLING_SELECT = { select: { status: true, trialEndsAt: true, graceEndsAt: true, lockedAt: true, accessGrantedUntil: true } };
+
 function getStoreByHandle(prisma, handle) {
-  return prisma.store.findUnique({ where: { handle } });
+  return prisma.store.findUnique({ where: { handle }, include: { subscription: BILLING_SELECT } });
 }
 
 function getStoreByDomain(prisma, domain) {

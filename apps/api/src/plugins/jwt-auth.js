@@ -2,8 +2,27 @@ const fp = require("fastify-plugin");
 const jwt = require("@fastify/jwt");
 const cookie = require("@fastify/cookie");
 const { env } = require("../config/env");
-const { computeAccessState, isAdminBlocked } = require("../modules/billing/access");
-const { applyDuePendingPlan } = require("../modules/billing/plan-change");
+const { computeAccess } = require("../modules/billing/access");
+const entitlements = require("../modules/billing/entitlements");
+const { activeMandate } = require("../modules/billing/charges");
+
+/** What a store with a locked dashboard can still reach: billing (to pay)
+ * and the store basics the admin's shell needs to show the billing page. */
+function reachableWhileLocked(request) {
+  const path = String(request.url || "").split("?")[0];
+  if (path === "/api/billing" || path.startsWith("/api/billing/")) return true;
+  if (request.method === "GET" && (path === "/api/store" || path === "/api/store/")) return true;
+  return false;
+}
+
+const STORE_INCLUDE = { plan: true, subscription: { include: { plan: { include: { features: true } } } } };
+
+const LOCKED_MESSAGE = {
+  pending_payment: "Your free trial has ended. Complete your subscription to keep using your dashboard.",
+  locked: "Your subscription payment is overdue. Pay now to unlock your dashboard — your store is still live.",
+  suspended: "Your store is offline because of unpaid billing. Pay now to bring it back.",
+  cancelled: "Your subscription has ended. Choose a plan to continue.",
+};
 
 /** Which console a session token was issued for. Both consoles share one
  * signing secret, so without this a token is valid wherever it's presented
@@ -125,14 +144,14 @@ async function jwtAuthPlugin(fastify) {
     const storeUser = request.user.storeId
       ? await fastify.prisma.storeUser.findFirst({
           where: { userId: user.id, storeId: request.user.storeId },
-          include: { store: { include: { plan: true } } },
+          include: { store: { include: STORE_INCLUDE } },
         })
       : null;
     const resolved =
       storeUser ||
       (await fastify.prisma.storeUser.findFirst({
         where: { userId: user.id },
-        include: { store: { include: { plan: true } } },
+        include: { store: { include: STORE_INCLUDE } },
         orderBy: { createdAt: "asc" },
       }));
 
@@ -145,52 +164,57 @@ async function jwtAuthPlugin(fastify) {
       return;
     }
 
-    // Fallback for a downgrade whose renewal webhook never arrived: once
-    // the paid period is over, the store moves to the scheduled plan.
-    const store = resolved.store.pendingPlanId
-      ? await applyDuePendingPlan(fastify.prisma, resolved.store)
-      : resolved.store;
-
+    const store = resolved.store;
     request.currentUser = user;
     request.storeRole = resolved.role;
     request.store = store;
-    // Computed fresh on every request from timestamps (see billing/access.js)
-    // — never stale, and never needs a background job to keep it current.
-    request.accessState = computeAccessState(store);
-  });
 
-  /** Blocks everything except the billing screens themselves once a store's
-   * subscription state says it should be — see billing/access.js for
-   * exactly which states trigger this and why. Applied per-module
-   * (deliberately NOT inside loadStoreContext itself), so the billing
-   * module's own routes — where a merchant actually fixes the problem —
-   * never end up gating themselves. */
-  fastify.decorate("requireActiveSubscription", async function requireActiveSubscription(request, reply) {
-    if (isAdminBlocked(request.accessState)) {
-      reply.code(402).send({
-        error:
-          request.accessState === "needs_plan"
-            ? "Choose a plan to continue using your store's admin."
-            : "Your last payment failed — update billing to restore admin access.",
-        accessState: request.accessState,
-      });
+    // Access comes from the billing engine's subscription (billing/access.js)
+    // — computed on every request from its status and dates, so a lock
+    // takes effect on the next request without waiting for a job.
+    const sub = store.subscription;
+    const trialOver = sub?.status === "TRIALING" && sub.trialEndsAt && new Date(sub.trialEndsAt) <= new Date();
+    const mandateActive = trialOver ? Boolean(await activeMandate(fastify.prisma, sub.id)) : false;
+    const access = computeAccess(sub, { storeStatus: store.status, mandateActive });
+    request.subscription = sub || null;
+    request.access = access;
+    request.accessState = access.accessState;
+
+    // Entitlements (plan features + per-store grants), loaded on first use.
+    let ent = null;
+    request.getEntitlements = async () => {
+      if (!ent) ent = entitlements.compute(sub?.plan || null, await entitlements.activeGrants(fastify.prisma, store.id));
+      return ent;
+    };
+
+    if (!access.dashboard && !reachableWhileLocked(request)) {
+      reply.code(402).send({ error: LOCKED_MESSAGE[access.reason] || LOCKED_MESSAGE.locked, code: "billing_locked", reason: access.reason, accessState: access.accessState });
+      return reply;
     }
   });
 
-  /** Premium-only features, enforced server-side — hiding a button in the
-   * admin isn't a lock. `flag` is one of the Plan booleans (hasMetaAds,
-   * hasWhatsappIntegration, hasCsvExport, hasApiAccess, ...). A store with
-   * no plan yet gets none of them: its free month starts only once it
-   * picks a plan, and it may well pick Starter. Returns a hook; use as
-   * `fastify.addHook("preHandler", fastify.requirePlanFeature("hasMetaAds"))`
-   * after loadStoreContext. An array means "any of these" — for shared
-   * plumbing (the Meta connection) that more than one feature relies on. */
-  fastify.decorate("requirePlanFeature", function requirePlanFeature(flags) {
-    const required = Array.isArray(flags) ? flags : [flags];
+  /** Kept for the modules that add it explicitly — loadStoreContext
+   * already enforces the same lock centrally. */
+  fastify.decorate("requireActiveSubscription", async function requireActiveSubscription(request, reply) {
+    if (reply.sent) return reply;
+    if (request.access && !request.access.dashboard && !reachableWhileLocked(request)) {
+      reply.code(402).send({ error: LOCKED_MESSAGE[request.access.reason] || LOCKED_MESSAGE.locked, code: "billing_locked", reason: request.access.reason, accessState: request.accessState });
+    }
+  });
+
+  /** Plan features, enforced server-side — hiding a button in the admin
+   * isn't a lock. Takes feature keys from billing/catalog.js (older Plan
+   * flag names like "hasMetaAds" are mapped). An array means "any of
+   * these". Use after loadStoreContext:
+   * `fastify.addHook("preHandler", fastify.requirePlanFeature("marketing_tools"))` */
+  fastify.decorate("requirePlanFeature", function requirePlanFeature(keys) {
+    const required = Array.isArray(keys) ? keys : [keys];
     return async function planFeatureGate(request, reply) {
-      if (required.some((flag) => request.store?.plan?.[flag])) return;
+      if (reply.sent || !request.getEntitlements) return;
+      const ent = await request.getEntitlements();
+      if (required.some((k) => entitlements.has(ent, k))) return;
       reply.code(403).send({
-        error: "This feature is part of the Premium plan. Upgrade in Settings › Billing to use it.",
+        error: `This feature isn't part of your ${ent.plan?.name || "current"} plan. Upgrade in Settings ▸ Plan & billing to use it.`,
         code: "plan_upgrade_required",
         feature: required[0],
       });

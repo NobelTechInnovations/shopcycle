@@ -1,40 +1,42 @@
 const { HttpError } = require("@shopcycle/utils");
 const repository = require("./repository");
+const entitlements = require("../billing/entitlements");
 
-/** Catalog apps that only Premium includes, keyed by App.key → the Plan
- * flag that unlocks them. Their API modules are gated too (see
- * requirePlanFeature in plugins/jwt-auth.js); this stops the install
+/** Catalog apps a plan has to include, keyed by App.key → the feature
+ * (billing/catalog.js) that unlocks them. Their API modules are gated too
+ * (requirePlanFeature in plugins/jwt-auth.js); this stops the install
  * itself and tells the Apps page which cards to badge. */
-const PREMIUM_APPS = {
-  "meta-ads": "hasMetaAds",
-  whatsapp: "hasWhatsappIntegration",
+const PLAN_APPS = {
+  "meta-ads": "marketing_tools",
+  whatsapp: "marketing_tools",
 };
 
-function lockedFor(store, appKey) {
-  const flag = PREMIUM_APPS[appKey];
-  return Boolean(flag && !store?.plan?.[flag]);
+function lockedFor(ent, appKey) {
+  const feature = PLAN_APPS[appKey];
+  return Boolean(feature && !entitlements.has(ent, feature));
 }
 
 async function listForStore(prisma, store) {
-  const [catalog, installs] = await Promise.all([
+  const [catalog, installs, ent] = await Promise.all([
     repository.listCatalog(prisma),
     repository.listInstalledForStore(prisma, store.id),
+    entitlements.forStore(prisma, store.id),
   ]);
   const installedByAppId = Object.fromEntries(installs.map((i) => [i.appId, i]));
   return catalog.map((app) => ({
     ...app,
     installed: Boolean(installedByAppId[app.id]),
     settings: installedByAppId[app.id]?.settings || {},
-    premium: Boolean(PREMIUM_APPS[app.key]),
-    locked: lockedFor(store, app.key),
+    premium: Boolean(PLAN_APPS[app.key]),
+    locked: lockedFor(ent, app.key),
   }));
 }
 
 async function installApp(prisma, store, key, settings) {
   const app = await repository.findAppByKey(prisma, key);
   if (!app) throw new HttpError(404, "App not found");
-  if (lockedFor(store, key)) {
-    throw new HttpError(403, `${app.name} is part of the Premium plan. Upgrade in Settings › Billing to install it.`, {
+  if (lockedFor(await entitlements.forStore(prisma, store.id), key)) {
+    throw new HttpError(403, `${app.name} is part of the Growth and Pro plans. Upgrade in Settings ▸ Plan & billing to install it.`, {
       code: "plan_upgrade_required",
     });
   }

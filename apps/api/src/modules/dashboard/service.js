@@ -38,7 +38,10 @@ async function getOverview(prisma, store, user) {
       hasProduct: productCount > 0,
       hasCollection: collectionCount > 0,
       hasShipping: shippingZoneCount > 0,
-      hasPlan: store.subscriptionStatus !== "no_plan",
+      // Done once the subscription is paid, or autopay is set up to pay it.
+      hasPlan:
+        ["ACTIVE", "CANCEL_SCHEDULED"].includes(store.subscription?.status) ||
+        (await prisma.mandate.count({ where: { storeId, status: { in: ["active", "pending"] } } })) > 0,
       hasDomain: Boolean(store.domain),
     },
   };

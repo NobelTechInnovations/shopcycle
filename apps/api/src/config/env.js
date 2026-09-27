@@ -63,12 +63,12 @@ const envSchema = z.object({
   // set (see checkout/service.js). Cash on Delivery works either way.
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
-  // Platform billing (Phase 9) — merchants paying us monthly, via the same
-  // Razorpay account/keys above but the Subscriptions product rather than
-  // one-off Orders. RAZORPAY_WEBHOOK_SECRET is the separate secret Razorpay
-  // gives you when you register the webhook URL in their dashboard
-  // (Settings ▸ Webhooks) — required to trust a webhook call actually came
-  // from Razorpay rather than anyone who finds the URL.
+  // Platform billing (modules/billing) — sellers paying Oyklane, through
+  // recurring payments on a mandate (UPI AutoPay, card or e-mandate) on the
+  // same Razorpay account. RAZORPAY_WEBHOOK_SECRET is the secret Razorpay
+  // gives you when you register https://<api>/api/webhooks/razorpay in
+  // their dashboard (Settings ▸ Webhooks) — without it no webhook is
+  // trusted, and payments are only picked up by the engine's polling.
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
   // Only ever changed to point the billing flows at a local mock in tests.
   RAZORPAY_API_URL: z.string().default("https://api.razorpay.com/v1"),
@@ -78,6 +78,16 @@ const envSchema = z.object({
   // Razorpay keys are set, and the API refuses to boot with it in
   // production — see the check at the bottom of this file.
   BILLING_SANDBOX: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
+  // The billing engine's timer (renewals, retries, locks, reminders).
+  // Unset: on in production, off elsewhere — local and production share a
+  // database, so a laptop must never bill real stores. "true" forces it on.
+  BILLING_JOBS: z.enum(["true", "false"]).optional(),
+  // Tests only: POST /api/billing/_test/clock runs the engine for the
+  // caller's store at a chosen time. Never available in production.
+  BILLING_TEST_CLOCK: z
     .enum(["true", "false"])
     .optional()
     .transform((v) => v === "true"),

@@ -1,237 +1,285 @@
-const crypto = require("crypto");
 const { HttpError } = require("@shopcycle/utils");
 const { env } = require("../../config/env");
-const { GRACE_DAYS_BEFORE_PLAN_REQUIRED, computeAccessState } = require("./access");
-const { safeEqual } = require("../../lib/crypto");
-const { razorpayConfigured, billingMode, razorpayRequest, fetchSubscription } = require("./razorpay");
-const { scheduleAccruedFees } = require("./commission");
-const { issueRenewalInvoice } = require("./invoices");
+const { getSettings } = require("./settings");
+const { billingMode, provider } = require("./providers");
+const { periodPrice } = require("./pricing");
+const { tax, num, round2 } = require("./money");
+const { computeAccess } = require("./access");
+const { S } = require("./state");
+const cycles = require("./cycles");
+const charges = require("./charges");
+const mandates = require("./mandates");
+const commission = require("./commission");
+const entitlements = require("./entitlements");
+const subscriptions = require("./subscriptions");
+const planChange = require("./plan-change");
 
-/** Every plan needs a matching Razorpay Plan before a merchant can
- * subscribe to it — created once, lazily, on whichever store subscribes
- * first, then reused by every store after (see Plan.razorpayPlanId). Never
- * pre-created in the seed script: creating it against a live Razorpay
- * account is a side effect that shouldn't happen just from running `seed`
- * in a dev environment with no real keys configured. */
-async function ensureRazorpayPlan(prisma, plan) {
-  if (plan.razorpayPlanId) return plan.razorpayPlanId;
+/**
+ * The seller side of billing, used by /api/billing. The admin derives
+ * everything it shows — locks included — from `overview`; it never
+ * decides access itself.
+ */
 
-  const created = await razorpayRequest("/plans", {
-    method: "POST",
-    body: {
-      period: "monthly",
-      interval: 1,
-      item: {
-        name: `${plan.name} plan`,
-        amount: Math.round(Number(plan.priceMonthly) * 100),
-        currency: "INR",
+/** Plans for the pricing table, with yearly prices and features. */
+async function listPlans(prisma, { settings, store } = {}) {
+  const s = settings || (await getSettings(prisma));
+  const [plans, features] = await Promise.all([
+    prisma.plan.findMany({ where: { isActive: true, key: { not: null } }, orderBy: { sortOrder: "asc" }, include: { features: true } }),
+    prisma.feature.findMany({ orderBy: { sortOrder: "asc" } }),
+  ]);
+  const featureName = Object.fromEntries(features.map((f) => [f.key, f]));
+  return plans.map((p) => {
+    const monthly = periodPrice(p, "month", s);
+    const yearly = periodPrice(p, "year", s);
+    const staff = entitlements.planStaffLimit(p);
+    return {
+      id: p.id,
+      key: p.key,
+      name: p.name,
+      tagline: p.tagline,
+      description: p.description,
+      priceMonthly: monthly,
+      priceYearly: yearly,
+      yearlyPerMonth: round2(yearly / 12),
+      yearlySavings: round2(monthly * 12 - yearly),
+      commissionPercent: num(p.commissionPercent),
+      staffLimit: staff,
+      productLimit: p.productLimit,
+      // What the seller pays at checkout for each (tax included).
+      withTax: {
+        month: tax(monthly, s.taxRate, store?.billingState).total,
+        year: tax(yearly, s.taxRate, store?.billingState).total,
+        intro: tax(s.introPrice, s.taxRate, store?.billingState).total,
       },
-      notes: { planId: plan.id },
-    },
-  });
-
-  await prisma.plan.update({ where: { id: plan.id }, data: { razorpayPlanId: created.id } });
-  return created.id;
-}
-
-/** Starts (or restarts) a store's subscription mandate. The subscription
- * is authorized right away — that's the whole point of a mandate — but
- * billing doesn't actually start until `start_at`, one month out, which is
- * what makes this "authorize now, first real charge in a month" rather
- * than an immediate charge. Razorpay requires a finite `total_count`; 120
- * monthly cycles (10 years) is used as a practical stand-in for "ongoing,"
- * renewable the same way if it's ever actually reached. */
-async function createSubscription(prisma, store, plan) {
-  const mode = billingMode();
-  if (mode === "sandbox") {
-    // No mandate to authorize — the free trial starts right here.
-    const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    const updated = await activateSubscription(prisma, store, plan, { subscriptionId: null, trialEndsAt });
-    return { sandbox: true, store: updated, trialEndsAt };
-  }
-  if (mode === "unconfigured") {
-    throw new HttpError(503, "Plan billing isn't switched on for Oyklane yet. Please try again later.");
-  }
-
-  const razorpayPlanId = await ensureRazorpayPlan(prisma, plan);
-  const startAt = Math.floor((Date.now() + 30 * 24 * 60 * 60 * 1000) / 1000);
-
-  const subscription = await razorpayRequest("/subscriptions", {
-    method: "POST",
-    body: {
-      plan_id: razorpayPlanId,
-      total_count: 120,
-      quantity: 1,
-      customer_notify: 1,
-      start_at: startAt,
-      notes: { storeId: store.id, planId: plan.id },
-    },
-  });
-
-  return { subscriptionId: subscription.id, razorpayKeyId: env.RAZORPAY_KEY_ID, trialEndsAt: new Date(startAt * 1000) };
-}
-
-/** Verifies the checkout widget's callback signature the same way
- * checkout/service.js would for a one-off order — HMAC-SHA256 over
- * `payment_id|subscription_id` using the account's key secret. Never
- * trust a client-reported "it worked" without this; it's the only proof
- * the callback actually came from Razorpay and wasn't fabricated. */
-function verifySubscriptionSignature({ razorpay_payment_id, razorpay_subscription_id, razorpay_signature }) {
-  const expected = crypto
-    .createHmac("sha256", env.RAZORPAY_KEY_SECRET)
-    .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
-    .digest("hex");
-  return safeEqual(expected, razorpay_signature);
-}
-
-/** Which plan a verified mandate is actually for — read from Razorpay's
- * own record of the subscription, never from the browser. The signature
- * only proves the payment/subscription pair is genuine; without this a
- * merchant could authorize a ₹999 Starter mandate and then report Premium
- * as the plan, getting Premium while being charged for Starter. Also
- * refuses a subscription created for a different store. */
-async function resolveMandatePlan(prisma, store, subscriptionId) {
-  const subscription = await fetchSubscription(subscriptionId);
-  if (subscription?.notes?.storeId !== store.id) {
-    throw new HttpError(400, "This subscription doesn't belong to your store.");
-  }
-  const plan = await prisma.plan.findUnique({ where: { id: String(subscription.notes.planId || "") } });
-  if (!plan || (plan.razorpayPlanId && subscription.plan_id && plan.razorpayPlanId !== subscription.plan_id)) {
-    throw new HttpError(400, "Couldn't match this subscription to a plan.");
-  }
-  return plan;
-}
-
-/** Called once the checkout widget's handler confirms the mandate was
- * authorized — moves the store from no_plan straight to trialing (the
- * free month), whatever plan it previously had (a re-subscribe after a
- * cancellation lands the same way). */
-async function activateSubscription(prisma, store, plan, { subscriptionId, trialEndsAt }) {
-  return prisma.store.update({
-    where: { id: store.id },
-    data: {
-      planId: plan.id,
-      subscriptionStatus: "trialing",
-      razorpaySubscriptionId: subscriptionId,
-      trialEndsAt,
-      mandateDeadline: null,
-      paymentFailedAt: null,
-    },
+      features: p.features
+        .filter((f) => f.enabled && f.featureKey !== "staff" && featureName[f.featureKey])
+        .sort((a, b) => featureName[a.featureKey].sortOrder - featureName[b.featureKey].sortOrder)
+        .map((f) => ({ key: f.featureKey, name: featureName[f.featureKey].name, category: featureName[f.featureKey].category })),
+    };
   });
 }
 
-const fromUnix = (s) => (s ? new Date(Number(s) * 1000) : null);
-
-/** A successful renewal charge — the heart of platform billing:
- *   1. a downgrade scheduled for this renewal takes effect (Razorpay has
- *      already switched the plan at cycle end, so the store follows)
- *   2. the store is active again, with its new billing period recorded
- *   3. the GST invoice for this charge is issued (idempotent per payment),
- *      itemising the platform fees that were scheduled onto it
- *   4. fees accrued since the last renewal are scheduled onto the next one
- * Step 4 failing (Razorpay unreachable) must not fail the webhook — the
- * fees simply stay accrued and are picked up at the next renewal. */
-async function handleCharged(prisma, store, event, log) {
-  const subscription = event.payload?.subscription?.entity || {};
-  const payment = event.payload?.payment?.entity || {};
-
-  const updated = await prisma.store.update({
-    where: { id: store.id },
-    data: {
-      subscriptionStatus: "active",
-      paymentFailedAt: null,
-      currentPeriodEnd: fromUnix(subscription.current_end) || store.currentPeriodEnd,
-      ...(store.pendingPlanId && { planId: store.pendingPlanId, pendingPlanId: null }),
-    },
-    include: { plan: true },
-  });
-
-  if (payment.id && payment.amount) {
-    await issueRenewalInvoice(prisma, updated, {
-      paymentId: payment.id,
-      total: Number(payment.amount) / 100,
-      periodStart: fromUnix(subscription.current_start),
-      periodEnd: fromUnix(subscription.current_end),
-      planName: updated.plan?.name,
-    });
-  }
-
-  try {
-    await scheduleAccruedFees(prisma, updated);
-  } catch (err) {
-    log?.warn({ err, storeId: store.id }, "billing: could not schedule platform fees; they stay accrued");
-  }
-}
-
-/** Handles the webhook events that change a store's billing state —
- * everything else (subscription.pending, invoice.*, ...) is acknowledged
- * and ignored. See access.js for what past_due does to admin/storefront
- * access over the following days. */
-async function handleWebhookEvent(prisma, event, log) {
-  const subscriptionId =
-    event.payload?.subscription?.entity?.id || event.payload?.payment?.entity?.subscription_id;
-  if (!subscriptionId) return;
-
-  const store = await prisma.store.findUnique({ where: { razorpaySubscriptionId: subscriptionId } });
-  if (!store) return; // not one of ours, or already unlinked — nothing to do
-
-  if (event.event === "subscription.charged") {
-    await handleCharged(prisma, store, event, log);
-  } else if (event.event === "payment.failed" || event.event === "subscription.halted") {
-    await prisma.store.update({
-      where: { id: store.id },
-      data: { subscriptionStatus: "past_due", paymentFailedAt: store.paymentFailedAt || new Date() },
-    });
-  } else if (event.event === "subscription.cancelled") {
-    await prisma.store.update({
-      where: { id: store.id },
-      data: { subscriptionStatus: "cancelled" },
-    });
-  }
-}
-
-function verifyWebhookSignature(rawBody, signature) {
-  if (!env.RAZORPAY_WEBHOOK_SECRET) return false;
-  const expected = crypto.createHmac("sha256", env.RAZORPAY_WEBHOOK_SECRET).update(rawBody).digest("hex");
-  return safeEqual(expected, signature);
-}
-
-function serializeBillingStatus(store) {
-  const mode = billingMode();
+function publicSettings(s) {
   return {
-    mode,
-    // A pointer for whoever runs a dev/staging copy — never shown to
-    // merchants on production, where it would only be noise.
-    setupHint:
-      mode === "unconfigured" && env.NODE_ENV !== "production"
-        ? "Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env, or set BILLING_SANDBOX=true to test plans locally, then restart the API."
-        : null,
-    subscriptionStatus: store.subscriptionStatus,
-    accessState: computeAccessState(store),
-    mandateDeadline: store.mandateDeadline,
-    trialEndsAt: store.trialEndsAt,
-    paymentFailedAt: store.paymentFailedAt,
-    currentPeriodEnd: store.currentPeriodEnd,
-    pendingPlanId: store.pendingPlanId,
-    graceDays: GRACE_DAYS_BEFORE_PLAN_REQUIRED,
-    billingDetails: {
-      billingName: store.billingName,
-      gstin: store.gstin,
-      billingAddress: store.billingAddress,
-      billingState: store.billingState,
-    },
+    taxRate: Number(s.taxRate),
+    trialDays: s.trialDays,
+    introEnabled: s.introEnabled,
+    introPrice: Number(s.introPrice),
+    annualDiscountPercent: Number(s.annualDiscountPercent),
+    graceDays: s.graceDays,
+    maxConsecutiveFailures: s.maxConsecutiveFailures,
+    oneClickFeePercent: Number(s.oneClickFeePercent),
+    mandateMaxAmount: s.mandateMaxAmount,
+    supportEmail: s.supportEmail,
   };
 }
 
-module.exports = {
-  razorpayConfigured,
-  billingMode,
-  ensureRazorpayPlan,
-  createSubscription,
-  verifySubscriptionSignature,
-  resolveMandatePlan,
-  activateSubscription,
-  handleWebhookEvent,
-  verifyWebhookSignature,
-  serializeBillingStatus,
-};
+/** Everything the billing screens show, computed server-side. */
+async function overview(prisma, store, { log } = {}) {
+  const settings = await getSettings(prisma);
+  const sub = await subscriptions.forStore(prisma, store);
+  if (!sub) {
+    return { mode: billingMode(), subscription: null, access: computeAccess(null), plans: await listPlans(prisma, { settings, store }), settings: publicSettings(settings) };
+  }
+  subscriptions.welcome(prisma, store, sub, { log }).catch(() => {});
+
+  const now = new Date();
+  const [mandate, open, plans, fees, ent, staffUsed, notices, pendingPlan, lastPayments] = await Promise.all([
+    prisma.mandate.findFirst({ where: { subscriptionId: sub.id, status: { in: ["active", "pending", "paused"] } }, orderBy: { createdAt: "desc" }, include: { paymentMethod: true } }),
+    cycles.outstanding(prisma, sub.id),
+    listPlans(prisma, { settings, store }),
+    commission.feeSummary(prisma, store.id),
+    entitlements.forStore(prisma, store.id, { planId: sub.planId }),
+    entitlements.staffUsage(prisma, store.id),
+    prisma.billingNotification.findMany({ where: { storeId: store.id }, orderBy: { createdAt: "desc" }, take: 10 }),
+    sub.pendingPlanId ? prisma.plan.findUnique({ where: { id: sub.pendingPlanId }, select: { id: true, name: true } }) : null,
+    prisma.billingPayment.findMany({ where: { storeId: store.id }, orderBy: { createdAt: "desc" }, take: 5 }),
+  ]);
+  const usable = await charges.activeMandate(prisma, sub.id);
+  const access = computeAccess(sub, { now, storeStatus: store.status, mandateActive: Boolean(usable) });
+  const next = await cycles.estimateNext(prisma, store, sub, sub.plan, { settings });
+
+  // What the seller would pay on the "Complete your subscription" page.
+  let due = open ? cycles.serializeCycle(open) : null;
+  if (!due && [S.EXPIRED, S.CANCELLED, S.SUSPENDED].includes(sub.status)) {
+    const price = periodPrice(sub.plan, sub.interval, settings);
+    const feeAcc = Math.max(0, (await commission.accruedTotal(prisma, store.id)).amount);
+    const t = tax(round2(price + feeAcc), settings.taxRate, store.billingState);
+    due = { kind: "reactivation", planAmount: price, feesAmount: feeAcc, creditAmount: 0, subtotal: t.taxable, taxRate: t.rate, taxAmount: t.amount, total: t.total, status: "quote" };
+  }
+
+  return {
+    mode: billingMode(),
+    livemode: billingMode() === "razorpay" ? provider().livemode() : false,
+    setupHint:
+      billingMode() === "unconfigured" && env.NODE_ENV !== "production"
+        ? "Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env, or set BILLING_SANDBOX=true to test locally, then restart the API."
+        : null,
+    subscription: { ...subscriptions.serialize(sub, { settings }), plan: plans.find((p) => p.id === sub.planId) || { id: sub.plan.id, name: sub.plan.name }, pendingPlan },
+    access,
+    mandate: mandates.serialize(mandate),
+    mandateUsable: Boolean(usable),
+    due,
+    next,
+    plans,
+    settings: publicSettings(settings),
+    fees: { accrued: fees.accrued, billed: fees.billed, paid: fees.paid, currentMonth: fees.currentMonth, months: fees.months.slice(0, 6) },
+    entitlements: ent,
+    staff: { used: staffUsed, limit: ent.limits.staff },
+    notifications: notices.map((n) => ({ id: n.id, type: n.type, title: n.title, body: n.body, severity: n.severity, readAt: n.readAt, createdAt: n.createdAt })),
+    recentPayments: lastPayments.map(serializePayment),
+    billingDetails: { billingName: store.billingName, gstin: store.gstin, billingAddress: store.billingAddress, billingState: store.billingState },
+  };
+}
+
+function serializePayment(p) {
+  return {
+    id: p.id,
+    purpose: p.purpose,
+    amount: num(p.amount),
+    currency: p.currency,
+    status: p.status,
+    method: p.method,
+    refundedAmount: num(p.refundedAmount),
+    failureReason: p.failureReason,
+    providerPaymentId: p.providerPaymentId,
+    cycleId: p.cycleId,
+    createdAt: p.createdAt,
+    capturedAt: p.capturedAt,
+    failedAt: p.failedAt,
+  };
+}
+
+/** The cycle the seller pays on the checkout page, created on demand. */
+async function dueCycle(prisma, store, sub, now = new Date()) {
+  const open = await cycles.outstanding(prisma, sub.id);
+  if (open) return open;
+  const plan = sub.plan || (await prisma.plan.findUnique({ where: { id: sub.planId } }));
+  if ([S.EXPIRED, S.CANCELLED, S.SUSPENDED, S.PENDING_PAYMENT].includes(sub.status)) {
+    return cycles.reactivationCycle(prisma, store, sub, plan, sub.interval, now);
+  }
+  if (sub.status === S.TRIALING && sub.trialEndsAt && new Date(sub.trialEndsAt) <= now) {
+    return cycles.firstCycle(prisma, store, sub, plan, sub.trialEndsAt);
+  }
+  return null;
+}
+
+/**
+ * "Complete your subscription" / "Pay now". Without autopay: sets it up,
+ * collecting whatever is due in the same step. With autopay already on
+ * and something due: a one-time payment for it.
+ */
+async function startCheckout(prisma, store, user, { planId, interval, method, now = new Date(), log }) {
+  let sub = await subscriptions.forStore(prisma, store);
+  if (!sub) throw new HttpError(503, "Billing isn't set up yet. Please try again shortly.");
+  if ((planId && planId !== sub.planId) || (interval && interval !== sub.interval)) {
+    const p = await planChange.preview(prisma, store, sub, { planId: planId || sub.planId, interval: interval || sub.interval, now });
+    if (p.type !== "free" && p.type !== "same") throw new HttpError(409, "Change plans from Settings ▸ Plan & billing.");
+    if (p.type === "free") await planChange.change(prisma, store, sub, { planId: planId || sub.planId, interval: interval || sub.interval, now, actorId: user?.id, log });
+    sub = await subscriptions.forStore(prisma, store);
+  }
+  const cycle = await dueCycle(prisma, store, sub, now);
+  if (cycle?.status === "processing") {
+    throw new HttpError(409, "A payment for this is already with your bank — we'll update this page as soon as it's confirmed.");
+  }
+  const mandate = await charges.activeMandate(prisma, sub.id);
+  if (mandate) {
+    if (!cycle) throw new HttpError(409, "Nothing to pay right now — autopay is set up.");
+    return startOneTime(prisma, store, sub, cycle, { now, log });
+  }
+  return mandates.createSetup(prisma, store, sub, { method: method || "upi", cycle, now, log, actorId: user?.id });
+}
+
+async function startOneTime(prisma, store, sub, cycle, { now, log }) {
+  const p = provider();
+  const amount = num(cycle.total);
+  const notes = { storeId: store.id, subscriptionId: sub.id, cycleId: cycle.id, purpose: "manual" };
+  const order = await p.createPaymentOrder({ amount, receipt: `pay_${cycle.id}`, notes });
+  const payment = await prisma.billingPayment.create({
+    data: { storeId: store.id, subscriptionId: sub.id, cycleId: cycle.id, purpose: "manual", provider: p.key, providerOrderId: order.orderId, amount, status: "created", attemptedAt: now },
+  });
+  if (p.key === "sandbox") {
+    const paymentId = `pay_sbx${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    await prisma.billingPayment.update({ where: { id: payment.id }, data: { providerPaymentId: paymentId } });
+    await charges.applyProviderPayment(prisma, { ...payment, providerPaymentId: paymentId }, { id: paymentId, orderId: order.orderId, status: "captured", amount, method: "upi" }, { now, log });
+    return { completed: true, amount };
+  }
+  const { ownerContact } = require("./notifications");
+  const who = await ownerContact(prisma, store.id);
+  return {
+    completed: false,
+    amount,
+    checkout: p.checkoutOptions({ orderId: order.orderId, amount, name: "Oyklane", description: `${store.name} — subscription`, prefill: { name: who.name || "", email: who.email || "", contact: who.contact || "" }, notes }),
+  };
+}
+
+/** The checkout window reported success. Verified with the provider —
+ * the signature proves it came from Razorpay, and the payment itself is
+ * fetched server-side before anything is applied. */
+async function verifyCheckout(prisma, store, { orderId, paymentId, signature }, { log } = {}) {
+  const payment = orderId ? await prisma.billingPayment.findUnique({ where: { providerOrderId: String(orderId) } }) : null;
+  if (!payment || payment.storeId !== store.id) throw new HttpError(404, "We couldn't find this payment.");
+  const p = provider(payment.provider);
+  if (!p.verifyCheckoutSignature({ orderId, paymentId, signature })) throw new HttpError(400, "We couldn't verify this payment. If money was taken, it will be matched automatically within a few minutes.");
+  const pp = await p.fetchPayment(paymentId);
+  if (!pp || (pp.orderId && pp.orderId !== payment.providerOrderId)) throw new HttpError(400, "This payment doesn't match your order.");
+  if (!payment.providerPaymentId) {
+    await prisma.billingPayment.update({ where: { id: payment.id }, data: { providerPaymentId: paymentId } }).catch(() => {});
+  }
+  if (payment.purpose === "mandate_setup") await mandates.recordToken(prisma, payment, pp);
+  const result = await charges.applyProviderPayment(prisma, { ...payment, providerPaymentId: paymentId }, pp, { log });
+  return { result, status: pp.status };
+}
+
+/** Replace the autopay method (card expired, different bank). */
+async function replaceMandate(prisma, store, user, { method, now = new Date(), log }) {
+  const sub = await subscriptions.forStore(prisma, store);
+  const open = await cycles.outstanding(prisma, sub.id);
+  const cycle = open && ["due", "failed"].includes(open.status) ? open : null;
+  return mandates.createSetup(prisma, store, sub, { method, cycle, now, log, actorId: user?.id });
+}
+
+/** Paged history for the billing screens. */
+async function listInvoices(prisma, storeId, { page = 1, pageSize = 20 } = {}) {
+  const [rows, total] = await Promise.all([
+    prisma.platformInvoice.findMany({ where: { storeId }, orderBy: { issuedAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+    prisma.platformInvoice.count({ where: { storeId } }),
+  ]);
+  return {
+    invoices: rows.map((i) => ({ id: i.id, number: i.number, kind: i.kind, issuedAt: i.issuedAt, periodStart: i.periodStart, periodEnd: i.periodEnd, subtotal: num(i.subtotal ?? i.taxableValue), taxAmount: num(i.taxAmount), total: num(i.total), status: i.status })),
+    total,
+    page,
+    pageSize,
+  };
+}
+
+async function listPayments(prisma, storeId, { page = 1, pageSize = 20 } = {}) {
+  const [rows, total] = await Promise.all([
+    prisma.billingPayment.findMany({ where: { storeId }, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+    prisma.billingPayment.count({ where: { storeId } }),
+  ]);
+  return { payments: rows.map(serializePayment), total, page, pageSize };
+}
+
+async function listCommissions(prisma, storeId, { month, page = 1, pageSize = 50 } = {}) {
+  const where = { storeId, ...(month && { periodMonth: month }) };
+  const [rows, total, summary] = await Promise.all([
+    prisma.commissionTransaction.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+    prisma.commissionTransaction.count({ where }),
+    commission.feeSummary(prisma, storeId),
+  ]);
+  return { transactions: rows.map(commission.serializeTransaction), total, page, pageSize, summary };
+}
+
+/** Seller asks for more staff accounts than the plan includes. */
+async function requestLimit(prisma, store, { requested, reason }) {
+  const ent = await entitlements.forStore(prisma, store.id);
+  const current = ent.limits.staff ?? 0;
+  const n = Number(requested);
+  if (!Number.isInteger(n) || n <= current || n > 500) throw new HttpError(400, `Ask for more than your current ${current} staff accounts (up to 500).`);
+  const pending = await prisma.limitRequest.findFirst({ where: { storeId: store.id, key: "staff", status: "pending" } });
+  if (pending) throw new HttpError(409, "You already have a request waiting — we'll get back to you soon.");
+  return prisma.limitRequest.create({ data: { storeId: store.id, key: "staff", currentLimit: current, requested: n, reason: reason ? String(reason).slice(0, 1000) : null } });
+}
+
+module.exports = { overview, listPlans, publicSettings, dueCycle, startCheckout, verifyCheckout, replaceMandate, listInvoices, listPayments, listCommissions, requestLimit, serializePayment };

@@ -8,7 +8,7 @@ export default async function OrderDetailPage({ params }) {
     <OrderDetailView
       order={order}
       role={me.role}
-      hasGstInvoices={Boolean(me.store?.plan?.hasGstSoftware)}
+      hasGstInvoices={Boolean(me.entitlements?.features?.gst_invoices)}
     />
   );
 }

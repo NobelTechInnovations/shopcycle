@@ -1,5 +1,5 @@
 const { HttpError } = require("@shopcycle/utils");
-const { syncOrderCommission } = require("../billing/commission");
+const { syncOrderCommission, feeSnapshot } = require("../billing/commission");
 const cartService = require("../cart/service");
 const discountService = require("../discounts/service");
 const customersRepository = require("../customers/repository");
@@ -164,6 +164,8 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     giftCardId: giftCard?.id || null,
     placedSignedIn: signedIn,
     ...(due <= 0 && { paymentStatus: "paid" }),
+    // Oyklane's fee terms for this order, fixed now (billing/commission.js).
+    ...(await feeSnapshot(prisma, storeId, { oneClick: Boolean(input.oneClick) })),
   };
 
   // Decrement inventory and create the order in one transaction — an order

@@ -8,7 +8,7 @@ export default async function SettingsNotificationsPage() {
       store={store}
       settings={resolvedSettings}
       canEdit={role !== "staff"}
-      hasGstInvoices={Boolean(me.store?.plan?.hasGstSoftware)}
+      hasGstInvoices={Boolean(me.entitlements?.features?.gst_invoices)}
     />
   );
 }

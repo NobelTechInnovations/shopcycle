@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const { HttpError, slugify } = require("@shopcycle/utils");
+const entitlements = require("../billing/entitlements");
 const { toCsv, parseCsvObjects } = require("../../lib/csv");
 const { setStock } = require("../../lib/inventory");
 const { amountSpent } = require("../customers/spend");
@@ -76,10 +77,8 @@ const CUSTOMER_COLUMNS = [
 const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 5000;
 
-function assertCanExport(request) {
-  if (!request.store.plan?.hasCsvExport) {
-    throw new HttpError(403, "CSV export is part of the Premium plan. Upgrade in Settings ▸ Plan & billing.");
-  }
+async function assertCanExport(request) {
+  entitlements.assertFeature(await request.getEntitlements(), "reports_advanced", "CSV export");
 }
 
 const dateOnly = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
@@ -267,8 +266,6 @@ async function importProducts(prisma, store, csv, { dryRun, actorName }) {
     include: { variants: true, images: true },
   });
   const bySlug = Object.fromEntries(existing.map((p) => [p.slug, p]));
-  let productCount = await prisma.product.count({ where: { storeId: store.id } });
-  const limit = store.plan?.productLimit ?? Infinity;
 
   const result = { created: 0, updated: 0, skipped: 0, errors: [] };
   for (const [handle, lines] of groups) {
@@ -279,17 +276,9 @@ async function importProducts(prisma, store, csv, { dryRun, actorName }) {
       continue;
     }
     const current = bySlug[handle];
-    if (!current && productCount >= limit) {
-      result.errors.push({ line: lines[0].line, message: `Your ${store.plan.name} plan allows up to ${limit} products — "${parsed.product.title}" wasn't added.` });
-      result.skipped += 1;
-      continue;
-    }
     if (dryRun) {
       if (current) result.updated += 1;
-      else {
-        result.created += 1;
-        productCount += 1;
-      }
+      else result.created += 1;
       continue;
     }
 
@@ -314,7 +303,6 @@ async function importProducts(prisma, store, csv, { dryRun, actorName }) {
         { actorName }
       );
       result.created += 1;
-      productCount += 1;
       continue;
     }
 
@@ -363,7 +351,7 @@ async function exportRoutes(fastify) {
   fastify.addHook("preHandler", fastify.requireActiveSubscription);
 
   fastify.get("/exports/:kind", async (request, reply) => {
-    assertCanExport(request);
+    await assertCanExport(request);
     const kind = z.enum(["products", "orders", "customers"]).parse(request.params.kind.replace(/\.csv$/, ""));
     const { prisma } = fastify;
     const csv =

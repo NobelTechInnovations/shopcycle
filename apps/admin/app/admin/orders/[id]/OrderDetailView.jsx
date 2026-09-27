@@ -587,7 +587,7 @@ export function OrderDetailView({ order, role, hasGstInvoices }) {
             ) : (
               <p className="text-sm text-ink-muted m-0">
                 <Crown size={13} className="inline text-accent mr-1 -mt-0.5" aria-hidden="true" />
-                GST invoices come with Premium.{" "}
+                GST invoices come with the Growth and Pro plans.{" "}
                 <Link href="/admin/settings/billing" className="text-ink underline">
                   See plans
                 </Link>

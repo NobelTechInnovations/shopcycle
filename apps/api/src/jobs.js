@@ -4,6 +4,12 @@ const domains = require("./modules/domains/service");
 const webhooksService = require("./modules/developer/webhooks");
 const { cancelOrder } = require("./modules/orders/operations");
 const { PROVIDER_KEYS } = require("./modules/payments/providers");
+const billingEngine = require("./modules/billing/engine");
+
+// The billing engine bills real stores, and local development shares the
+// production database — so it runs only in production unless BILLING_JOBS
+// says otherwise (config/env.js).
+const billingJobsOn = () => (env.BILLING_JOBS ? env.BILLING_JOBS === "true" : env.NODE_ENV === "production");
 
 /** Online orders whose payment was never completed (the shopper closed the
  * gateway's page) hold stock and any gift card money — after two hours
@@ -64,6 +70,14 @@ function startJobs(fastify) {
       if (result.retried) fastify.log.info(result, "jobs: webhook retries");
     } catch (err) {
       fastify.log.error({ err }, "jobs: webhook retries failed");
+    }
+    if (billingJobsOn()) {
+      try {
+        const result = await billingEngine.tick(fastify.prisma, { log: fastify.log });
+        if (result.processed || result.reminders || result.payments || result.mandates || result.webhooks) fastify.log.info(result, "jobs: billing engine");
+      } catch (err) {
+        fastify.log.error({ err }, "jobs: billing engine failed");
+      }
     }
     try {
       const result = await domains.recheckPending(fastify.prisma);

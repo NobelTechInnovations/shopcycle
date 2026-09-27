@@ -43,6 +43,7 @@ export async function POST(request, { params }) {
     shippingCountry: form.get("shippingCountry"),
     paymentMethod: form.get("paymentMethod") || "cod",
     acceptsMarketing: form.get("acceptsMarketing") === "true",
+    oneClick: form.get("oneClick") === "1",
     // Where a payment gateway sends the shopper back — the address they're
     // shopping on right now.
     returnBase: storeBase(request, handle),

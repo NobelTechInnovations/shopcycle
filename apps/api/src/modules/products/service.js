@@ -1,5 +1,4 @@
 const { HttpError, slugify } = require("@shopcycle/utils");
-const { assertWithinPlanLimit } = require("../../lib/plan-limits");
 const repository = require("./repository");
 const metafieldService = require("../metafields/service");
 
@@ -25,8 +24,6 @@ async function getProduct(prisma, storeId, id) {
 }
 
 async function createProduct(prisma, store, input, { actorName } = {}) {
-  const productCount = await repository.count(prisma, store.id);
-  assertWithinPlanLimit(store.plan, productCount, "productLimit", "products");
   const slug = await uniqueSlug(prisma, store.id, input.title);
   const metafields = await metafieldService.applyValues(prisma, store.id, "product", input.metafields);
   return repository.create(prisma, store.id, { ...input, metafields }, slug, { actorName });
