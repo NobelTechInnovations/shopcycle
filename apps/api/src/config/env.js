@@ -114,9 +114,11 @@ const envSchema = z.object({
   // (Zoho Mail is SMTP only: smtp.zoho.in, port 465, SMTP_SECURE=true); their
   // HTTP APIs avoid hosts that block outbound SMTP ports.
   EMAIL_PROVIDER: z.enum(["smtp", "zeptomail", "brevo", "log"]).optional(),
-  // ZeptoMail (Zoho CPaaS) "Send Mail Token", without the Zoho-enczapikey prefix.
+  // ZeptoMail / Zoho CPaaS agent API key (SMTP/API ▸ API key). With or
+  // without the "Zoho-enczapikey " prefix. ZOHO_CPAAS_TOKEN is the same key
+  // (it also sends WhatsApp); either name works for email.
   ZEPTOMAIL_TOKEN: z.string().optional(),
-  ZEPTOMAIL_API_URL: z.string().default("https://api.zeptomail.in/v1.1/email"),
+  ZEPTOMAIL_API_URL: z.string().default("https://cpaas.zoho.in/v1.1/email"),
   BREVO_API_KEY: z.string().optional(),
   BREVO_API_URL: z.string().default("https://api.brevo.com/v3/smtp/email"),
 
@@ -141,7 +143,15 @@ const envSchema = z.object({
   // One-time codes by SMS / WhatsApp (lib/messaging). Unset providers keep
   // every message in the message log instead of sending (development).
   SMS_PROVIDER: z.enum(["twilio", "msg91", "log"]).optional(),
-  WHATSAPP_PROVIDER: z.enum(["twilio", "meta", "log"]).optional(),
+  WHATSAPP_PROVIDER: z.enum(["zoho", "twilio", "meta", "log"]).optional(),
+  // Zoho CPaaS WhatsApp: the agent's API key, the WhatsApp number (as shown
+  // under the agent ▸ WhatsApp), an approved template's key, and the name
+  // of that template's placeholder that holds the code.
+  ZOHO_CPAAS_TOKEN: z.string().optional(),
+  ZOHO_CPAAS_API_URL: z.string().default("https://cpaas.zoho.in/v1.1"),
+  ZOHO_WHATSAPP_FROM: z.string().optional(),
+  ZOHO_WHATSAPP_TEMPLATE_KEY: z.string().optional(),
+  ZOHO_WHATSAPP_MERGE_KEY: z.string().default("code"),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   // SMS sender: a Messaging Service SID (preferred) or a Twilio number.

@@ -7,7 +7,7 @@ const { env } = require("../config/env");
  * body included, so development and tests need no account.
  *
  *   SMS:      Twilio, MSG91 (India, DLT template)
- *   WhatsApp: Twilio, Meta WhatsApp Cloud API (approved auth template)
+ *   WhatsApp: Zoho CPaaS, Twilio, Meta WhatsApp Cloud API (approved template)
  */
 
 function smsProvider() {
@@ -17,8 +17,11 @@ function smsProvider() {
   return p;
 }
 
+const zohoToken = () => String(env.ZOHO_CPAAS_TOKEN || env.ZEPTOMAIL_TOKEN || "").replace(/^Zoho-enczapikey\s+/i, "").trim();
+
 function whatsappProvider() {
-  const p = env.WHATSAPP_PROVIDER || (env.META_WHATSAPP_TOKEN ? "meta" : env.TWILIO_WHATSAPP_FROM ? "twilio" : "log");
+  const p = env.WHATSAPP_PROVIDER || (env.ZOHO_WHATSAPP_TEMPLATE_KEY ? "zoho" : env.META_WHATSAPP_TOKEN ? "meta" : env.TWILIO_WHATSAPP_FROM ? "twilio" : "log");
+  if (p === "zoho" && !(zohoToken() && env.ZOHO_WHATSAPP_FROM && env.ZOHO_WHATSAPP_TEMPLATE_KEY)) return "log";
   if (p === "twilio" && !(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_WHATSAPP_FROM)) return "log";
   if (p === "meta" && !(env.META_WHATSAPP_TOKEN && env.META_WHATSAPP_PHONE_NUMBER_ID && env.META_WHATSAPP_OTP_TEMPLATE)) return "log";
   return p;
@@ -69,6 +72,14 @@ const SENDERS = {
     },
   },
   whatsapp: {
+    async zoho({ to, code }) {
+      const from = env.ZOHO_WHATSAPP_FROM.startsWith("+") ? env.ZOHO_WHATSAPP_FROM : `+${env.ZOHO_WHATSAPP_FROM}`;
+      const data = await request(`${env.ZOHO_CPAAS_API_URL.replace(/\/$/, "")}/whatsapp`, {
+        headers: { authorization: `Zoho-enczapikey ${zohoToken()}` },
+        body: { from, to: `+${to}`, template_key: env.ZOHO_WHATSAPP_TEMPLATE_KEY, merge_info: { [env.ZOHO_WHATSAPP_MERGE_KEY]: code } },
+      });
+      return data.request_id || data.data?.[0]?.message_id || data.message_id || null;
+    },
     async twilio({ to, code, text }) {
       const from = env.TWILIO_WHATSAPP_FROM.replace(/^whatsapp:/, "");
       const body = { To: `whatsapp:+${to}`, From: `whatsapp:${from.startsWith("+") ? from : `+${from}`}` };

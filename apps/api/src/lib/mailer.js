@@ -36,9 +36,14 @@ function getTransport() {
 function emailProvider() {
   const p = env.EMAIL_PROVIDER || (env.SMTP_HOST ? "smtp" : "log");
   if (p === "smtp" && !env.SMTP_HOST) return "log";
-  if (p === "zeptomail" && !env.ZEPTOMAIL_TOKEN) return "log";
+  if (p === "zeptomail" && !zohoKey()) return "log";
   if (p === "brevo" && !env.BREVO_API_KEY) return "log";
   return p;
+}
+
+/** The Zoho key, whichever name it was given, without its prefix. */
+function zohoKey() {
+  return String(env.ZEPTOMAIL_TOKEN || env.ZOHO_CPAAS_TOKEN || "").replace(/^Zoho-enczapikey\s+/i, "").trim();
 }
 
 function emailConfigured() {
@@ -73,7 +78,7 @@ const PROVIDERS = {
   async zeptomail({ sender, to, replyTo, subject, html, text }) {
     const data = await postJson(
       env.ZEPTOMAIL_API_URL,
-      { authorization: `Zoho-enczapikey ${env.ZEPTOMAIL_TOKEN.replace(/^Zoho-enczapikey\s+/i, "")}` },
+      { authorization: `Zoho-enczapikey ${zohoKey()}` },
       {
         from: { address: sender.address, name: sender.name },
         to: [{ email_address: { address: to } }],

@@ -105,6 +105,7 @@ function startMock() {
     if (url.pathname === "/zepto") return send(201, { request_id: "zep_req_1", data: [{ message_id: "zep_msg_1" }] });
     if (url.pathname === "/brevo") return send(201, { messageId: "<brevo-1@smtp>" });
     if (/^\/twilio\/Accounts\/[^/]+\/Messages\.json$/.test(url.pathname)) return send(201, { sid: "SM_test_1" });
+    if (url.pathname === "/zoho/whatsapp") return send(200, { request_id: "zoho_req_1", message: "OK" });
     if (url.pathname === "/msg91/flow") return send(200, { type: "success", message: "msg91_req_1" });
     if (/^\/graph\/v[\d.]+\/[^/]+\/messages$/.test(url.pathname)) return send(200, { messages: [{ id: "wamid.test1" }] });
     if ((m = url.pathname.match(/^\/ik\/api\/files\/([^/]+)\/details$/))) return ik.has(m[1]) ? send(200, ik.get(m[1])) : send(404, { message: "The requested file does not exist." });
@@ -280,6 +281,11 @@ async function partOne(mock) {
   const tpl = json(c).template;
   check("Meta WhatsApp: bearer token, auth template with the code in body and copy button", r.status === "sent" && c.path.endsWith("/1180350/messages") && c.headers.authorization === "Bearer EAAB_test" && tpl.name === "login_code" && tpl.components[0].parameters[0].text === "333444" && tpl.components[1].sub_type === "url" && tpl.components[1].parameters[0].text === "333444", json(c));
   check("both channels live once configured", messaging.channels().sms && messaging.channels().whatsapp);
+
+  Object.assign(env, { WHATSAPP_PROVIDER: "zoho", ZOHO_CPAAS_TOKEN: "Zoho-enczapikey zoho-key", ZOHO_CPAAS_API_URL: `${MOCK}/zoho`, ZOHO_WHATSAPP_FROM: "+15554330409", ZOHO_WHATSAPP_TEMPLATE_KEY: "tpl_login", ZOHO_WHATSAPP_MERGE_KEY: "otp" });
+  r = await messaging.sendOtp(fakePrisma, { to: "919876543210", code: "555666", channel: "whatsapp" });
+  c = mock.last(/^\/zoho\//);
+  check("Zoho CPaaS WhatsApp: API key, from number, template key, code in merge_info", r.status === "sent" && c.headers.authorization === "Zoho-enczapikey zoho-key" && json(c).from === "+15554330409" && json(c).to === "+919876543210" && json(c).template_key === "tpl_login" && json(c).merge_info.otp === "555666", json(c));
   Object.assign(env, { SMS_PROVIDER: "log", WHATSAPP_PROVIDER: "log" });
 
   // Image CDN signatures
