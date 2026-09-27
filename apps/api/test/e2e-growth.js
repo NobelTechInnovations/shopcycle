@@ -159,7 +159,7 @@ async function main() {
   try {
     // ── Setup: a store with one product ──
     const ownerEmail = `growth-e2e-${stamp}@test.oyklane.dev`;
-    let r = await owner("POST", "/api/auth/register", { name: "Growth Test", email: ownerEmail, password: "correct-horse-battery", storeName: `Growth E2E ${stamp}` });
+    let r = await owner("POST", "/api/auth/register", { name: "Growth Test", email: ownerEmail, password: "correct-horse-battery", storeName: `Growth E2E ${stamp}`, plan: "growth" });
     check("register a store", r.status === 201, r.data);
     const store = r.data.store;
     created.push({ storeId: store.id, emails: [ownerEmail] });

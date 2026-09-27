@@ -18,7 +18,7 @@ function findUserByEmail(prisma, email) {
   return prisma.user.findFirst({ where: { email: { equals: normalizeEmail(email), mode: "insensitive" } } });
 }
 
-async function register(prisma, { name, email, password, storeName }) {
+async function register(prisma, { name, email, password, storeName, plan }) {
   const existing = await findUserByEmail(prisma, email);
   if (existing) {
     throw new HttpError(409, "An account with that email already exists");
@@ -29,7 +29,7 @@ async function register(prisma, { name, email, password, storeName }) {
   const { user, store } = await prisma.$transaction(
     async (tx) => {
       const user = await tx.user.create({ data: { name, email: normalizeEmail(email), passwordHash } });
-      const store = await provisionStore(tx, { name: storeName, ownerId: user.id });
+      const store = await provisionStore(tx, { name: storeName, ownerId: user.id, planKey: plan });
       return { user, store };
     },
     { timeout: 30000 }

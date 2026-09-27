@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { slugify } = require("@shopcycle/utils");
+const { slugify, HttpError } = require("@shopcycle/utils");
 const themesService = require("../modules/themes/service");
 const subscriptions = require("../modules/billing/subscriptions");
 
@@ -29,7 +29,12 @@ const RESERVED_HANDLES = new Set([
  * included — starts its own free trial here (billing/subscriptions.js),
  * then the ₹99 first month and the regular price, like any other store.
  */
-async function provisionStore(tx, { name, ownerId, role = "owner" }) {
+async function provisionStore(tx, { name, ownerId, planKey, role = "owner" }) {
+  // Every new store starts on the plan its owner chose (its free trial,
+  // then the ₹99 first month, run on that plan).
+  const plan = planKey ? await tx.plan.findFirst({ where: { key: String(planKey), isActive: true } }) : null;
+  if (!plan) throw new HttpError(400, "Choose a plan for your store.");
+
   // The handle is the store's free address ({handle}.<root>). If the name
   // is taken, add a short random tag — sonchiri-2f3a — rather than a
   // counter that hints at how many stores share the name.
@@ -49,7 +54,7 @@ async function provisionStore(tx, { name, ownerId, role = "owner" }) {
   });
 
   await themesService.installTheme(tx, store.id, "classic");
-  await subscriptions.createForStore(tx, store);
+  await subscriptions.createForStore(tx, store, { planId: plan.id });
 
   return store;
 }

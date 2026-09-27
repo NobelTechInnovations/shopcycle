@@ -90,13 +90,19 @@ model EmailLog {
   template          String
   refType           String?
   refId             String?
-  /// "sent" | "logged" (no provider — kept locally) | "failed"
+  /// "queued" → "sending" → "sent" | "failed"; "logged" (no provider — kept locally)
   status            String
   provider          String
   providerMessageId String?
   error             String?  @db.Text
   /// Only kept for "logged" emails (local dev) — sent mail isn't stored.
   html              String?  @db.Text
+  /// The message to deliver (subject, html, sender, reply-to) while it's
+  /// queued; emptied once it's sent or given up on (lib/mailer.js).
+  payload           Json?
+  attempts          Int       @default(0)
+  nextAttemptAt     DateTime?
+  sentAt            DateTime?
   createdAt         DateTime @default(now())
 
   store Store? @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -104,6 +110,7 @@ model EmailLog {
   @@index([storeId, createdAt])
   @@index([refType, refId])
   @@index([createdAt])
+  @@index([status, nextAttemptAt])
   @@map("email_logs")
 }
 

@@ -119,7 +119,22 @@ async function resendVerificationHandler(request, reply) {
   reply.send({ ok: true });
 }
 
+/** What really happened to the last confirmation email (it's delivered in
+ * the background) — so the dashboard never claims "sent" when it wasn't. */
+async function verificationStatusHandler(request, reply) {
+  const user = request.authUser;
+  if (user.emailVerifiedAt) return reply.send({ verified: true });
+  const row = await request.server.prisma.emailLog.findFirst({
+    where: { refType: "user", refId: user.id, template: "email_verify" },
+    orderBy: { createdAt: "desc" },
+    select: { status: true, createdAt: true, sentAt: true },
+  });
+  const status = !row ? "none" : ["queued", "sending"].includes(row.status) ? "sending" : row.status === "failed" ? "failed" : "sent";
+  reply.send({ verified: false, status, at: row?.sentAt || row?.createdAt || null });
+}
+
 module.exports = {
+  verificationStatusHandler,
   sendVerificationEmail,
   forgotPasswordHandler,
   checkResetTokenHandler,

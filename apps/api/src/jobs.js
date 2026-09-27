@@ -5,6 +5,7 @@ const webhooksService = require("./modules/developer/webhooks");
 const { cancelOrder } = require("./modules/orders/operations");
 const { PROVIDER_KEYS } = require("./modules/payments/providers");
 const billingEngine = require("./modules/billing/engine");
+const { drainQueue } = require("./lib/mailer");
 
 // The billing engine bills real stores, and local development shares the
 // production database — so it runs only in production unless BILLING_JOBS
@@ -78,6 +79,12 @@ function startJobs(fastify) {
       } catch (err) {
         fastify.log.error({ err }, "jobs: billing engine failed");
       }
+    }
+    try {
+      const sent = await drainQueue(fastify.prisma, { log: fastify.log });
+      if (sent) fastify.log.info({ sent }, "jobs: queued emails delivered");
+    } catch (err) {
+      fastify.log.error({ err }, "jobs: email queue failed");
     }
     try {
       const result = await domains.recheckPending(fastify.prisma);

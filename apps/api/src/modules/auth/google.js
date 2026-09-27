@@ -62,7 +62,7 @@ const registerSchema = z.object({ ticket: z.string().min(10).max(4000) }).merge(
 /** New account from Google: the ticket from the callback + a store name. */
 async function registerHandler(request, reply) {
   const fastify = request.server;
-  const { ticket, storeName } = registerSchema.parse(request.body);
+  const { ticket, storeName, plan } = registerSchema.parse(request.body);
   let t = null;
   try {
     t = fastify.jwt.verify(ticket);
@@ -79,7 +79,7 @@ async function registerHandler(request, reply) {
   const { user, store } = await prisma.$transaction(
     async (tx) => {
       const user = await tx.user.create({ data: { name: t.name || email.split("@")[0], email, passwordHash, emailVerifiedAt: new Date(), googleSub: t.gsub } });
-      const store = await provisionStore(tx, { name: storeName, ownerId: user.id });
+      const store = await provisionStore(tx, { name: storeName, ownerId: user.id, planKey: plan });
       return { user, store };
     },
     { timeout: 30000 }

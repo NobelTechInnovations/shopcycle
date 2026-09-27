@@ -211,7 +211,7 @@ async function myStoresHandler(request, reply) {
 async function createStoreHandler(request, reply) {
   const body = createStoreSchema.parse(request.body);
   const store = await request.server.prisma.$transaction(
-    (tx) => provisionStore(tx, { name: body.storeName, ownerId: request.user.userId }),
+    (tx) => provisionStore(tx, { name: body.storeName, ownerId: request.user.userId, planKey: body.plan }),
     { timeout: 15000 }
   );
   setSellerSession(reply, request.server, request.authUser, store.id);

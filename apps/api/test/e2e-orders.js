@@ -158,6 +158,7 @@ async function main() {
       email,
       password: "correct-horse-battery",
       storeName: `Orders E2E ${stamp}`,
+      plan: "growth",
     });
     check("register a store", r.status === 201, r.data);
     const store = r.data.store;

@@ -114,6 +114,7 @@ async function registerStore(call, label, created) {
     email,
     password: "correct-horse-battery",
     storeName: `Billing ${label} ${stamp}`,
+    plan: "growth",
   });
   if (r.data?.store?.id) created.push({ storeId: r.data.store.id, email });
   return r;

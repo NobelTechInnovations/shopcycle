@@ -207,7 +207,7 @@ async function main() {
 
   try {
     // ── A new store starts its own trial ──────────────────────────────
-    let r = await owner("POST", "/api/auth/register", { name: "Billing Test", email, password: "correct-horse-battery", storeName: `Billing E2E ${stamp}` });
+    let r = await owner("POST", "/api/auth/register", { name: "Billing Test", email, password: "correct-horse-battery", storeName: `Billing E2E ${stamp}`, plan: "growth" });
     check("register a new store", r.status === 201, r.data);
     const store = r.data.store;
     storeIds.push(store.id);
@@ -510,7 +510,7 @@ async function main() {
     check("no duplicate subscription", (await prisma.subscription.count({ where: { storeId: store.id } })) === 1);
 
     // ── A second store by the same owner bills separately ─────────────
-    r = await owner("POST", "/api/auth/stores", { storeName: `Billing E2E Two ${stamp}` });
+    r = await owner("POST", "/api/auth/stores", { storeName: `Billing E2E Two ${stamp}`, plan: "growth" });
     check("second store created", r.status === 201, r.data);
     const store2 = r.data.store;
     storeIds.push(store2.id);

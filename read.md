@@ -174,8 +174,16 @@ Local `.env` points at the **production** Supabase database, so every local writ
 - Schema pushed (additive): `files.storage/providerFileId`, `users.googleSub`, `customers.phoneVerifiedAt`, `apps.priceMonthly`, `billing_cycles.appsAmount`, new tables `shopper_phone_otps`, `app_charges`, `message_logs`.
 - ⚠️ The **Phone Login app row already exists in the shared DB** (local API bootstrap), so production's Apps page lists it before this code is deployed. Installing it there does nothing until deploy.
 
+### Fixed later on 27 Sep (NOT committed yet)
+
+- **Email is queued, never blocking**: `sendEmail` writes an EmailLog row (`queued`) and returns; an in-process worker delivers with retries (1, 5, 15 min) and the jobs tick drains leftovers. Sign-up used to hang ~2 min because Railway blocks outbound SMTP (ZeptoMail SMTP timed out).
+- The dashboard's "Confirm your email" banner shows the real status (sending / sent / couldn't send) via `GET /api/auth/email/status`.
+- **Plan choice is mandatory** for every new store (register, Google sign-up, "Create new store"): `plan` (starter/growth/pro) is required; the trial runs on it. Public `GET /api/auth/plans` feeds the picker.
+- Railway `SUPER_ADMIN_ORIGIN` was `http://localhost:3003` (super admin sign-in failed with "Failed to fetch"); set to `https://superadmin.oyklane.com`. The API now warns at start-up if any origin is localhost in production.
+
 ### Left to do
 
+0. **Production email**: Railway blocks SMTP (outbound SMTP needs Railway Pro). Set `EMAIL_PROVIDER=zeptomail` and `ZEPTOMAIL_TOKEN=<ZeptoMail ▸ Mail Agents ▸ SMTP/API ▸ API ▸ Send Mail Token>` on Railway. The SMTP username/password in `.env` are not that token.
 1. **Commit and deploy** this work (owner decides).
 2. **Keys for the new providers** (see `.env.example`): `IMAGEKIT_*`, `GOOGLE_CLIENT_ID/SECRET` (+ both redirect URIs), `TWILIO_*` / `MSG91_*` / `META_WHATSAPP_*`, optionally `EMAIL_PROVIDER=zeptomail` + `ZEPTOMAIL_TOKEN`. Storefront (Vercel) needs `API_PUBLIC_URL` (or its `API_INTERNAL_URL` must be the public https API).
 3. India SMS needs **DLT registration** (MSG91 or Twilio) before real OTPs deliver.

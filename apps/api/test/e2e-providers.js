@@ -171,6 +171,39 @@ async function startApi() {
   throw new Error(`API did not start:\n${log.slice(-3000)}`);
 }
 
+// An in-memory stand-in for prisma.emailLog, enough for the mail queue.
+function fakeQueueDb() {
+  const rows = [];
+  let n = 0;
+  const match = (r, w) =>
+    Object.entries(w || {}).every(([k, v]) => {
+      if (k === "OR") return v.some((o) => match(r, o));
+      if (v && typeof v === "object" && !(v instanceof Date)) {
+        if ("lte" in v) return r[k] != null && r[k] <= v.lte;
+        if ("lt" in v) return r[k] != null && r[k] < v.lt;
+        return false;
+      }
+      return r[k] === v;
+    });
+  return {
+    rows,
+    emailLog: {
+      create: async ({ data }) => {
+        const row = { id: `e${(n += 1)}`, attempts: 0, nextAttemptAt: null, createdAt: new Date(), ...data };
+        rows.push(row);
+        return row;
+      },
+      findFirst: async ({ where }) => rows.find((r) => match(r, where)) || null,
+      updateMany: async ({ where, data }) => {
+        const hit = rows.filter((r) => match(r, where));
+        hit.forEach((r) => Object.assign(r, data));
+        return { count: hit.length };
+      },
+      update: async ({ where, data }) => Object.assign(rows.find((r) => r.id === where.id), data),
+    },
+  };
+}
+
 // ── Part 1: the provider code itself ────────────────────────────────────
 async function partOne(mock) {
   const { env } = require(path.join(ROOT, "apps/api/src/config/env"));
@@ -183,22 +216,39 @@ async function partOne(mock) {
   const json = (c) => JSON.parse(c.body);
   const form = (c) => Object.fromEntries(new URLSearchParams(c.body));
 
-  // Email
+  // Email — the provider formats (sent directly)…
   Object.assign(env, { EMAIL_PROVIDER: "zeptomail", ZEPTOMAIL_TOKEN: "zep-token" });
-  let r = await mailer.sendEmail(fakePrisma, { to: "buyer@test.oyklane.dev", subject: "Hello", html: "<p>Hi <b>there</b></p>", fromName: "Loom", replyTo: "help@loom.test", template: "t" });
+  let r = await mailer.sendNow({ to: "buyer@test.oyklane.dev", subject: "Hello", html: "<p>Hi <b>there</b></p>", fromName: "Loom", replyTo: "help@loom.test" });
   let c = mock.last(/^\/zepto$/);
-  check("ZeptoMail: sent over its API with the Send Mail Token", r.status === "sent" && c.headers.authorization === "Zoho-enczapikey zep-token", { r, auth: c?.headers.authorization });
+  check("ZeptoMail: sent over its API with the Send Mail Token", r.provider === "zeptomail" && c.headers.authorization === "Zoho-enczapikey zep-token", { r, auth: c?.headers.authorization });
   check("ZeptoMail: from/to/reply-to/html/text shaped for its API", json(c).to[0].email_address.address === "buyer@test.oyklane.dev" && json(c).from.name === "Loom" && json(c).reply_to[0].address === "help@loom.test" && json(c).htmlbody.includes("<b>there</b>") && json(c).textbody === "Hi there", json(c));
-  check("email log records the provider, not the body, for a real send", logged.at(-1).provider === "zeptomail" && logged.at(-1).html === null && logged.at(-1).status === "sent", logged.at(-1));
 
   Object.assign(env, { EMAIL_PROVIDER: "brevo", BREVO_API_KEY: "brevo-key" });
-  r = await mailer.sendEmail(fakePrisma, { to: "buyer@test.oyklane.dev", subject: "Hello", html: "<p>Hi</p>", replyTo: "help@loom.test" });
+  r = await mailer.sendNow({ to: "buyer@test.oyklane.dev", subject: "Hello", html: "<p>Hi</p>", replyTo: "help@loom.test" });
   c = mock.last(/^\/brevo$/);
-  check("Brevo: api-key header and its payload shape", r.status === "sent" && c.headers["api-key"] === "brevo-key" && json(c).to[0].email === "buyer@test.oyklane.dev" && json(c).replyTo.email === "help@loom.test" && json(c).htmlContent === "<p>Hi</p>", json(c));
+  check("Brevo: api-key header and its payload shape", r.provider === "brevo" && c.headers["api-key"] === "brevo-key" && json(c).to[0].email === "buyer@test.oyklane.dev" && json(c).replyTo.email === "help@loom.test" && json(c).htmlContent === "<p>Hi</p>", json(c));
 
-  Object.assign(env, { EMAIL_PROVIDER: "zeptomail", ZEPTOMAIL_API_URL: `${MOCK}/nope` });
-  r = await mailer.sendEmail(fakePrisma, { to: "buyer@test.oyklane.dev", subject: "x", html: "<p>x</p>" });
-  check("a provider error is recorded as failed, never thrown", r.status === "failed" && /404/.test(r.error), r);
+  // …and the queue: sendEmail returns at once, a worker delivers and retries.
+  const db = fakeQueueDb();
+  const waitFor = async (fn) => {
+    for (let i = 0; i < 40 && !fn(); i += 1) await new Promise((res) => setTimeout(res, 50));
+    return fn();
+  };
+  Object.assign(env, { EMAIL_PROVIDER: "zeptomail" });
+  const t0 = Date.now();
+  r = await mailer.sendEmail(db, { to: "buyer@test.oyklane.dev", subject: "Welcome", html: "<p>Hi</p>", template: "welcome", logSubject: "Welcome (logged)" });
+  check("sendEmail queues and returns without waiting for the provider", r.status === "queued" && Date.now() - t0 < 500 && db.rows[0].payload.subject === "Welcome" && db.rows[0].subject === "Welcome (logged)", { r, ms: Date.now() - t0 });
+  await waitFor(() => db.rows[0].status === "sent");
+  check("the worker delivers it; the stored message is emptied", db.rows[0].status === "sent" && db.rows[0].sentAt && JSON.stringify(db.rows[0].payload) === "{}" && !db.rows[0].html && db.rows[0].attempts === 1, db.rows[0]);
+
+  Object.assign(env, { ZEPTOMAIL_API_URL: `${MOCK}/nope` });
+  r = await mailer.sendEmail(db, { to: "buyer@test.oyklane.dev", subject: "x", html: "<p>x</p>" });
+  const failing = db.rows.find((row) => row.id === r.id);
+  await waitFor(() => failing.attempts === 1);
+  check("a provider error schedules a retry (never thrown)", failing.status === "queued" && /404/.test(failing.error) && failing.nextAttemptAt > new Date(), failing);
+  Object.assign(failing, { attempts: 3, nextAttemptAt: new Date(Date.now() - 1000) });
+  await mailer.drainQueue(db);
+  check("after the last retry it's marked failed", failing.status === "failed" && failing.attempts === 4 && JSON.stringify(failing.payload) === "{}", failing);
   Object.assign(env, { EMAIL_PROVIDER: "zeptomail", ZEPTOMAIL_TOKEN: "" });
   check("a provider without its key falls back to the log", mailer.emailProvider() === "log");
   Object.assign(env, { EMAIL_PROVIDER: "log", ZEPTOMAIL_API_URL: `${MOCK}/zepto` });
@@ -272,10 +322,16 @@ async function partTwo(mock, prisma) {
   try {
     const email = `providers-${stamp}@test.oyklane.dev`;
     created.emails.push(email);
-    let r = await owner("POST", "/api/auth/register", { name: "Provider Test", email, password: "correct-horse-battery", storeName: `Providers ${stamp}` });
+    let r = await owner("POST", "/api/auth/register", { name: "Provider Test", email, password: "correct-horse-battery", storeName: `Providers ${stamp}`, plan: "growth" });
     check("register a store", r.status === 201, r.data);
     const store = r.data.store;
     created.storeIds.push(store.id);
+    check("new store's trial is on the plan it chose", (await prisma.subscription.findUnique({ where: { storeId: store.id }, include: { plan: true } }))?.plan?.key === "growth");
+    r = await client()("POST", "/api/auth/register", { name: "No Plan", email: `no-plan-${stamp}@test.oyklane.dev`, password: "correct-horse-battery", storeName: `No Plan ${stamp}` });
+    check("signing up without choosing a plan is refused", r.status === 400 && /plan/i.test(JSON.stringify(r.data)), r.data);
+    if (r.data?.store?.id) created.storeIds.push(r.data.store.id);
+    r = await client()("GET", "/api/auth/plans");
+    check("sign-up can list the plans (public)", r.status === 200 && r.data.plans?.map((p) => p.key).join() === "starter,growth,pro" && r.data.trialDays > 0, r.data);
 
     // Direct uploads to ImageKit
     r = await owner("GET", "/api/files/upload/config");
@@ -396,10 +452,11 @@ async function partTwo(mock, prisma) {
     r = await seller("GET", `/api/auth/google/callback?code=c1&state=${encodeURIComponent(g.state)}`);
     check("new Google account → register with a ticket", r.status === 302 && r.location.startsWith(`${ADMIN}/register?google=`), r.location);
     const gTicket = new URL(r.location).searchParams.get("google");
-    r = await seller("POST", "/api/auth/google/register", { ticket: gTicket, storeName: `Google Store ${stamp}` });
+    r = await seller("POST", "/api/auth/google/register", { ticket: gTicket, storeName: `Google Store ${stamp}`, plan: "pro" });
     check("store created, email verified", r.status === 201 && r.data.user?.emailVerified === true, r.data);
     if (r.data.store?.id) created.storeIds.push(r.data.store.id);
-    r = await seller("POST", "/api/auth/google/register", { ticket: gTicket, storeName: "Again" });
+    check("Google sign-up's store is on the plan it chose", (await prisma.subscription.findUnique({ where: { storeId: r.data.store.id }, include: { plan: true } }))?.plan?.key === "pro");
+    r = await seller("POST", "/api/auth/google/register", { ticket: gTicket, storeName: "Again", plan: "growth" });
     check("the ticket can't create a second account", r.status === 409, r.data);
 
     const returning = client();

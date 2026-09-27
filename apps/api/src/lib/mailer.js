@@ -6,11 +6,14 @@ const { env } = require("../config/env");
  * a shopper on a store's behalf — is recorded in EmailLog (see its doc
  * comment in schema.prisma), whether it was sent, kept locally, or failed.
  *
- * sendEmail never throws: an email is always a side effect of something
- * that has already happened (an order placed, a refund issued), and a
- * provider outage must not turn that into an error for the person who did
- * it. Callers that need to know (the "resend" buttons) read the result.
+ * sendEmail never throws and never waits for the provider: it queues the
+ * message (EmailLog status "queued") and returns at once; a worker in this
+ * process delivers it, retrying a few times, and the jobs tick drains
+ * anything left after a restart. A slow or blocked provider can't hold up
+ * a sign-up or a checkout.
  */
+const RETRY_MINUTES = [1, 5, 15];
+const STUCK_MS = 10 * 60 * 1000;
 
 let transport = null;
 function getTransport() {
@@ -20,6 +23,10 @@ function getTransport() {
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,
       auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+      // Fail fast (default is 2 minutes) — e.g. hosts that block SMTP ports.
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 30000,
     });
   }
   return transport;
@@ -133,51 +140,89 @@ function htmlToText(html) {
  *   logSubject             — what the log records instead of the real
  *                            subject, for subjects carrying a secret
  *                            (a sign-in code) that staff shouldn't read
- * @returns {{ status: "sent"|"logged"|"failed", id: string|null, error?: string }}
+ * @returns {{ status: "queued"|"logged"|"failed", id: string|null }}
  */
 async function sendEmail(prisma, { to, subject, html, template, storeId = null, fromName, replyTo, refType, refId, logSubject, log }) {
-  const from = parseFrom(env.EMAIL_FROM);
-  const sender = { name: fromName || from.name, address: from.address };
   const provider = emailProvider();
-
-  let status = "logged";
-  let providerMessageId = null;
-  let error = null;
-
-  if (provider !== "log") {
-    try {
-      providerMessageId = await PROVIDERS[provider]({ sender, to, replyTo, subject, html, text: htmlToText(html) });
-      status = "sent";
-    } catch (err) {
-      status = "failed";
-      error = err.message || String(err);
-      log?.warn({ err, template, to, provider }, "mailer: send failed");
-    }
-  }
-
-  let id = null;
+  const base = { storeId, to, subject: logSubject || subject, template: template || "other", refType: refType || null, refId: refId || null, provider };
   try {
-    const row = await prisma.emailLog.create({
-      data: {
-        storeId,
-        to,
-        subject: logSubject || subject,
-        template: template || "other",
-        refType: refType || null,
-        refId: refId || null,
-        status,
-        provider,
-        providerMessageId,
-        error,
-        html: status === "logged" ? html : null,
-      },
-    });
-    id = row.id;
+    if (provider === "log") {
+      const row = await prisma.emailLog.create({ data: { ...base, status: "logged", html } });
+      return { status: "logged", id: row.id };
+    }
+    const row = await prisma.emailLog.create({ data: { ...base, status: "queued", payload: { subject, html, fromName: fromName || null, replyTo: replyTo || null } } });
+    kick(prisma, log);
+    return { status: "queued", id: row.id };
   } catch (err) {
-    log?.error({ err, template }, "mailer: could not write the email log");
+    log?.error({ err, template }, "mailer: could not queue the email");
+    return { status: "failed", id: null };
   }
-
-  return { status, id, ...(error && { error }) };
 }
 
-module.exports = { sendEmail, emailConfigured, emailProvider, htmlToText, parseFrom };
+/** Sends one message now, straight to the provider (used by the queue). */
+async function sendNow({ to, subject, html, fromName, replyTo }) {
+  const provider = emailProvider();
+  if (provider === "log") throw new Error("No email provider is configured.");
+  const from = parseFrom(env.EMAIL_FROM);
+  const sender = { name: fromName || from.name, address: from.address };
+  return { provider, providerMessageId: await PROVIDERS[provider]({ sender, to, replyTo, subject, html, text: htmlToText(html) }) };
+}
+
+async function deliver(prisma, row, log) {
+  const p = row.payload || {};
+  try {
+    const { provider, providerMessageId } = await sendNow({ to: row.to, subject: p.subject || row.subject, html: p.html || "", fromName: p.fromName, replyTo: p.replyTo });
+    await prisma.emailLog.update({ where: { id: row.id }, data: { status: "sent", attempts: row.attempts + 1, provider, providerMessageId: providerMessageId ? String(providerMessageId) : null, error: null, payload: {}, sentAt: new Date(), nextAttemptAt: null } });
+  } catch (err) {
+    const attempts = row.attempts + 1;
+    const retryIn = RETRY_MINUTES[attempts - 1];
+    log?.warn({ err, template: row.template, to: row.to, attempts }, "mailer: send failed");
+    await prisma.emailLog.update({
+      where: { id: row.id },
+      data: retryIn
+        ? { status: "queued", attempts, error: String(err.message || err).slice(0, 500), nextAttemptAt: new Date(Date.now() + retryIn * 60000) }
+        : { status: "failed", attempts, error: String(err.message || err).slice(0, 500), payload: {}, nextAttemptAt: null },
+    });
+    if (retryIn) setTimeout(() => kick(prisma, log), retryIn * 60000 + 1000).unref?.();
+  }
+}
+
+/** Delivers queued emails that are due, oldest first. Safe to run from
+ * several places at once: each row is claimed before it's sent. */
+async function drainQueue(prisma, { log, limit = 50 } = {}) {
+  // A process that died mid-send leaves rows in "sending": try them again.
+  await prisma.emailLog.updateMany({ where: { status: "sending", nextAttemptAt: { lt: new Date(Date.now() - STUCK_MS) } }, data: { status: "queued" } });
+  let sent = 0;
+  for (let i = 0; i < limit; i += 1) {
+    const row = await prisma.emailLog.findFirst({
+      where: { status: "queued", OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: new Date() } }] },
+      orderBy: { createdAt: "asc" },
+    });
+    if (!row) break;
+    const claimed = await prisma.emailLog.updateMany({ where: { id: row.id, status: "queued" }, data: { status: "sending", nextAttemptAt: new Date() } });
+    if (!claimed.count) continue;
+    await deliver(prisma, row, log);
+    sent += 1;
+  }
+  return sent;
+}
+
+let running = false;
+let again = false;
+function kick(prisma, log) {
+  if (running) {
+    again = true;
+    return;
+  }
+  running = true;
+  (async () => {
+    do {
+      again = false;
+      await drainQueue(prisma, { log }).catch((err) => log?.error({ err }, "mailer: queue failed"));
+    } while (again);
+  })().finally(() => {
+    running = false;
+  });
+}
+
+module.exports = { sendEmail, sendNow, drainQueue, emailConfigured, emailProvider, htmlToText, parseFrom };
