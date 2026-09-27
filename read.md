@@ -32,6 +32,11 @@ Oyklane is a Shopify-like SaaS in a pnpm monorepo.
 
 ## 3. ⚠️ Shared database
 
+- **Production DB is Supabase project `oyklane-in` (Mumbai, ap-south-1)** since 27 Sep 2026. All 79 tables were copied from the old Tokyo project `Oyklane` (ap-northeast-1) with pg_dump/psql and every table's row count verified. Tokyo is now a **stale backup** — don't point anything at it.
+- Railway (`api.oyklane.com`, project "powerful-light") and local `.env` both point at Mumbai.
+- Lesson: switching `DATABASE_URL` to a new, empty database took every store offline for hours. Copy the data first, verify, then switch.
+- **Reset on 27 Sep 2026 (owner's request): every store, store account, order, customer and log was deleted** to start real testing. Kept: the super admin (`admin@shopcycle.platform`), plans/features, app catalog, billing settings, platform audit log. Backup of everything before the reset: `../shopcycle-db-backups/mumbai-before-reset-2026-09-27.dump` (restore with `pg_restore`). The Sonchiri/Loomwear rules below refer to stores that no longer exist until they're recreated.
+
 Local `.env` points at the **production** Supabase database, so every local write is a live write.
 
 - Keep schema pushes additive: `pnpm --filter @shopcycle/database push`.

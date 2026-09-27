@@ -320,6 +320,14 @@ if (parsed.data.BILLING_SANDBOX && parsed.data.NODE_ENV === "production") {
         "sign-ins won't stick. Set COOKIE_DOMAIN to the shared parent domain, e.g. .oyklane.com."
     );
   }
+  // The browser apps allowed to call the API (CORS, app.js). A localhost
+  // value copied from development blocks that app in production with a
+  // bare "Failed to fetch".
+  for (const key of ["ADMIN_ORIGIN", "SUPER_ADMIN_ORIGIN", "STOREFRONT_ORIGIN"]) {
+    if (d.NODE_ENV === "production" && ["localhost", "127.0.0.1"].includes(host(d[key]))) {
+      console.warn(`${key} is ${d[key]} — the real ${key.replace(/_ORIGIN$/, "").toLowerCase().replace(/_/g, " ")} app can't call this API until it's set to its https:// address.`);
+    }
+  }
 }
 
 module.exports = { env: parsed.data, isInfraDomain };

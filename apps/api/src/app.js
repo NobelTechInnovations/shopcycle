@@ -60,7 +60,9 @@ const billingRoutes = require("./modules/billing/routes");
 // shopper-facing request reaches the API server-to-server (the storefront
 // app's route handlers/server actions), never from a shopper's browser, so
 // stores on their own custom domains never need to be listed here.
-const TRUSTED_ORIGINS = [env.ADMIN_ORIGIN, env.STOREFRONT_ORIGIN, env.SUPER_ADMIN_ORIGIN];
+// Browsers send Origin without a trailing slash, so a configured
+// "https://superadmin.oyklane.com/" would never match.
+const TRUSTED_ORIGINS = [env.ADMIN_ORIGIN, env.STOREFRONT_ORIGIN, env.SUPER_ADMIN_ORIGIN].map((o) => String(o).trim().replace(/\/+$/, ""));
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 function buildApp() {
