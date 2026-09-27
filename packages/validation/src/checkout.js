@@ -4,7 +4,13 @@ const checkoutSchema = z.object({
   cartId: z.string().min(1, "Missing cart"),
   sessionId: z.string().optional(),
   email: z.string().email("Enter a valid email"),
-  phone: z.string().min(1, "Phone is required"),
+  // Whether phone, landmark, company, GSTIN and the note are asked for
+  // (and required) is the store's choice — Settings ▸ Checkout, enforced
+  // in checkout/service.js.
+  phone: z.string().trim().max(20).optional().nullable(),
+  company: z.string().trim().max(120).optional().nullable(),
+  gstin: z.string().trim().max(20).optional().nullable(),
+  note: z.string().trim().max(1000).optional().nullable(),
   shippingName: z.string().min(1, "Name is required"),
   shippingAddress1: z.string().min(1, "Address is required"),
   shippingAddress2: z.string().optional().nullable(),

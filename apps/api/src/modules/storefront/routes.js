@@ -2,6 +2,7 @@ const controller = require("./controller");
 const { redirectsToDomain } = require("../../lib/storefront-url");
 const service = require("./service");
 const growth = require("./growth");
+const reviews = require("../reviews/service");
 
 // Public — no auth. This is what apps/storefront calls to get rendered
 // HTML and raw theme assets for anonymous visitors.
@@ -31,6 +32,16 @@ async function storefrontRoutes(fastify) {
     reply.send(await growth.subscribe(fastify, store, request.body));
   });
   fastify.get("/:handle/render/:template", controller.renderHandler);
+  // A review written on the product page (Product Reviews app).
+  fastify.post("/:handle/products/:slug/reviews", { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async (request) => {
+    const store = await service.loadStoreOrThrow(fastify.prisma, request.params.handle);
+    return reviews.submit(fastify.prisma, store, request.params.slug, request.body || {});
+  });
+  // Quick add on product cards (platform cart-drawer.js).
+  fastify.get("/:handle/products/:slug/quick", async (request, reply) => {
+    reply.header("cache-control", "no-store");
+    return service.quickProduct(fastify.prisma, request.params.handle, request.params.slug);
+  });
   fastify.get("/:handle/assets/:themeId/*", controller.assetHandler);
 }
 

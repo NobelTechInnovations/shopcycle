@@ -102,7 +102,10 @@ Environment for this:
   `COOKIE_DOMAIN=.oyklane.com`, and — to add custom domains and their SSL to
   Vercel automatically — `VERCEL_TOKEN`, `VERCEL_STOREFRONT_PROJECT_ID`,
   `VERCEL_TEAM_ID` (team projects only).
-- Storefront (Vercel): `STOREFRONT_ROOT_DOMAIN=oyklane.com`, `API_INTERNAL_URL=https://api.oyklane.com`;
+- Storefront (Vercel): `STOREFRONT_ROOT_DOMAIN=oyklane.com`, `API_INTERNAL_URL=https://api.oyklane.com`
+  (https — an http address gets redirected, and a redirected POST arrives as
+  a GET, so add-to-cart and checkout would fail; the storefront now upgrades
+  a public http address itself);
   domains `*.oyklane.com` (wildcard SSL needs `oyklane.com` on Vercel's nameservers).
 - Admin (Vercel): `NEXT_PUBLIC_API_URL=https://api.oyklane.com`, `NEXT_PUBLIC_STOREFRONT_ROOT_DOMAIN=oyklane.com`.
 
@@ -139,6 +142,25 @@ large volumes, swap `modules/uploads` to S3/R2 behind the same functions.
   the platform's own on every theme; variants titled like `M / Black` get
   separate Size and Colour pickers. Every store's footer carries
   "Powered by Oyklane.com".
+- **Product page layout** (theme editor ▸ Product page): the seller
+  reorders, hides and resizes the product page's blocks (title, price,
+  pickers, buy buttons, badges, description, details, extra tabs…) and adds
+  theme sections around it. Saved as the theme's `templates/product.json`;
+  the design stays the platform's. Cart and checkout stay fixed.
+- **Quick add**: product cards open a size/colour picker in the cart drawer.
+- **Checkout fields** (Settings ▸ Checkout): mobile, landmark, company,
+  GSTIN and an order note — hidden, optional or required; India-only
+  shipping hides the country menu. Enforced by the API, shown on the order
+  and the GST invoice.
+- **Product Reviews app** (Apps): stars on cards and product pages, a
+  review form (anyone or verified buyers only), moderation, replies and CSV
+  import matched by product slug.
+- **Facebook Pixel / Google Analytics**: added by the platform to every
+  page, checkout included, with ViewContent/view_item, AddToCart,
+  InitiateCheckout, Purchase and Search events. "Continue with Facebook"
+  lists the seller's pixels when `META_APP_ID`/`META_APP_SECRET` are set.
+- **New-order alerts**: the admin plays a coin sound and shows the order
+  when a COD or paid order comes in (one tab rings; mute in the top bar).
 
 ## Phase status
 

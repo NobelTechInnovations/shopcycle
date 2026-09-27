@@ -8,6 +8,7 @@ const {
 } = require("@shopcycle/validation");
 const service = require("./service");
 const storefrontService = require("../storefront/service");
+const platform = require("../storefront/platform");
 
 async function listHandler(request, reply) {
   const themes = await service.listThemes(request.server.prisma, request.store.id);
@@ -16,7 +17,9 @@ async function listHandler(request, reply) {
 
 async function getHandler(request, reply) {
   const theme = await service.getTheme(request.server.prisma, request.store.id, request.params.id);
-  reply.send({ theme });
+  // The platform's arrangeable pages (product page): their sections and
+  // default layouts, for the editor's page switcher.
+  reply.send({ theme, platform: await platform.editorPackage() });
 }
 
 async function installHandler(request, reply) {

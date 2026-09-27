@@ -53,6 +53,7 @@ export function SettingsPanel({ catalog, products, collections, menus, onOpenSet
   const removeBlock = useEditorStore((s) => s.removeBlock);
   const updateBlockSetting = useEditorStore((s) => s.updateBlockSetting);
   const moveBlock = useEditorStore((s) => s.moveBlock);
+  const toggleBlockDisabled = useEditorStore((s) => s.toggleBlockDisabled);
   const [openBlock, setOpenBlock] = useState(null);
 
   if (!selectedSectionKey || !template.sections[selectedSectionKey]) {
@@ -69,7 +70,10 @@ export function SettingsPanel({ catalog, products, collections, menus, onOpenSet
   const Icon = meta.icon;
   const blockOrder = entry.block_order || [];
   const blockTypes = schema.blocks || [];
-  const canAddBlock = blockTypes.length > 0 && (!schema.max_blocks || blockOrder.length < schema.max_blocks);
+  // Block types limited to one (a title, a price…) drop out of "Add block" once used.
+  const usedCount = (type) => blockOrder.filter((id) => entry.blocks[id]?.type === type).length;
+  const addableTypes = blockTypes.filter((b) => !b.limit || usedCount(b.type) < b.limit);
+  const canAddBlock = addableTypes.length > 0 && (!schema.max_blocks || blockOrder.length < schema.max_blocks);
 
   function add(type) {
     const id = newBlockId();
@@ -87,15 +91,17 @@ export function SettingsPanel({ catalog, products, collections, menus, onOpenSet
           <p className="text-sm font-semibold text-ink m-0 truncate">{schema.name}</p>
           <p className="text-[11.5px] text-ink-muted m-0 leading-snug">{meta.text}</p>
         </div>
-        <Tooltip title={entry.disabled ? "Show section" : "Hide section"}>
-          <Button
-            size="small"
-            type="text"
-            icon={entry.disabled ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
-            aria-label={entry.disabled ? "Show section" : "Hide section"}
-            onClick={() => toggleSectionDisabled(selectedSectionKey)}
-          />
-        </Tooltip>
+        {!schema.locked && (
+          <Tooltip title={entry.disabled ? "Show section" : "Hide section"}>
+            <Button
+              size="small"
+              type="text"
+              icon={entry.disabled ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
+              aria-label={entry.disabled ? "Show section" : "Hide section"}
+              onClick={() => toggleSectionDisabled(selectedSectionKey)}
+            />
+          </Tooltip>
+        )}
         <Button size="small" type="text" aria-label="Close" onClick={() => selectSection(null)}>
           Done
         </Button>
@@ -137,8 +143,17 @@ export function SettingsPanel({ catalog, products, collections, menus, onOpenSet
                         onClick={() => setOpenBlock(open ? null : blockId)}
                       >
                         <ChevronRight size={13} className={`text-ink-subtle shrink-0 transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true" />
-                        <span className="text-[13px] text-ink truncate">{blockLabel(block, blockSchema)}</span>
+                        <span className={`text-[13px] truncate ${block.disabled ? "text-ink-subtle line-through" : "text-ink"}`}>{blockLabel(block, blockSchema)}</span>
                       </button>
+                      <Tooltip title={block.disabled ? "Show" : "Hide"}>
+                        <Button
+                          size="small"
+                          type="text"
+                          icon={block.disabled ? <EyeOff size={12} aria-hidden="true" /> : <Eye size={12} aria-hidden="true" />}
+                          aria-label={block.disabled ? "Show block" : "Hide block"}
+                          onClick={() => toggleBlockDisabled(selectedSectionKey, blockId)}
+                        />
+                      </Tooltip>
                       <Button size="small" type="text" icon={<ChevronUp size={12} aria-hidden="true" />} aria-label="Move up" disabled={idx === 0} onClick={() => moveBlock(selectedSectionKey, blockId, -1)} />
                       <Button size="small" type="text" icon={<ChevronDown size={12} aria-hidden="true" />} aria-label="Move down" disabled={idx === blockOrder.length - 1} onClick={() => moveBlock(selectedSectionKey, blockId, 1)} />
                       <Tooltip title={blockOrder.length === 1 && schema.default_blocks ? "A section needs at least one — hide the section instead" : "Remove"}>
@@ -176,7 +191,7 @@ export function SettingsPanel({ catalog, products, collections, menus, onOpenSet
                   Add {blockTypes[0].name.toLowerCase()}
                 </Button>
               ) : (
-                <Dropdown trigger={["click"]} menu={{ items: blockTypes.map((b) => ({ key: b.type, label: b.name, onClick: () => add(b.type) })) }}>
+                <Dropdown trigger={["click"]} menu={{ items: addableTypes.map((b) => ({ key: b.type, label: b.name, onClick: () => add(b.type) })) }}>
                   <Button type="dashed" block size="small" className="mt-2" icon={<Plus size={13} aria-hidden="true" />}>
                     Add block
                   </Button>

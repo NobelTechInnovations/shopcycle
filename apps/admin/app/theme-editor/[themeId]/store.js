@@ -141,6 +141,12 @@ export const useEditorStore = create((set, get) => ({
    * mirror updateSectionSetting/addBlock/removeBlock/updateBlockSetting,
    * just targeting settingsData instead of the draft template.
    */
+  toggleBlockDisabled: (sectionKey, blockId) =>
+    get()._commit((t) => {
+      const block = t.sections[sectionKey]?.blocks?.[blockId];
+      if (block) block.disabled = !block.disabled;
+    }),
+
   updateGlobalSectionSetting: (sectionType, settingId, value) =>
     set((s) => {
       const sections = clone(s.settingsData.sections || {});

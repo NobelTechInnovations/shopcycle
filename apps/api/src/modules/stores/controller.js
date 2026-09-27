@@ -50,6 +50,18 @@ const updateStoreSchema = z.object({
             .optional(),
         })
         .optional(),
+      // Settings ▸ Checkout — see lib/store-settings.js.
+      checkout: z
+        .object({
+          phone: z.enum(["required", "optional", "hidden"]).optional(),
+          address2: z.enum(["required", "optional", "hidden"]).optional(),
+          company: z.enum(["required", "optional", "hidden"]).optional(),
+          gstin: z.enum(["optional", "hidden"]).optional(),
+          note: z.enum(["optional", "hidden"]).optional(),
+          marketing: z.enum(["unchecked", "hidden"]).optional(),
+          country: z.enum(["show", "india"]).optional(),
+        })
+        .optional(),
     })
     .optional(),
 });

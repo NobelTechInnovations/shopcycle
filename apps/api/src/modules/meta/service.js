@@ -38,23 +38,43 @@ async function graphRequest(path, { method = "GET", token, params, body } = {}) 
  * comes from that request's session cookie, the same way every other
  * write in this app is scoped — not from an OAuth `state` param, which
  * would just be re-deriving something the session already tells us. */
-function buildAuthorizeUrl() {
+function buildAuthorizeUrl(scopes) {
   const url = new URL("https://www.facebook.com/dialog/oauth");
   url.searchParams.set("client_id", env.META_APP_ID);
   url.searchParams.set("redirect_uri", env.META_OAUTH_REDIRECT_URI);
   url.searchParams.set(
     "scope",
-    [
-      "ads_management",
-      "ads_read",
-      "business_management",
-      "pages_show_list",
-      "pages_read_engagement",
-      "whatsapp_business_management",
-      "whatsapp_business_messaging",
-    ].join(",")
+    (
+      scopes || [
+        "ads_management",
+        "ads_read",
+        "business_management",
+        "pages_show_list",
+        "pages_read_engagement",
+        "whatsapp_business_management",
+        "whatsapp_business_messaging",
+      ]
+    ).join(",")
   );
   return url.toString();
+}
+
+/** Pixels (datasets) the connected Facebook user can use — across their
+ * ad accounts, newest activity first. */
+async function listPixels(token) {
+  const accounts = await graphRequest("/me/adaccounts", { token, params: { fields: "id,name", limit: 25 } });
+  const seen = new Map();
+  for (const acct of (accounts.data || []).slice(0, 15)) {
+    try {
+      const px = await graphRequest(`/${acct.id}/adspixels`, { token, params: { fields: "id,name,last_fired_time", limit: 50 } });
+      for (const p of px.data || []) {
+        if (!seen.has(p.id)) seen.set(p.id, { id: p.id, name: p.name, adAccount: acct.name, lastFired: p.last_fired_time || null });
+      }
+    } catch {
+      // An ad account without pixel access — skip it.
+    }
+  }
+  return [...seen.values()].sort((a, b) => String(b.lastFired || "").localeCompare(String(a.lastFired || "")));
 }
 
 /** Authorization code → short-lived token → long-lived (~60 day) token,
@@ -135,6 +155,7 @@ async function listConnectableAssets(token) {
 }
 
 module.exports = {
+  listPixels,
   metaConfigured,
   graphRequest,
   buildAuthorizeUrl,

@@ -70,6 +70,7 @@ const APP_ICON_KEYS = [
   "percent",
   "search",
   "puzzle",
+  "quote",
 ];
 
 module.exports = { slugify, formatCurrency, asyncHandler, HttpError, detectDeviceType, APP_ICON_KEYS };

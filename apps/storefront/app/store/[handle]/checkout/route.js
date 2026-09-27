@@ -29,7 +29,11 @@ export async function POST(request, { params }) {
     cartId,
     sessionId,
     email: form.get("email"),
-    phone: form.get("phone"),
+    phone: form.get("phone") || undefined,
+    // Asked for only when the store turns them on (Settings ▸ Checkout).
+    company: form.get("company") || undefined,
+    gstin: form.get("gstin") || undefined,
+    note: form.get("note") || undefined,
     shippingName: form.get("shippingName"),
     shippingAddress1: form.get("shippingAddress1"),
     shippingAddress2: form.get("shippingAddress2") || undefined,

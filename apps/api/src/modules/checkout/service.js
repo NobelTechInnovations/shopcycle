@@ -10,6 +10,7 @@ const notify = require("../orders/notify");
 const giftCards = require("../gift-cards/service");
 const payments = require("../payments/service");
 const webhooks = require("../developer/webhooks");
+const { storeSettings } = require("../../lib/store-settings");
 
 /** What checkout offers: cash on delivery (Settings ▸ Payments) and each
  * gateway the seller connected with their own account — shoppers' money
@@ -33,12 +34,44 @@ function returnUrls(base, provider, orderId) {
   };
 }
 
+const GSTIN = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+
+/**
+ * The checkout form as this store has set it up (Settings ▸ Checkout):
+ * hidden fields are dropped whatever was sent, required ones must be
+ * filled, and values are tidied. Throws a 400 naming the missing field.
+ */
+function applyCheckoutFields(store, input) {
+  const f = storeSettings(store).checkout;
+  const out = { ...input };
+  const clean = (v) => (v == null ? "" : String(v).trim());
+  const need = (key, label, mode) => {
+    if (mode === "hidden") out[key] = null;
+    else if (mode === "required" && !clean(out[key])) throw new HttpError(400, `Enter your ${label}.`);
+    else out[key] = clean(out[key]) || null;
+  };
+  need("phone", "mobile number", f.phone);
+  if (out.phone && !/^\+?[\d\s-]{7,20}$/.test(out.phone)) throw new HttpError(400, "Enter a valid mobile number.");
+  need("shippingAddress2", "apartment or landmark", f.address2);
+  need("company", "company name", f.company);
+  need("note", "note", f.note);
+  need("gstin", "GSTIN", f.gstin);
+  if (out.gstin) {
+    out.gstin = out.gstin.toUpperCase().replace(/\s+/g, "");
+    if (!GSTIN.test(out.gstin)) throw new HttpError(400, "That GSTIN doesn't look right — it's 15 characters, like 27ABCDE1234F1Z5.");
+  }
+  if (f.marketing === "hidden") out.acceptsMarketing = false;
+  if (f.country === "india") out.shippingCountry = "IN";
+  return out;
+}
+
 /** Creates a real Order from the shopper's current cart — re-hydrated here
  * (never trusting client-submitted totals) so the price/discount/shipping/
  * tax actually charged is always what the store's current configuration
  * says it should be, not whatever the checkout form happened to render. */
 async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopper = null, log } = {}) {
   input = { ...input, email: String(input.email).trim().toLowerCase() };
+  if (store) input = applyCheckoutFields(store, input);
   const raw = await cartService.readRaw(prisma, storeId, cartId);
   const cart = await cartService.hydrateCart(prisma, storeId, cartId, raw);
   if (cart.items.length === 0) throw new HttpError(400, "Your cart is empty");
@@ -74,7 +107,7 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
   // still Phase-out-of-scope, so it's captured fresh at checkout).
   const customerFields = {
     name: input.shippingName,
-    phone: input.phone,
+    ...(input.phone && { phone: input.phone }),
     address1: input.shippingAddress1,
     address2: input.shippingAddress2 || null,
     city: input.shippingCity,
@@ -122,6 +155,9 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     shippingProvince: input.shippingProvince,
     shippingZip: input.shippingZip,
     shippingCountry: input.shippingCountry,
+    customerNote: input.note || null,
+    buyerCompany: input.company || null,
+    buyerGstin: input.gstin || null,
     paymentMethod: input.paymentMethod,
     sessionId: session?.id || null,
     giftCardAmount: giftCard?.amount || 0,

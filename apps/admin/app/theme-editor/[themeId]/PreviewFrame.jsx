@@ -81,6 +81,13 @@ export function PreviewFrame({ themeId, templateName, previewSlug, device, selec
   useEffect(() => {
     if (!template) return;
     clearTimeout(timeoutRef.current);
+    // Product/collection previews need something to show.
+    if ((templateName === "product" || templateName === "collection") && !previewSlug) {
+      setSrcDoc(
+        `<div style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:90vh;text-align:center;color:#6b7280"><div><p style="font-size:15px;color:#111;margin:0 0 6px">Nothing to preview yet</p><p style="font-size:13px;margin:0">Add an active ${templateName} first — its page shows here.</p></div></div>`
+      );
+      return undefined;
+    }
     timeoutRef.current = setTimeout(async () => {
       try {
         const { html } = await apiFetch(`/api/themes/${themeId}/render-draft`, {

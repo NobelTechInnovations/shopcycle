@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isPlatformHost, subdomainHandle, ROOT_DOMAIN } from "@/lib/domain";
 
-const API_URL = process.env.API_INTERNAL_URL || "http://localhost:4100";
+import { API_URL } from "@/lib/api-url";
 
 /**
  * Every store gets two ways in, resolved here with zero awareness needed

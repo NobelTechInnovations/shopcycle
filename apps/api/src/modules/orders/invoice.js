@@ -131,6 +131,8 @@ function buildInvoice(store, order) {
       stateCode: buyerState?.code || null,
       email: order.email,
       phone: order.phone,
+      company: order.buyerCompany || null,
+      gstin: order.buyerGstin || null,
     },
     placeOfSupply: buyerState ? `${buyerState.name} (${buyerState.code})` : order.shippingProvince || "—",
     lines,
@@ -206,8 +208,10 @@ function renderInvoiceHtml(store, order) {
       ${inv.seller.address ? `<div class="muted" style="white-space:pre-line">${esc(inv.seller.address)}</div>` : ""}
       ${inv.seller.state ? `<div class="muted">${esc(inv.seller.state)}${inv.seller.stateCode ? ` (${inv.seller.stateCode})` : ""}</div>` : ""}
       ${inv.seller.email ? `<div class="muted">${esc(inv.seller.email)}</div>` : ""}</div>
-    <div><div class="label">Billed and shipped to</div><div>${esc(inv.buyer.name)}</div>
+    <div><div class="label">Billed and shipped to</div><div>${esc(inv.buyer.company || inv.buyer.name)}</div>
+      ${inv.buyer.company ? `<div class="muted">${esc(inv.buyer.name)}</div>` : ""}
       <div class="muted">${esc(inv.buyer.address)}</div>
+      ${inv.buyer.gstin ? `<div class="muted">GSTIN ${esc(inv.buyer.gstin)}</div>` : ""}
       <div class="muted">Place of supply: ${esc(inv.placeOfSupply)}</div></div>
   </div>
   <div class="scroll"><table>

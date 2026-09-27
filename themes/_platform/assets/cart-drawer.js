@@ -193,13 +193,30 @@
       headers: { accept: "application/json" },
       credentials: "same-origin",
     }).then(function (res) {
-      if (!res.ok) throw new Error("cart request failed");
-      return res.json();
+      if (res.ok) return res.json();
+      // The store answered but said no (sold out, not enough stock…):
+      // carry its message so it can be shown instead of leaving the page.
+      return res
+        .json()
+        .catch(function () {
+          return {};
+        })
+        .then(function (body) {
+          var err = new Error((body && body.error) || "Couldn't update your cart.");
+          err.status = res.status;
+          throw err;
+        });
     });
+  }
+
+  function showError(text) {
+    notice.innerHTML = esc(text);
+    notice.classList.add("is-shown", "is-error");
   }
 
   function showNotice(text) {
     notice.innerHTML = ICON.check + " " + esc(text);
+    notice.classList.remove("is-error");
     notice.classList.add("is-shown");
   }
 
@@ -230,9 +247,38 @@
           open();
           var title = form.getAttribute("data-product-title") || "Item";
           showNotice(title + " added to your cart");
+          // Facebook Pixel / Google Analytics (platform tracking.js), if installed.
+          if (window.oyTrack) {
+            var vid = data.get("variantId");
+            var line = (res.cart.items || []).filter(function (i) {
+              return i.variantId === vid;
+            })[0];
+            var qty = Number(data.get("quantity")) || 1;
+            if (line) {
+              window.oyTrack("AddToCart", {
+                ids: [line.productId],
+                name: line.title,
+                value: Math.round(line.price * qty * 100) / 100,
+                currency: cfg.currency,
+                items: [{ item_id: line.productId, item_name: line.title, price: line.price, quantity: qty }],
+              });
+            }
+          }
         })
-        .catch(function () {
-          // Fall back to the full-page flow.
+        .catch(function (err) {
+          if (err && err.status && err.status < 500 && err.status !== 404) {
+            // A real answer from the store — show it in the drawer.
+            return request(cfg.cartJson)
+              .then(function (res) {
+                render(res.cart);
+              })
+              .catch(function () {})
+              .then(function () {
+                open();
+                showError(err.message);
+              });
+          }
+          // No usable answer: fall back to the full-page flow.
           form.submit();
         })
         .then(function () {
@@ -267,6 +313,178 @@
         body.removeAttribute("aria-busy");
       });
   });
+
+  // ── Quick add from product cards ───────────────────────
+  // A card's "Quick add" / "Choose options" link goes to the product page;
+  // with the drawer on it opens a size/colour picker here instead, and the
+  // add itself goes through the add-to-cart handler above.
+  var QUICK = "[data-oy-quick], a.pcard__quick-btn, a.card__quick-btn";
+  var quick = null; // { product, currency, lowStock }
+
+  function quickSlug(el) {
+    var explicit = el.getAttribute("data-oy-quick");
+    if (explicit) return explicit;
+    var m = pathOf(el.href || "").match(/\/products\/([^/?#]+)$/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+  function quickUrl(slug) {
+    return cfg.root.replace(/\/$/, "") + "/products/" + encodeURIComponent(slug) + "/quick";
+  }
+  var parts = function (v) {
+    return String(v.title || "").split(" / ").map(function (x) {
+      return x.trim();
+    });
+  };
+
+  function priceHtml(v) {
+    var sale = v.comparePrice && v.comparePrice > v.price;
+    return '<span class="oy-quick__now' + (sale ? " is-sale" : "") + '">' + money(v.price) + "</span>" + (sale ? "<s>" + money(v.comparePrice) + "</s>" : "");
+  }
+
+  function renderQuick(data, href) {
+    var p = data.product;
+    quick = data;
+    title.textContent = "Quick add";
+    var sel = p.variants.filter(function (v) {
+      return v.id === p.selected_variant_id;
+    })[0] || p.variants[0];
+    var options = p.options && p.options.length ? p.options : null;
+    var img = p.images[0];
+    var html =
+      '<div class="oy-quick">' +
+      '<div class="oy-quick__top">' +
+      '<a class="oy-quick__media" href="' + esc(href) + '" tabindex="-1" aria-hidden="true">' +
+      (img ? '<img data-oy-qimg src="' + esc(img.url) + '" alt="" width="240" height="300">' : '<span class="oy-line__ph">' + ICON.photo + "</span>") +
+      "</a>" +
+      '<div class="oy-quick__info">' +
+      (p.brand ? '<span class="oy-quick__brand">' + esc(p.brand) + "</span>" : "") +
+      '<a class="oy-quick__title" href="' + esc(href) + '">' + esc(p.title) + "</a>" +
+      '<div class="oy-quick__price" data-oy-qprice>' + priceHtml(sel) + "</div>" +
+      '<a class="oy-quick__more" href="' + esc(href) + '">View full details</a>' +
+      "</div></div>" +
+      '<form method="post" action="' + esc(cfg.add) + '" class="oy-quick__form" data-product-title="' + esc(p.title) + '">' +
+      '<input type="hidden" name="variantId" value="' + esc(sel.id) + '" data-oy-qvariant>' +
+      '<input type="hidden" name="quantity" value="1">';
+    if (options) {
+      options.forEach(function (opt, i) {
+        html += '<fieldset class="oy-opt" data-oy-opt="' + i + '"><legend>' + esc(opt.name) + ': <span data-oy-optval>' + esc(opt.selected) + "</span></legend><div class=\"oy-opt__values\">";
+        opt.values.forEach(function (val) {
+          html +=
+            '<label class="oy-chip"><input type="radio" name="oyq' + i + '" value="' + esc(val.value) + '"' + (val.value === opt.selected ? " checked" : "") + ">" +
+            "<span>" + (opt.is_colour && val.swatch ? '<i class="oy-chip__dot" style="background:' + esc(val.swatch) + '"></i>' : "") + esc(val.value) + "</span></label>";
+        });
+        html += "</div></fieldset>";
+      });
+    } else if (p.variants.length > 1) {
+      html += '<fieldset class="oy-opt" data-oy-opt="0"><legend>Option: <span data-oy-optval>' + esc(sel.title) + '</span></legend><div class="oy-opt__values">';
+      p.variants.forEach(function (v) {
+        html += '<label class="oy-chip"><input type="radio" name="oyq0" value="' + esc(v.title) + '"' + (v.id === sel.id ? " checked" : "") + "><span>" + esc(v.title) + "</span></label>";
+      });
+      html += "</div></fieldset>";
+    }
+    html +=
+      '<p class="oy-quick__stock" data-oy-qstock></p>' +
+      '<button type="submit" class="oy-btn oy-btn--block" data-oy-qadd>Add to cart</button>' +
+      "</form></div>";
+    body.innerHTML = html;
+    foot.hidden = true;
+    foot.innerHTML = "";
+    var form = body.querySelector(".oy-quick__form");
+    form.addEventListener("change", function () {
+      syncQuick(form, !!options);
+    });
+    syncQuick(form, !!options);
+    var first = form.querySelector("input:checked") || form.querySelector("[data-oy-qadd]");
+    if (first) first.focus();
+  }
+
+  function syncQuick(form, split) {
+    var p = quick.product;
+    var groups = Array.prototype.slice.call(form.querySelectorAll("[data-oy-opt]"));
+    var picks = groups.map(function (g) {
+      var r = g.querySelector("input:checked");
+      return r ? r.value : null;
+    });
+    var fits = function (v, want) {
+      if (!split) return v.title === want[0];
+      var pv = parts(v);
+      return want.every(function (val, k) {
+        return pv[k] === val;
+      });
+    };
+    var match = groups.length
+      ? p.variants.filter(function (v) {
+          return fits(v, picks);
+        })[0]
+      : p.variants[0];
+    groups.forEach(function (g, i) {
+      var label = g.querySelector("[data-oy-optval]");
+      if (label) label.textContent = picks[i] || "";
+      g.querySelectorAll("input").forEach(function (input) {
+        var trial = picks.slice();
+        trial[i] = input.value;
+        var ok = p.variants.some(function (v) {
+          return v.available && fits(v, trial);
+        });
+        input.parentNode.classList.toggle("is-out", !ok);
+      });
+    });
+    var btn = form.querySelector("[data-oy-qadd]");
+    var stock = form.querySelector("[data-oy-qstock]");
+    if (!match) {
+      btn.disabled = true;
+      btn.textContent = "Unavailable";
+      stock.className = "oy-quick__stock is-out";
+      stock.textContent = "This combination isn't available";
+      return;
+    }
+    form.querySelector("[data-oy-qvariant]").value = match.id;
+    body.querySelector("[data-oy-qprice]").innerHTML = priceHtml(match);
+    btn.disabled = !match.available;
+    btn.textContent = match.available ? "Add to cart · " + money(match.price) : "Sold out";
+    var q = match.inventoryQuantity;
+    stock.className = "oy-quick__stock" + (q <= 0 ? " is-out" : q <= quick.lowStock ? " is-low" : "");
+    stock.textContent = q <= 0 ? "Out of stock" : q <= quick.lowStock ? "Only " + q + " left" : "In stock";
+    // Show the photo that names the chosen value ("… in Olive").
+    var imgEl = body.querySelector("[data-oy-qimg]");
+    if (imgEl) {
+      for (var i = picks.length - 1; i >= 0; i -= 1) {
+        var want = String(picks[i] || "").toLowerCase();
+        var hit = want && p.images.filter(function (im) {
+          return (" " + String(im.altText || "").toLowerCase() + " ").indexOf(" " + want + " ") !== -1;
+        })[0];
+        if (hit) {
+          imgEl.src = hit.url;
+          break;
+        }
+      }
+    }
+  }
+
+  document.addEventListener(
+    "click",
+    function (e) {
+      var el = e.target.closest && e.target.closest(QUICK);
+      if (!el || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      var slug = quickSlug(el);
+      if (!slug) return;
+      e.preventDefault();
+      var href = el.getAttribute("href") || cfg.root.replace(/\/$/, "") + "/products/" + slug;
+      notice.classList.remove("is-shown", "is-error");
+      title.textContent = "Quick add";
+      foot.hidden = true;
+      body.innerHTML = '<div class="oy-quick oy-quick--loading" aria-busy="true"><span class="oy-spinner" aria-label="Loading"></span></div>';
+      open();
+      request(quickUrl(slug))
+        .then(function (data) {
+          renderQuick(data, href);
+        })
+        .catch(function () {
+          location.href = href;
+        });
+    },
+    true
+  );
 
   // Quantity buttons inside the drawer.
   body.addEventListener("click", function (e) {

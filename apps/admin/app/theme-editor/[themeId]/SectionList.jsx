@@ -29,7 +29,7 @@ function subtitleFor(entry) {
   return String(text).replace(/<[^>]+>/g, "").slice(0, 60);
 }
 
-function SortableSectionRow({ id, entry, label, selected, onSelect, onDuplicate, onDelete, onToggleHide }) {
+function SortableSectionRow({ id, entry, label, locked, selected, onSelect, onDuplicate, onDelete, onToggleHide }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const Icon = sectionMeta(entry.type).icon;
   const sub = subtitleFor(entry);
@@ -61,6 +61,9 @@ function SortableSectionRow({ id, entry, label, selected, onSelect, onDuplicate,
           )}
         </span>
       </button>
+      {locked ? (
+        <span className="text-[10.5px] text-ink-subtle pr-1">Always shown</span>
+      ) : (
       <div className={`flex items-center ${selected ? "" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"} transition-opacity`}>
         <Tooltip title={entry.disabled ? "Show" : "Hide"}>
           <Button
@@ -78,6 +81,7 @@ function SortableSectionRow({ id, entry, label, selected, onSelect, onDuplicate,
           <Button size="small" type="text" danger icon={<Trash2 size={13} aria-hidden="true" />} aria-label={`Delete ${label}`} onClick={() => onDelete(id)} />
         </Tooltip>
       </div>
+      )}
     </div>
   );
 }
@@ -99,7 +103,7 @@ function FixedRow({ icon: Icon, label, hint, onClick }) {
   );
 }
 
-export function SectionList({ catalog, onAddSection, onOpenGlobal }) {
+export function SectionList({ catalog, onAddSection, onOpenGlobal, pageLabel = "Home page", hint }) {
   const template = useEditorStore((s) => s.template);
   const selectedSectionKey = useEditorStore((s) => s.selectedSectionKey);
   const selectSection = useEditorStore((s) => s.selectSection);
@@ -141,8 +145,8 @@ export function SectionList({ catalog, onAddSection, onOpenGlobal }) {
   return (
     <div className="h-full flex flex-col">
       <div className="px-3 pt-3 pb-2">
-        <p className="m-0 text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">Home page</p>
-        <p className="m-0 mt-1 text-[11.5px] text-ink-muted leading-snug">Click a section to edit it, drag to reorder. Changes save automatically.</p>
+        <p className="m-0 text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">{pageLabel}</p>
+        <p className="m-0 mt-1 text-[11.5px] text-ink-muted leading-snug">{hint || "Click a section to edit it, drag to reorder. Changes save automatically."}</p>
       </div>
       <div className="flex-1 overflow-y-auto px-2 pb-3 flex flex-col gap-1">
         <FixedRow icon={PanelTop} label="Header" hint="Logo, menu, announcement bar" onClick={onOpenGlobal} />
@@ -155,6 +159,7 @@ export function SectionList({ catalog, onAddSection, onOpenGlobal }) {
                   id={key}
                   entry={template.sections[key]}
                   label={catalog[template.sections[key].type]?.name || template.sections[key].type}
+                  locked={Boolean(catalog[template.sections[key].type]?.locked)}
                   selected={key === selectedSectionKey}
                   onSelect={selectSection}
                   onDuplicate={handleDuplicate}

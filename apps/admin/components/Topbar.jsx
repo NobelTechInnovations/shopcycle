@@ -18,6 +18,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { storefrontUrlFor, initials } from "@/lib/storefront";
 import { CommandPalette } from "./CommandPalette";
+import { NewOrderAlerts } from "./NewOrderAlerts";
 
 export function Topbar({ user, store, onOpenNav }) {
   const router = useRouter();
@@ -168,6 +169,7 @@ export function Topbar({ user, store, onOpenNav }) {
       </button>
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <div className="flex items-center gap-2">
+        {store && <NewOrderAlerts storeId={store.id} />}
         {store && (
           <Button
             href={storefrontUrlFor(store)}

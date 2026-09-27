@@ -19,12 +19,18 @@ import {
   PanelBottom,
   MoveRight,
   Layers,
+  ShoppingCart,
+  MessageSquareText,
 } from "lucide-react";
 
 /** How each section type is described to a merchant in the editor — an
  * icon and one line on what it's for. Unknown types (a merchant's own
  * section from the code editor) fall back to a generic entry. */
 const META = {
+  // Oyklane's own product page (arranged, not designed, in the editor).
+  "sys-product": { icon: ShoppingCart, group: "Products", text: "Photos, price, options and add to cart — reorder, hide or resize its parts." },
+  "sys-reviews": { icon: MessageSquareText, group: "Products", text: "Star rating, reviews and a review form (Product Reviews app)." },
+  "sys-related": { icon: ShoppingBag, group: "Products", text: "“You may also like” — products from the same collection or category." },
   hero: { icon: ImageIcon, group: "Banners", text: "A big photo with a headline and buttons — the first thing shoppers see." },
   slideshow: { icon: GalleryHorizontal, group: "Banners", text: "Several banners that rotate, each with its own heading and button." },
   "promo-banner": { icon: Tag, group: "Banners", text: "Sale or launch tiles with a photo, headline and link." },

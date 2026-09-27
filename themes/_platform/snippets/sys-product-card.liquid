@@ -1,9 +1,10 @@
 {% comment %}
   Product card for platform pages (collection, search, related). Shows
   the second photo on hover, a sale badge computed from compare-at price,
-  and "Sold out" when no variant has stock.
+  and "Sold out" when no variant has stock. The + button quick-adds.
 {% endcomment %}
 {% assign card_variant = product.price_variant | default: product.variants.first %}
+<div class="sys-pcard-wrap">
 <a class="sys-pcard" href="{{ product.url }}">
   <div class="sys-pcard__media">
     {% if product.images.size > 0 %}
@@ -25,9 +26,17 @@
   <div class="sys-pcard__body">
     {% if product.brand %}<span class="sys-pcard__vendor">{{ product.brand }}</span>{% endif %}
     <span class="sys-pcard__title">{{ product.title }}</span>
+    {% if show_card_ratings and product.rating.count > 0 %}
+      <span class="sys-pcard__rating">{% render 'snippets/sys-stars', rating: product.rating.average %}({{ product.rating.count }})</span>
+    {% endif %}
     <span class="sys-price">
       {% if product.price_varies %}<span class="sys-muted sys-small">From</span>{% endif %}
       {% render 'snippets/sys-price', variant: card_variant %}
     </span>
   </div>
 </a>
+{% if product.available %}
+  {% comment %} Quick add: a picker in the cart drawer (single-variant products go straight in). {% endcomment %}
+  <a class="sys-pcard__quick" href="{{ product.url }}" data-oy-quick="{{ product.handle }}" aria-label="Quick add {{ product.title | escape }}">{% render 'snippets/sys-icon', icon: 'plus' %}</a>
+{% endif %}
+</div>

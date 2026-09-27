@@ -86,7 +86,7 @@
       }
       if (button) {
         button.disabled = !v.available;
-        button.textContent = v.available ? data.labels.add : data.labels.soldOut;
+        button.textContent = v.available ? button.getAttribute("data-label") || data.labels.add : data.labels.soldOut;
       }
       if (selectedLabel) selectedLabel.textContent = v.title;
     }

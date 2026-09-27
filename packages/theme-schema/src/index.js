@@ -81,7 +81,8 @@ function resolveBlocks(schema, sectionEntry) {
   }
   const order = sectionEntry.block_order || [];
   const blocks = sectionEntry.blocks || {};
-  return order.filter((id) => blocks[id]).map((id) => mergeBlockSettings(schema, { id, ...blocks[id] }));
+  // A block hidden in the editor (`disabled`) keeps its settings but isn't shown.
+  return order.filter((id) => blocks[id] && !blocks[id].disabled).map((id) => mergeBlockSettings(schema, { id, ...blocks[id] }));
 }
 
 /**

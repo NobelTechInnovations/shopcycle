@@ -1,292 +1,420 @@
+import { ThemeShowcase } from "./ThemeShowcase";
+
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const DEMO_URL = process.env.NEXT_PUBLIC_DEMO_STORE_URL || "https://loomwear.oyklane.com";
 
-const FEATURES = [
-  { title: "Drag-and-drop theme editor", text: "Real controllers for every section — image uploads, color pickers, menu and collection dropdowns. No code, no guesswork." },
-  { title: "Multi-store, one login", text: "Run several stores from a single account and switch between them in one click, the way an agency or multi-brand seller actually works." },
-  { title: "A real app ecosystem", text: "Install analytics, reviews, and marketing apps the same way you install a theme — configure once, it runs on every page." },
-  { title: "Your own domain", text: "Launch on your store's oyklane.com address, then point your own domain at it whenever you're ready — no migration, no downtime." },
-  { title: "Built-in checkout", text: "Cart, discounts, shipping, and Cash on Delivery or online payments — wired up from day one, not a paid add-on." },
-  { title: "Built for every device", text: "Every theme, every editor screen, every storefront — responsive by default, not an afterthought." },
-];
+const I = {
+  check: "M5 12.5l4.5 4.5L19 7.5",
+  layers: "M12 3 3 8l9 5 9-5-9-5zM3 16l9 5 9-5M3 12l9 5 9-5",
+  bolt: "M13 2 4 14h7l-1 8 9-12h-7z",
+  card: "M3 6h18v12H3zM3 10h18M7 15h4",
+  receipt: "M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6",
+  star: "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z",
+  chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
+  code: "M8 8l-5 4 5 4M16 8l5 4-5 4M14 5l-4 14",
+  globe: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.3 2.5 3.5 5.5 3.5 9s-1.2 6.5-3.5 9c-2.3-2.5-3.5-5.5-3.5-9S9.7 5.5 12 3z",
+  sliders: "M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4",
+  bell: "M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 21h4",
+  arrow: "M5 12h14M13 6l6 6-6 6",
+};
 
-const PLANS = [
-  { name: "Free", price: "₹0", period: "/mo", desc: "Get started and see how it feels.", items: ["Up to 10 products", "1 staff account", "Free theme library", "Community support"] },
-  { name: "Starter", price: "₹999", period: "/mo", highlight: true, desc: "For a store that's finding its customers.", items: ["Up to 200 products", "5 staff accounts", "Custom domain", "App installs", "Email support"] },
-  { name: "Growth", price: "₹2,999", period: "/mo", desc: "For a team scaling past one store.", items: ["Up to 5,000 products", "20 staff accounts", "Multi-store switching", "Priority support"] },
-];
-
-function Icon({ d }) {
+function Icon({ d, className }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={d} />
     </svg>
   );
 }
 
-const ICONS = {
-  layers: "M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
-  store: "M3 9l1-5h16l1 5M3 9v11h18V9M3 9h18M9 20v-6h6v6",
-  puzzle: "M12 2v4M12 18v4M2 12h4M18 12h4M8 8l-2-2M18 6l-2 2M6 18l2-2M16 16l2 2",
-  globe: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2c2.5 2.7 4 6.3 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.3-4-10s1.5-7.3 4-10z",
-  cart: "M3 3h2l2.4 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 8H6",
-  device: "M4 4h16v12H4zM9 20h6M12 16v4",
-};
+const FAQ = [
+  ["Do I need to know how to code?", "No. Pick a theme, change its colours, fonts, photos and sections in the editor, and arrange your product page by dragging blocks. The code editor is there if you ever want it."],
+  ["How do I get paid?", "Straight into your own account. Connect Razorpay, Cashfree, PayU, Stripe or PayPal (test mode first, if you like) and turn cash on delivery on or off. Oyklane never holds your money."],
+  ["Can I use my own domain?", "Yes. Every store gets a free yourname.oyklane.com address. Point your own domain at it from Settings ▸ Domains — SSL is set up for you automatically."],
+  ["What does it cost?", "Starter is ₹999 a month and Premium ₹2,299, each with a small fee per paid order (2.5% on Starter, 1.5% on Premium). Your first month is free once you choose a plan."],
+  ["Can I move my reviews and products over?", "Yes — import products from a CSV, and import your existing product reviews from a CSV matched by product. Customers' stars show up straight away."],
+  ["Is it built for Indian sellers?", "From the ground up: rupee pricing, cash on delivery, UPI and Indian gateways, GST invoices with HSN codes and GSTIN, Indian states at checkout and PIN-code addresses."],
+];
 
 export default function HomePage() {
   return (
     <>
-      <nav className="nav">
-        <a href="/" className="nav__logo">
-          <span className="nav__logo-mark" aria-hidden="true" />
-          Oyklane
-        </a>
-        <div className="nav__actions">
-          <a href={`${APP_URL}/login`} className="nav__link">Log in</a>
-          <a href={`${APP_URL}/register`} className="btn btn--solid btn--sm">Start free trial</a>
-        </div>
-      </nav>
-
-      {/* Hero */}
-      <header className="hero">
-        <div className="hero__glow" aria-hidden="true" />
-        <div className="hero__content">
-          <span className="hero__eyebrow">Now live in early access — <span>free while you build</span></span>
-          <h1>
-            Build your store.<br />Sell <em>everywhere</em>.
-          </h1>
-          <p>
-            Oyklane is the commerce platform to design a store that looks like you, install the apps you actually
-            need, and sell to real customers — without touching a line of code.
-          </p>
-          <div className="hero__ctas">
-            <a href={`${APP_URL}/register`} className="btn btn--solid">Start free trial</a>
-            <a href="#product" className="btn btn--outline">See how it works</a>
+      <header className="nav">
+        <div className="wrap nav__inner">
+          <a href="/" className="logo" aria-label="Oyklane home">
+            <span className="logo__mark" aria-hidden="true" />
+            Oyklane
+          </a>
+          <nav aria-label="Main">
+            <ul className="nav__links">
+              <li><a href="#themes">Themes</a></li>
+              <li><a href="#features">Features</a></li>
+              <li><a href="#payments">Payments</a></li>
+              <li><a href="#pricing">Pricing</a></li>
+              <li><a href="#faq">FAQ</a></li>
+            </ul>
+          </nav>
+          <div className="nav__actions">
+            <a href={`${APP_URL}/login`} className="nav__login">Log in</a>
+            <a href={`${APP_URL}/register`} className="btn btn--primary btn--sm">Start free</a>
           </div>
-          <p className="hero__note">No credit card required · Free theme included · Cancel anytime</p>
         </div>
       </header>
 
-      {/* Showcase */}
-      <section className="section" id="product">
-        <div className="section__head center">
-          <p className="section__kicker">One platform</p>
-          <h2>Everything a store needs, already built in</h2>
-          <p>Storefront, theme editor, and order management — the same three screens you'll actually live in.</p>
-        </div>
-
-        <div className="showcase">
-          <div className="mockup">
-            <div className="mockup__bar"><span className="mockup__dot" /><span className="mockup__dot" /><span className="mockup__dot" /></div>
-            <div className="mini-store__header">
-              <span className="mini-store__logo">Aurora Goods</span>
-              <span className="mini-store__nav">New · Shop · About</span>
-              <span className="mini-store__icons"><span /><span /><span /></span>
-            </div>
-            <div className="mini-store__hero">
-              <strong>Summer Edit</strong>
-              <span />
-            </div>
-            <div className="mini-store__grid">
-              <div className="mini-store__card" /><div className="mini-store__card" /><div className="mini-store__card" />
-            </div>
-          </div>
-
-          <div className="mockup">
-            <div className="mockup__bar"><span className="mockup__dot" /><span className="mockup__dot" /><span className="mockup__dot" /></div>
-            <div className="mini-editor" style={{ height: 220 }}>
-              <div className="mini-editor__panel">
-                <div className="active" /><div /><div /><div /><div />
+      <main>
+        {/* Hero */}
+        <section className="hero">
+          <div className="wrap hero__grid">
+            <div className="hero__copy">
+              <a href="#themes" className="pill">
+                <b>New</b> Atelier &amp; Lumière themes · Product reviews
+              </a>
+              <h1 className="h1">Your brand&rsquo;s store, live this week.</h1>
+              <p className="lead">
+                Oyklane gives Indian brands a fast, beautiful storefront with cash on delivery, five payment gateways, GST invoices and reviews built in — and an editor you&rsquo;ll actually enjoy.
+              </p>
+              <div className="hero__ctas">
+                <a href={`${APP_URL}/register`} className="btn btn--primary">
+                  Start your store <Icon d={I.arrow} />
+                </a>
+                <a href={DEMO_URL} target="_blank" rel="noopener" className="btn btn--ghost">
+                  See a live store
+                </a>
               </div>
-              <div className="mini-editor__preview">
-                <div className="block" style={{ height: 50 }} />
-                <div className="block" /><div className="block" />
-              </div>
-              <div className="mini-editor__settings">
-                <div className="mini-editor__field" />
-                <div className="mini-editor__field" style={{ height: 40 }} />
-                <div className="mini-editor__swatches">
-                  <span style={{ background: "#111" }} /><span style={{ background: "#7c5cff" }} /><span style={{ background: "#2dd4bf" }} />
+              <p className="hero__trust">
+                <span><Icon d={I.check} /> First month free</span>
+                <span><Icon d={I.check} /> Cash on delivery built in</span>
+                <span><Icon d={I.check} /> Your own domain, free SSL</span>
+              </p>
+            </div>
+
+            <div className="hero__visual">
+              <div className="browser">
+                <div className="browser__bar">
+                  <span className="browser__dots" aria-hidden="true"><i /><i /><i /></span>
+                  <span className="browser__url">loomwear.oyklane.com</span>
+                </div>
+                <div className="browser__screen">
+                  <img src="/showcase/atelier.webp" alt="Loomwear, a clothing store built on Oyklane with the Atelier theme" width="1440" height="1000" fetchPriority="high" />
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className="mockup">
-            <div className="mockup__bar"><span className="mockup__dot" /><span className="mockup__dot" /><span className="mockup__dot" /></div>
-            <div className="mini-dash">
-              <div className="mini-dash__stats">
-                <div className="mini-dash__stat">Sales<b>₹48.2k</b></div>
-                <div className="mini-dash__stat">Orders<b>36</b></div>
-                <div className="mini-dash__stat">Visitors<b>1.2k</b></div>
+              <div className="phone">
+                <img src="/showcase/atelier-mobile.webp" alt="The same store's product page on a phone, with size and colour pickers" width="390" height="844" />
               </div>
-              <div className="mini-dash__row"><span>#1042 Riya S.</span><span className="mini-dash__badge">Paid</span></div>
-              <div className="mini-dash__row"><span>#1041 Aman K.</span><span className="mini-dash__badge">Paid</span></div>
-              <div className="mini-dash__row"><span>#1040 Neha P.</span><span className="mini-dash__badge">Fulfilled</span></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Big editor deep-dive */}
-      <section className="section" style={{ paddingTop: 0 }}>
-        <div className="feature-panel">
-          <div className="feature-panel__inner">
-            <div className="section__head center" style={{ maxWidth: 620, margin: "0 auto" }}>
-              <p className="section__kicker">Theme editor</p>
-              <h2>Design your store like you mean it</h2>
-              <p>Every section — header, hero, product grid, footer — has real controls: pick a collection from a dropdown, upload an image, choose your colors. Nothing to type that you don't already know.</p>
-            </div>
-            <div className="mockup">
-              <div className="mockup__bar"><span className="mockup__dot" /><span className="mockup__dot" /><span className="mockup__dot" /></div>
-              <div className="mini-editor" style={{ height: 320, fontSize: 10 }}>
-                <div className="mini-editor__panel" style={{ gap: 10, padding: "16px 12px" }}>
-                  <div className="active" style={{ height: 10 }} /><div style={{ height: 10 }} /><div style={{ height: 10 }} /><div style={{ height: 10 }} /><div style={{ height: 10 }} /><div style={{ height: 10 }} />
-                </div>
-                <div className="mini-editor__preview" style={{ padding: 20, gap: 10 }}>
-                  <div className="block" style={{ height: 90 }} />
-                  <div className="block" style={{ height: 40 }} />
-                  <div className="block" style={{ height: 40 }} />
-                </div>
-                <div className="mini-editor__settings" style={{ padding: "16px 12px", gap: 10 }}>
-                  <div className="mini-editor__field" style={{ height: 12 }} />
-                  <div className="mini-editor__field" style={{ height: 12 }} />
-                  <div className="mini-editor__field" style={{ height: 60 }} />
-                  <div className="mini-editor__swatches">
-                    <span style={{ background: "#111" }} /><span style={{ background: "#7c5cff" }} /><span style={{ background: "#2dd4bf" }} /><span style={{ background: "#eee", border: "1px solid #ccc" }} />
-                  </div>
-                  <div className="mini-editor__field" style={{ height: 24, borderRadius: 999 }} />
-                </div>
+              <div className="toast" role="img" aria-label="A new-order alert: order 1043, ₹2,299, cash on delivery">
+                <span className="toast__icon"><Icon d={I.bell} /></span>
+                <span>
+                  <strong>New order #1043 · ₹2,299</strong>
+                  <span>Ananya S. · Cash on delivery</span>
+                </span>
               </div>
             </div>
           </div>
-          <div style={{ height: 48 }} />
-        </div>
-      </section>
+        </section>
 
-      {/* Feature grid */}
-      <section className="section">
-        <div className="section__head center">
-          <p className="section__kicker">Why Oyklane</p>
-          <h2>Built for people running a real business</h2>
-        </div>
-        <div className="grid-features">
-          {FEATURES.map((f, i) => (
-            <div className="grid-features__item" key={f.title}>
-              <div className="grid-features__icon"><Icon d={ICONS[Object.keys(ICONS)[i % 6]]} /></div>
-              <h3>{f.title}</h3>
-              <p>{f.text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Roles */}
-      <section className="section">
-        <div className="section__head center">
-          <p className="section__kicker">Built for how commerce actually works</p>
-          <h2>One platform, three ways in</h2>
-          <p>Whether you're selling, shopping, or running the platform itself, Oyklane gives you exactly the screen you need — nothing borrowed from someone else's flow.</p>
-        </div>
-        <div className="roles">
-          <div className="role-card">
-            <span className="role-card__tag">Sellers</span>
-            <h3>Build & manage your store</h3>
-            <p>Sign in once, run every store you own, and design each one independently.</p>
-            <ul>
-              <li>Install a theme, customize every section</li>
-              <li>Manage products, orders, and customers</li>
-              <li>Switch between your stores in one click</li>
-            </ul>
-          </div>
-          <div className="role-card">
-            <span className="role-card__tag">Buyers</span>
-            <h3>Shop like anywhere else</h3>
-            <p>A fast, familiar storefront on the seller's own address — no account required to browse.</p>
-            <ul>
-              <li>Search, cart, and checkout that just works</li>
-              <li>Cash on delivery or online payment</li>
-              <li>Order confirmation and tracking</li>
-            </ul>
-          </div>
-          <div className="role-card">
-            <span className="role-card__tag">Platform</span>
-            <h3>Run the whole marketplace</h3>
-            <p>A fully separate control room for the team running Oyklane itself.</p>
-            <ul>
-              <li>Manage every company and its plan</li>
-              <li>Publish apps and themes to the library</li>
-              <li>Suspend a store if billing fails</li>
+        <div className="strip">
+          <div className="wrap strip__inner">
+            <p className="strip__label">Built for how India shops</p>
+            <ul className="strip__items">
+              <li>UPI</li>
+              <li>Razorpay</li>
+              <li>Cashfree</li>
+              <li>PayU</li>
+              <li>Stripe</li>
+              <li>PayPal</li>
+              <li>Cash on delivery</li>
+              <li>GST invoices</li>
             </ul>
           </div>
         </div>
-      </section>
 
-      {/* Pricing */}
-      <section className="section">
-        <div className="section__head center">
-          <p className="section__kicker">Pricing</p>
-          <h2>Start free. Grow when you're ready.</h2>
-        </div>
-        <div className="pricing">
-          {PLANS.map((p) => (
-            <div className={`price-card ${p.highlight ? "price-card--highlight" : ""}`} key={p.name}>
-              <p className="price-card__name">{p.name}</p>
-              <p className="price-card__price">{p.price}<span>{p.period}</span></p>
-              <p className="price-card__desc">{p.desc}</p>
-              <ul>
-                {p.items.map((it) => <li key={it}>{it}</li>)}
+        {/* Themes */}
+        <section className="section section--soft" id="themes">
+          <div className="wrap">
+            <div className="head">
+              <span className="kicker">Themes</span>
+              <h2 className="h2">Four themes. Your brand in every one.</h2>
+              <p className="lead">Start from a design made for what you sell, then make it yours — colours, fonts, photos and sections, all without code.</p>
+            </div>
+            <ThemeShowcase demoUrl={DEMO_URL} appUrl={APP_URL} />
+          </div>
+        </section>
+
+        {/* Features */}
+        <section className="section" id="features">
+          <div className="wrap">
+            <div className="head">
+              <span className="kicker">Everything included</span>
+              <h2 className="h2">The things a growing store needs, already built.</h2>
+              <p className="lead">No stack of paid plugins. The day you sign up, you have what most stores spend months wiring together.</p>
+            </div>
+
+            <div className="bento">
+              <article className="card card--xl">
+                <span className="card__icon"><Icon d={I.layers} /></span>
+                <h3 className="h3">Arrange your pages — no code</h3>
+                <p className="muted">Drag sections on your home page. On the product page, move the price under the button, make the title bigger, hide what you don&rsquo;t need — the design stays polished.</p>
+                <div className="card__demo">
+                  <ul className="blocks" aria-label="Product page blocks, as seen in the editor">
+                    <li><span className="grip">⋮⋮</span> Title <b>Large</b></li>
+                    <li><span className="grip">⋮⋮</span> Size &amp; colour picker <b>Pills</b></li>
+                    <li><span className="grip">⋮⋮</span> Quantity &amp; add to cart</li>
+                    <li><span className="grip">⋮⋮</span> Price <b>Large</b></li>
+                    <li className="is-off"><span className="grip">⋮⋮</span> Delivery &amp; payment badges <b>Hidden</b></li>
+                  </ul>
+                </div>
+              </article>
+
+              <article className="card">
+                <span className="card__icon"><Icon d={I.bolt} /></span>
+                <h3 className="h3">Quick add, from any card</h3>
+                <p className="muted">Shoppers pick a size and colour right from the collection page — the cart slides in, no page loads.</p>
+              </article>
+
+              <article className="card">
+                <span className="card__icon"><Icon d={I.star} /></span>
+                <h3 className="h3">Reviews that sell</h3>
+                <p className="muted">Stars on every card, verified-buyer badges, replies and CSV import.</p>
+                <div className="card__demo"><span className="stars" aria-label="4.5 out of 5">★★★★½</span> <span className="muted">4.5 · 128 reviews</span></div>
+              </article>
+
+              <article className="card">
+                <span className="card__icon"><Icon d={I.receipt} /></span>
+                <h3 className="h3">GST-ready</h3>
+                <p className="muted">Tax invoices with HSN codes, CGST/SGST or IGST worked out, and your buyer&rsquo;s GSTIN when they add one (Premium).</p>
+              </article>
+
+              <article className="card">
+                <span className="card__icon"><Icon d={I.sliders} /></span>
+                <h3 className="h3">A checkout you control</h3>
+                <p className="muted">Choose which fields to ask for — mobile, landmark, company, GSTIN, a gift note — and which are required.</p>
+              </article>
+
+              <article className="card card--wide card--dark">
+                <span className="card__icon"><Icon d={I.chart} /></span>
+                <h3 className="h3">Meta Pixel &amp; Google Analytics, fully wired</h3>
+                <p className="muted">Connect with Facebook and pick your pixel. Every shopping event is sent — including checkout — so your ads learn from real sales.</p>
+                <div className="card__demo chips">
+                  <span className="chip">ViewContent</span>
+                  <span className="chip">AddToCart</span>
+                  <span className="chip">InitiateCheckout</span>
+                  <span className="chip">Purchase</span>
+                </div>
+              </article>
+
+              <article className="card card--wide">
+                <span className="card__icon"><Icon d={I.code} /></span>
+                <h3 className="h3">API &amp; webhooks</h3>
+                <p className="muted">Keys with exactly the access each app needs, and signed webhooks for orders, products and customers.</p>
+                <pre className="code">
+                  <span className="k">GET</span> /api/v1/orders?status=paid{"\n"}Authorization: Bearer <span className="s">oyk_••••••</span>
+                </pre>
+              </article>
+
+              <article className="card">
+                <span className="card__icon"><Icon d={I.globe} /></span>
+                <h3 className="h3">Your domain, free SSL</h3>
+                <p className="muted">A free yourbrand.oyklane.com address from day one; connect your own domain whenever you&rsquo;re ready.</p>
+              </article>
+
+              <article className="card">
+                <span className="card__icon"><Icon d={I.layers} /></span>
+                <h3 className="h3">Custom data</h3>
+                <p className="muted">Add Fabric, Fit, Care or a Size chart to every product — shown on the page, in one click.</p>
+              </article>
+
+              <article className="card">
+                <span className="card__icon"><Icon d={I.bell} /></span>
+                <h3 className="h3">Hear every sale</h3>
+                <p className="muted">A cheerful coin sound and a note with the customer&rsquo;s name whenever an order comes in.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        {/* Payments */}
+        <section className="section band" id="payments">
+          <div className="wrap">
+            <div className="head">
+              <span className="kicker">Payments</span>
+              <h2 className="h2">Get paid your way — straight into your account.</h2>
+              <p className="lead muted">Connect as many gateways as you like, try them in test mode, and switch any off with one click. Unpaid online orders release their stock automatically.</p>
+            </div>
+            <div className="pay-grid">
+              <div className="pay"><strong>Razorpay</strong><span>UPI, cards, netbanking and wallets</span></div>
+              <div className="pay"><strong>Cashfree</strong><span>UPI, cards and pay later</span></div>
+              <div className="pay"><strong>PayU</strong><span>India&rsquo;s widest set of methods</span></div>
+              <div className="pay"><strong>Stripe</strong><span>Cards from anywhere</span></div>
+              <div className="pay"><strong>PayPal</strong><span>For international buyers</span></div>
+              <div className="pay"><strong>Cash on delivery</strong><span>On or off, your call</span></div>
+            </div>
+          </div>
+        </section>
+
+        {/* Product page spotlight */}
+        <section className="section">
+          <div className="wrap split">
+            <div className="browser">
+              <div className="browser__bar">
+                <span className="browser__dots" aria-hidden="true"><i /><i /><i /></span>
+                <span className="browser__url">loomwear.oyklane.com/products/pure-linen-shirt</span>
+              </div>
+              <div className="browser__screen">
+                <img src="/showcase/atelier-product.webp" alt="A product page with star rating, size and colour pickers and add to cart" width="1440" height="1000" loading="lazy" />
+              </div>
+            </div>
+            <div className="head" style={{ marginBottom: 0 }}>
+              <span className="kicker">Product pages</span>
+              <h2 className="h2">Pages that turn visits into orders.</h2>
+              <ul className="ticks">
+                <li><Icon d={I.check} /> Separate Size and Colour pickers, with sold-out options crossed out</li>
+                <li><Icon d={I.check} /> The photo changes to the colour they pick</li>
+                <li><Icon d={I.check} /> Stars, reviews and verified-buyer badges</li>
+                <li><Icon d={I.check} /> Delivery, COD and returns promises right by the button</li>
+                <li><Icon d={I.check} /> Fast on phones — where most of your customers shop</li>
               </ul>
-              <a href={`${APP_URL}/register`} className={`btn ${p.highlight ? "btn--solid" : "btn--outline"}`}>Get started</a>
             </div>
-          ))}
-        </div>
-      </section>
+          </div>
+        </section>
 
-      {/* Final CTA */}
-      <div className="cta-band">
-        <h2>Your store is one click away</h2>
-        <p>Free to start. No credit card. Live in minutes.</p>
-        <a href={`${APP_URL}/register`} className="btn btn--solid">Start free trial</a>
-      </div>
+        {/* Steps */}
+        <section className="section section--soft">
+          <div className="wrap">
+            <div className="head head--center">
+              <span className="kicker">How it works</span>
+              <h2 className="h2">From sign-up to first sale in an afternoon.</h2>
+            </div>
+            <ol className="steps">
+              <li className="step">
+                <h3 className="h3">Pick a theme</h3>
+                <p className="muted">Choose Atelier, Lumière, Modern or Classic and make it yours in the editor.</p>
+              </li>
+              <li className="step">
+                <h3 className="h3">Add your products</h3>
+                <p className="muted">Photos, sizes and colours in a few clicks — or import a CSV of everything you sell.</p>
+              </li>
+              <li className="step">
+                <h3 className="h3">Switch on payments</h3>
+                <p className="muted">Connect a gateway, keep cash on delivery on, share your link — you&rsquo;re open.</p>
+              </li>
+            </ol>
+          </div>
+        </section>
 
-      {/* Footer */}
+        {/* Pricing */}
+        <section className="section" id="pricing">
+          <div className="wrap">
+            <div className="head head--center">
+              <span className="kicker">Pricing</span>
+              <h2 className="h2">Simple plans. Your first month free.</h2>
+              <p className="lead">No setup fees and nothing to install. Change plans whenever you like.</p>
+            </div>
+            <div className="plans">
+              <div className="plan">
+                <div>
+                  <h3 className="h3">Starter</h3>
+                  <p className="muted">Everything to launch and grow.</p>
+                </div>
+                <p className="plan__price"><strong>₹999</strong><span className="muted">/month</span></p>
+                <ul>
+                  <li><Icon d={I.check} /> Up to 1,000 products</li>
+                  <li><Icon d={I.check} /> All themes and the no-code editor</li>
+                  <li><Icon d={I.check} /> 5 payment gateways and cash on delivery</li>
+                  <li><Icon d={I.check} /> Reviews, discounts, gift cards and blog</li>
+                  <li><Icon d={I.check} /> Your own domain with free SSL</li>
+                  <li><Icon d={I.check} /> 5 staff accounts</li>
+                  <li><Icon d={I.check} /> 2.5% fee per paid order</li>
+                </ul>
+                <a href={`${APP_URL}/register`} className="btn btn--ghost">Start with Starter</a>
+              </div>
+              <div className="plan plan--featured">
+                <span className="plan__badge">Most complete</span>
+                <div>
+                  <h3 className="h3">Premium</h3>
+                  <p className="muted">For brands scaling up.</p>
+                </div>
+                <p className="plan__price"><strong>₹2,299</strong><span className="muted">/month</span></p>
+                <ul>
+                  <li><Icon d={I.check} /> Everything in Starter</li>
+                  <li><Icon d={I.check} /> Up to 1,00,000 products</li>
+                  <li><Icon d={I.check} /> GST tax invoices to your customers</li>
+                  <li><Icon d={I.check} /> Meta Ads and WhatsApp built in</li>
+                  <li><Icon d={I.check} /> CSV exports</li>
+                  <li><Icon d={I.check} /> 25 staff accounts, priority support</li>
+                  <li><Icon d={I.check} /> 1.5% fee per paid order</li>
+                </ul>
+                <a href={`${APP_URL}/register`} className="btn btn--primary">Start with Premium</a>
+              </div>
+            </div>
+            <p className="plans__note">Prices include GST. Your first month is free once you choose a plan.</p>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section className="section section--soft" id="faq">
+          <div className="wrap">
+            <div className="head head--center">
+              <span className="kicker">Questions</span>
+              <h2 className="h2">Good to know</h2>
+            </div>
+            <div className="faq">
+              {FAQ.map(([q, a]) => (
+                <details key={q}>
+                  <summary>{q}</summary>
+                  <p>{a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="section">
+          <div className="wrap">
+            <div className="cta">
+              <h2 className="h2">Open your store today.</h2>
+              <p className="lead">Pick a theme, add a few products and share your link — your first month is on us.</p>
+              <div className="hero__ctas" style={{ justifyContent: "center" }}>
+                <a href={`${APP_URL}/register`} className="btn btn--light">Start your store <Icon d={I.arrow} /></a>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
       <footer className="footer">
-        <div className="container">
+        <div className="wrap">
           <div className="footer__grid">
             <div>
-              <div className="footer__brand"><span className="nav__logo-mark" aria-hidden="true" />Oyklane</div>
-              <p className="footer__brand-text">The commerce platform for building, running, and growing an online store.</p>
+              <a href="/" className="logo"><span className="logo__mark" aria-hidden="true" />Oyklane</a>
+              <p className="muted" style={{ marginTop: 12, maxWidth: "32ch", fontSize: 14.5 }}>The commerce platform for Indian brands — themes, payments, GST and growth in one place.</p>
             </div>
-            <div className="footer__col">
-              <h4>Oyklane</h4>
-              <a href="#product">What is Oyklane?</a>
-              <a href={`${APP_URL}/register`}>Start free trial</a>
-              <a href={`${APP_URL}/login`}>Log in</a>
+            <div>
+              <h4>Product</h4>
+              <ul>
+                <li><a href="#themes">Themes</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#payments">Payments</a></li>
+                <li><a href="#pricing">Pricing</a></li>
+              </ul>
             </div>
-            <div className="footer__col">
-              <h4>Platform</h4>
-              <a href="#product">Theme library</a>
-              <a href="#product">App library</a>
-              <a href="#pricing">Pricing</a>
+            <div>
+              <h4>Sellers</h4>
+              <ul>
+                <li><a href={`${APP_URL}/register`}>Start a store</a></li>
+                <li><a href={`${APP_URL}/login`}>Log in</a></li>
+                <li><a href={DEMO_URL} target="_blank" rel="noopener">Live demo store</a></li>
+              </ul>
             </div>
-            <div className="footer__col">
-              <h4>Support</h4>
-              <a href="mailto:hello@oyklane.com">Contact us</a>
-              <a href="#">Help center</a>
-              <a href="#">Status</a>
+            <div>
+              <h4>Help</h4>
+              <ul>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href={`${APP_URL}/login`}>Seller dashboard</a></li>
+              </ul>
             </div>
           </div>
           <div className="footer__bottom">
-            <div className="footer__legal">
-              <span>© {new Date().getFullYear()} Oyklane</span>
-              <a href="#">Terms</a>
-              <a href="#">Privacy</a>
-            </div>
-            <div className="footer__social">
-              <a href="#" aria-label="X"><Icon d="M4 4l16 16M20 4L4 20" /></a>
-              <a href="#" aria-label="Instagram"><Icon d="M4 4h16v16H4zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM17 7h.01" /></a>
-              <a href="#" aria-label="LinkedIn"><Icon d="M4 4h16v16H4zM8 10v6M8 8v.01M12 16v-3.5a1.5 1.5 0 0 1 3 0V16" /></a>
-            </div>
+            <span>© {new Date().getFullYear()} Oyklane. Made in India.</span>
+            <span>Prices in INR, GST included.</span>
           </div>
         </div>
       </footer>

@@ -30,12 +30,16 @@
         <button type="submit" class="pcard__quick-btn" aria-label="Add {{ product.title | escape }} to cart">{% render 'snippets/icon', icon: 'plus', class: 'icon icon--sm' %}<span>Quick add</span></button>
       </form>
     {% else %}
-      <div class="pcard__quick"><a class="pcard__quick-btn" href="{{ product.url }}" aria-label="Choose options for {{ product.title | escape }}">{% render 'snippets/icon', icon: 'plus', class: 'icon icon--sm' %}<span>Choose options</span></a></div>
+      {% comment %} Opens a size/colour picker in the cart drawer (the product page without JS). {% endcomment %}
+      <div class="pcard__quick"><a class="pcard__quick-btn" href="{{ product.url }}" data-oy-quick="{{ product.handle }}" aria-label="Quick add {{ product.title | escape }}">{% render 'snippets/icon', icon: 'plus', class: 'icon icon--sm' %}<span>Quick add</span></a></div>
     {% endif %}
   {% endif %}
   <div class="pcard__body">
     {% if settings.card_show_brand and product.brand %}<span class="pcard__brand">{{ product.brand }}</span>{% endif %}
     <h3 class="pcard__title"><a href="{{ product.url }}">{{ product.title }}</a></h3>
+    {% if show_card_ratings and product.rating.count > 0 %}
+      <span class="card-rating" aria-label="Rated {{ product.rating.average }} out of 5 from {{ product.rating.count }} reviews"><span class="stars" style="--stars: {{ product.rating.average | times: 20 }}%"></span>({{ product.rating.count }})</span>
+    {% endif %}
     <p class="price">
       {% if product.price_varies %}<span class="price__from">From</span>{% endif %}
       {% if pv.comparePrice and pv.comparePrice > pv.price %}

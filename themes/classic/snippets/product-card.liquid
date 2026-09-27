@@ -1,7 +1,8 @@
 {% comment %}
   Product card for home page sections. Expects `product` (serialized).
   Quick add posts the cheapest in-stock variant straight to the cart when
-  the product has a single option; otherwise it links to the product.
+  the product has a single option; otherwise it opens a size/colour picker
+  in the cart drawer (the product page without JS).
 {% endcomment %}
 {% assign pv = product.price_variant | default: product.variants.first %}
 <article class="card">
@@ -30,12 +31,16 @@
         <button type="submit" class="card__quick-btn" aria-label="Add {{ product.title }} to cart">{% render 'snippets/icon', icon: 'plus' %}<span>Add</span></button>
       </form>
     {% else %}
-      <div class="card__quick"><a class="card__quick-btn" href="{{ product.url }}" aria-label="Choose options for {{ product.title }}">{% render 'snippets/icon', icon: 'plus' %}<span>Options</span></a></div>
+      {% comment %} Opens a size/colour picker in the cart drawer (the product page without JS). {% endcomment %}
+      <div class="card__quick"><a class="card__quick-btn" href="{{ product.url }}" data-oy-quick="{{ product.handle }}" aria-label="Quick add {{ product.title | escape }}">{% render 'snippets/icon', icon: 'plus' %}<span>Add</span></a></div>
     {% endif %}
   {% endif %}
   <div class="card__body">
     {% if settings.card_show_brand and product.brand %}<span class="card__brand">{{ product.brand }}</span>{% endif %}
     <h3 class="card__title"><a href="{{ product.url }}">{{ product.title }}</a></h3>
+    {% if show_card_ratings and product.rating.count > 0 %}
+      <span class="card-rating" aria-label="Rated {{ product.rating.average }} out of 5 from {{ product.rating.count }} reviews"><span class="stars" style="--stars: {{ product.rating.average | times: 20 }}%"></span>({{ product.rating.count }})</span>
+    {% endif %}
     <p class="price">
       {% if product.price_varies %}<span class="price__from">From</span>{% endif %}
       {% if pv.comparePrice and pv.comparePrice > pv.price %}

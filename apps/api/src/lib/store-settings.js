@@ -20,6 +20,20 @@ const DEFAULTS = {
   lowStockThreshold: 5,
   // Online Store ▸ Preferences: the home page's search/social listing.
   seo: { title: "", description: "", image: "" },
+  // Settings ▸ Checkout: which fields the checkout form asks for.
+  // "required" | "optional" | "hidden" (email is always required — order
+  // updates go there). marketing: the "email me offers" box — "unchecked"
+  // (explicit consent) or "hidden". country: "show" the country menu, or
+  // "india" to ship to India only and leave it out.
+  checkout: {
+    phone: "required",
+    address2: "optional",
+    company: "hidden",
+    gstin: "hidden",
+    note: "hidden",
+    marketing: "unchecked",
+    country: "show",
+  },
 };
 
 function storeSettings(store) {
@@ -29,6 +43,7 @@ function storeSettings(store) {
     ...raw,
     notifications: { ...DEFAULTS.notifications, ...(raw.notifications || {}) },
     seo: { ...DEFAULTS.seo, ...(raw.seo || {}) },
+    checkout: { ...DEFAULTS.checkout, ...(raw.checkout || {}) },
   };
 }
 
@@ -40,6 +55,7 @@ function mergeSettings(store, patch) {
     ...patch,
     ...(patch.notifications && { notifications: { ...(current.notifications || {}), ...patch.notifications } }),
     ...(patch.seo && { seo: { ...(current.seo || {}), ...patch.seo } }),
+    ...(patch.checkout && { checkout: { ...(current.checkout || {}), ...patch.checkout } }),
   };
 }
 

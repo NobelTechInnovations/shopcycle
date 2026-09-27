@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { isDomainRequest } from "./domain";
 
-const API_URL = process.env.API_INTERNAL_URL || "http://localhost:4100";
+import { API_URL } from "@/lib/api-url";
 export const CART_COOKIE = "sc_cart_id";
 const CART_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 

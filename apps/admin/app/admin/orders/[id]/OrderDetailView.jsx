@@ -513,8 +513,16 @@ export function OrderDetailView({ order, role, hasGstInvoices }) {
                   {order.phone}
                 </a>
               )}
+              {order.buyerCompany && <span className="text-ink">{order.buyerCompany}</span>}
+              {order.buyerGstin && <span className="text-ink-muted font-mono text-[13px]">GSTIN {order.buyerGstin}</span>}
             </div>
           </Card>
+
+          {order.customerNote && (
+            <Card size="small" title="Note from customer">
+              <p className="m-0 text-sm text-ink whitespace-pre-line break-words">{order.customerNote}</p>
+            </Card>
+          )}
 
           {order.shippingAddress1 && (
             <Card size="small" title="Shipping address">

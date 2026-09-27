@@ -515,6 +515,119 @@ async function main() {
     r = await sf("GET", `/api/storefront/${H}/render/index`);
     check("…and a value edited in the theme editor (flat) wins", String(r.data).includes("Edited about text") && !String(r.data).includes("Shipped about text"));
 
+    // ── Quick add on product cards ──
+    r = await sf("GET", `/api/storefront/${H}/products/${optionTee.slug}/quick`);
+    check("quick add: a card gets the product's pickers and stock", r.status === 200 && r.data.product.options.length === 2 && r.data.product.variants.length === 4 && r.data.product.variants.some((v) => !v.available), r.data);
+    r = await sf("GET", `/api/storefront/${H}/products/no-such-product/quick`);
+    check("quick add: unknown product is a 404", r.status === 404);
+
+    // ── Product page arranged in the theme editor ──
+    const layoutTheme = (await owner("GET", "/api/themes")).data.themes.find((t) => t.isActive);
+    const arranged = {
+      sections: {
+        main: {
+          type: "sys-product",
+          settings: { gallery_layout: "stacked", show_breadcrumbs: false },
+          blocks: {
+            t: { type: "title", settings: { size: "large" } },
+            pk: { type: "variant_picker", settings: {} },
+            b: { type: "buy_buttons", settings: { show_quantity: false, button_label: "Buy it now" } },
+            p: { type: "price", settings: { size: "large", show_tax_note: false } },
+            tr: { type: "trust", settings: {}, disabled: true },
+          },
+          block_order: ["t", "pk", "b", "p", "tr"],
+        },
+        extra: { type: "sys-checkout-summary", settings: {} },
+      },
+      order: ["main", "extra"],
+    };
+    r = await owner("POST", `/api/themes/${layoutTheme.id}/render-draft`, { template: "product", slug: optionTee.slug, templateOverride: arranged });
+    check("the editor previews an unsaved product layout", r.status === 200 && r.data.html.includes("Buy it now") && !r.data.html.includes("fbevents"), r.data?.error);
+    r = await owner("GET", `/api/themes/${layoutTheme.id}`);
+    check("the editor gets the platform's product page sections", r.data.platform?.sections.some((f) => f.path === "sections/sys-product.liquid") && r.data.platform.templates.product.order.includes("main"), r.data.platform);
+    r = await owner("PATCH", `/api/themes/${layoutTheme.id}/files`, { path: "templates/product.json", content: JSON.stringify(arranged) });
+    check("save a product page layout", r.status === 200, r.data);
+    r = await sf("GET", `/api/storefront/${H}/render/product?slug=${optionTee.slug}`);
+    const arrangedHtml = String(r.data);
+    check(
+      "product page follows the seller's layout: order, sizes, labels",
+      arrangedHtml.includes("sys-pinfo__title--large") && arrangedHtml.includes("sys-pinfo__pricebox--large") && arrangedHtml.includes("Buy it now") && arrangedHtml.indexOf("data-sys-add") < arrangedHtml.indexOf("data-sys-price") && !arrangedHtml.includes("sys-crumbs"),
+      arrangedHtml.slice(0, 200)
+    );
+    check("…hidden blocks and removed sections stay off", !arrangedHtml.includes("sys-trust") && !arrangedHtml.includes('data-section-type="sys-related"') && !arrangedHtml.includes('name="quantity" value="1" min="1"'));
+    check("…and other platform sections can't be slipped in", !arrangedHtml.includes("sys-checkout-summary"));
+    await owner("PATCH", `/api/themes/${layoutTheme.id}/files`, { path: "templates/product.json", content: JSON.stringify({ sections: { x: { type: "rich-text", settings: {} } }, order: ["x"] }) });
+    r = await sf("GET", `/api/storefront/${H}/render/product?slug=${optionTee.slug}`);
+    check("a layout without the product itself falls back to the standard page", String(r.data).includes("sys-trust") && String(r.data).includes("data-sys-add"));
+
+    // ── Checkout fields (Settings ▸ Checkout) ──
+    r = await owner("PATCH", "/api/store", { settings: { checkout: { phone: "hidden", company: "required", gstin: "optional", note: "optional", country: "india" } } });
+    check("save checkout field settings", r.status === 200, r.data);
+    r = await sf("POST", `/api/storefront/${H}/cart/add`, { variantId: product.variants[0].id, quantity: 1 });
+    const fieldsCart = r.data.cart.cartId;
+    r = await sf("GET", `/api/storefront/${H}/render/checkout?cartId=${fieldsCart}`);
+    const checkoutHtml = String(r.data);
+    check("checkout form follows the settings", !checkoutHtml.includes('name="phone"') && /name="company"\s+required/.test(checkoutHtml) && checkoutHtml.includes('name="gstin"') && checkoutHtml.includes('name="note"') && checkoutHtml.includes('type="hidden" name="shippingCountry" value="IN"'), checkoutHtml.slice(0, 200));
+    const { phone: _phone, ...shipNoPhone } = SHIP;
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId: fieldsCart, email: `fields-${stamp}@test.oyklane.dev`, ...shipNoPhone, paymentMethod: "cod" });
+    check("a required company name is enforced", r.status === 400 && /company/i.test(r.data.error), r.data);
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId: fieldsCart, email: `fields-${stamp}@test.oyklane.dev`, ...shipNoPhone, company: "Acme Traders", gstin: "27ABCDE1234F1Z", paymentMethod: "cod" });
+    check("a malformed GSTIN is refused", r.status === 400 && /GSTIN/.test(r.data.error), r.data);
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId: fieldsCart, email: `fields-${stamp}@test.oyklane.dev`, ...shipNoPhone, phone: "9999999999", company: "Acme Traders", gstin: "27abcde1234f1z5", note: "Leave with the guard", paymentMethod: "cod" });
+    const fieldsOrder = r.data.order;
+    check("order keeps company, GSTIN (uppercased) and note; a hidden phone is dropped", r.status === 201 && fieldsOrder && (await prisma.order.findUnique({ where: { id: fieldsOrder.id } })).buyerGstin === "27ABCDE1234F1Z5", r.data);
+    const fieldsRow = await prisma.order.findUnique({ where: { id: fieldsOrder.id } });
+    check("…stored as sent", fieldsRow.buyerCompany === "Acme Traders" && fieldsRow.customerNote === "Leave with the guard" && fieldsRow.phone === null, fieldsRow);
+    await owner("PATCH", "/api/store", { settings: { checkout: { phone: "required", company: "hidden", gstin: "hidden", note: "hidden", country: "show" } } });
+
+    // ── Product Reviews app ──
+    r = await sf("POST", `/api/storefront/${H}/products/${product.slug}/reviews`, { rating: 5, name: "A", email: "a@test.oyklane.dev", body: "Lovely shirt, fits well." });
+    check("reviews are off until the app is installed", r.status === 402, r.data);
+    r = await owner("POST", "/api/apps/product-reviews/install", { settings: {} });
+    check("install Product Reviews", r.status === 200 || r.status === 201, r.data);
+    r = await sf("GET", `/api/storefront/${H}/render/product?slug=${product.slug}`);
+    check("product page shows the reviews section and form", String(r.data).includes('id="reviews"') && String(r.data).includes("Write a review"));
+    // The Linen Shirt was ordered earlier by `shopperEmail` — a verified buyer.
+    r = await sf("POST", `/api/storefront/${H}/products/${product.slug}/reviews`, { rating: 5, name: "Growth Shopper", email: shopperEmail, title: "Perfect", body: "Soft linen and a great fit." });
+    check("a verified buyer's review is published straight away", r.status === 200 && r.data.status === "published", r.data);
+    r = await sf("POST", `/api/storefront/${H}/products/${product.slug}/reviews`, { rating: 2, name: "Stranger", email: `stranger-${stamp}@test.oyklane.dev`, body: "Didn't like the colour." });
+    check("…anyone else's waits for approval", r.status === 200 && r.data.status === "pending", r.data);
+    r = await sf("POST", `/api/storefront/${H}/products/${product.slug}/reviews`, { rating: 4, name: "Growth Shopper", email: shopperEmail, body: "Second try at a review." });
+    check("one review per person per product", r.status === 409, r.data);
+    r = await sf("POST", `/api/storefront/${H}/products/${product.slug}/reviews`, { rating: 9, name: "X", email: "x@test.oyklane.dev", body: "Out of range rating here." });
+    check("ratings are 1 to 5", r.status === 400, r.data);
+    r = await owner("GET", "/api/reviews?status=pending");
+    check("the pending review is in the admin queue", r.status === 200 && r.data.counts.pending === 1 && r.data.reviews[0].authorName === "Stranger", r.data);
+    const pendingId = r.data.reviews[0].id;
+    await owner("PATCH", `/api/reviews/${pendingId}`, { status: "published", reply: "Sorry to hear that — we've added more colours." });
+    const csv = [
+      "product_slug,rating,title,body,author,verified",
+      `${product.slug},4,"Nice, but","Good linen, runs a bit ""large"".",Priya,yes`,
+      `/products/${product.slug},5,,"Second, imported",Rahul,no`,
+      "no-such-thing,5,,Lost,Nobody,no",
+      `${product.slug},0,,Bad rating,Zero,no`,
+    ].join("\n");
+    r = await owner("POST", "/api/reviews/import", { csv });
+    check("CSV import matches products by slug and skips bad rows", r.status === 200 && r.data.imported === 2 && r.data.skippedCount === 2 && /no-such-thing/.test(r.data.skipped[0].reason), r.data);
+    r = await sf("GET", `/api/storefront/${H}/render/product?slug=${product.slug}`);
+    const reviewHtml = String(r.data);
+    check("published reviews show with the average, reply and verified badge", reviewHtml.includes("Based on 4 reviews") && reviewHtml.includes("added more colours") && reviewHtml.includes("Verified buyer") && (reviewHtml.includes("runs a bit &quot;large&quot;") || reviewHtml.includes("runs a bit &#34;large&#34;")), reviewHtml.slice(0, 200));
+    r = await sf("GET", `/api/storefront/${H}/render/collection?slug=all`);
+    check("stars on product cards", String(r.data).includes("sys-pcard__rating"));
+
+    // ── Facebook Pixel + GA events, on every page ──
+    await owner("POST", "/api/apps/facebook-pixel/install", { settings: { pixelId: "123456789012345" } });
+    await owner("POST", "/api/apps/google-analytics/install", { settings: { measurementId: "G-TEST1234" } });
+    r = await sf("GET", `/api/storefront/${H}/render/product?slug=${product.slug}`);
+    const trackedPdp = String(r.data);
+    check("product page: pixel once, and a ViewContent event", (trackedPdp.match(/fbq\('init'/g) || []).length === 1 && trackedPdp.includes('oyTrack("ViewContent"'), trackedPdp.slice(0, 200));
+    r = await sf("GET", `/api/storefront/${H}/render/checkout?cartId=${fieldsCart}`);
+    r = await sf("POST", `/api/storefront/${H}/cart/add`, { variantId: product.variants[0].id, quantity: 1 });
+    r = await sf("GET", `/api/storefront/${H}/render/checkout?cartId=${r.data.cart.cartId}`);
+    check("checkout (its own layout) still gets the pixel and InitiateCheckout", String(r.data).includes("fbevents.js") && String(r.data).includes('oyTrack("InitiateCheckout"'));
+    r = await sf("GET", `/api/storefront/${H}/render/order-confirmation?orderId=${fieldsOrder.id}`);
+    check("order confirmation fires Purchase once", String(r.data).includes('oyTrack("Purchase"') && String(r.data).includes("oy-purchase-"), String(r.data).slice(0, 200));
+
     // ── Custom data (metafields) ──
     r = await owner("POST", "/api/metafields", { ownerType: "product", name: "Fabric", type: "text" });
     check("define a product field (key from the name)", r.status === 201 && r.data.definition.key === "fabric", r.data);

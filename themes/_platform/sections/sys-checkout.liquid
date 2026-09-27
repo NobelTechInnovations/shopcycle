@@ -59,20 +59,26 @@
                 <a class="sys-link sys-small" href="{{ routes.account_login_url }}?return_to=checkout">Sign in for faster checkout</a>
               {% endif %}
             </div>
-            <div class="sys-fields sys-fields--2">
+            {% comment %} Which fields show, and which are required: Settings ▸ Checkout (checkout_fields). {% endcomment %}
+            {% assign cf = checkout_fields %}
+            <div class="sys-fields{% if cf.phone != 'hidden' %} sys-fields--2{% endif %}">
               <label class="sys-field">
                 <span class="sys-label">Email</span>
                 <input class="sys-input" type="email" name="email" required autocomplete="email" value="{{ customer.email }}" placeholder="you@example.com">
               </label>
-              <label class="sys-field">
-                <span class="sys-label">Mobile number</span>
-                <input class="sys-input" type="tel" name="phone" required autocomplete="tel" inputmode="tel" value="{{ customer.phone }}" placeholder="10-digit mobile number">
-              </label>
+              {% if cf.phone != 'hidden' %}
+                <label class="sys-field">
+                  <span class="sys-label">Mobile number{% if cf.phone == 'optional' %} <span class="sys-muted" style="font-weight:400">(optional)</span>{% endif %}</span>
+                  <input class="sys-input" type="tel" name="phone" {% if cf.phone == 'required' %}required{% endif %} autocomplete="tel" inputmode="tel" value="{{ customer.phone }}" placeholder="10-digit mobile number">
+                </label>
+              {% endif %}
             </div>
-            <label class="sys-check">
-              <input type="checkbox" name="acceptsMarketing" value="true">
-              <span>Email me news and offers from {{ shop.name }}. You can unsubscribe any time.</span>
-            </label>
+            {% if cf.marketing != 'hidden' %}
+              <label class="sys-check">
+                <input type="checkbox" name="acceptsMarketing" value="true">
+                <span>Email me news and offers from {{ shop.name }}. You can unsubscribe any time.</span>
+              </label>
+            {% endif %}
           </div>
 
           <div class="sys-step">
@@ -86,10 +92,12 @@
                 <span class="sys-label">Address</span>
                 <input class="sys-input" type="text" name="shippingAddress1" required autocomplete="address-line1" value="{{ customer.address1 }}" placeholder="House number, street, area">
               </label>
-              <label class="sys-field">
-                <span class="sys-label">Apartment, landmark <span class="sys-muted" style="font-weight:400">(optional)</span></span>
-                <input class="sys-input" type="text" name="shippingAddress2" autocomplete="address-line2" value="{{ customer.address2 }}">
-              </label>
+              {% if cf.address2 != 'hidden' %}
+                <label class="sys-field">
+                  <span class="sys-label">Apartment, landmark{% if cf.address2 == 'optional' %} <span class="sys-muted" style="font-weight:400">(optional)</span>{% endif %}</span>
+                  <input class="sys-input" type="text" name="shippingAddress2" {% if cf.address2 == 'required' %}required{% endif %} autocomplete="address-line2" value="{{ customer.address2 }}">
+                </label>
+              {% endif %}
               <div class="sys-fields sys-fields--3">
                 <label class="sys-field">
                   <span class="sys-label">City</span>
@@ -104,15 +112,41 @@
                   <input class="sys-input" type="text" name="shippingZip" required autocomplete="postal-code" inputmode="numeric" maxlength="10" value="{{ customer.zip }}">
                 </label>
               </div>
-              <label class="sys-field">
-                <span class="sys-label">Country</span>
-                <select class="sys-select" name="shippingCountry" required autocomplete="country">
-                  {% assign selected_country = customer.country | default: 'IN' %}
-                  {% for country in checkout_countries %}
-                    <option value="{{ country.code }}" {% if country.code == selected_country %}selected{% endif %}>{{ country.name }}</option>
-                  {% endfor %}
-                </select>
-              </label>
+              {% if cf.country == 'india' %}
+                <input type="hidden" name="shippingCountry" value="IN">
+              {% else %}
+                <label class="sys-field">
+                  <span class="sys-label">Country</span>
+                  <select class="sys-select" name="shippingCountry" required autocomplete="country">
+                    {% assign selected_country = customer.country | default: 'IN' %}
+                    {% for country in checkout_countries %}
+                      <option value="{{ country.code }}" {% if country.code == selected_country %}selected{% endif %}>{{ country.name }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+              {% endif %}
+              {% if cf.company != 'hidden' or cf.gstin != 'hidden' %}
+                <div class="sys-fields{% if cf.company != 'hidden' and cf.gstin != 'hidden' %} sys-fields--2{% endif %}">
+                  {% if cf.company != 'hidden' %}
+                    <label class="sys-field">
+                      <span class="sys-label">Company name{% if cf.company == 'optional' %} <span class="sys-muted" style="font-weight:400">(optional)</span>{% endif %}</span>
+                      <input class="sys-input" type="text" name="company" {% if cf.company == 'required' %}required{% endif %} autocomplete="organization" maxlength="120">
+                    </label>
+                  {% endif %}
+                  {% if cf.gstin != 'hidden' %}
+                    <label class="sys-field">
+                      <span class="sys-label">GSTIN <span class="sys-muted" style="font-weight:400">(optional — for a GST invoice)</span></span>
+                      <input class="sys-input" type="text" name="gstin" maxlength="15" autocapitalize="characters" spellcheck="false" placeholder="27ABCDE1234F1Z5" pattern="[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][1-9A-Za-z][Zz][0-9A-Za-z]" title="15 characters, like 27ABCDE1234F1Z5">
+                    </label>
+                  {% endif %}
+                </div>
+              {% endif %}
+              {% if cf.note != 'hidden' %}
+                <label class="sys-field">
+                  <span class="sys-label">Order note <span class="sys-muted" style="font-weight:400">(optional)</span></span>
+                  <textarea class="sys-input sys-textarea" name="note" rows="2" maxlength="1000" placeholder="Delivery instructions, a gift message…"></textarea>
+                </label>
+              {% endif %}
               <datalist id="sys-states">
                 {% for state in indian_states %}<option value="{{ state }}"></option>{% endfor %}
               </datalist>

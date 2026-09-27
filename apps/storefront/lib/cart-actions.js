@@ -13,6 +13,12 @@ export function wantsJson(request) {
 // An uploaded image on the API's host: https://<api>/uploads/<store>/<file>.
 const UPLOAD_URL = /^https?:\/\/[^/]+(\/uploads\/[A-Za-z0-9_-]+\/[^/?#]+)$/;
 
+/** An uploaded image's URL under this store's own address (other URLs as-is). */
+export function storeImageUrl(url, host, handle) {
+  const upload = String(url || "").match(UPLOAD_URL);
+  return upload ? storefrontPath(host, handle, upload[1]) : url;
+}
+
 /** The cart as the drawer reads it — item links and images under this
  * store's own address (they come from the API under /store/:handle and
  * the API's host; pages get the same rewrite server-side). */

@@ -36,11 +36,14 @@ function MetaCallback() {
   useEffect(() => {
     const code = searchParams.get("code");
     const returnTo = sessionStorage.getItem("meta-connect-return-to") || "/admin/apps";
+    // The Facebook Pixel setup uses its own (every-plan) endpoint.
+    const endpoint = sessionStorage.getItem("meta-connect-endpoint") || "/api/meta/connect/exchange";
+    sessionStorage.removeItem("meta-connect-endpoint");
     if (!code) {
       setError("Facebook didn't return an authorization code — the connection was likely cancelled.");
       return;
     }
-    apiFetch("/api/meta/connect/exchange", { method: "POST", body: { code } })
+    apiFetch(endpoint, { method: "POST", body: { code } })
       .then(() => router.replace(returnTo))
       .catch((err) => setError(err.message));
   }, [searchParams, router]);

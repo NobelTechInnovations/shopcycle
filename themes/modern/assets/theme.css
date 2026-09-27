@@ -2026,3 +2026,32 @@ a.gallery__item:hover img {
     gap: 18px;
   }
 }
+
+/* ── Star rating on product cards (Product Reviews app) ─────────────── */
+.stars {
+  position: relative;
+  display: inline-block;
+  width: 68px;
+  height: 13px;
+  flex: none;
+  background: color-mix(in srgb, var(--c-text) 20%, transparent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 16'%3E%3Cg%3E%3Cpath id='s' d='M8 .8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L.8 6.1l5-.7z'/%3E%3Cuse href='%23s' x='17'/%3E%3Cuse href='%23s' x='34'/%3E%3Cuse href='%23s' x='51'/%3E%3Cuse href='%23s' x='68'/%3E%3C/g%3E%3C/svg%3E") no-repeat 0 0 / 68px 13px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 16'%3E%3Cg%3E%3Cpath id='s' d='M8 .8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L.8 6.1l5-.7z'/%3E%3Cuse href='%23s' x='17'/%3E%3Cuse href='%23s' x='34'/%3E%3Cuse href='%23s' x='51'/%3E%3Cuse href='%23s' x='68'/%3E%3C/g%3E%3C/svg%3E") no-repeat 0 0 / 68px 13px;
+}
+.stars::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--stars, 0%);
+  background: #f5a524;
+}
+.card-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--c-text) 60%, transparent);
+}
+.card-rating {
+  align-self: flex-start;
+}

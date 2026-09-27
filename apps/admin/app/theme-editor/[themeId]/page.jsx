@@ -22,9 +22,10 @@ export default async function ThemeEditorPage({ params }) {
   // most often it belongs to another of the merchant's stores (the session
   // is on one store at a time) or was deleted.
   let theme = null;
+  let platform = null;
   let problem = null;
   try {
-    ({ theme } = await serverApiFetch(`/api/themes/${themeId}`));
+    ({ theme, platform } = await serverApiFetch(`/api/themes/${themeId}`));
   } catch (err) {
     problem =
       err.status === 404
@@ -44,5 +45,5 @@ export default async function ThemeEditorPage({ params }) {
       </div>
     );
   }
-  return <EditorView theme={theme} />;
+  return <EditorView theme={theme} platform={platform} />;
 }

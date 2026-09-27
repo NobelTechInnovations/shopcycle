@@ -14,15 +14,17 @@ import { AddSectionModal } from "./AddSectionModal";
 import { ThemeSettingsDrawer } from "./ThemeSettingsDrawer";
 import { GlobalSectionsDrawer } from "./GlobalSectionsDrawer";
 
-// Only the home page is designed in a theme. The rest are Oyklane's own
-// pages (same layout on every store, styled by Theme settings) — listed
-// here as previews so a colour or font change can be checked on them.
+// The home page is designed in the theme. The product page is Oyklane's
+// own, but its blocks and sections can be arranged here. Collection and
+// cart are fixed — listed as previews so a colour or font change can be
+// checked on them.
 const TEMPLATE_OPTIONS = [
   { value: "index", label: "Home page" },
-  { value: "product", label: "Product page · preview" },
+  { value: "product", label: "Product page" },
   { value: "collection", label: "Collection page · preview" },
   { value: "cart", label: "Cart · preview" },
 ];
+const EDITABLE = new Set(["index", "product"]);
 
 function FixedPageNote({ onOpenSettings }) {
   return (
@@ -41,9 +43,18 @@ function FixedPageNote({ onOpenSettings }) {
   );
 }
 
-function getTemplateJson(files, name) {
+function getTemplateJson(files, name, platform) {
   const file = files.find((f) => f.path === `templates/${name}.json`);
-  return file ? JSON.parse(file.content) : { sections: {}, order: [] };
+  if (file) {
+    try {
+      const json = JSON.parse(file.content);
+      // A saved product layout counts only while its main section is there.
+      if (name !== "product" || Object.values(json.sections || {}).some((sec) => sec.type === "sys-product")) return json;
+    } catch {
+      // fall through to the default
+    }
+  }
+  return platform?.templates?.[name] ? JSON.parse(JSON.stringify(platform.templates[name])) : { sections: {}, order: [] };
 }
 
 function getSettingsSchemaGroups(files) {
@@ -56,7 +67,7 @@ function getSettingsSchemaGroups(files) {
   }
 }
 
-export function EditorView({ theme }) {
+export function EditorView({ theme, platform }) {
   const { message } = App.useApp();
   const [templateName, setTemplateName] = useState("index");
   const [device, setDevice] = useState("desktop");
@@ -72,7 +83,9 @@ export function EditorView({ theme }) {
   // Theme files are fixed for this editor session — the code editor
   // (Phase 4) is the only place file *content* itself changes.
   const filesRef = useRef(theme.files);
-  const catalog = useMemo(() => buildSectionCatalog(filesRef.current), []);
+  // The theme's sections plus the platform's arrangeable ones (product
+  // page, reviews, related products).
+  const catalog = useMemo(() => buildSectionCatalog([...filesRef.current, ...(platform?.sections || [])]), [platform]);
   const settingsSchemaGroups = useMemo(() => getSettingsSchemaGroups(filesRef.current), []);
 
   const template = useEditorStore((s) => s.template);
@@ -86,28 +99,31 @@ export function EditorView({ theme }) {
   const addSection = useEditorStore((s) => s.addSection);
   const markSaved = useEditorStore((s) => s.markSaved);
 
-  const editable = templateName === "index";
+  const editable = EDITABLE.has(templateName);
 
   const save = useCallback(async () => {
     if (!template) return;
     setSaving(true);
     try {
+      const path = `templates/${templateName}.json`;
+      const content = JSON.stringify(template);
       await Promise.all([
-        // Built-in pages have no theme template to save — only settings.
-        templateName === "index" &&
-          apiFetch(`/api/themes/${theme.id}/files`, {
-            method: "PATCH",
-            body: { path: `templates/${templateName}.json`, content: JSON.stringify(template) },
-          }),
+        // Fixed pages have no layout to save — only settings.
+        editable && apiFetch(`/api/themes/${theme.id}/files`, { method: "PATCH", body: { path, content } }),
         apiFetch(`/api/themes/${theme.id}/settings`, { method: "PATCH", body: { settingsData } }),
       ]);
+      if (editable) {
+        // Keep the session's copy current, so switching pages and back shows this.
+        const files = filesRef.current.filter((f) => f.path !== path);
+        filesRef.current = [...files, { path, content }];
+      }
       markSaved();
     } catch (err) {
       message.error(`Save failed: ${err.message}`);
     } finally {
       setSaving(false);
     }
-  }, [template, settingsData, templateName, theme.id, markSaved, message]);
+  }, [template, settingsData, templateName, editable, theme.id, markSaved, message]);
 
   useEffect(() => {
     // Pickers still work (empty) if one of these fails.
@@ -121,7 +137,7 @@ export function EditorView({ theme }) {
   // Initial load and every template switch.
   useEffect(() => {
     setReady(false);
-    const raw = getTemplateJson(filesRef.current, templateName);
+    const raw = getTemplateJson(filesRef.current, templateName, platform);
     init(hydrateTemplateDefaults(catalog, raw), theme.settingsData);
     setReady(true);
     // catalog/theme.settingsData/init are stable for the component's lifetime
@@ -150,8 +166,10 @@ export function EditorView({ theme }) {
     addSection(newSectionKey(type), type, defaultSettingsFor(catalog, type), blocks, block_order, at);
   }
 
+  const [previewPick, setPreviewPick] = useState({});
+  const previewOptions = templateName === "product" ? products : templateName === "collection" ? collections : [];
   const previewSlug =
-    templateName === "product" ? products[0]?.slug : templateName === "collection" ? collections[0]?.slug : undefined;
+    previewOptions.length && (previewOptions.find((x) => x.slug === previewPick[templateName])?.slug || previewOptions[0].slug);
 
   if (!ready || !template) {
     return (
@@ -178,6 +196,19 @@ export function EditorView({ theme }) {
             options={TEMPLATE_OPTIONS}
             aria-label="Template being edited"
           />
+          {previewOptions.length > 1 && (
+            <Select
+              size="small"
+              className="w-48 hidden lg:block"
+              value={previewSlug}
+              showSearch
+              optionFilterProp="label"
+              onChange={(v) => setPreviewPick((cur) => ({ ...cur, [templateName]: v }))}
+              options={previewOptions.map((x) => ({ value: x.slug, label: x.title }))}
+              aria-label="Preview with"
+              prefix={<span className="text-ink-subtle text-xs">Preview:</span>}
+            />
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -224,7 +255,17 @@ export function EditorView({ theme }) {
       <div className="flex flex-1 min-h-0">
         <div className="w-64 shrink-0 border-r border-app-border bg-app-surface">
           {editable ? (
-            <SectionList catalog={catalog} onAddSection={() => setAddModalOpen(true)} onOpenGlobal={() => setGlobalSectionsOpen(true)} />
+            <SectionList
+              catalog={catalog}
+              onAddSection={() => setAddModalOpen(true)}
+              onOpenGlobal={() => setGlobalSectionsOpen(true)}
+              pageLabel={templateName === "product" ? "Product page" : "Home page"}
+              hint={
+                templateName === "product"
+                  ? "Oyklane's product page on every store. Click “Product” to reorder, hide or resize its parts; add your theme's sections around it."
+                  : undefined
+              }
+            />
           ) : (
             <FixedPageNote onOpenSettings={() => setSettingsDrawerOpen(true)} />
           )}
@@ -250,12 +291,19 @@ export function EditorView({ theme }) {
               onOpenGlobal={() => setGlobalSectionsOpen(true)}
             />
           ) : (
-            <p className="text-[13px] text-ink-muted p-4 m-0">Pick “Home page” above to edit sections.</p>
+            <p className="text-[13px] text-ink-muted p-4 m-0">Pick “Home page” or “Product page” above to edit sections.</p>
           )}
         </div>
       </div>
 
-      <AddSectionModal open={addModalOpen} onClose={() => setAddModalOpen(false)} catalog={catalog} onAdd={handleAddSection} />
+      <AddSectionModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        catalog={catalog}
+        onAdd={handleAddSection}
+        templateName={templateName}
+        presentTypes={template.order.map((k) => template.sections[k]?.type)}
+      />
       <ThemeSettingsDrawer
         open={settingsDrawerOpen}
         onClose={() => setSettingsDrawerOpen(false)}

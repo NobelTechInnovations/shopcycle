@@ -13,6 +13,7 @@ import {
   Percent,
   Search,
   Puzzle,
+  Quote,
 } from "lucide-react";
 import { APP_ICON_KEYS } from "@shopcycle/utils";
 
@@ -35,6 +36,7 @@ const ICON_COMPONENTS = {
   percent: Percent,
   search: Search,
   puzzle: Puzzle,
+  quote: Quote,
 };
 
 export const APP_ICONS = ICON_COMPONENTS;

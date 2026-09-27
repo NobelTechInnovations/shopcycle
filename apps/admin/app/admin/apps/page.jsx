@@ -6,6 +6,7 @@ import { Card, Button, Modal, Form, Input, InputNumber, Select, Switch, Tag, App
 import { Plus, Trash2, Crown, Lock } from "lucide-react";
 import { useConfirmDialog, PageHeader, AppIcon, useHasMounted } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+import { PixelSetup } from "./PixelSetup";
 
 // A handful of apps have a full dedicated panel (Connect flow, campaign
 // builder, message composer — see MetaConnectPanel) instead of the
@@ -15,6 +16,7 @@ import { apiFetch } from "@/lib/api";
 const DEDICATED_PANELS = {
   "meta-ads": "/admin/apps/meta-ads",
   whatsapp: "/admin/apps/whatsapp",
+  "product-reviews": "/admin/apps/reviews",
 };
 
 /** One field inside a repeater row — same small set of primitive types as
@@ -134,6 +136,18 @@ export default function AppsPage() {
     load();
   }, [load]);
 
+  // Back from "Continue with Facebook": reopen that app's setup.
+  useEffect(() => {
+    const key = new URLSearchParams(window.location.search).get("setup");
+    if (!key || !apps.length) return;
+    const app = apps.find((a) => a.key === key);
+    if (app) {
+      openConfigure(app);
+      window.history.replaceState(null, "", "/admin/apps");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apps]);
+
   function openConfigure(app) {
     setConfiguring(app);
     form.resetFields();
@@ -244,9 +258,11 @@ export default function AppsPage() {
           forceRender
         >
           <Form layout="vertical" form={form} onFinish={handleInstall} requiredMark={false}>
-            {configuring?.settingsSchema.map((field) => (
-              <SettingsField key={field.id} field={field} />
-            ))}
+            {configuring?.key === "facebook-pixel" ? (
+              <PixelSetup key={configuring.id} form={form} />
+            ) : (
+              configuring?.settingsSchema.map((field) => <SettingsField key={field.id} field={field} />)
+            )}
           </Form>
         </Modal>
       )}

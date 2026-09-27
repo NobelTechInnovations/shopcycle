@@ -19,6 +19,7 @@ const { computeAccessState, isStorefrontBlocked } = require("../billing/access")
 const shopperService = require("../shopper/service");
 const paymentsService = require("../payments/service");
 const metafieldService = require("../metafields/service");
+const reviewsService = require("../reviews/service");
 const { FULL_INCLUDE } = require("../orders/operations");
 const { publicOrder } = require("../orders/public");
 const { ensureStatusToken } = require("../orders/notify");
@@ -27,6 +28,7 @@ const { storeSettings } = require("../../lib/store-settings");
 const { INDIAN_STATES } = require("../../lib/indian-states");
 const blogService = require("../blog/service");
 const platform = require("./platform");
+const { trackingTags } = require("./tracking");
 const { buildSeo, seoTags } = require("./seo");
 
 const CHECKOUT_COUNTRIES = [
@@ -275,6 +277,17 @@ async function buildGlobalContext(prisma, store, { slug, cartId, discountError, 
     products: Object.values(all_products),
   };
 
+  // Product Reviews app: stars on every product (cards and pages).
+  const reviewsApp = apps[reviewsService.APP_KEY] ? { ...reviewsService.DEFAULTS, ...apps[reviewsService.APP_KEY] } : null;
+  if (reviewsApp) {
+    const ratings = await reviewsService.summaries(prisma, store.id);
+    const tag = (p) => {
+      p.rating = ratings[p.id] || { average: 0, count: 0 };
+    };
+    Object.values(all_products).forEach(tag);
+    Object.values(collectionsMap).forEach((c) => (c.products || []).forEach(tag));
+  }
+
   const best = await bestSellers(prisma, store, all_products);
   const headerLogo = themeSettings?.sections?.header?.settings?.logo || null;
 
@@ -305,6 +318,9 @@ async function buildGlobalContext(prisma, store, { slug, cartId, discountError, 
     payment_methods: await checkoutService.availablePaymentMethods(prisma, store),
     platform: { fonts_url: platform.fontsUrl(themeSettings) },
     apps,
+    // Stars under product cards (Product Reviews app, "show on cards").
+    show_card_ratings: Boolean(reviewsApp && reviewsApp.showOnCards),
+    reviews_app: reviewsApp,
   };
 }
 
@@ -336,7 +352,13 @@ function colourSwatch(value) {
   const m = String(value).match(COLOUR_WORDS);
   if (!m) return null;
   const word = m[1].toLowerCase().replace(/[^a-z]/g, "").replace(/^multicolou?r$/, "multi");
-  return COLOUR_HEX[word] || null;
+  const hex = COLOUR_HEX[word];
+  if (!hex || !hex.startsWith("#")) return hex || null;
+  // "Light blue", "Dark green": the same colour, lighter or darker.
+  const shift = /\b(light|pale|baby|pastel)\b/i.test(value) ? [255, 0.45] : /\b(dark|deep)\b/i.test(value) ? [0, 0.35] : null;
+  if (!shift) return hex;
+  const [target, t] = shift;
+  return `#${[1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) + (target - parseInt(hex.slice(i, i + 2), 16)) * t).toString(16).padStart(2, "0")).join("")}`;
 }
 
 /**
@@ -464,8 +486,14 @@ async function renderPage(
   // a theme can style them but not replace them.
   let filesByPath = { ...(await masterFiles(theme.handle)), ...filesArrayToMap(theme.files), ...(filesOverride || {}) };
   if (system) {
+    // The store's own arrangement of this page (theme editor), if it has one
+    // and it's still valid — read before the platform's files replace it.
+    const arranged = platform.isArrangeable(templateName)
+      ? platform.sanitizeArrangement(templateName, templateOverride ?? filesByPath[`templates/${templateName}.json`])
+      : null;
     const { renderFiles } = await platform.load();
     filesByPath = { ...filesByPath, ...renderFiles };
+    if (arranged) filesByPath[`templates/${templateName}.json`] = arranged;
     if (platform.OWN_LAYOUT[templateName]) filesByPath["layout/theme.liquid"] = renderFiles[platform.OWN_LAYOUT[templateName]];
   }
 
@@ -496,8 +524,15 @@ async function renderPage(
     const collection = primaryCollection(globalContext, found);
     const selected = found.variants.find((v) => v.id === variant) || found.variants.find((v) => v.available) || found.variants[0] || null;
     const fieldDefs = await metafieldService.list(prisma, store.id, "product");
+    const reviewData = globalContext.reviews_app ? await reviewsService.forProduct(prisma, store.id, found.id) : null;
     globalContext.product = {
       ...found,
+      // Product Reviews app: the summary, published reviews and the form.
+      reviews: reviewData && {
+        ...reviewData,
+        form_url: `${found.url}/reviews`,
+        buyers_only: globalContext.reviews_app.whoCanReview === "buyers",
+      },
       // Custom data the seller marked "show on the product page".
       specs: metafieldService.specs(fieldDefs, found.metafields.custom),
       collection: collection && { title: collection.title, slug: collection.slug, url: collection.url },
@@ -559,6 +594,8 @@ async function renderPage(
     }
   }
   if (templateName === "checkout") {
+    // Which fields the form asks for — Settings ▸ Checkout.
+    globalContext.checkout_fields = storeSettings(store).checkout;
     globalContext.checkout_countries = CHECKOUT_COUNTRIES;
     globalContext.indian_states = INDIAN_STATES.map((s) => s.name);
   }
@@ -693,6 +730,14 @@ async function renderPage(
   const head = `${await platform.headTags(themeSettings, { system, drawer, assetBase })}${seoTags(seo)}`;
   html = html.includes("</head>") ? html.replace("</head>", `${head}</head>`) : head + html;
 
+  // Facebook Pixel / Google Analytics and their shopping events — on every
+  // page, never in the theme editor's preview (it would count as visits).
+  const editorPreview = templateOverride != null || settingsOverride != null || filesOverride != null || assetBaseOverride != null;
+  if (!editorPreview) {
+    const tracking = trackingTags({ apps: globalContext.apps, templateName, ctx: globalContext, currency: store.currency, html });
+    if (tracking) html = html.includes("</head>") ? html.replace("</head>", `${tracking}</head>`) : tracking + html;
+  }
+
   // CSS is fetched by the browser via a separate <link> GET to the asset
   // endpoint, which always serves the *saved* file — an unsaved CSS edit
   // has no other way to reach the preview, so inline it where it cascades
@@ -736,4 +781,34 @@ async function getAsset(prisma, { handle, themeId, assetPath }) {
   return asset;
 }
 
-module.exports = { loadStoreOrThrow, resolveTheme, buildGlobalContext, renderPage, getAsset, resolveDomain };
+/**
+ * One product for the quick-add panel on product cards: photos, prices,
+ * option pickers and every variant's stock. Active products only.
+ */
+async function quickProduct(prisma, handle, slug) {
+  const store = await loadStoreOrThrow(prisma, handle);
+  const product = await repository.getProductBySlug(prisma, store.id, String(slug || ""));
+  if (!product) throw new HttpError(404, "Product not found");
+  const p = serializeProduct(product, store.handle);
+  const selected = p.variants.find((v) => v.available) || p.variants[0] || null;
+  return {
+    currency: store.currency,
+    lowStock: storeSettings(store).lowStockThreshold,
+    product: {
+      id: p.id,
+      title: p.title,
+      handle: p.handle,
+      brand: p.brand,
+      images: p.images.slice(0, 8),
+      price: p.price,
+      compare_at_price: p.compare_at_price,
+      price_varies: p.price_varies,
+      available: p.available,
+      selected_variant_id: selected?.id || null,
+      options: variantOptions(p, selected),
+      variants: p.variants.map((v) => ({ id: v.id, title: v.title, price: v.price, comparePrice: v.comparePrice, available: v.available, inventoryQuantity: v.inventoryQuantity })),
+    },
+  };
+}
+
+module.exports = { loadStoreOrThrow, resolveTheme, buildGlobalContext, renderPage, getAsset, resolveDomain, quickProduct };

@@ -63,6 +63,62 @@ function isSystemTemplate(name) {
   return SYSTEM_TEMPLATES.has(name);
 }
 
+/**
+ * Platform pages a seller may arrange in the theme editor: reorder, hide
+ * and adjust the platform's own blocks and sections, and add the theme's
+ * sections around them — while the design stays Oyklane's. Cart and
+ * checkout are never arrangeable. `main` must stay on the page; `sections`
+ * are the platform sections allowed on it.
+ */
+const ARRANGEABLE = {
+  product: { main: "sys-product", sections: ["sys-product", "sys-related", "sys-reviews"] },
+};
+
+function isArrangeable(name) {
+  return Boolean(ARRANGEABLE[name]);
+}
+
+/**
+ * A store's saved (or the editor's unsaved) layout for an arrangeable
+ * page, made safe: parsed, other platform sections dropped, and only kept
+ * if the main section is still on the page. Null means "use the default".
+ */
+function sanitizeArrangement(name, raw) {
+  const rule = ARRANGEABLE[name];
+  if (!rule || !raw) return null;
+  let json;
+  try {
+    json = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (!json || typeof json !== "object" || !json.sections || !Array.isArray(json.order)) return null;
+  const sections = {};
+  const order = [];
+  for (const key of json.order) {
+    const entry = json.sections[key];
+    if (!entry || typeof entry.type !== "string") continue;
+    if (entry.type.startsWith("sys-") && !rule.sections.includes(entry.type)) continue;
+    if (entry.type === rule.main && order.some((k) => sections[k].type === rule.main)) continue; // one main section
+    sections[key] = entry.type === rule.main ? { ...entry, disabled: false } : entry;
+    order.push(key);
+  }
+  if (!order.some((k) => sections[k].type === rule.main)) return null;
+  return JSON.stringify({ sections, order });
+}
+
+/** The platform's own section files and default layouts for arrangeable
+ * pages — the theme editor builds its section list from these. */
+async function editorPackage() {
+  const { renderFiles } = await load();
+  const sections = Object.entries(renderFiles)
+    .filter(([p]) => /^sections\/sys-/.test(p) && Object.values(ARRANGEABLE).some((r) => r.sections.includes(p.slice(9, -7))))
+    .map(([path, content]) => ({ path, content }));
+  const templates = {};
+  for (const name of Object.keys(ARRANGEABLE)) templates[name] = JSON.parse(renderFiles[`templates/${name}.json`] || '{"sections":{},"order":[]}');
+  return { sections, templates };
+}
+
 // ── Tokens ─────────────────────────────────────────────────────────
 
 function parseHex(value, fallback) {
@@ -211,6 +267,10 @@ async function asset(name) {
 }
 
 module.exports = {
+  ARRANGEABLE,
+  isArrangeable,
+  sanitizeArrangement,
+  editorPackage,
   SYSTEM_TEMPLATES,
   OWN_LAYOUT,
   isSystemTemplate,

@@ -8,19 +8,24 @@ import { GLOBAL_SECTION_TYPES } from "./schema-utils";
 
 /** Pick a section type to add — grouped, searchable, each with a line on
  * what it's for. */
-export function AddSectionModal({ open, onClose, catalog, onAdd }) {
+export function AddSectionModal({ open, onClose, catalog, onAdd, templateName = "index", presentTypes = [] }) {
   const [q, setQ] = useState("");
   const groups = useMemo(() => {
     const out = {};
     for (const [type, schema] of Object.entries(catalog)) {
       if (GLOBAL_SECTION_TYPES.includes(type)) continue;
+      // Platform sections only on their own page (the product page's
+      // reviews, related products); one-per-page sections once.
+      if (schema.templates && !schema.templates.includes(templateName)) continue;
+      if (schema.locked) continue;
+      if (schema.limit && presentTypes.filter((t) => t === type).length >= schema.limit) continue;
       const meta = sectionMeta(type);
       const name = schema.name || type;
       if (q && !`${name} ${meta.text}`.toLowerCase().includes(q.toLowerCase())) continue;
       (out[meta.group] ||= []).push({ type, name, meta });
     }
     return GROUP_ORDER.filter((g) => out[g]).map((g) => [g, out[g]]);
-  }, [catalog, q]);
+  }, [catalog, q, templateName, presentTypes]);
 
   return (
     <Modal title="Add a section" open={open} onCancel={onClose} footer={null} width={680} destroyOnHidden afterOpenChange={(o) => !o && setQ("")}>

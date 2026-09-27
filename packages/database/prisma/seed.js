@@ -87,17 +87,25 @@ async function main() {
     },
   });
 
+  const GA_DESCRIPTION =
+    "Google Analytics 4 on every page, checkout included — with product views, add to cart, checkout and purchase events.";
+  const PIXEL_DESCRIPTION =
+    "Meta Pixel on every page, checkout included — ViewContent, AddToCart, InitiateCheckout and Purchase, so your ads learn from real sales.";
+  const PRODUCT_REVIEWS_DESCRIPTION =
+    "Star ratings on product pages and cards, a review form for shoppers, verified-buyer badges, moderation and CSV import.";
+  const TESTIMONIALS_DESCRIPTION =
+    "Quotes from happy customers for your home page — add them once here; they show wherever a Testimonials section is placed.";
   // App catalog (Phase 8) — seeded fixtures a super admin manages from
   // /admin/super-admin/apps, not something a merchant creates. Each
   // settingsSchema entry is what the install form renders generically —
   // adding a new field to an app is a data change, not a UI change.
   await prisma.app.upsert({
     where: { key: "google-analytics" },
-    update: { iconKey: "bar-chart" },
+    update: { iconKey: "bar-chart", description: GA_DESCRIPTION },
     create: {
       key: "google-analytics",
       name: "Google Analytics",
-      description: "Adds the gtag.js snippet to every storefront page using your Measurement ID.",
+      description: GA_DESCRIPTION,
       category: "analytics",
       iconKey: "bar-chart",
       settingsSchema: [{ id: "measurementId", label: "Measurement ID", type: "text", placeholder: "G-XXXXXXXXXX" }],
@@ -105,11 +113,11 @@ async function main() {
   });
   await prisma.app.upsert({
     where: { key: "facebook-pixel" },
-    update: { iconKey: "activity" },
+    update: { iconKey: "activity", description: PIXEL_DESCRIPTION },
     create: {
       key: "facebook-pixel",
       name: "Facebook Pixel",
-      description: "Adds the Meta Pixel base code to every storefront page using your Pixel ID.",
+      description: PIXEL_DESCRIPTION,
       category: "analytics",
       iconKey: "activity",
       settingsSchema: [{ id: "pixelId", label: "Pixel ID", type: "text", placeholder: "123456789012345" }],
@@ -127,14 +135,27 @@ async function main() {
       settingsSchema: [{ id: "headHtml", label: "Head HTML/JS", type: "textarea", placeholder: "<script>...</script>" }],
     },
   });
+  // Real per-product reviews — a dedicated panel (Apps ▸ Product Reviews),
+  // so no install form; see apps/api/src/modules/reviews.
+  await prisma.app.upsert({
+    where: { key: "product-reviews" },
+    update: { name: "Product Reviews", iconKey: "star", description: PRODUCT_REVIEWS_DESCRIPTION },
+    create: {
+      key: "product-reviews",
+      name: "Product Reviews",
+      description: PRODUCT_REVIEWS_DESCRIPTION,
+      category: "marketing",
+      iconKey: "star",
+      settingsSchema: [],
+    },
+  });
   await prisma.app.upsert({
     where: { key: "customer-reviews" },
-    update: { iconKey: "star" },
+    update: { iconKey: "quote", name: "Testimonials", description: TESTIMONIALS_DESCRIPTION },
     create: {
       key: "customer-reviews",
-      name: "Customer Reviews",
-      description:
-        "A simple review widget for your storefront — add every review here once; it shows wherever the Customer Reviews section is placed in your theme, on every page, no theme editing needed per review.",
+      name: "Testimonials",
+      description: TESTIMONIALS_DESCRIPTION,
       category: "marketing",
       iconKey: "star",
       settingsSchema: [

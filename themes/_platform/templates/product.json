@@ -1,6 +1,8 @@
 {
   "sections": {
-    "main": { "type": "sys-product", "settings": {} }
+    "main": { "type": "sys-product", "settings": {} },
+    "reviews": { "type": "sys-reviews", "settings": {} },
+    "related": { "type": "sys-related", "settings": {} }
   },
-  "order": ["main"]
+  "order": ["main", "reviews", "related"]
 }

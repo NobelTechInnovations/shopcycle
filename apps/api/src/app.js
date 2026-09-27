@@ -48,6 +48,7 @@ const domainRoutes = require("./modules/domains/routes");
 const paymentRoutes = require("./modules/payments/routes");
 const developerAdminRoutes = require("./modules/developer/admin-routes");
 const metafieldRoutes = require("./modules/metafields/routes");
+const reviewRoutes = require("./modules/reviews/routes");
 const publicApiRoutes = require("./modules/developer/public-routes");
 const inventoryRoutes = require("./modules/inventory/routes");
 const exportRoutes = require("./modules/exports/routes");
@@ -156,6 +157,7 @@ function buildApp() {
   app.register(paymentRoutes, { prefix: "/api/payments" });
   app.register(developerAdminRoutes, { prefix: "/api/developer" });
   app.register(metafieldRoutes, { prefix: "/api/metafields" });
+  app.register(reviewRoutes, { prefix: "/api/reviews" });
   app.register(publicApiRoutes, { prefix: "/api/v1" });
   app.register(menuRoutes, { prefix: "/api/menus" });
   app.register(uploadRoutes, { prefix: "/api/files" });

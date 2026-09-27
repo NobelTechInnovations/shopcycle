@@ -395,6 +395,7 @@ model Store {
   apiKeys              ApiKey[]
   webhookEndpoints     WebhookEndpoint[]
   metafieldDefinitions MetafieldDefinition[]
+  productReviews       ProductReview[]
 
   @@map("stores")
 }
@@ -591,6 +592,7 @@ model Product {
   images             ProductImage[]
   collectionProducts CollectionProduct[]
   orderItems         OrderItem[]
+  reviews            ProductReview[]
 
   @@unique([storeId, slug])
   @@index([storeId])
@@ -847,6 +849,12 @@ model Order {
   confirmationSentAt DateTime?
   /// Private note for the store's staff; never shown to the shopper.
   note               String?   @db.Text
+  /// From the checkout form, when the store asks for them (Settings ▸
+  /// Checkout): the shopper's note ("leave with the guard"), and a
+  /// business buyer's company name and GSTIN (printed on the GST invoice).
+  customerNote       String?   @db.Text
+  buyerCompany       String?
+  buyerGstin         String?
   /// Part of `total` paid with a gift card (see GiftCard). The rest —
   /// total − giftCardAmount — is what the shopper pays by COD or online.
   giftCardAmount     Decimal   @default(0) @db.Decimal(10, 2)
@@ -1639,4 +1647,34 @@ model MetafieldDefinition {
 
   @@unique([storeId, ownerType, key])
   @@index([storeId, ownerType])
+}
+
+/// A shopper's review of a product (the Product Reviews app). Written on
+/// the product page, imported from a CSV, or added by the seller.
+/// `verified`: the email has an order containing this product.
+model ProductReview {
+  id          String   @id @default(cuid())
+  storeId     String
+  productId   String
+  rating      Int
+  title       String?
+  body        String   @db.Text
+  authorName  String
+  authorEmail String?
+  verified    Boolean  @default(false)
+  /// pending (waiting for approval) | published | hidden
+  status      String   @default("pending")
+  /// storefront | import | admin
+  source      String   @default("storefront")
+  /// The seller's public reply, shown under the review.
+  reply       String?  @db.Text
+  repliedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, status])
+  @@index([productId, status])
 }
