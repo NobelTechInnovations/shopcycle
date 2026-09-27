@@ -8,7 +8,7 @@ async function listHandler(request, reply) {
 
 async function installHandler(request, reply) {
   const { settings } = installAppSchema.parse(request.body);
-  const app = await service.installApp(request.server.prisma, request.store, request.params.key, settings);
+  const app = await service.installApp(request.server.prisma, request.store, request.params.key, settings, { role: request.storeRole });
   reply.send({ app });
 }
 

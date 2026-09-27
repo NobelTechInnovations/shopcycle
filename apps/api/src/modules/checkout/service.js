@@ -123,9 +123,12 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
   // the order recorded, but can't change what the account has saved.
   const signedIn = Boolean(shopper && shopper.email.toLowerCase() === input.email);
   const existingCustomer = signedIn ? shopper : await customersRepository.findByEmail(prisma, storeId, input.email);
+  // A verified sign-in phone (Phone Login) is never replaced by the
+  // delivery phone typed here — the order keeps its own copy.
+  if (existingCustomer?.phoneVerifiedAt) delete customerFields.phone;
   const customer = !existingCustomer
     ? await customersRepository.create(prisma, storeId, { email: input.email, ...customerFields })
-    : existingCustomer.passwordHash && !signedIn
+    : (existingCustomer.passwordHash || existingCustomer.phoneVerifiedAt) && !signedIn
       ? existingCustomer
       : await customersRepository.update(prisma, existingCustomer.id, customerFields);
 

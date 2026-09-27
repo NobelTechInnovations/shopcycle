@@ -125,7 +125,7 @@ large volumes, swap `modules/uploads` to S3/R2 behind the same functions.
   and turns cash on delivery on or off. Keys are stored encrypted
   (`DATA_ENCRYPTION_KEY`) and never shown again in full. An unpaid online
   order is cancelled and restocked after 2 hours.
-- **API & webhooks** (Settings ▸ API & webhooks): API keys (`oyk_…`, shown
+- **API & webhooks** (Settings ▸ API & webhooks, Pro plan): API keys (`oyk_…`, shown
   once) with scopes — read/write products and inventory, read/write orders,
   read customers — for `https://api.oyklane.com/api/v1/…`
   (`Authorization: Bearer <key>`). Webhooks POST signed JSON
@@ -161,6 +161,89 @@ large volumes, swap `modules/uploads` to S3/R2 behind the same functions.
   lists the seller's pixels when `META_APP_ID`/`META_APP_SECRET` are set.
 - **New-order alerts**: the admin plays a coin sound and shows the order
   when a COD or paid order comes in (one tab rings; mute in the top bar).
+
+## Platform billing
+
+What sellers pay Oyklane. The engine is `apps/api/src/modules/billing/`, the
+seller API is `/api/billing`, and super admin controls live under
+`/api/super-admin/billing/*` (every action audited).
+
+| Plan | Monthly | Checkout fee | Staff |
+| --- | --- | --- | --- |
+| Starter | ₹199 | 2% | 2 |
+| Growth | ₹599 | 1.5% | 10 |
+| Pro | ₹1,299 | 0.5% | 30 |
+
+- **Per store**: every store (even a second one by the same owner) gets a
+  3-day free trial, then a one-time ₹99 first month, then the regular price.
+  Yearly = monthly × 12 × 80%. No product limits.
+- **GST** (18%) is added on top and shown separately: CGST+SGST in the
+  platform's state (`PLATFORM_STATE`), IGST otherwise. Invoices use the
+  `PLATFORM_*` values in `.env`.
+- **Fees**: each order stores the plan's fee rate; the One-Click Checkout app
+  adds 0.3%. Fees are collected with each renewal (monthly for yearly plans).
+- **Autopay** via Razorpay (UPI AutoPay, card or e-mandate). Only Razorpay
+  ids are stored. Payments are verified with Razorpay, never trusted from the
+  browser. A ₹1 setup check is refunded.
+- **Failed payments**: 7 days of grace with full access and automatic
+  retries → dashboard locked (402 `billing_locked`; storefront stays live) →
+  after 3 unpaid cycles the store is suspended (storefront offline, checkout
+  closed). Cancelling runs to period end, then the same rules apply.
+- **Plan features** are a matrix edited in Super admin ▸ Plans. Growth adds
+  GST invoices, CSV exports, Meta/WhatsApp and the theme code editor; Pro
+  adds API keys and the public API (other plans get a 403).
+
+Environment:
+
+| Variable | Purpose |
+| --- | --- |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Platform Razorpay account (recurring payments must be enabled by Razorpay support) |
+| `RAZORPAY_WEBHOOK_SECRET` | Secret for `https://api.oyklane.com/api/webhooks/razorpay`; subscribe to `payment.captured`, `payment.failed`, `token.confirmed`, `token.rejected`, `token.cancelled`, `token.paused`, `refund.processed`, `refund.failed` |
+| `BILLING_JOBS=true` | Run the billing job outside production (it always runs in production) |
+| `BILLING_SANDBOX=true` | Local only: autopay approves at once, charges always succeed. Refused when `NODE_ENV=production` |
+| `BILLING_TEST_CLOCK=true` | Enables `POST /api/billing/_test/clock` for tests. Never in production |
+
+- **Paid apps** (App.priceMonthly, set in Super admin ▸ Apps): billed for
+  every billing period a store has the app installed in, on the next bill
+  (`billing/app-charges.js`). Installing adds the current period (the free
+  trial counts as one); removing it stops future charges but a period
+  already added stays payable. The **Phone Login** app is ₹299/month.
+
+Tests (they use the shared database through the transaction pooler and
+clean up after themselves):
+
+```bash
+node apps/api/test/e2e-billing.js         # full lifecycle with a mock Razorpay
+node apps/api/test/e2e-billing-modes.js   # sandbox / unconfigured / production guard
+node apps/api/test/e2e-providers.js       # email/SMS/WhatsApp/CDN providers, Google, phone login, paid apps
+```
+
+## Providers and sign-in
+
+All optional; each one is off until its keys are in `.env` (see
+`.env.example`). Tests never contact them.
+
+- **Email** (`lib/mailer.js`): SMTP (any provider — ZeptoMail
+  `smtp.zeptomail.in`, Zoho Mail `smtp.zoho.in`, Brevo), or the ZeptoMail /
+  Brevo HTTP APIs with `EMAIL_PROVIDER`. Unset: emails are only logged.
+- **Images** (`modules/uploads`): ImageKit or Cloudinary. The admin uploads
+  straight from the browser with a 30-minute signature; the API then checks
+  the file with the provider (image type, ≤ 8 MB, in the store's folder)
+  before recording it. Images uploaded earlier stay in the database.
+- **SMS / WhatsApp codes** (`lib/messaging.js`): Twilio (SMS + WhatsApp),
+  MSG91 (India SMS, DLT template), WhatsApp Cloud API (Meta). Every message
+  is in `message_logs`; the code itself is only kept when nothing was sent.
+- **Shopper phone sign-in** (Phone Login app, `modules/shopper/phone.js`):
+  code by SMS or WhatsApp. Only numbers verified this way can sign in; a new
+  number finishes sign-up with name + email; joining an account that already
+  has orders needs that email's code. Codes only go to
+  `PHONE_LOGIN_COUNTRIES` (default +91), at most `PHONE_LOGIN_DAILY_LIMIT`
+  per store per day.
+- **Continue with Google** — sellers (`modules/auth/google.js`; a new email
+  names its first store on /register; platform accounts can't use it) and
+  shoppers (`modules/shopper/google.js`; Google returns to one API callback,
+  which sends the shopper back to the store's own address with a one-time
+  ticket bound to that browser).
 
 ## Phase status
 

@@ -3,8 +3,8 @@ import { FlaskConical, Info } from "lucide-react";
 /**
  * Tells the merchant how plan billing behaves on this deployment, before
  * they click anything (billing.mode from the API):
- *   sandbox       — local test mode: plans start with no payment
- *   unconfigured  — plans can't be chosen yet
+ *   sandbox       — local test mode: autopay approves at once, no real money
+ *   unconfigured  — autopay can't be set up yet
  *   razorpay      — normal; renders nothing
  */
 export function BillingModeNotice({ billing, className = "" }) {
@@ -16,8 +16,8 @@ export function BillingModeNotice({ billing, className = "" }) {
       >
         <FlaskConical size={16} className="text-accent mt-0.5 shrink-0" aria-hidden="true" />
         <p className="text-sm text-ink m-0">
-          <strong className="font-semibold">Test mode.</strong> Choosing a plan starts the free trial straight away, with no
-          Razorpay mandate and no payment. Real billing switches on once Razorpay keys are added.
+          <strong className="font-semibold">Test mode.</strong> Autopay is approved instantly and every charge succeeds
+          without taking real money. Real billing switches on once Razorpay keys are added.
         </p>
       </div>
     );
@@ -31,8 +31,8 @@ export function BillingModeNotice({ billing, className = "" }) {
         <Info size={16} className="text-status-warning mt-0.5 shrink-0" aria-hidden="true" />
         <div className="text-sm text-ink">
           <p className="m-0">
-            <strong className="font-semibold">Plan billing isn't switched on yet.</strong> You can keep using your store;
-            choosing a plan will open up shortly.
+            <strong className="font-semibold">Payments aren't switched on yet.</strong> You can keep using your store;
+            setting up autopay will open up shortly.
           </p>
           {billing.setupHint && <p className="text-[13px] text-ink-muted mt-1 mb-0">Setup: {billing.setupHint}</p>}
         </div>

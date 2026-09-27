@@ -22,12 +22,30 @@ const { startRazorpayMock } = require("./razorpay-mock");
 
 const ROOT = path.resolve(__dirname, "../../..");
 require(path.join(ROOT, "apps/api/node_modules/dotenv")).config({ path: path.join(ROOT, ".env") });
+// Tests never send real email/SMS or upload to a media CDN (this process and the API it starts).
+Object.assign(process.env, { SMTP_HOST: "", EMAIL_PROVIDER: "log", SMS_PROVIDER: "log", WHATSAPP_PROVIDER: "log", MEDIA_STORAGE: "database" });
 
 const MOCK_PORT = 4297;
 const API_PORT = 4198;
 const API = `http://localhost:${API_PORT}`;
 const ORIGIN = process.env.ADMIN_ORIGIN || "http://localhost:3000";
 const KEY_SECRET = "mock_key_secret_for_tests";
+
+// Shared production database: the session pooler (:5432) allows only 15
+// clients in total, so tests use the transaction pooler (:6543).
+function dbUrl(limit) {
+  const u = new URL(process.env.DATABASE_URL);
+  if (/pooler\.supabase\.com$/.test(u.hostname) && u.port === "5432") {
+    u.port = "6543";
+    u.searchParams.set("pgbouncer", "true");
+  }
+  u.searchParams.set("connection_limit", String(limit));
+  u.searchParams.set("connect_timeout", "30");
+  u.searchParams.set("pool_timeout", "30");
+  return u.toString();
+}
+const API_DATABASE_URL = dbUrl(3);
+process.env.DATABASE_URL = dbUrl(2);
 
 let pass = 0;
 let fail = 0;
@@ -92,6 +110,7 @@ async function startApi() {
     cwd: path.join(ROOT, "apps/api"),
     env: {
       ...process.env,
+      DATABASE_URL: API_DATABASE_URL,
       API_PORT: String(API_PORT),
       NODE_ENV: "test",
       RAZORPAY_KEY_ID: "rzp_test_mock",
@@ -123,7 +142,7 @@ const linkFrom = (html, pathPart) => {
 };
 
 async function main() {
-  const { server } = await startRazorpayMock(MOCK_PORT);
+  const { server, payments: rzpPayments, orders: rzpOrders } = await startRazorpayMock(MOCK_PORT);
   const api = await startApi();
   const { PrismaClient } = require(path.join(ROOT, "packages/database/node_modules/@prisma/client"));
   const prisma = new PrismaClient();
@@ -364,6 +383,8 @@ async function main() {
     const order3Id = r.data.order.id;
     const rzpOrder = r.data.razorpay.orderId;
     check("no confirmation before payment", (await prisma.emailLog.count({ where: { refId: order3Id, template: "order_confirmation" } })) === 0);
+    // The shopper pays in Razorpay's window, so Razorpay knows the payment (and can refund it).
+    rzpPayments.set("pay_online_1", { id: "pay_online_1", order_id: rzpOrder, amount: rzpOrders.get(rzpOrder)?.amount, method: "card", status: "captured" });
     const sig = crypto.createHmac("sha256", KEY_SECRET).update(`${rzpOrder}|pay_online_1`).digest("hex");
     r = await sf("POST", "/api/storefront/checkout/razorpay/verify", { orderId: order3Id, razorpay_order_id: rzpOrder, razorpay_payment_id: "pay_online_1", razorpay_signature: sig });
     check("payment verified", r.status === 200 && r.data.order?.paymentStatus === "paid", r.data);
@@ -429,13 +450,19 @@ async function main() {
     r = await sf("POST", `/api/storefront/${store.handle}/cart/recover`, { token: recoveryToken });
     check("recovery link restores the cart", r.data.cartId === abandonedCart, r.data);
 
-    // ── GST invoice (Premium) ──
+    // ── GST invoice (Growth and Pro) ──
+    // New stores trial on Growth, so drop to Starter first to see the gate.
+    const setPlan = async (key) => {
+      const plan = await prisma.plan.findFirst({ where: { key } });
+      await prisma.subscription.update({ where: { storeId: store.id }, data: { planId: plan.id } });
+      await prisma.store.update({ where: { id: store.id }, data: { planId: plan.id } });
+    };
+    await setPlan("starter");
     r = await owner("POST", `/api/orders/${orderId}/invoice`, {});
-    check("GST invoices are Premium-only", r.status === 403, r.data);
-    const premium = await prisma.plan.findUnique({ where: { name: "Premium" } });
-    await prisma.store.update({ where: { id: store.id }, data: { planId: premium.id, subscriptionStatus: "trialing", trialEndsAt: new Date(Date.now() + 20 * 86400000) } });
+    check("GST invoices are not on Starter", r.status === 403 && /Growth or Pro/.test(r.data?.error || r.data?.message || ""), r.data);
+    await setPlan("growth");
     r = await owner("POST", `/api/orders/${orderId}/invoice`, {});
-    check("invoice issued on Premium", r.status === 200 && /^INV-\d{4}-0001$/.test(r.data.invoiceNumber || ""), r.data);
+    check("invoice issued on Growth", r.status === 200 && /^INV-\d{4}-0001$/.test(r.data.invoiceNumber || ""), r.data);
     const firstNumber = r.data.invoiceNumber;
     r = await owner("POST", `/api/orders/${orderId}/invoice`, {});
     check("issuing again returns the same number", r.data.invoiceNumber === firstNumber, r.data);
@@ -445,7 +472,7 @@ async function main() {
     r = await sf("GET", `/api/storefront/${store.handle}/orders/${statusToken}/invoice`);
     check("shopper can open the invoice", r.status === 200 && String(r.data).includes(firstNumber) && String(r.data).includes("27AAPFU0939F1ZV"), String(r.data).slice(0, 200));
 
-    // ── CSV (Premium) ──
+    // ── CSV (Growth and Pro) ──
     await prisma.customer.create({ data: { storeId: store.id, name: '=HYPERLINK("http://evil.test","x")', email: `formula-${stamp}@test.oyklane.dev` } });
     r = await owner("GET", "/api/data/exports/customers");
     check("customers export", r.status === 200 && String(r.data).includes("Amount Spent"), String(r.data).slice(0, 120));

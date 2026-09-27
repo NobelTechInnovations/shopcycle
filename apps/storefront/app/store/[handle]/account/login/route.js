@@ -12,6 +12,10 @@ import {
   visitorAllowed,
   PREFILL_COOKIE,
   withPrefill,
+  LOGIN_PHONE_COOKIE,
+  PHONE_CHANNEL_COOKIE,
+  PHONE_TICKET_COOKIE,
+  PHONE_PROFILE_COOKIE,
 } from "@/lib/shopper";
 
 /**
@@ -28,9 +32,113 @@ import {
 
 const EMAIL_STEP_MAX_AGE = 15 * 60;
 
+const PHONE_COOKIES = [LOGIN_PHONE_COOKIE, PHONE_CHANNEL_COOKIE, PHONE_TICKET_COOKIE, PHONE_PROFILE_COOKIE];
+
+function readProfile(value) {
+  try {
+    const p = JSON.parse(value || "{}");
+    return { name: String(p.name || "").slice(0, 120), email: String(p.email || "").slice(0, 200) };
+  } catch {
+    return { name: "", email: "" };
+  }
+}
+
+/** Phone sign-in pages: which step we're on comes from the cookies each
+ * earlier step set, so a step can't be reached out of order. */
+async function phoneGET(request, handle, sp) {
+  const jar = await cookies();
+  if (sp.get("change")) {
+    const response = redirectTo(request, handle, "/account/login", { mode: "phone" });
+    for (const name of PHONE_COOKIES) clearCookie(response, request, handle, name);
+    return response;
+  }
+  const phone = jar.get(LOGIN_PHONE_COOKIE)?.value || "";
+  const ticket = jar.get(PHONE_TICKET_COOKIE)?.value || "";
+  const profile = readProfile(jar.get(PHONE_PROFILE_COOKIE)?.value);
+  const wanted = sp.get("step");
+  const step =
+    wanted === "phone-email-code" && ticket && profile.email ? wanted : wanted === "phone-profile" && ticket ? wanted : wanted === "phone-code" && phone ? wanted : "phone";
+  const returnTo = RETURN_TARGETS[sp.get("return_to")] ? sp.get("return_to") : "";
+  return proxyRender(
+    handle,
+    "account-login",
+    {
+      loginMode: "phone",
+      loginStep: step,
+      loginPhone: phone,
+      loginEmail: profile.email,
+      formError: sp.get("formError") || "",
+      notice: sp.get("notice") || "",
+      ...(returnTo && { returnTo }),
+    },
+    request
+  );
+}
+
+async function phonePOST(request, handle, intent, form) {
+  const jar = await cookies();
+  const back = (step, extra = {}) => redirectTo(request, handle, "/account/login", { mode: "phone", ...(step && { step }), ...extra });
+  const phone = jar.get(LOGIN_PHONE_COOKIE)?.value || "";
+  const ticket = jar.get(PHONE_TICKET_COOKIE)?.value || "";
+
+  if (intent === "phone-request" || intent === "phone-resend") {
+    if (!visitorAllowed(request, "phone-code", { max: 5, windowMs: 10 * 60 * 1000 })) {
+      return back(intent === "phone-resend" ? "phone-code" : "", { formError: "Too many codes requested from this device. Try again in a few minutes." });
+    }
+    const number = intent === "phone-resend" ? phone : String(form.get("phone") || "").trim();
+    const channel = intent === "phone-resend" ? jar.get(PHONE_CHANNEL_COOKIE)?.value : String(form.get("channel") || "");
+    if (!number) return back("", { formError: "Your sign-in timed out. Enter your number again." });
+    const res = await apiPost(handle, "/account/phone/code", { phone: number, ...(channel && { channel }) });
+    if (!res.ok) return back(intent === "phone-resend" ? "phone-code" : "", { formError: res.data?.error || "Enter a valid mobile number." });
+    const response = back("phone-code", intent === "phone-resend" ? { notice: "A new code is on its way." } : {});
+    response.cookies.set(LOGIN_PHONE_COOKIE, res.data.phone, cookieOptions(request, handle, EMAIL_STEP_MAX_AGE));
+    response.cookies.set(PHONE_CHANNEL_COOKIE, res.data.channel, cookieOptions(request, handle, EMAIL_STEP_MAX_AGE));
+    const returnTo = String(form.get("return_to") || "");
+    if (RETURN_TARGETS[returnTo]) response.cookies.set(RETURN_COOKIE, returnTo, cookieOptions(request, handle, EMAIL_STEP_MAX_AGE));
+    return response;
+  }
+
+  const savedReturn = jar.get(RETURN_COOKIE)?.value;
+  const done = (token) => {
+    const response = signedInResponse(request, handle, token, RETURN_TARGETS[savedReturn]);
+    for (const name of PHONE_COOKIES) clearCookie(response, request, handle, name);
+    return response;
+  };
+
+  if (intent === "phone-verify") {
+    if (!phone) return back("", { formError: "Your sign-in timed out. Enter your number again." });
+    const res = await apiPost(handle, "/account/phone/verify", { phone, code: String(form.get("code") || "") });
+    if (!res.ok) return back("phone-code", { formError: res.data?.error || "That code didn't work." });
+    if (res.data?.token) return done(res.data.token);
+    const response = back("phone-profile");
+    response.cookies.set(PHONE_TICKET_COOKIE, res.data.signupTicket, cookieOptions(request, handle, 20 * 60));
+    return response;
+  }
+
+  if (!ticket) return back("", { formError: "Your number check expired. Enter your number again." });
+
+  if (intent === "phone-profile") {
+    const profile = { name: String(form.get("name") || "").trim().slice(0, 120), email: String(form.get("email") || "").trim().toLowerCase().slice(0, 200) };
+    const res = await apiPost(handle, "/account/phone/complete", { ticket, ...profile });
+    if (!res.ok) return back("phone-profile", { formError: res.data?.error || "Check your name and email." });
+    if (res.data?.token) return done(res.data.token);
+    const response = back("phone-email-code", { notice: "We emailed you a 6-digit code." });
+    response.cookies.set(PHONE_PROFILE_COOKIE, JSON.stringify(profile), cookieOptions(request, handle, 20 * 60));
+    return response;
+  }
+
+  // phone-email-verify
+  const profile = readProfile(jar.get(PHONE_PROFILE_COOKIE)?.value);
+  if (!profile.email) return back("phone-profile", { formError: "Enter your name and email again." });
+  const res = await apiPost(handle, "/account/phone/complete", { ticket, ...profile, code: String(form.get("code") || "") });
+  if (!res.ok || !res.data?.token) return back("phone-email-code", { formError: res.data?.error || "That code didn't work." });
+  return done(res.data.token);
+}
+
 export async function GET(request, { params }) {
   const { handle } = await params;
   const sp = request.nextUrl.searchParams;
+  if (sp.get("mode") === "phone") return phoneGET(request, handle, sp);
   const pendingEmail = (await cookies()).get(LOGIN_EMAIL_COOKIE)?.value || "";
 
   if (sp.get("change")) {
@@ -68,6 +176,7 @@ export async function POST(request, { params }) {
   const { handle } = await params;
   const form = await request.formData();
   const intent = String(form.get("intent") || "request");
+  if (intent.startsWith("phone-")) return phonePOST(request, handle, intent, form);
   const pendingEmail = (await cookies()).get(LOGIN_EMAIL_COOKIE)?.value || "";
   const returnTo = String(form.get("return_to") || "");
 

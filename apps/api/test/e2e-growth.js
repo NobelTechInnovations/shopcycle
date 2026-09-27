@@ -21,12 +21,30 @@ const { startGatewaysMock } = require("./gateways-mock");
 
 const ROOT = path.resolve(__dirname, "../../..");
 require(path.join(ROOT, "apps/api/node_modules/dotenv")).config({ path: path.join(ROOT, ".env") });
+// Tests never send real email/SMS or upload to a media CDN (this process and the API it starts).
+Object.assign(process.env, { SMTP_HOST: "", EMAIL_PROVIDER: "log", SMS_PROVIDER: "log", WHATSAPP_PROVIDER: "log", MEDIA_STORAGE: "database" });
 
 const API_PORT = 4199;
 const API = `http://localhost:${API_PORT}`;
 const MOCK_PORT = 4296;
 const MOCK = `http://localhost:${MOCK_PORT}`;
 const ORIGIN = process.env.ADMIN_ORIGIN || "http://localhost:3000";
+
+// Shared production database: the session pooler (:5432) allows only 15
+// clients in total, so tests use the transaction pooler (:6543).
+function dbUrl(limit) {
+  const u = new URL(process.env.DATABASE_URL);
+  if (/pooler\.supabase\.com$/.test(u.hostname) && u.port === "5432") {
+    u.port = "6543";
+    u.searchParams.set("pgbouncer", "true");
+  }
+  u.searchParams.set("connection_limit", String(limit));
+  u.searchParams.set("connect_timeout", "30");
+  u.searchParams.set("pool_timeout", "30");
+  return u.toString();
+}
+const API_DATABASE_URL = dbUrl(3);
+process.env.DATABASE_URL = dbUrl(2);
 
 let pass = 0;
 let fail = 0;
@@ -91,6 +109,7 @@ async function startApi() {
     cwd: path.join(ROOT, "apps/api"),
     env: {
       ...process.env,
+      DATABASE_URL: API_DATABASE_URL,
       API_PORT: String(API_PORT),
       NODE_ENV: "test",
       JOBS_DISABLED: "true",
@@ -446,6 +465,15 @@ async function main() {
       });
       return { status: res.status, data: await res.json().catch(() => null) };
     };
+    const setPlan = async (key) => {
+      const plan = await prisma.plan.findFirst({ where: { key } });
+      await prisma.subscription.update({ where: { storeId: store.id }, data: { planId: plan.id } });
+      await prisma.store.update({ where: { id: store.id }, data: { planId: plan.id } });
+    };
+    await setPlan("growth");
+    r = await owner("POST", "/api/developer/keys", { name: "Too early", scopes: ["read_products"] });
+    check("API keys need Pro (refused on Growth)", r.status === 403, r.data);
+    await setPlan("pro");
     r = await owner("POST", "/api/developer/keys", { name: "Read catalogue", scopes: ["read_products"] });
     check("create an API key (token shown once)", r.status === 201 && /^oyk_/.test(r.data.token) && r.data.key.prefix === r.data.token.slice(0, 10), r.data);
     const readKey = r.data.token;
@@ -456,6 +484,10 @@ async function main() {
     check("no key → 401", r.status === 401, r.data);
     r = await v1("GET", "/products", readKey);
     check("read_products lists products", r.status === 200 && r.data.data.some((p) => p.id === product.id && p.variants[0].price === 1000) && r.data.total >= 1, r.data);
+    await setPlan("growth");
+    r = await v1("GET", "/products", readKey);
+    check("an existing key stops working off Pro", r.status === 403 && r.data?.code === "plan_upgrade_required", r.data);
+    await setPlan("pro");
     r = await v1("GET", "/orders", readKey);
     check("…but can't read orders (scope)", r.status === 403 && /read_orders/.test(r.data.error), r.data);
     r = await owner("POST", "/api/developer/keys", { name: "Warehouse app", scopes: ["read_orders", "write_orders", "write_products", "write_inventory", "read_customers"] });

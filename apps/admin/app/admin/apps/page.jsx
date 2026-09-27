@@ -6,6 +6,7 @@ import { Card, Button, Modal, Form, Input, InputNumber, Select, Switch, Tag, App
 import { Plus, Trash2, Crown, Lock } from "lucide-react";
 import { useConfirmDialog, PageHeader, AppIcon, useHasMounted } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+import { inr } from "@/lib/billing";
 import { PixelSetup } from "./PixelSetup";
 
 // A handful of apps have a full dedicated panel (Connect flow, campaign
@@ -32,7 +33,7 @@ function RepeaterSubField({ field, name }) {
     case "select":
       return (
         <Form.Item name={name} label={field.label} className="mb-2">
-          <Select options={(field.options || []).map((o) => ({ value: o, label: String(o) }))} />
+          <Select options={(field.options || []).map(optionOf)} />
         </Form.Item>
       );
     case "checkbox":
@@ -95,9 +96,19 @@ function RepeaterField({ field }) {
   );
 }
 
+const optionOf = (o) => (typeof o === "object" ? o : { value: o, label: String(o) });
+
 function SettingsField({ field }) {
   if (field.type === "repeater") {
     return <RepeaterField key={field.id} field={field} />;
+  }
+  if (field.type === "select") {
+    const options = (field.options || []).map(optionOf);
+    return (
+      <Form.Item key={field.id} name={field.id} label={field.label} initialValue={options[0]?.value} rules={[{ required: true, message: "Required" }]}>
+        <Select options={options} />
+      </Form.Item>
+    );
   }
   if (field.type === "textarea") {
     return (
@@ -157,10 +168,10 @@ export default function AppsPage() {
   // `app` defaults to the one open in the Configure modal; apps with no
   // settings (Meta Ads, WhatsApp) install straight from their card and
   // pass themselves in — there's no modal, so `configuring` is null then.
-  async function handleInstall(values, app = configuring) {
+  async function install(values, app) {
     try {
       await apiFetch(`/api/apps/${app.key}/install`, { method: "POST", body: { settings: values } });
-      message.success(`${app.name} installed`);
+      message.success(app.installed ? `${app.name} saved` : `${app.name} installed`);
       setConfiguring(null);
       form.resetFields();
       load();
@@ -169,10 +180,22 @@ export default function AppsPage() {
     }
   }
 
+  function handleInstall(values, app = configuring) {
+    if (!app.priceMonthly || app.installed) return install(values, app);
+    confirmDialog({
+      title: `Install ${app.name} for ${inr(app.priceMonthly)}/month?`,
+      description: `${inr(app.priceMonthly)} + GST is added to your next bill for this billing period, and to every billing period the app stays installed. Removing it stops future charges; a period already added is still payable.`,
+      okText: "Install",
+      onConfirm: () => install(values, app),
+    });
+  }
+
   function handleUninstall(app) {
     confirmDialog({
       title: `Remove ${app.name}?`,
-      description: "This stops it from running on your storefront immediately.",
+      description: app.priceMonthly
+        ? `This stops it on your storefront immediately and stops future charges. This billing period's ${inr(app.priceMonthly)} + GST stays on your next bill.`
+        : "This stops it from running on your storefront immediately.",
       okText: "Remove",
       danger: true,
       onConfirm: async () => {
@@ -206,6 +229,11 @@ export default function AppsPage() {
                 {app.premium && (
                   <Tag className="!mr-0 !border-0 !bg-accent-soft !text-accent inline-flex items-center gap-1">
                     <Crown size={11} aria-hidden="true" /> Growth+
+                  </Tag>
+                )}
+                {app.priceMonthly && (
+                  <Tag className="!mr-0" title="Plus GST, billed with your subscription">
+                    {inr(app.priceMonthly)}/mo
                   </Tag>
                 )}
                 {app.installed && (

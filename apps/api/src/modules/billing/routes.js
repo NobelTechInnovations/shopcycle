@@ -6,6 +6,7 @@ const subscriptions = require("./subscriptions");
 const planChange = require("./plan-change");
 const commission = require("./commission");
 const engine = require("./engine");
+const charges = require("./charges");
 const { METHODS } = require("./mandates");
 
 /**
@@ -47,14 +48,18 @@ async function billingRoutes(fastify) {
   // What the admin shell's billing banner needs — cheap, loaded on every page.
   fastify.get("/status", async (request) => {
     const sub = request.subscription;
-    const notice = await prisma.billingNotification.findFirst({
-      where: { storeId: request.store.id, readAt: null, severity: { in: ["warning", "danger"] } },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, type: true, title: true, body: true, severity: true, createdAt: true },
-    });
+    const [notice, mandate] = await Promise.all([
+      prisma.billingNotification.findFirst({
+        where: { storeId: request.store.id, readAt: null, severity: { in: ["warning", "danger"] } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, type: true, title: true, body: true, severity: true, createdAt: true },
+      }),
+      sub ? charges.activeMandate(prisma, sub.id) : null,
+    ]);
     return {
       status: sub?.status || null,
       planName: sub?.plan?.name || null,
+      autopay: Boolean(mandate),
       access: request.access,
       trialEndsAt: sub?.trialEndsAt || null,
       graceEndsAt: sub?.graceEndsAt || null,

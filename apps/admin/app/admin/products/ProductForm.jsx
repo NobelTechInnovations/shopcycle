@@ -7,8 +7,8 @@ import { Plus, Trash2, UploadCloud, Images, Wand2, ExternalLink } from "lucide-r
 import { MediaLibraryModal } from "@/components/MediaLibraryModal";
 import { CustomDataFields, metafieldPayload } from "@/components/CustomDataFields";
 import { PageHeader, StatusBadge, SaveBar } from "@shopcycle/ui";
-import { apiFetch, apiUpload } from "@/lib/api";
-import { IMAGE_ACCEPT } from "@/lib/uploads";
+import { apiFetch } from "@/lib/api";
+import { IMAGE_ACCEPT, uploadImage } from "@/lib/uploads";
 import { storefrontUrlFor, storefrontLabelFor } from "@/lib/storefront";
 
 const STATUS_OPTIONS = [
@@ -145,7 +145,7 @@ export function ProductForm({ product, store }) {
   async function handleImageUpload(file) {
     setUploading(true);
     try {
-      const { file: uploaded } = await apiUpload("/api/files/upload", file);
+      const uploaded = await uploadImage(file);
       setImages((prev) => [...prev, { uid: uploaded.id, url: uploaded.url }]);
       setDirty(true); // images live outside the form's own values
     } catch (err) {
@@ -153,7 +153,7 @@ export function ProductForm({ product, store }) {
     } finally {
       setUploading(false);
     }
-    return false; // stop antd's own XHR upload — we already uploaded via apiUpload
+    return false; // stop antd's own XHR upload — we already uploaded via uploadImage
   }
 
   function removeImage(uid) {

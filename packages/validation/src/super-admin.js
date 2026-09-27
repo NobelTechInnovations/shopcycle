@@ -14,8 +14,9 @@ const updatePlanSchema = createPlanSchema.partial();
 const settingsFieldSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
-  type: z.enum(["text", "textarea", "number"]).default("text"),
+  type: z.enum(["text", "textarea", "number", "select"]).default("text"),
   placeholder: z.string().optional(),
+  options: z.array(z.union([z.string(), z.object({ value: z.string(), label: z.string() })])).optional(),
 });
 
 const createAppSchema = z.object({
@@ -29,6 +30,8 @@ const createAppSchema = z.object({
   category: z.string().max(40).default("other"),
   iconKey: z.enum(APP_ICON_KEYS).default("puzzle"),
   settingsSchema: z.array(settingsFieldSchema).default([]),
+  // Monthly price before GST for a paid app; empty = free.
+  priceMonthly: z.coerce.number().min(0).max(100000).nullable().optional(),
 });
 
 const updateAppSchema = createAppSchema.partial();

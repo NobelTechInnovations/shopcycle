@@ -14,6 +14,7 @@ import {
   Search,
   Puzzle,
   Quote,
+  Smartphone,
 } from "lucide-react";
 import { APP_ICON_KEYS } from "@shopcycle/utils";
 
@@ -37,6 +38,7 @@ const ICON_COMPONENTS = {
   search: Search,
   puzzle: Puzzle,
   quote: Quote,
+  smartphone: Smartphone,
 };
 
 export const APP_ICONS = ICON_COMPONENTS;

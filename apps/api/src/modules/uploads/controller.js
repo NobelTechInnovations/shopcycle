@@ -1,3 +1,4 @@
+const { z } = require("zod");
 const { HttpError } = require("@shopcycle/utils");
 const service = require("./service");
 
@@ -9,6 +10,22 @@ async function uploadHandler(request, reply) {
     filename: data.filename,
     buffer,
   });
+  reply.code(201).send({ file });
+}
+
+async function configHandler() {
+  return service.uploadConfig();
+}
+
+async function signHandler(request) {
+  return service.signUpload(request.store.id);
+}
+
+const completeSchema = z.object({ providerFileId: z.string().min(1).max(300), name: z.string().max(200).optional() });
+
+async function completeHandler(request, reply) {
+  const body = completeSchema.parse(request.body);
+  const file = await service.completeUpload(request.server.prisma, request.store.id, body);
   reply.code(201).send({ file });
 }
 
@@ -24,4 +41,4 @@ async function deleteHandler(request, reply) {
   reply.code(204).send();
 }
 
-module.exports = { uploadHandler, listHandler, deleteHandler };
+module.exports = { uploadHandler, configHandler, signHandler, completeHandler, listHandler, deleteHandler };

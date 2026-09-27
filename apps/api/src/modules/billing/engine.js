@@ -8,6 +8,7 @@ const cycles = require("./cycles");
 const charges = require("./charges");
 const mandates = require("./mandates");
 const commission = require("./commission");
+const appCharges = require("./app-charges");
 const subscriptions = require("./subscriptions");
 
 /**
@@ -197,8 +198,11 @@ async function settleYearlyFees(prisma, store, sub, { now, settings, log }) {
   const to = addInterval(from, "month");
   if (to > now) return false;
   const acc = await commission.accruedTotal(prisma, store.id);
-  const total = tax(Math.max(0, acc.amount), settings.taxRate, store.billingState).total;
-  if (acc.amount <= 0 || total < 1) {
+  const apps = await appCharges.pendingTotal(prisma, store.id, to);
+  const owed = Math.max(0, acc.amount) + apps;
+  const total = tax(owed, settings.taxRate, store.billingState).total;
+  const installedPaid = await prisma.storeApp.count({ where: { storeId: store.id, app: { priceMonthly: { gt: 0 } } } });
+  if ((owed <= 0 || total < 1) && !installedPaid) {
     await prisma.subscription.update({ where: { id: sub.id }, data: { feesSettledThrough: to } });
     return true;
   }

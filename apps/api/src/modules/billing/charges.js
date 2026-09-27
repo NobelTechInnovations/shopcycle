@@ -307,8 +307,10 @@ async function failCycle(prisma, cycleId, reason, { now = new Date(), log, payme
       await tx.billingFailure.create({ data: { storeId: sub.storeId, subscriptionId: sub.id, cycleId, paymentId, failureNumber, reason: String(reason).slice(0, 500), graceEndsAt } });
       return { first: true, sub: updated, cycle };
     }
-    // A retry of an already-failed cycle.
-    const retry = sub.status === "GRACE_PERIOD" && code !== "no_mandate" ? nextRetryAt(sub.lastFailureAt || now, now, settings, sub.graceEndsAt) : null;
+    // A retry of an already-failed cycle. A late webhook can report the failure with a `now`
+    // earlier than the attempt itself; scheduling from that would retry again immediately.
+    const after = cycle.lastAttemptAt && cycle.lastAttemptAt > now ? cycle.lastAttemptAt : now;
+    const retry = sub.status === "GRACE_PERIOD" && code !== "no_mandate" ? nextRetryAt(sub.lastFailureAt || now, after, settings, sub.graceEndsAt) : null;
     const updated = await tx.subscription.update({ where: { id: sub.id }, data: { nextRetryAt: retry } });
     await logEvent(tx, sub, "payment.retry_failed", { data: { cycleId, reason, code, nextRetryAt: retry } });
     return { first: false, sub: updated, cycle };

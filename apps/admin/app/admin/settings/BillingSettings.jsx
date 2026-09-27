@@ -242,6 +242,7 @@ export function BillingSettings() {
             <>
               <Line label={b.next.kind === "intro" ? `${sub.plan?.name} — first month` : `${sub.plan?.name} plan`} value={inr(b.next.planAmount)} />
               <Line label={`Checkout fees so far (${b.next.feeOrders} order${b.next.feeOrders === 1 ? "" : "s"})`} value={inr(b.next.fees)} />
+              {b.next.apps > 0 && <Line label="Apps" value={inr(b.next.apps)} />}
               <Line label={`GST (${b.next.taxRate}%)`} value={inr(b.next.tax)} />
               <Line label={`Total on ${formatDay(b.next.date)}`} value={inr(b.next.total)} strong />
               <p className="text-xs text-ink-muted mt-3 mb-0">
@@ -252,6 +253,7 @@ export function BillingSettings() {
             <>
               <Line label={KIND_LABEL[b.due.kind] || "Subscription"} value={inr(b.due.planAmount)} />
               {b.due.feesAmount !== 0 && <Line label="Checkout fees" value={inr(b.due.feesAmount)} />}
+              {b.due.appsAmount > 0 && <Line label="Apps" value={inr(b.due.appsAmount)} />}
               <Line label={`GST (${b.due.taxRate}%)`} value={inr(b.due.taxAmount)} />
               <Line label="Due now" value={inr(b.due.total)} strong />
             </>

@@ -1,6 +1,9 @@
 const { HttpError } = require("@shopcycle/utils");
 const repository = require("./repository");
 const entitlements = require("../billing/entitlements");
+const subscriptions = require("../billing/subscriptions");
+const appCharges = require("../billing/app-charges");
+const { num } = require("../billing/money");
 
 /** Catalog apps a plan has to include, keyed by App.key → the feature
  * (billing/catalog.js) that unlocks them. Their API modules are gated too
@@ -29,10 +32,11 @@ async function listForStore(prisma, store) {
     settings: installedByAppId[app.id]?.settings || {},
     premium: Boolean(PLAN_APPS[app.key]),
     locked: lockedFor(ent, app.key),
+    priceMonthly: num(app.priceMonthly) > 0 ? num(app.priceMonthly) : null,
   }));
 }
 
-async function installApp(prisma, store, key, settings) {
+async function installApp(prisma, store, key, settings, { role } = {}) {
   const app = await repository.findAppByKey(prisma, key);
   if (!app) throw new HttpError(404, "App not found");
   if (lockedFor(await entitlements.forStore(prisma, store.id), key)) {
@@ -40,8 +44,15 @@ async function installApp(prisma, store, key, settings) {
       code: "plan_upgrade_required",
     });
   }
+  const paid = num(app.priceMonthly) > 0;
+  if (paid && role === "staff") throw new HttpError(403, "Only the store owner or an admin can install paid apps.");
   await repository.upsertInstall(prisma, store.id, app.id, settings);
-  return { ...app, installed: true, settings };
+  let chargedFrom = null;
+  if (paid) {
+    const sub = await subscriptions.forStore(prisma, store);
+    chargedFrom = await appCharges.onInstall(prisma, store, sub, app);
+  }
+  return { ...app, priceMonthly: paid ? num(app.priceMonthly) : null, installed: true, settings, chargedFrom };
 }
 
 async function uninstallApp(prisma, storeId, key) {

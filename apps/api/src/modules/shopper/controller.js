@@ -2,6 +2,8 @@ const { z } = require("zod");
 const { HttpError } = require("@shopcycle/utils");
 const storefrontService = require("../storefront/service");
 const service = require("./service");
+const phone = require("./phone");
+const { exchangeTicket } = require("./google");
 const abandoned = require("../checkout/abandoned");
 const returns = require("../orders/returns");
 const { FULL_INCLUDE } = require("../orders/operations");
@@ -62,6 +64,49 @@ async function requireShopper(request, store) {
   const customer = await service.customerFromToken(request.server, store, request.headers["x-shopper-token"]);
   if (!customer) throw new HttpError(401, "Please sign in again.");
   return customer;
+}
+
+const phoneCodeSchema = z.object({ phone: z.string().trim().min(6, "Enter your mobile number").max(24), channel: z.enum(["sms", "whatsapp"]).optional() });
+const phoneVerifySchema = z.object({ phone: z.string().trim().min(6).max(24), code: z.string().trim().min(4).max(12) });
+const phoneCompleteSchema = z.object({
+  ticket: z.string().min(10).max(4000),
+  name: z.string().trim().max(120).optional(),
+  email: z.string().trim().email("Enter a valid email").max(200),
+  code: z.string().trim().min(4).max(12).optional(),
+});
+
+async function phoneCodeHandler(request, reply) {
+  const store = await storeFor(request);
+  const body = phoneCodeSchema.parse(request.body);
+  const sent = await phone.requestCode(request.server.prisma, store, body, request.log);
+  reply.send({ ok: true, ...sent });
+}
+
+async function phoneVerifyHandler(request, reply) {
+  const store = await storeFor(request);
+  const body = phoneVerifySchema.parse(request.body);
+  await throttle(request.server, `phone-verify:${store.id}:${body.phone.replace(/\D/g, "")}`, { max: 15, windowSeconds: 15 * 60 });
+  const result = await phone.verifyCode(request.server.prisma, store, body);
+  if (result.customer) {
+    return reply.send({ token: service.signSession(request.server, store, result.customer, "phone"), customer: { id: result.customer.id, name: result.customer.name } });
+  }
+  reply.send({ signupTicket: phone.signupTicket(request.server, store, result.phone) });
+}
+
+async function phoneCompleteHandler(request, reply) {
+  const store = await storeFor(request);
+  const body = phoneCompleteSchema.parse(request.body);
+  if (body.code) await throttle(request.server, `otp-verify:${store.id}:${service.normalizeEmail(body.email)}`, { max: 15, windowSeconds: 15 * 60 });
+  const result = await phone.completeSignup(request.server, store, body, request.log);
+  if (result.needsEmailCode) return reply.send({ needsEmailCode: true, email: result.email });
+  reply.send({ token: service.signSession(request.server, store, result.customer, "phone"), customer: { id: result.customer.id, name: result.customer.name } });
+}
+
+async function googleExchangeHandler(request, reply) {
+  const store = await storeFor(request);
+  const { ticket, nonce } = z.object({ ticket: z.string().min(10).max(4000), nonce: z.string().min(16).max(200) }).parse(request.body);
+  const { token, customer } = await exchangeTicket(request.server, store, ticket, nonce);
+  reply.send({ token, customer: { id: customer.id, name: customer.name } });
 }
 
 async function requestCodeHandler(request, reply) {
@@ -185,4 +230,8 @@ module.exports = {
   invoiceHandler,
   contactHandler,
   recoverHandler,
+  phoneCodeHandler,
+  phoneVerifyHandler,
+  phoneCompleteHandler,
+  googleExchangeHandler,
 };

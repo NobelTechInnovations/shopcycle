@@ -109,6 +109,79 @@ const envSchema = z.object({
   // "<Store name> <this address>" with Reply-To set to the store's own
   // support email, so shoppers' replies reach the merchant.
   EMAIL_FROM: z.string().default("Oyklane <no-reply@oyklane.com>"),
+  // Which service sends email (lib/mailer.js). Unset: "smtp" when SMTP_HOST
+  // is set, otherwise "log". ZeptoMail and Brevo can also be used over SMTP
+  // (Zoho Mail is SMTP only: smtp.zoho.in, port 465, SMTP_SECURE=true); their
+  // HTTP APIs avoid hosts that block outbound SMTP ports.
+  EMAIL_PROVIDER: z.enum(["smtp", "zeptomail", "brevo", "log"]).optional(),
+  // ZeptoMail (Zoho CPaaS) "Send Mail Token", without the Zoho-enczapikey prefix.
+  ZEPTOMAIL_TOKEN: z.string().optional(),
+  ZEPTOMAIL_API_URL: z.string().default("https://api.zeptomail.in/v1.1/email"),
+  BREVO_API_KEY: z.string().optional(),
+  BREVO_API_URL: z.string().default("https://api.brevo.com/v3/smtp/email"),
+
+  // Where uploaded images are stored (modules/uploads). Unset: ImageKit when
+  // its keys are set, else Cloudinary when its keys are set, else the
+  // database. With ImageKit/Cloudinary the browser uploads straight to the
+  // provider with a signature from the API; the file never passes through it.
+  MEDIA_STORAGE: z.enum(["imagekit", "cloudinary", "database"]).optional(),
+  IMAGEKIT_PUBLIC_KEY: z.string().optional(),
+  IMAGEKIT_PRIVATE_KEY: z.string().optional(),
+  // e.g. https://ik.imagekit.io/oyklane
+  IMAGEKIT_URL_ENDPOINT: z.string().optional(),
+  IMAGEKIT_FOLDER: z.string().default("/stores"),
+  IMAGEKIT_UPLOAD_URL: z.string().default("https://upload.imagekit.io/api/v1/files/upload"),
+  IMAGEKIT_API_URL: z.string().default("https://api.imagekit.io/v1"),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  CLOUDINARY_FOLDER: z.string().default("stores"),
+  CLOUDINARY_API_URL: z.string().default("https://api.cloudinary.com/v1_1"),
+
+  // One-time codes by SMS / WhatsApp (lib/messaging). Unset providers keep
+  // every message in the message log instead of sending (development).
+  SMS_PROVIDER: z.enum(["twilio", "msg91", "log"]).optional(),
+  WHATSAPP_PROVIDER: z.enum(["twilio", "meta", "log"]).optional(),
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  // SMS sender: a Messaging Service SID (preferred) or a Twilio number.
+  TWILIO_MESSAGING_SERVICE_SID: z.string().optional(),
+  TWILIO_SMS_FROM: z.string().optional(),
+  // e.g. +14155238886 (the "whatsapp:" prefix is added automatically).
+  TWILIO_WHATSAPP_FROM: z.string().optional(),
+  // Approved WhatsApp content template with the code as variable {{1}} —
+  // required to message someone outside a 24-hour conversation window.
+  TWILIO_WHATSAPP_CONTENT_SID: z.string().optional(),
+  TWILIO_API_URL: z.string().default("https://api.twilio.com/2010-04-01"),
+  MSG91_AUTH_KEY: z.string().optional(),
+  // DLT-approved flow/template id, and the variable name the code fills in it.
+  MSG91_OTP_TEMPLATE_ID: z.string().optional(),
+  MSG91_OTP_VAR: z.string().default("otp"),
+  MSG91_API_URL: z.string().default("https://control.msg91.com/api/v5"),
+  // WhatsApp Cloud API (Meta): a system-user token and the sending number's
+  // phone_number_id, plus an approved "authentication" template.
+  META_WHATSAPP_TOKEN: z.string().optional(),
+  META_WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  META_WHATSAPP_OTP_TEMPLATE: z.string().optional(),
+  META_WHATSAPP_OTP_LANGUAGE: z.string().default("en"),
+  // Authentication templates with a "Copy code" button need the code there too.
+  META_WHATSAPP_OTP_BUTTON: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
+  META_GRAPH_API_URL: z.string().default("https://graph.facebook.com"),
+  // Phone sign-in guards against SMS-pumping fraud: codes only go to these
+  // country codes (comma-separated), and at most this many per store a day.
+  PHONE_LOGIN_COUNTRIES: z.string().default("91"),
+  PHONE_LOGIN_DAILY_LIMIT: z.coerce.number().int().min(1).default(500),
+
+  // "Continue with Google" for sellers and shoppers. Register
+  // <API_PUBLIC_URL>/api/auth/google/callback and
+  // <API_PUBLIC_URL>/api/shopper/google/callback as redirect URIs.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_OAUTH_URL: z.string().default("https://accounts.google.com/o/oauth2/v2/auth"),
+  GOOGLE_TOKEN_URL: z.string().default("https://oauth2.googleapis.com/token"),
 
   // Background jobs (jobs.js): abandoned-checkout reminders. A shopper who
   // reached checkout and left their email gets one reminder this many

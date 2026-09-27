@@ -18,6 +18,16 @@ export const RETURN_COOKIE = "sc_login_return";
 export const PREFILL_COOKIE = "sc_login_prefill";
 // Where a shopper may be sent back to after signing in.
 export const RETURN_TARGETS = { checkout: "/checkout", cart: "/cart" };
+// Phone sign-in (Phone Login app): the number and channel between steps,
+// the "number verified" ticket while sign-up is finished, and the email
+// being confirmed when that number joins an existing account.
+export const LOGIN_PHONE_COOKIE = "sc_login_phone";
+export const PHONE_CHANNEL_COOKIE = "sc_login_channel";
+export const PHONE_TICKET_COOKIE = "sc_phone_ticket";
+export const PHONE_PROFILE_COOKIE = "sc_phone_profile";
+// "Continue with Google": a nonce only this browser holds, so the sign-in
+// Google hands back is only accepted here.
+export const GOOGLE_NONCE_COOKIE = "sc_google_nonce";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 
 function cookiePath(request, handle) {

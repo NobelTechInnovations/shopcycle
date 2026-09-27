@@ -25,6 +25,8 @@ const { startRazorpayMock } = require("./razorpay-mock");
 
 const ROOT = path.resolve(__dirname, "../../..");
 require(path.join(ROOT, "apps/api/node_modules/dotenv")).config({ path: path.join(ROOT, ".env") });
+// Tests never send real email/SMS or upload to a media CDN (this process and the API it starts).
+Object.assign(process.env, { SMTP_HOST: "", EMAIL_PROVIDER: "log", SMS_PROVIDER: "log", WHATSAPP_PROVIDER: "log", MEDIA_STORAGE: "database" });
 
 const MOCK_PORT = 4299;
 const API_PORT = 4199;
@@ -508,7 +510,7 @@ async function main() {
     check("no duplicate subscription", (await prisma.subscription.count({ where: { storeId: store.id } })) === 1);
 
     // ── A second store by the same owner bills separately ─────────────
-    r = await owner("POST", "/api/auth/stores", { name: `Billing E2E Two ${stamp}` });
+    r = await owner("POST", "/api/auth/stores", { storeName: `Billing E2E Two ${stamp}` });
     check("second store created", r.status === 201, r.data);
     const store2 = r.data.store;
     storeIds.push(store2.id);

@@ -35,6 +35,30 @@ const ONE_CLICK = {
   settingsSchema: [],
 };
 
+// A paid app: the price is billed for every billing period it's installed
+// in (billing/app-charges.js). Created once; the super admin edits the price.
+const PHONE_LOGIN = {
+  key: "phone-login",
+  name: "Phone Login",
+  description:
+    "Shoppers sign in with their mobile number and a one-time code by SMS or WhatsApp — no password or email needed. ₹299/month (+GST), added to your next bill.",
+  category: "customers",
+  iconKey: "smartphone",
+  priceMonthly: 299,
+  settingsSchema: [
+    {
+      id: "channel",
+      label: "Send sign-in codes by",
+      type: "select",
+      options: [
+        { value: "sms", label: "SMS" },
+        { value: "whatsapp", label: "WhatsApp" },
+        { value: "both", label: "SMS or WhatsApp (shopper chooses)" },
+      ],
+    },
+  ],
+};
+
 async function seedCatalog(prisma, { log } = {}) {
   const have = new Set((await prisma.feature.findMany({ select: { key: true } })).map((f) => f.key));
   const missing = FEATURES.filter((f) => !have.has(f.key));
@@ -81,6 +105,7 @@ async function seedCatalog(prisma, { log } = {}) {
 
   await prisma.platformSetting.upsert({ where: { key: "billing" }, update: {}, create: { key: "billing", value: DEFAULTS } });
   await prisma.app.upsert({ where: { key: ONE_CLICK.key }, update: {}, create: ONE_CLICK });
+  await prisma.app.upsert({ where: { key: PHONE_LOGIN.key }, update: {}, create: PHONE_LOGIN });
 }
 
 /** A trial for every store that has no subscription yet. A store already
@@ -111,4 +136,4 @@ async function bootstrap(prisma, { log } = {}) {
   await migrateStores(prisma, { log });
 }
 
-module.exports = { bootstrap, seedCatalog, migrateStores, ONE_CLICK };
+module.exports = { bootstrap, seedCatalog, migrateStores, ONE_CLICK, PHONE_LOGIN };

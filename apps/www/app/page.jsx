@@ -30,7 +30,7 @@ const FAQ = [
   ["Do I need to know how to code?", "No. Pick a theme, change its colours, fonts, photos and sections in the editor, and arrange your product page by dragging blocks. The code editor is there if you ever want it."],
   ["How do I get paid?", "Straight into your own account. Connect Razorpay, Cashfree, PayU, Stripe or PayPal (test mode first, if you like) and turn cash on delivery on or off. Oyklane never holds your money."],
   ["Can I use my own domain?", "Yes. Every store gets a free yourname.oyklane.com address. Point your own domain at it from Settings ▸ Domains — SSL is set up for you automatically."],
-  ["What does it cost?", "Starter is ₹999 a month and Premium ₹2,299, each with a small fee per paid order (2.5% on Starter, 1.5% on Premium). Your first month is free once you choose a plan."],
+  ["What does it cost?", "Starter is ₹199 a month, Growth ₹599 and Pro ₹1,299 (plus 18% GST), with a small fee per paid order: 2%, 1.5% or 0.5%. Every store starts with a 3-day free trial, then ₹99 for the first month. Pay yearly and save 20%."],
   ["Can I move my reviews and products over?", "Yes — import products from a CSV, and import your existing product reviews from a CSV matched by product. Customers' stars show up straight away."],
   ["Is it built for Indian sellers?", "From the ground up: rupee pricing, cash on delivery, UPI and Indian gateways, GST invoices with HSN codes and GSTIN, Indian states at checkout and PIN-code addresses."],
 ];
@@ -81,7 +81,7 @@ export default function HomePage() {
                 </a>
               </div>
               <p className="hero__trust">
-                <span><Icon d={I.check} /> First month free</span>
+                <span><Icon d={I.check} /> 3-day free trial</span>
                 <span><Icon d={I.check} /> Cash on delivery built in</span>
                 <span><Icon d={I.check} /> Your own domain, free SSL</span>
               </p>
@@ -180,7 +180,7 @@ export default function HomePage() {
               <article className="card">
                 <span className="card__icon"><Icon d={I.receipt} /></span>
                 <h3 className="h3">GST-ready</h3>
-                <p className="muted">Tax invoices with HSN codes, CGST/SGST or IGST worked out, and your buyer&rsquo;s GSTIN when they add one (Premium).</p>
+                <p className="muted">Tax invoices with HSN codes, CGST/SGST or IGST worked out, and your buyer&rsquo;s GSTIN when they add one (Growth and Pro).</p>
               </article>
 
               <article className="card">
@@ -305,47 +305,64 @@ export default function HomePage() {
           <div className="wrap">
             <div className="head head--center">
               <span className="kicker">Pricing</span>
-              <h2 className="h2">Simple plans. Your first month free.</h2>
-              <p className="lead">No setup fees and nothing to install. Change plans whenever you like.</p>
+              <h2 className="h2">Simple plans. Try free for 3 days.</h2>
+              <p className="lead">Then ₹99 for your first month on any plan. No setup fees, no product limits, and you can change plans whenever you like.</p>
             </div>
             <div className="plans">
               <div className="plan">
                 <div>
                   <h3 className="h3">Starter</h3>
-                  <p className="muted">Everything to launch and grow.</p>
+                  <p className="muted">Everything to open your store.</p>
                 </div>
-                <p className="plan__price"><strong>₹999</strong><span className="muted">/month</span></p>
+                <p className="plan__price"><strong>₹199</strong><span className="muted">/month</span></p>
                 <ul>
-                  <li><Icon d={I.check} /> Up to 1,000 products</li>
-                  <li><Icon d={I.check} /> All themes and the no-code editor</li>
+                  <li><Icon d={I.check} /> Unlimited products</li>
+                  <li><Icon d={I.check} /> All themes and the visual editor</li>
                   <li><Icon d={I.check} /> 5 payment gateways and cash on delivery</li>
-                  <li><Icon d={I.check} /> Reviews, discounts, gift cards and blog</li>
+                  <li><Icon d={I.check} /> Reviews, discount codes and blog</li>
                   <li><Icon d={I.check} /> Your own domain with free SSL</li>
-                  <li><Icon d={I.check} /> 5 staff accounts</li>
-                  <li><Icon d={I.check} /> 2.5% fee per paid order</li>
+                  <li><Icon d={I.check} /> 2 staff accounts</li>
+                  <li><Icon d={I.check} /> 2% fee per paid order</li>
                 </ul>
                 <a href={`${APP_URL}/register`} className="btn btn--ghost">Start with Starter</a>
               </div>
               <div className="plan plan--featured">
-                <span className="plan__badge">Most complete</span>
+                <span className="plan__badge">Most popular</span>
                 <div>
-                  <h3 className="h3">Premium</h3>
-                  <p className="muted">For brands scaling up.</p>
+                  <h3 className="h3">Growth</h3>
+                  <p className="muted">Marketing, reports and GST invoices for a growing brand.</p>
                 </div>
-                <p className="plan__price"><strong>₹2,299</strong><span className="muted">/month</span></p>
+                <p className="plan__price"><strong>₹599</strong><span className="muted">/month</span></p>
                 <ul>
                   <li><Icon d={I.check} /> Everything in Starter</li>
-                  <li><Icon d={I.check} /> Up to 1,00,000 products</li>
                   <li><Icon d={I.check} /> GST tax invoices to your customers</li>
                   <li><Icon d={I.check} /> Meta Ads and WhatsApp built in</li>
-                  <li><Icon d={I.check} /> CSV exports</li>
-                  <li><Icon d={I.check} /> 25 staff accounts, priority support</li>
+                  <li><Icon d={I.check} /> Advanced reports and CSV exports</li>
+                  <li><Icon d={I.check} /> Gift cards, segments and automations</li>
+                  <li><Icon d={I.check} /> Theme code editor</li>
+                  <li><Icon d={I.check} /> 10 staff accounts</li>
                   <li><Icon d={I.check} /> 1.5% fee per paid order</li>
                 </ul>
-                <a href={`${APP_URL}/register`} className="btn btn--primary">Start with Premium</a>
+                <a href={`${APP_URL}/register`} className="btn btn--primary">Start with Growth</a>
+              </div>
+              <div className="plan">
+                <div>
+                  <h3 className="h3">Pro</h3>
+                  <p className="muted">The lowest fees, API access and priority support.</p>
+                </div>
+                <p className="plan__price"><strong>₹1,299</strong><span className="muted">/month</span></p>
+                <ul>
+                  <li><Icon d={I.check} /> Everything in Growth</li>
+                  <li><Icon d={I.check} /> API keys and webhooks</li>
+                  <li><Icon d={I.check} /> Advanced automation and integrations</li>
+                  <li><Icon d={I.check} /> Priority support</li>
+                  <li><Icon d={I.check} /> 30 staff accounts</li>
+                  <li><Icon d={I.check} /> 0.5% fee per paid order</li>
+                </ul>
+                <a href={`${APP_URL}/register`} className="btn btn--ghost">Start with Pro</a>
               </div>
             </div>
-            <p className="plans__note">Prices include GST. Your first month is free once you choose a plan.</p>
+            <p className="plans__note">Prices exclude 18% GST. Pay yearly and save 20%. The One-Click Checkout app adds 0.3% to the per-order fee.</p>
           </div>
         </section>
 

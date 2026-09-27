@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { Upload, Button, App } from "antd";
 import { Upload as UploadIcon, X, Images } from "lucide-react";
-import { apiUpload } from "@/lib/api";
-import { IMAGE_ACCEPT } from "@/lib/uploads";
+import { IMAGE_ACCEPT, uploadImage } from "@/lib/uploads";
 import { MediaLibraryModal } from "./MediaLibraryModal";
 
 /** An image picked by uploading it to the Files library — for antd Form
@@ -19,7 +18,7 @@ export function ImageUploadField({ value, onChange, aspect = "16 / 9", label = "
   async function handleUpload(file) {
     setUploading(true);
     try {
-      const { file: uploaded } = await apiUpload("/api/files/upload", file);
+      const uploaded = await uploadImage(file);
       onChange?.(uploaded.url);
     } catch (err) {
       message.error(err.message);

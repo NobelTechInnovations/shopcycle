@@ -14,7 +14,6 @@ const { env } = require("../config/env");
 
 let transport = null;
 function getTransport() {
-  if (!env.SMTP_HOST) return null;
   if (!transport) {
     transport = nodemailer.createTransport({
       host: env.SMTP_HOST,
@@ -26,9 +25,75 @@ function getTransport() {
   return transport;
 }
 
-function emailConfigured() {
-  return Boolean(env.SMTP_HOST);
+/** "smtp" | "zeptomail" | "brevo" | "log" — see EMAIL_PROVIDER in env.js. */
+function emailProvider() {
+  const p = env.EMAIL_PROVIDER || (env.SMTP_HOST ? "smtp" : "log");
+  if (p === "smtp" && !env.SMTP_HOST) return "log";
+  if (p === "zeptomail" && !env.ZEPTOMAIL_TOKEN) return "log";
+  if (p === "brevo" && !env.BREVO_API_KEY) return "log";
+  return p;
 }
+
+function emailConfigured() {
+  return emailProvider() !== "log";
+}
+
+async function postJson(url, headers, body) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json", ...headers },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = JSON.parse(text);
+  } catch {}
+  if (!res.ok) {
+    const detail = data?.error?.details?.[0]?.message || data?.error?.message || data?.message || text.slice(0, 200);
+    throw new Error(`${res.status}: ${detail}`);
+  }
+  return data || {};
+}
+
+/** Sends one message; returns the provider's message id. */
+const PROVIDERS = {
+  async smtp({ sender, to, replyTo, subject, html, text }) {
+    const info = await getTransport().sendMail({ from: sender, to, replyTo: replyTo || undefined, subject, html, text });
+    return info.messageId || null;
+  },
+  async zeptomail({ sender, to, replyTo, subject, html, text }) {
+    const data = await postJson(
+      env.ZEPTOMAIL_API_URL,
+      { authorization: `Zoho-enczapikey ${env.ZEPTOMAIL_TOKEN.replace(/^Zoho-enczapikey\s+/i, "")}` },
+      {
+        from: { address: sender.address, name: sender.name },
+        to: [{ email_address: { address: to } }],
+        ...(replyTo && { reply_to: [{ address: replyTo }] }),
+        subject,
+        htmlbody: html,
+        textbody: text,
+      }
+    );
+    return data.request_id || data.data?.[0]?.message_id || null;
+  },
+  async brevo({ sender, to, replyTo, subject, html, text }) {
+    const data = await postJson(
+      env.BREVO_API_URL,
+      { "api-key": env.BREVO_API_KEY },
+      {
+        sender: { email: sender.address, name: sender.name },
+        to: [{ email: to }],
+        ...(replyTo && { replyTo: { email: replyTo } }),
+        subject,
+        htmlContent: html,
+        textContent: text,
+      }
+    );
+    return data.messageId || null;
+  },
+};
 
 /** "Oyklane <no-reply@oyklane.com>" → { name, address } */
 function parseFrom(from) {
@@ -73,28 +138,20 @@ function htmlToText(html) {
 async function sendEmail(prisma, { to, subject, html, template, storeId = null, fromName, replyTo, refType, refId, logSubject, log }) {
   const from = parseFrom(env.EMAIL_FROM);
   const sender = { name: fromName || from.name, address: from.address };
-  const smtp = getTransport();
+  const provider = emailProvider();
 
   let status = "logged";
   let providerMessageId = null;
   let error = null;
 
-  if (smtp) {
+  if (provider !== "log") {
     try {
-      const info = await smtp.sendMail({
-        from: sender,
-        to,
-        replyTo: replyTo || undefined,
-        subject,
-        html,
-        text: htmlToText(html),
-      });
+      providerMessageId = await PROVIDERS[provider]({ sender, to, replyTo, subject, html, text: htmlToText(html) });
       status = "sent";
-      providerMessageId = info.messageId || null;
     } catch (err) {
       status = "failed";
       error = err.message || String(err);
-      log?.warn({ err, template, to }, "mailer: send failed");
+      log?.warn({ err, template, to, provider }, "mailer: send failed");
     }
   }
 
@@ -109,7 +166,7 @@ async function sendEmail(prisma, { to, subject, html, template, storeId = null, 
         refType: refType || null,
         refId: refId || null,
         status,
-        provider: smtp ? "smtp" : "log",
+        provider,
         providerMessageId,
         error,
         html: status === "logged" ? html : null,
@@ -123,4 +180,4 @@ async function sendEmail(prisma, { to, subject, html, template, storeId = null, 
   return { status, id, ...(error && { error }) };
 }
 
-module.exports = { sendEmail, emailConfigured, htmlToText, parseFrom };
+module.exports = { sendEmail, emailConfigured, emailProvider, htmlToText, parseFrom };

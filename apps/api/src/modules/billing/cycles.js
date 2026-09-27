@@ -2,6 +2,7 @@ const { round2, num, tax } = require("./money");
 const { getSettings } = require("./settings");
 const { regularPrice, addInterval } = require("./pricing");
 const commission = require("./commission");
+const appCharges = require("./app-charges");
 
 /**
  * A billing cycle is one amount the engine collects: the ₹99 first month,
@@ -12,7 +13,7 @@ const commission = require("./commission");
  */
 const OPEN = ["due", "processing", "failed"];
 
-async function createCycle(prisma, { store, sub, kind, planId, interval, periodStart, periodEnd, dueAt, planAmount, credit = 0, includeFees = false, key, meta = {} }) {
+async function createCycle(prisma, { store, sub, kind, planId, interval, periodStart, periodEnd, dueAt, planAmount, credit = 0, includeFees = false, appsBoundary = null, key, meta = {} }) {
   const existing = await prisma.billingCycle.findUnique({ where: { idempotencyKey: key } });
   if (existing) return existing;
   const settings = await getSettings(prisma);
@@ -39,9 +40,10 @@ async function createCycle(prisma, { store, sub, kind, planId, interval, periodS
         },
       });
       const fees = includeFees ? (await commission.collect(tx, store.id, draft.id)).amount : 0;
-      const subtotal = round2(Math.max(0, num(planAmount) - num(credit) + fees));
+      const apps = appsBoundary ? (await appCharges.collect(tx, store, sub, draft.id, appsBoundary)).amount : 0;
+      const subtotal = round2(Math.max(0, num(planAmount) - num(credit) + fees + apps));
       const t = tax(subtotal, settings.taxRate, store.billingState);
-      return tx.billingCycle.update({ where: { id: draft.id }, data: { feesAmount: fees, subtotal, taxAmount: t.amount, total: t.total } });
+      return tx.billingCycle.update({ where: { id: draft.id }, data: { feesAmount: fees, appsAmount: apps, subtotal, taxAmount: t.amount, total: t.total } });
     });
   } catch (err) {
     if (err.code === "P2002") return prisma.billingCycle.findUnique({ where: { idempotencyKey: key } });
@@ -64,6 +66,7 @@ async function firstCycle(prisma, store, sub, plan, start) {
       periodEnd: addInterval(start, "month"),
       planAmount: settings.introPrice,
       includeFees: true,
+      appsBoundary: start,
       key: `intro:${sub.id}`,
       meta: { introPrice: settings.introPrice },
     });
@@ -86,6 +89,7 @@ async function regularCycle(prisma, store, sub, plan, start, { interval } = {}) 
     periodEnd: addInterval(start, iv),
     planAmount: regularPrice(sub, plan, iv, settings),
     includeFees: true,
+    appsBoundary: start,
     key: `regular:${sub.id}:${new Date(start).toISOString()}`,
     meta: promo ? { promo: true, promoNote: sub.promoNote || null } : {},
   });
@@ -114,11 +118,12 @@ async function reactivationCycle(prisma, store, sub, plan, interval, now = new D
     periodEnd: addInterval(now, interval),
     planAmount: regularPrice(sub, plan, interval, settings),
     includeFees: true,
+    appsBoundary: now,
     key: `reactivation:${sub.id}:${now.getTime()}`,
   });
 }
 
-/** Checkout fees for a yearly plan, settled every month. */
+/** Checkout fees (and paid apps) for a yearly plan, settled every month. */
 async function feesCycle(prisma, store, sub, from, to) {
   return createCycle(prisma, {
     store,
@@ -128,6 +133,7 @@ async function feesCycle(prisma, store, sub, from, to) {
     periodEnd: to,
     planAmount: 0,
     includeFees: true,
+    appsBoundary: to,
     key: `fees:${sub.id}:${new Date(from).toISOString()}`,
   });
 }
@@ -153,7 +159,10 @@ async function prorationCycle(prisma, store, sub, { toPlan, toInterval, charge, 
 async function voidCycle(prisma, cycleId, reason) {
   await prisma.$transaction(async (tx) => {
     const r = await tx.billingCycle.updateMany({ where: { id: cycleId, status: { in: ["due", "failed"] } }, data: { status: "void", failureReason: reason } });
-    if (r.count) await commission.settle(tx, cycleId, "released");
+    if (r.count) {
+      await commission.settle(tx, cycleId, "released");
+      await appCharges.release(tx, await tx.billingCycle.findUnique({ where: { id: cycleId } }));
+    }
   });
 }
 
@@ -181,9 +190,10 @@ async function estimateNext(prisma, store, sub, plan, { settings } = {}) {
     return null;
   }
   const feeAmount = Math.max(0, fees.amount);
-  const subtotal = round2(planAmount + feeAmount);
+  const apps = await appCharges.pendingTotal(prisma, store.id, date);
+  const subtotal = round2(planAmount + feeAmount + apps);
   const t = tax(subtotal, s.taxRate, store.billingState);
-  return { date, kind, planAmount: round2(planAmount), fees: feeAmount, feeOrders: fees.count, subtotal, taxRate: Number(s.taxRate), tax: t.amount, total: t.total };
+  return { date, kind, planAmount: round2(planAmount), fees: feeAmount, feeOrders: fees.count, apps, subtotal, taxRate: Number(s.taxRate), tax: t.amount, total: t.total };
 }
 
 function serializeCycle(c) {
@@ -198,6 +208,7 @@ function serializeCycle(c) {
     dueAt: c.dueAt,
     planAmount: num(c.planAmount),
     feesAmount: num(c.feesAmount),
+    appsAmount: num(c.appsAmount),
     creditAmount: num(c.creditAmount),
     subtotal: num(c.subtotal),
     taxRate: num(c.taxRate),

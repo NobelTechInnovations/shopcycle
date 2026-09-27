@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal, Input, Upload, Button, Empty, Skeleton, App } from "antd";
 import { Search, UploadCloud, Check } from "lucide-react";
-import { apiFetch, apiUpload } from "@/lib/api";
-import { IMAGE_ACCEPT } from "@/lib/uploads";
+import { apiFetch } from "@/lib/api";
+import { IMAGE_ACCEPT, uploadImage } from "@/lib/uploads";
 
 /** Pick images already in Content ▸ Files (or upload new ones right here),
  * so one upload can be reused anywhere: theme sections, products, blog
@@ -38,7 +38,7 @@ export function MediaLibraryModal({ open, onClose, onSelect, multiple = false, m
   async function upload(file) {
     setUploading((n) => n + 1);
     try {
-      const { file: up } = await apiUpload("/api/files/upload", file);
+      const up = await uploadImage(file);
       setFiles((list) => [up, ...(list || [])]);
       toggle(up.url);
     } catch (err) {

@@ -5,6 +5,7 @@ const { sendEmail } = require("../../lib/mailer");
 const { safeEqual } = require("../../lib/crypto");
 const templates = require("../../emails/templates");
 const customersRepository = require("../customers/repository");
+const { toE164 } = require("../../lib/phone");
 
 /**
  * Shopper accounts, for one store only. Two ways in:
@@ -212,9 +213,13 @@ async function customerFromToken(fastify, store, token) {
 }
 
 async function updateProfile(prisma, store, customer, input) {
+  const phone = input.phone || null;
+  const samePhone = toE164(phone) && toE164(phone) === toE164(customer.phone);
   return customersRepository.update(prisma, customer.id, {
     name: input.name,
-    phone: input.phone || null,
+    phone: samePhone ? customer.phone : phone,
+    // A changed number isn't verified until it's used to sign in by code.
+    ...(!samePhone && customer.phoneVerifiedAt && { phoneVerifiedAt: null }),
     address1: input.address1 || null,
     address2: input.address2 || null,
     city: input.city || null,
@@ -241,4 +246,6 @@ module.exports = {
   updateProfile,
   signOutEverywhere,
   normalizeEmail,
+  claimable,
+  SESSION_TTL,
 };

@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, Upload, App, Skeleton } from "antd";
 import { UploadCloud, Trash2, Link2, ImagePlus } from "lucide-react";
 import { PageHeader, useConfirmDialog } from "@shopcycle/ui";
-import { apiFetch, apiUpload } from "@/lib/api";
-import { IMAGE_ACCEPT } from "@/lib/uploads";
+import { apiFetch } from "@/lib/api";
+import { IMAGE_ACCEPT, uploadImage } from "@/lib/uploads";
 
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -37,7 +37,7 @@ export default function ContentFilesPage() {
   async function handleUpload(file) {
     setUploading((n) => n + 1);
     try {
-      await apiUpload("/api/files/upload", file);
+      await uploadImage(file);
       await load();
     } catch (err) {
       message.error(`${file.name}: ${err.message}`);

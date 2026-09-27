@@ -1,15 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Form, Input, Button, Alert } from "antd";
 import { AuthShell } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+import { GoogleSignIn } from "@/components/GoogleSignIn";
 
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Back from a Google sign-in that didn't work out (?error=…).
+  useEffect(() => {
+    const message = new URLSearchParams(window.location.search).get("error");
+    if (message) {
+      setError(message.slice(0, 200));
+      window.history.replaceState(null, "", "/login");
+    }
+  }, []);
 
   async function onFinish(values) {
     setError(null);
@@ -62,6 +72,7 @@ export default function LoginPage() {
           Sign in
         </Button>
       </Form>
+      <GoogleSignIn />
     </AuthShell>
   );
 }

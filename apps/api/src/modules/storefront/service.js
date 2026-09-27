@@ -30,6 +30,8 @@ const blogService = require("../blog/service");
 const platform = require("./platform");
 const { trackingTags } = require("./tracking");
 const { buildSeo, seoTags } = require("./seo");
+const shopperPhone = require("../shopper/phone");
+const googleOAuth = require("../../lib/google-oauth");
 
 const CHECKOUT_COUNTRIES = [
   { code: "IN", name: "India" },
@@ -487,6 +489,7 @@ async function renderPage(
     loginStep,
     loginMode,
     loginEmail,
+    loginPhone,
     formError,
     notice,
     localAssets = false,
@@ -661,11 +664,18 @@ async function renderPage(
     withItemPhotos(globalContext, [globalContext.order]);
   }
   if (templateName === "account-login") {
+    const phoneLogin = await shopperPhone.config(prisma, store);
+    const PHONE_STEPS = ["phone", "phone-code", "phone-profile", "phone-email-code"];
+    const mode = ["register", "code"].includes(loginMode) ? loginMode : loginMode === "phone" && phoneLogin.enabled ? "phone" : "password";
     globalContext.login = {
-      step: loginStep === "code" ? "code" : "email",
-      mode: ["register", "code"].includes(loginMode) ? loginMode : "password",
+      step: mode === "phone" ? (PHONE_STEPS.includes(loginStep) ? loginStep : "phone") : loginStep === "code" ? "code" : "email",
+      mode,
       email: safe(loginEmail) || "",
+      phone: safe(loginPhone) || "",
       return_to: returnTo || null,
+      phone_enabled: phoneLogin.enabled,
+      phone_channels: phoneLogin.channels,
+      google_enabled: googleOAuth.configured(),
     };
   }
   if (templateName === "account") globalContext.indian_states = INDIAN_STATES.map((s) => s.name);

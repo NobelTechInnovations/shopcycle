@@ -43,6 +43,8 @@ model User {
   /// sign-up. Not required to use the admin — the dashboard just keeps
   /// asking until it's done, since password reset relies on the address.
   emailVerifiedAt DateTime?
+  /// Google account id ("sub") once the user has signed in with Google.
+  googleSub       String?    @unique
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -122,6 +124,74 @@ model ShopperOtp {
 
   @@index([storeId, email, createdAt])
   @@map("shopper_otps")
+}
+
+/// A one-time code sent by SMS or WhatsApp for phone sign-in (the paid
+/// "Phone Login" app). Only a hash of the code is kept; `phone` is E.164
+/// digits without "+".
+model ShopperPhoneOtp {
+  id         String    @id @default(cuid())
+  storeId    String
+  phone      String
+  channel    String
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, phone, createdAt])
+  @@map("shopper_phone_otps")
+}
+
+/// One paid app for one billing period. Created when the app is installed
+/// (for the current period) and at every new period while it stays
+/// installed; collected with the next billing cycle. Uninstalling never
+/// removes a charge already created — the period is owed.
+model AppCharge {
+  id             String   @id @default(cuid())
+  storeId        String
+  subscriptionId String
+  appId          String
+  appKey         String
+  appName        String
+  amount         Decimal  @db.Decimal(10, 2)
+  periodStart    DateTime
+  /// pending → billed (cycleId set) → back to pending if that cycle is voided.
+  status         String   @default("pending")
+  cycleId        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, appId, periodStart])
+  @@index([storeId, status])
+  @@index([cycleId])
+  @@map("app_charges")
+}
+
+/// Every SMS / WhatsApp message the platform sends (lib/messaging.js),
+/// like EmailLog. `body` is only kept when nothing was sent (no provider
+/// configured) — never for real sends, since it holds one-time codes.
+model MessageLog {
+  id                String   @id @default(cuid())
+  storeId           String?
+  channel           String
+  to                String
+  template          String
+  provider          String
+  status            String
+  providerMessageId String?
+  error             String?
+  body              String?
+  createdAt         DateTime @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([to, createdAt])
+  @@map("message_logs")
 }
 
 // ─────────────────────────────────────────────
@@ -400,6 +470,8 @@ model Store {
   whatsappMessages     WhatsappMessage[]
   emailLogs            EmailLog[]
   shopperOtps          ShopperOtp[]
+  shopperPhoneOtps     ShopperPhoneOtp[]
+  appCharges           AppCharge[]
   inventoryAdjustments InventoryAdjustment[]
   articles             Article[]
   giftCards            GiftCard[]
@@ -787,6 +859,10 @@ model Customer {
   /// no password. tokenVersion works like User.tokenVersion: bumping it
   /// signs the shopper out on every device.
   emailVerifiedAt DateTime?
+  /// Set when the shopper proved they own `phone` with a one-time code.
+  /// Phone sign-in only ever matches customers with a verified phone —
+  /// a number typed at checkout proves nothing.
+  phoneVerifiedAt DateTime?
   lastSignInAt    DateTime?
   tokenVersion    Int       @default(0)
 
@@ -808,6 +884,7 @@ model Customer {
 
   @@unique([storeId, email])
   @@index([storeId])
+  @@index([storeId, phone])
   @@index([platformCustomerId])
   @@map("customers")
 }
@@ -1073,23 +1150,28 @@ model OrderItem {
 // ─────────────────────────────────────────────
 
 model File {
-  id        String   @id @default(cuid())
-  storeId   String
-  name      String
-  url       String
-  mimeType  String
-  size      Int
-  width     Int?
-  height    Int?
+  id             String   @id @default(cuid())
+  storeId        String
+  name           String
+  url            String
+  mimeType       String
+  size           Int
+  width          Int?
+  height         Int?
   /// The file's bytes. The API's own disk is only a cache: a host like
   /// Railway starts every deploy with an empty disk, so /uploads/... is
   /// served from here whenever the disk copy is missing
   /// (modules/uploads/serve.js). Never selected in lists.
-  data      Bytes?
-  createdAt DateTime @default(now())
+  data           Bytes?
+  /// null = bytes in `data` (the database); "imagekit" / "cloudinary" = on
+  /// that CDN, `providerFileId` being its id there (used to delete it).
+  storage        String?
+  providerFileId String?
+  createdAt      DateTime @default(now())
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
+  @@unique([storage, providerFileId])
   @@index([storeId])
   @@map("files")
 }
@@ -1344,6 +1426,9 @@ model App {
   /// "puzzle") — rendered as a real icon component, never an emoji glyph.
   /// Was `iconEmoji` (a literal emoji character) before Phase 10.
   iconKey        String   @default("puzzle")
+  /// Monthly price (before GST) for a paid app — billed for every billing
+  /// period the app is installed in (billing/app-charges.js). null = free.
+  priceMonthly   Decimal? @db.Decimal(10, 2)
   /// The settings a merchant fills in on install, as a JSON Schema-ish
   /// shape the admin's install form renders generically: [{ id, label,
   /// type: "text" }]. Keeps adding a new app a data-only change most of
@@ -1695,24 +1780,24 @@ model MetafieldDefinition {
 /// the product page, imported from a CSV, or added by the seller.
 /// `verified`: the email has an order containing this product.
 model ProductReview {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   storeId     String
   productId   String
   rating      Int
   title       String?
-  body        String   @db.Text
+  body        String    @db.Text
   authorName  String
   authorEmail String?
-  verified    Boolean  @default(false)
+  verified    Boolean   @default(false)
   /// pending (waiting for approval) | published | hidden
-  status      String   @default("pending")
+  status      String    @default("pending")
   /// storefront | import | admin
-  source      String   @default("storefront")
+  source      String    @default("storefront")
   /// The seller's public reply, shown under the review.
-  reply       String?  @db.Text
+  reply       String?   @db.Text
   repliedAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -1720,7 +1805,6 @@ model ProductReview {
   @@index([storeId, status])
   @@index([productId, status])
 }
-
 
 // ─────────────────────────────────────────────
 // Billing engine — subscriptions, mandates, payments, fees, tax
@@ -1890,6 +1974,8 @@ model BillingCycle {
   dueAt          DateTime
   planAmount     Decimal          @db.Decimal(12, 2)
   feesAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  /// Paid apps (AppCharge rows billed to this cycle).
+  appsAmount     Decimal          @default(0) @db.Decimal(12, 2)
   creditAmount   Decimal          @default(0) @db.Decimal(12, 2)
   subtotal       Decimal          @db.Decimal(12, 2)
   taxRate        Decimal          @db.Decimal(5, 2)
@@ -1977,31 +2063,31 @@ model PaymentMethod {
 /// Every attempt to take money from a seller — mandate authorisation,
 /// automatic charge, or a manual "pay now".
 model BillingPayment {
-  id                String        @id @default(cuid())
+  id                String    @id @default(cuid())
   storeId           String
   subscriptionId    String
   cycleId           String?
   mandateId         String?
   /// mandate_setup | charge | manual
   purpose           String
-  provider          String        @default("razorpay")
-  providerOrderId   String?       @unique
-  providerPaymentId String?       @unique
+  provider          String    @default("razorpay")
+  providerOrderId   String?   @unique
+  providerPaymentId String?   @unique
   /// Total asked for, tax included.
-  amount            Decimal       @db.Decimal(12, 2)
-  currency          String        @default("INR")
+  amount            Decimal   @db.Decimal(12, 2)
+  currency          String    @default("INR")
   /// created | pending | captured | failed | refunded | partially_refunded
-  status            String        @default("created")
+  status            String    @default("created")
   method            String?
   failureCode       String?
   failureReason     String?
-  refundedAmount    Decimal       @default(0) @db.Decimal(12, 2)
-  attemptedAt       DateTime      @default(now())
+  refundedAmount    Decimal   @default(0) @db.Decimal(12, 2)
+  attemptedAt       DateTime  @default(now())
   capturedAt        DateTime?
   failedAt          DateTime?
   raw               Json?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   store        Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
   subscription Subscription    @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)

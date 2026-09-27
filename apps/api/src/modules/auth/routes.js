@@ -1,5 +1,6 @@
 const controller = require("./controller");
 const recovery = require("./recovery");
+const google = require("./google");
 
 // Per-IP limits (the @fastify/rate-limit plugin, registered in app.js).
 // These sit alongside the per-account lockout in lib/login-guard.js — this
@@ -18,6 +19,12 @@ async function authRoutes(fastify) {
   fastify.post("/logout", controller.logoutHandler);
   fastify.post("/logout-everywhere", { preHandler: [fastify.authenticate] }, controller.logoutEverywhereHandler);
   fastify.get("/me", { preHandler: [fastify.authenticate] }, controller.meHandler);
+
+  // "Continue with Google" — see google.js.
+  fastify.get("/google/config", google.configHandler);
+  fastify.get("/google/start", { config: signInLimit }, google.startHandler);
+  fastify.get("/google/callback", { config: signInLimit }, google.callbackHandler);
+  fastify.post("/google/register", { config: signUpLimit }, google.registerHandler);
 
   // Account recovery (see recovery.js) — seller accounts only.
   fastify.post("/password/forgot", { config: emailLimit }, recovery.forgotPasswordHandler);

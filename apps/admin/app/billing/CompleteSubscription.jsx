@@ -94,9 +94,9 @@ export function CompleteSubscription({ initial, storeName, role }) {
       return { now: due, nowLabel: due.kind === "intro" ? `${selected.name} — first month` : `${selected.name} plan`, after };
     }
     if (due) {
-      const subtotal = Math.round((regular + (due.feesAmount || 0)) * 100) / 100;
+      const subtotal = Math.round((regular + (due.feesAmount || 0) + (due.appsAmount || 0)) * 100) / 100;
       return {
-        now: { planAmount: regular, feesAmount: due.feesAmount || 0, creditAmount: 0, subtotal, taxRate: rate, taxAmount: gstOf(subtotal, rate), total: withGst(subtotal, rate) },
+        now: { planAmount: regular, feesAmount: due.feesAmount || 0, appsAmount: due.appsAmount || 0, creditAmount: 0, subtotal, taxRate: rate, taxAmount: gstOf(subtotal, rate), total: withGst(subtotal, rate) },
         nowLabel: `${selected.name} — ${interval === "year" ? "first year" : "first month"}`,
         after,
       };
@@ -317,6 +317,7 @@ export function CompleteSubscription({ initial, storeName, role }) {
                   <Row label={summary.nowLabel} value={inr(summary.now.planAmount)} />
                   {summary.now.creditAmount > 0 && <Row label="Credit" value={`−${inr(summary.now.creditAmount)}`} />}
                   {summary.now.feesAmount !== 0 && <Row label="Checkout fees" value={inr(summary.now.feesAmount)} />}
+                  {summary.now.appsAmount > 0 && <Row label="Apps" value={inr(summary.now.appsAmount)} />}
                   <Row label={`GST (${summary.now.taxRate}%)`} value={inr(summary.now.taxAmount)} />
                   <Row label="Due now" value={inr(summary.now.total)} strong />
                 </div>

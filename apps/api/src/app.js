@@ -41,6 +41,7 @@ const metaAdsRoutes = require("./modules/meta-ads/routes");
 const whatsappRoutes = require("./modules/whatsapp/routes");
 const platformCustomersRoutes = require("./modules/platform-customers/routes");
 const shopperRoutes = require("./modules/shopper/routes");
+const { shopperGoogleRoutes } = require("./modules/shopper/google");
 const blogRoutes = require("./modules/blog/routes");
 const giftCardRoutes = require("./modules/gift-cards/routes");
 const searchRoutes = require("./modules/search/routes");
@@ -145,6 +146,7 @@ function buildApp() {
   app.register(cartRoutes, { prefix: "/api/storefront" });
   app.register(checkoutRoutes, { prefix: "/api/storefront" });
   app.register(shopperRoutes, { prefix: "/api/storefront" });
+  app.register(shopperGoogleRoutes, { prefix: "/api/shopper" });
   app.register(inventoryRoutes, { prefix: "/api/inventory" });
   app.register(exportRoutes, { prefix: "/api/data" });
   app.register(emailLogRoutes, { prefix: "/api/email-log" });

@@ -35,7 +35,7 @@ async function nextNumber(db) {
 const KIND = { intro: "subscription", regular: "subscription", reactivation: "subscription", proration: "proration", fees: "fees" };
 
 /** The invoice lines for a cycle (before tax). */
-function cycleLines(cycle, { planName, feeOrders = 0 }) {
+function cycleLines(cycle, { planName, feeOrders = 0, apps = [] }) {
   const lines = [];
   const plan = num(cycle.planAmount);
   const range = `${fmt(cycle.periodStart)} – ${fmt(cycle.periodEnd)}`;
@@ -49,6 +49,7 @@ function cycleLines(cycle, { planName, feeOrders = 0 }) {
       amount: num(cycle.feesAmount),
     });
   }
+  for (const a of apps) lines.push({ description: `${a.appName} app — billing period from ${fmt(a.periodStart)}`, amount: num(a.amount) });
   return lines;
 }
 
@@ -66,7 +67,8 @@ async function issueForCycle(tx, { store, cycle, payment, planName }) {
   if (existing) return existing;
 
   const feeOrders = await tx.commissionTransaction.count({ where: { cycleId: cycle.id, kind: "accrual" } });
-  const lines = cycleLines(cycle, { planName, feeOrders });
+  const apps = num(cycle.appsAmount) > 0 ? await tx.appCharge.findMany({ where: { cycleId: cycle.id }, orderBy: [{ periodStart: "asc" }, { appName: "asc" }] }) : [];
+  const lines = cycleLines(cycle, { planName, feeOrders, apps });
   const b = buyer(store);
   const t = tax(num(cycle.subtotal), num(cycle.taxRate), b.state);
 

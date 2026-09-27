@@ -10,6 +10,7 @@ const cycles = require("./cycles");
 const charges = require("./charges");
 const mandates = require("./mandates");
 const commission = require("./commission");
+const appCharges = require("./app-charges");
 const entitlements = require("./entitlements");
 const subscriptions = require("./subscriptions");
 const planChange = require("./plan-change");
@@ -104,8 +105,9 @@ async function overview(prisma, store, { log } = {}) {
   if (!due && [S.EXPIRED, S.CANCELLED, S.SUSPENDED].includes(sub.status)) {
     const price = periodPrice(sub.plan, sub.interval, settings);
     const feeAcc = Math.max(0, (await commission.accruedTotal(prisma, store.id)).amount);
-    const t = tax(round2(price + feeAcc), settings.taxRate, store.billingState);
-    due = { kind: "reactivation", planAmount: price, feesAmount: feeAcc, creditAmount: 0, subtotal: t.taxable, taxRate: t.rate, taxAmount: t.amount, total: t.total, status: "quote" };
+    const appsOwed = await appCharges.pendingTotal(prisma, store.id);
+    const t = tax(round2(price + feeAcc + appsOwed), settings.taxRate, store.billingState);
+    due = { kind: "reactivation", planAmount: price, feesAmount: feeAcc, appsAmount: appsOwed, creditAmount: 0, subtotal: t.taxable, taxRate: t.rate, taxAmount: t.amount, total: t.total, status: "quote" };
   }
 
   return {

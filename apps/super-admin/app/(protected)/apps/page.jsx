@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Button, Modal, Form, Input, Select, App } from "antd";
+import { Card, Button, Modal, Form, Input, InputNumber, Select, App } from "antd";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { PageHeader, useConfirmDialog, AppIcon, APP_ICON_OPTIONS, useHasMounted } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
@@ -9,6 +9,8 @@ import { apiFetch } from "@/lib/api";
 const CATEGORY_OPTIONS = [
   { value: "analytics", label: "Analytics" },
   { value: "marketing", label: "Marketing" },
+  { value: "customers", label: "Customers" },
+  { value: "checkout", label: "Checkout" },
   { value: "utility", label: "Utility" },
   { value: "other", label: "Other" },
 ];
@@ -17,6 +19,7 @@ const FIELD_TYPE_OPTIONS = [
   { value: "text", label: "Text" },
   { value: "textarea", label: "Text area" },
   { value: "number", label: "Number" },
+  { value: "select", label: "Choice" },
 ];
 
 export default function SuperAdminAppsPage() {
@@ -51,10 +54,17 @@ export default function SuperAdminAppsPage() {
   function openEdit(app) {
     setEditing(app);
     form.resetFields();
-    form.setFieldsValue(app);
+    form.setFieldsValue({ ...app, priceMonthly: app.priceMonthly == null ? null : Number(app.priceMonthly) });
   }
 
-  async function handleSubmit(values) {
+  async function handleSubmit(formValues) {
+    // Choice fields keep their options (not editable in this form).
+    const before = Object.fromEntries((editing?.settingsSchema || []).map((f) => [f.id, f]));
+    const values = {
+      ...formValues,
+      priceMonthly: formValues.priceMonthly ?? null,
+      settingsSchema: (formValues.settingsSchema || []).map((f) => (before[f.id]?.options ? { ...f, options: before[f.id].options } : f)),
+    };
     try {
       if (editing?.id) {
         await apiFetch(`/api/super-admin/apps/${editing.id}`, { method: "PATCH", body: values });
@@ -109,6 +119,7 @@ export default function SuperAdminAppsPage() {
                 <p className="text-sm font-medium m-0">{a.name}</p>
                 <p className="text-xs text-ink-muted m-0">
                   <code>{a.key}</code> · {a.category}
+                  {Number(a.priceMonthly) > 0 && <> · ₹{Number(a.priceMonthly).toLocaleString("en-IN")}/month + GST</>}
                 </p>
               </div>
             </div>
@@ -155,6 +166,13 @@ export default function SuperAdminAppsPage() {
             </Form.Item>
             <Form.Item name="description" label="Description">
               <Input.TextArea rows={2} />
+            </Form.Item>
+            <Form.Item
+              name="priceMonthly"
+              label="Monthly price (₹, before GST)"
+              extra="Leave empty for a free app. Billed for every billing period a store has it installed, on their next bill; removing it doesn't cancel a period already added."
+            >
+              <InputNumber min={0} max={100000} precision={2} className="!w-40" placeholder="Free" />
             </Form.Item>
             <Form.List name="settingsSchema">
               {(fields, { add, remove }) => (

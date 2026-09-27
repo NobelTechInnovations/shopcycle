@@ -1,0 +1,224 @@
+# Handoff notes — Oyklane (read this first)
+
+Notes kept in the project so they survive switching Claude accounts. Last updated 27 Sep 2026.
+
+---
+
+## 1. The project
+
+Oyklane is a Shopify-like SaaS in a pnpm monorepo.
+
+| App | Local | Live |
+|---|---|---|
+| API (Fastify, `apps/api`) | localhost:4100 | api.oyklane.com (Railway) |
+| Seller admin (`apps/admin`, Next 16) | localhost:3000 | store.oyklane.com |
+| Storefront (`apps/storefront`) | localhost:3002 | `{handle}.oyklane.com` (Vercel) |
+| Super admin (`apps/super-admin`) | localhost:3003 | — |
+| Marketing site (`apps/www`) | localhost:3004 | oyklane.com |
+
+- **Packages:** database (Prisma on Supabase), theme-engine, theme-schema, ui, utils, validation.
+- **Themes:** classic, modern, atelier, lumiere, plus `_platform` (system pages, cart drawer, checkout).
+- **Run everything:** `pnpm run dev`.
+
+## 2. Rules the owner set (always follow)
+
+- **Super admin is platform-only.** A store owner must never be able to log in there.
+- **Sessions stay separate** between seller admin, super admin and storefront.
+- **Login details** for admin, super admin and stores go in `.env` as comments, so the owner can copy them.
+- **Don't touch the domain setup.** It works.
+- **Never add demo data to Sonchiri.** Sonchiri (handle `sonchiri`, sonchirisweets.com) is the owner's real sweets store. Loomwear (handle `loomwear`) is the demo clothing store.
+- **Don't commit unless the owner asks.**
+- **Rotate the Vercel token.** It was exposed once in a screenshot; never use or repeat it.
+
+## 3. ⚠️ Shared database
+
+Local `.env` points at the **production** Supabase database, so every local write is a live write.
+
+- Keep schema pushes additive: `pnpm --filter @shopcycle/database push`.
+- Only clean up rows you created yourself.
+- Don't run `apps/api/test/e2e-security.sh` while the owner is signed in locally.
+- **Connection limit:** Supabase's session pooler (`:5432`) allows only **15 connections in total**, and production holds most of them.
+  - Tests use the transaction pooler instead (`:6543` with `pgbouncer=true`); `e2e-billing.js` already does this.
+  - Recommended for production: set `DATABASE_URL` to `:6543?pgbouncer=true&connection_limit=...` and keep `DIRECT_URL` on `:5432`.
+
+---
+
+## 4. Billing engine rebuild — committed ("payment module", 27 Sep) and LIVE in production
+
+### ⚠️ Urgent
+
+- **Production already runs the new billing code** (the push to main deployed it; the billing job runs there).
+- The billing **bootstrap already ran on the shared database**:
+  - Plans are now **Starter ₹199 / Growth ₹599 / Pro ₹1,299**. The old "Premium" plan was renamed "Pro".
+  - Every store has a trial:
+    - Loomwear, Sonchiri and Second Store: trial ends **30 Sep 2026**.
+    - Demo Store and Sonchiri Sweets: trial ends 26 Oct.
+- **Protect Sonchiri** (real store): its dashboard locks at trial end (30 Sep) unless autopay is on. Either extend its trial in Super admin ▸ Billing ▸ Subscriptions, or set up autopay first.
+- Demo Store still has an old test Razorpay subscription (`sub_TgaIqCE2AWsZFg`). Leave it alone.
+
+### What the spec asked for (the owner's requirements)
+
+**Plans**
+
+| Plan | Monthly price | Checkout fee | Staff accounts |
+|---|---|---|---|
+| Starter | ₹199 | 2% | 2 |
+| Growth | ₹599 | 1.5% | 10 |
+| Pro | ₹1,299 | 0.5% | 30 |
+
+- No product limit on any plan.
+- More staff than the plan allows → the seller files a limit request.
+- Yearly price = monthly × 12 × 80%.
+
+**Pricing rules**
+- 3-day free trial, then a one-time ₹99 first month, then the regular price.
+- **Billing is per store.** A second store from the same email gets its own trial and ₹99 month.
+- GST of 18% is added on top and shown separately: CGST+SGST in the same state, IGST otherwise.
+
+**Payment failures**
+- Payment fails → 7 days of grace with full access.
+- Grace over → the dashboard locks; the storefront stays live.
+- 3 unpaid cycles → store suspended: storefront offline and checkout closed.
+
+**Cancellation** → the plan runs to the end of the period, then expires with 7 days of grace, then the same lock and suspension rules apply.
+
+**One-Click Checkout app** → adds +0.3% to the fee. Each order records whether it was used.
+
+**Razorpay mandates** → UPI AutoPay, card or e-mandate. Only Razorpay ids are stored, never card or bank details. The frontend's word is never trusted — payments are always verified with Razorpay.
+
+**Super admin controls**
+- Views: MRR, statuses, GST, payments, mandates, refunds.
+- Actions: suspend/restore, grant access, extend trial, change plan, promo price, reminders, retry, refund, grants, limit requests, settings. Every action is audited.
+
+### Done
+
+**Schema** (`packages/database/prisma/schema.prisma`, already pushed)
+- Plan fields: `key`, `isActive`, `tagline`, `sortOrder`.
+- New models: `PlatformSetting`, `Feature`, `PlanFeature`, `Subscription`, `SubscriptionItem`, `BillingCycle`, `Mandate` (has a `livemode` field), `PaymentMethod`, `BillingPayment`, `BillingRefund`, `BillingFailure`, `SubscriptionEvent`, `CommissionTransaction`, `CommissionSummary`, `TaxTransaction`, `PaymentWebhookEvent`, `BillingNotification`, `EntitlementGrant`, `LimitRequest`.
+- New Order fee fields: `feePlanId`, `feeCommissionRate`, `feeOneClickRate`, `oneClickCheckout`.
+
+**Engine** (`apps/api/src/modules/billing/`)
+
+| File | What it does |
+|---|---|
+| `settings.js` | Platform billing rules (stored in `PlatformSetting` "billing") |
+| `money.js`, `pricing.js` | GST split, yearly price, proration |
+| `catalog.js` | Features and the 3 plans |
+| `entitlements.js` | Feature and limit checks, staff usage |
+| `state.js` | The 9 statuses and allowed transitions; every change is logged |
+| `access.js` | Dashboard / storefront / checkout access |
+| `cycles.js` | Charges with idempotency keys (intro, regular, proration, fees, reactivation) |
+| `charges.js` | Charge on mandate, settle or fail, invoices, refunds |
+| `mandates.js` | Autopay setup, activation, replacement, cancellation; the ₹1 check is refunded |
+| `engine.js` | Scheduled job: trial end, renewals, retries, grace, lock, suspension, reminders, reconciliation |
+| `commission.js` | Per-order fees, reversals, monthly summaries |
+| `invoices.js` | GST invoices and tax records |
+| `plan-change.js` | Free switches in the trial/intro month; upgrades now with proration; downgrades at period end |
+| `subscriptions.js` | Per-store trial, cancel, resume |
+| `webhooks.js` | Each event stored once, failed ones replayed |
+| `notifications.js` | Dashboard notices and emails |
+| `admin.js` | Super admin actions |
+| `bootstrap.js` | Runs at API start; only fills in what's missing |
+| `service.js`, `routes.js` | Seller API at `/api/billing` |
+| `providers/` | Razorpay and a sandbox behind one interface |
+
+**Connected to the rest of the app**
+- `plugins/jwt-auth.js`: central dashboard lock (402 `billing_locked`; `/api/billing` and GET `/api/store` stay open) and `request.getEntitlements()`.
+- Storefront: 503 "temporarily unavailable" and checkout closed when a store is suspended.
+- `lib/store-provisioning.js`: every new store gets a trial.
+- Plan-gated features:
+  - Team staff limit.
+  - GST invoices, CSV export and Meta/WhatsApp apps: Growth and Pro.
+  - API keys and the public API: Pro only (breaking change for existing keys on other plans).
+  - Theme code editor: Growth and Pro. JSON saves from the visual editor are allowed on every plan.
+- Checkout saves the fee terms on each order.
+- `/api/auth/me` returns `access` and `entitlements`.
+- Super admin API at `/api/super-admin/billing/*`, audited.
+- Old `/api/store/billing|subscribe|plan` routes were removed.
+- `jobs.js`: the billing job runs only in production unless `BILLING_JOBS=true`.
+- `server.js`: runs the bootstrap at start.
+
+**UI**
+- **Seller admin:**
+  - `/billing` "Complete Your Subscription" page (`app/billing/CompleteSubscription.jsx`).
+  - Settings ▸ Plan & billing (`app/admin/settings/BillingSettings.jsx`).
+  - `lib/billing.js` opens Razorpay Checkout.
+  - Invoice view shows GST separately; admin layout redirects locked stores; "Premium" wording replaced.
+- **Super admin:**
+  - Billing section: overview, subscriptions, subscription detail with all actions, limit requests, settings.
+  - New Plans page with plan editor and feature matrix.
+  - "Billing" added to the nav.
+- **Storefront:** One-Click Checkout popup in `themes/_platform/assets/cart-drawer.js` and `.css`. The config comes from `oneClickConfig` in `modules/storefront/service.js`.
+
+**Tests**
+- `apps/api/test/razorpay-mock.js`: customers, tokens, recurring payments, refunds, plus test helpers.
+- `apps/api/test/e2e-billing.js`: the full lifecycle, using the test clock (`POST /api/billing/_test/clock`, enabled with `BILLING_TEST_CLOCK=true`; never in production).
+- Last runs (27 Sep): billing 136/136, orders 117/117, growth 181/181 (before the provider work — re-run in progress), billing-modes 16/16 and providers 64/64 (after it).
+- Every suite forces `EMAIL_PROVIDER/SMS_PROVIDER/WHATSAPP_PROVIDER=log` and `MEDIA_STORAGE=database`, so tests never send real mail/SMS or upload to a CDN (earlier runs did send a few emails to `@test.oyklane.dev` through ZeptoMail).
+
+### Done on 27 Sep (NOT committed yet)
+
+- Billing follow-ups: `failCycle` retry fix; tests rewritten/fixed; AdminShell billing banner (`components/BillingBanner.jsx`, `/api/billing/status` now also returns `autopay`); register/notice copy; marketing site pricing (3 plans, prices **exclude** GST); dead code deleted; README billing section.
+- **Providers & sign-in** (see README ▸ Providers and sign-in):
+  - Email: SMTP (ZeptoMail over SMTP already in `.env`), plus ZeptoMail/Brevo HTTP APIs via `EMAIL_PROVIDER`.
+  - Images: ImageKit (or Cloudinary) — direct browser upload, API only signs and verifies. Old DB images untouched.
+  - SMS/WhatsApp codes: Twilio, MSG91, WhatsApp Cloud API. **Zoho CPaaS WhatsApp not done** — its send API isn't publicly documented; paste a sample request from the Zoho CPaaS console to add it (one file: `lib/messaging.js`).
+  - Shopper phone sign-in = paid **Phone Login** app (₹299/month, editable in Super admin ▸ Apps).
+  - "Continue with Google" for sellers (admin login/register) and shoppers (storefront).
+- **Paid apps billing** (`billing/app-charges.js`): charged per billing period installed (trial counts as one), on the next bill; removing stops future charges only.
+- Schema pushed (additive): `files.storage/providerFileId`, `users.googleSub`, `customers.phoneVerifiedAt`, `apps.priceMonthly`, `billing_cycles.appsAmount`, new tables `shopper_phone_otps`, `app_charges`, `message_logs`.
+- ⚠️ The **Phone Login app row already exists in the shared DB** (local API bootstrap), so production's Apps page lists it before this code is deployed. Installing it there does nothing until deploy.
+
+### Left to do
+
+1. **Commit and deploy** this work (owner decides).
+2. **Keys for the new providers** (see `.env.example`): `IMAGEKIT_*`, `GOOGLE_CLIENT_ID/SECRET` (+ both redirect URIs), `TWILIO_*` / `MSG91_*` / `META_WHATSAPP_*`, optionally `EMAIL_PROVIDER=zeptomail` + `ZEPTOMAIL_TOKEN`. Storefront (Vercel) needs `API_PUBLIC_URL` (or its `API_INTERNAL_URL` must be the public https API).
+3. India SMS needs **DLT registration** (MSG91 or Twilio) before real OTPs deliver.
+4. Try the One-Click popup and the phone/Google sign-in screens in a browser on a test store — **not Sonchiri**.
+5. **Deploy (billing):**
+   - Set `RAZORPAY_WEBHOOK_SECRET`.
+   - In Razorpay, register `https://api.oyklane.com/api/webhooks/razorpay` for these events: `payment.captured`, `payment.failed`, `token.confirmed`, `token.rejected`, `token.cancelled`, `token.paused`, `refund.processed`, `refund.failed`.
+   - Ask Razorpay support to enable recurring payments (UPI AutoPay, card recurring, e-mandate).
+   - Check `PLATFORM_STATE`, `PLATFORM_GSTIN` and the other `PLATFORM_*` values (used on invoices).
+   - Consider moving production `DATABASE_URL` to the transaction pooler (see section 3).
+   - After deploying, check the trials of real stores (Sonchiri).
+
+### Useful commands
+
+```bash
+pnpm run dev                                    # all apps
+pnpm --filter @shopcycle/database push          # additive schema changes (shared DB!)
+node apps/api/test/e2e-billing.js               # billing lifecycle test (cleans up after itself)
+KEEP_TEST_STORE=1 node apps/api/test/e2e-billing.js   # keep the test stores to inspect
+node apps/api/test/e2e-providers.js             # providers, Google, phone login, paid apps (all mocked)
+```
+
+---
+
+## 5. Earlier work (done, all tests passed at the time)
+
+- **Payments:** 5 gateways, public API, webhooks, custom data (metafields).
+- **Themes:** Atelier and Lumière.
+- **Loomwear demo store:** 22 products and reviews.
+- **Quick add** on product cards.
+- **Add-to-cart fix on live:** `apps/storefront/lib/api-url.js` upgrades an http `API_INTERNAL_URL` to https. Set `API_INTERNAL_URL` to https on Vercel.
+- **Product page:** sections can be rearranged, shown or hidden.
+- **Settings ▸ Checkout:** checkout fields can be required, optional or hidden.
+- **Tracking:** Pixel/GA injected with shopping events, and a Facebook-login pixel picker.
+- **Product Reviews app.**
+- **Coin sound** on new orders.
+- **Marketing site** redesigned with theme screenshots.
+- **Prisma transaction timeout** raised to 20 s.
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { Input, InputNumber, Select, Slider, Switch, ColorPicker, Upload, Button, App } from "antd";
 import { Upload as UploadIcon, X, Images } from "lucide-react";
-import { apiUpload } from "@/lib/api";
-import { IMAGE_ACCEPT } from "@/lib/uploads";
+import { IMAGE_ACCEPT, uploadImage } from "@/lib/uploads";
 import { MediaLibraryModal } from "@/components/MediaLibraryModal";
 
 // Google Fonts that read well for Indian storefronts (Latin + good
@@ -15,7 +14,7 @@ const FONT_OPTIONS = [
 ];
 
 /** A real upload, not a URL paste — matches how the Products page picks
- * images (apiUpload -> Files library), so a merchant never needs to know
+ * images (uploadImage -> Files library), so a merchant never needs to know
  * what a public image URL even is to put a photo in a theme section. */
 function ImagePickerField({ value, onChange }) {
   const { message } = App.useApp();
@@ -26,7 +25,7 @@ function ImagePickerField({ value, onChange }) {
   async function handleUpload(file) {
     setUploading(true);
     try {
-      const { file: uploaded } = await apiUpload("/api/files/upload", file);
+      const uploaded = await uploadImage(file);
       onChange(uploaded.url);
     } catch (err) {
       message.error(err.message);

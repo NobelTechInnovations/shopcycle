@@ -796,9 +796,9 @@ p {
 /* Pricing */
 .plans {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
-  max-width: 920px;
+  max-width: 1080px;
   margin-inline: auto;
 }
 .plan {
@@ -1008,6 +1008,10 @@ p {
   }
   .pay-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .plans {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 520px;
   }
   .footer__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
