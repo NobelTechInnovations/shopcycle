@@ -14,7 +14,10 @@ const checkoutSchema = z.object({
   shippingCountry: z.string().min(1, "Country is required"),
   // "gift_card" only when a gift card covers the whole order — the API
   // decides that from the cart, whatever the form says.
-  paymentMethod: z.enum(["cod", "razorpay", "gift_card"]).default("cod"),
+  paymentMethod: z.enum(["cod", "gift_card", "razorpay", "cashfree", "payu", "stripe", "paypal"]).default("cod"),
+  // The storefront address the shopper is on — where a gateway sends them
+  // back after paying (…/checkout/return/:provider).
+  returnBase: z.string().url().max(500).optional(),
   // The unticked-by-default "email me offers" box — explicit consent only.
   acceptsMarketing: z.boolean().default(false),
 });

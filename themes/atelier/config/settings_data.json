@@ -1,0 +1,113 @@
+{
+  "color_background": "#FFFFFF",
+  "color_text": "#121212",
+  "color_primary": "#121212",
+  "color_accent": "#C8102E",
+  "color_surface": "#F4F4F2",
+  "color_dark": "#121212",
+  "heading_font": "Archivo",
+  "body_font": "Inter",
+  "heading_weight": "600",
+  "heading_case": "uppercase",
+  "heading_tracking": "normal",
+  "base_size": 15,
+  "container_width": 1520,
+  "section_spacing": "comfortable",
+  "button_radius": 0,
+  "card_radius": 0,
+  "card_image_ratio": "tall",
+  "card_hover_image": true,
+  "card_show_brand": false,
+  "card_quick_add": true,
+  "card_align": "left",
+  "cart_type": "drawer",
+  "social_instagram": "",
+  "social_facebook": "",
+  "social_youtube": "",
+  "social_x": "",
+  "social_pinterest": "",
+  "social_whatsapp": "",
+  "sections": {
+    "announcement-bar": {
+      "settings": {
+        "show": true,
+        "style": "rotate",
+        "background": "#121212",
+        "text_color": "#FFFFFF"
+      },
+      "blocks": {
+        "m1": {
+          "type": "message",
+          "settings": {
+            "text": "Free shipping on orders over ₹1,499",
+            "link": ""
+          }
+        },
+        "m2": {
+          "type": "message",
+          "settings": {
+            "text": "Easy 15-day exchanges",
+            "link": ""
+          }
+        },
+        "m3": {
+          "type": "message",
+          "settings": {
+            "text": "Cash on delivery available",
+            "link": ""
+          }
+        }
+      },
+      "block_order": [
+        "m1",
+        "m2",
+        "m3"
+      ]
+    },
+    "header": {
+      "settings": {
+        "menu": "main-menu",
+        "layout": "center",
+        "sticky": true,
+        "transparent": false,
+        "logo_width": 120
+      }
+    },
+    "footer": {
+      "settings": {
+        "about": "Considered clothing for everyday life — designed in India, made in small runs.",
+        "show_payments": true,
+        "show_wordmark": true,
+        "copyright": "All rights reserved."
+      },
+      "blocks": {
+        "f1": {
+          "type": "links",
+          "settings": {
+            "heading": "Shop",
+            "menu": "main-menu"
+          }
+        },
+        "f2": {
+          "type": "links",
+          "settings": {
+            "heading": "Help",
+            "menu": "footer-menu"
+          }
+        },
+        "f3": {
+          "type": "newsletter",
+          "settings": {
+            "heading": "Join the list",
+            "text": "New drops and private sales, first."
+          }
+        }
+      },
+      "block_order": [
+        "f1",
+        "f2",
+        "f3"
+      ]
+    }
+  }
+}

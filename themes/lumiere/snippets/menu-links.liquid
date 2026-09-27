@@ -1,0 +1,16 @@
+{% comment %}
+  Menu items as <li>s. A store that hasn't built its menu yet (Content ▸
+  Navigation) still gets a useful one: all products, its first
+  collections and the blog.
+{% endcomment %}
+{% if menu and menu.links.size > 0 %}
+  {% for link in menu.links %}<li><a href="{{ link.url }}">{{ link.title }}</a></li>{% endfor %}
+{% else %}
+  <li><a href="{{ routes.all_products_url }}">Shop all</a></li>
+  {% assign shown = 0 %}
+  {% for pair in collections %}
+    {% assign c = pair[1] %}
+    {% if c.slug != 'all' and shown < 4 %}<li><a href="{{ c.url }}">{{ c.title }}</a></li>{% assign shown = shown | plus: 1 %}{% endif %}
+  {% endfor %}
+  {% if blog.articles.size > 0 %}<li><a href="{{ routes.blog_url }}">Journal</a></li>{% endif %}
+{% endif %}

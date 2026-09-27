@@ -1,0 +1,37 @@
+{
+  "sections": {
+    "hero": {
+      "type": "hero",
+      "settings": {
+        "eyebrow": "Fine jewellery",
+        "heading": "Everyday heirlooms",
+        "text": "Hallmarked gold and sterling silver, finished by hand — made to be worn every day and kept for ever.",
+        "button_label": "Shop the collection",
+        "button2_label": "Find a gift",
+        "height": "large",
+        "position": "center",
+        "text_color": "light",
+        "overlay": 30
+      }
+    },
+    "trust": {
+      "type": "usp",
+      "settings": { "surface": false },
+      "blocks": {
+        "u1": { "type": "item", "settings": { "icon": "award", "title": "BIS hallmarked", "text": "Certified purity on every piece." } },
+        "u2": { "type": "item", "settings": { "icon": "diamond", "title": "Certified stones", "text": "Natural and lab-grown, graded." } },
+        "u3": { "type": "item", "settings": { "icon": "exchange", "title": "Lifetime exchange", "text": "Upgrade any piece, any time." } },
+        "u4": { "type": "item", "settings": { "icon": "shield", "title": "Insured shipping", "text": "Free, tracked and fully insured." } }
+      },
+      "block_order": ["u1", "u2", "u3", "u4"]
+    },
+    "categories": { "type": "category-circles", "settings": { "eyebrow": "Collections", "heading": "Shop by category", "shape": "arch" } },
+    "bestsellers": { "type": "product-grid", "settings": { "eyebrow": "Most loved", "heading": "Bestsellers", "source": "best_sellers", "align": "center", "limit": 8, "columns": 4 } },
+    "craft": { "type": "craft-story", "settings": { "surface": true } },
+    "gifts": { "type": "gift-guide", "settings": {} },
+    "new": { "type": "product-grid", "settings": { "eyebrow": "Just in", "heading": "New arrivals", "source": "newest", "align": "center", "limit": 4, "columns": 4, "surface": true } },
+    "reviews": { "type": "testimonials", "settings": {} },
+    "newsletter": { "type": "newsletter", "settings": { "eyebrow": "The inner circle", "heading": "First look at new collections", "text": "Private previews, styling notes and early access to festive offers.", "button_text": "Join", "style": "dark" } }
+  },
+  "order": ["hero", "trust", "categories", "bestsellers", "craft", "gifts", "new", "reviews", "newsletter"]
+}

@@ -6,6 +6,7 @@ const createCollectionSchema = z.object({
   image: z.string().url().optional().nullable(),
   status: z.enum(["active", "draft"]).default("draft"),
   productIds: z.array(z.string()).default([]),
+  metafields: z.record(z.string().max(40), z.any()).optional(),
 });
 
 const updateCollectionSchema = createCollectionSchema.partial();

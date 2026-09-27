@@ -44,22 +44,25 @@ function findBySlug(prisma, storeId, slug, excludeId) {
 /** Opening stock is recorded like any other stock change, so a variant's
  * history starts from its first unit (see lib/inventory.js). */
 async function recordOpeningStock(tx, storeId, variants, actorName) {
-  for (const v of variants) {
-    if (v.inventoryQuantity) {
-      await tx.inventoryAdjustment.create({
-        data: {
-          storeId,
-          variantId: v.id,
-          delta: v.inventoryQuantity,
-          quantityAfter: v.inventoryQuantity,
-          reason: "received",
-          note: "Opening stock",
-          actorName: actorName || null,
-        },
-      });
-    }
-  }
+  // One insert for all of them — a product with dozens of size/colour
+  // variants shouldn't make dozens of round trips inside the transaction.
+  const data = variants
+    .filter((v) => v.inventoryQuantity)
+    .map((v) => ({
+      storeId,
+      variantId: v.id,
+      delta: v.inventoryQuantity,
+      quantityAfter: v.inventoryQuantity,
+      reason: "received",
+      note: "Opening stock",
+      actorName: actorName || null,
+    }));
+  if (data.length) await tx.inventoryAdjustment.createMany({ data });
 }
+
+// Saving a product with many variants is several statements; the default
+// 5s interactive-transaction limit is too tight against a remote database.
+const TX = { timeout: 20000, maxWait: 10000 };
 
 function create(prisma, storeId, { variants, images, collectionIds, ...data }, slug, { actorName } = {}) {
   return prisma.$transaction(async (tx) => {
@@ -78,7 +81,7 @@ function create(prisma, storeId, { variants, images, collectionIds, ...data }, s
     });
     await recordOpeningStock(tx, storeId, product.variants, actorName);
     return product;
-  });
+  }, TX);
 }
 
 /**
@@ -145,7 +148,7 @@ async function update(prisma, id, { variants, images, collectionIds, ...data }, 
       },
       include,
     });
-  });
+  }, TX);
 }
 
 function remove(prisma, id) {

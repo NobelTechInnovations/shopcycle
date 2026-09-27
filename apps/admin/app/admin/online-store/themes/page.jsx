@@ -32,14 +32,30 @@ function LivePreview({ src, title }) {
   );
 }
 
-function ThemeSwatch({ handle }) {
-  const styles =
-    handle === "modern"
-      ? "bg-[radial-gradient(circle_at_70%_40%,#FE8138_0,transparent_45%),linear-gradient(135deg,#FFF8EE,#F4E6D2)]"
-      : "bg-[radial-gradient(circle_at_75%_45%,#D2452F33_0,transparent_40%),linear-gradient(135deg,#FFFFFF,#F6F3EE)]";
+/** A small mock of the theme — its palette and heading font — for themes
+ * not installed yet (installed ones show a live render instead). */
+function ThemeSwatch({ handle, meta }) {
+  const c = meta.swatch || { bg: "#FFFFFF", surface: "#F6F3EE", text: "#1A1A1A", accent: "#7C5CFF", font: "Inter" };
+  const fontUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(c.font).replace(/%20/g, "+")}:wght@500;600&display=swap`;
   return (
-    <div className={`aspect-[16/10] rounded-[10px] border border-app-border ${styles} flex items-end p-3`}>
-      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink/60">{handle}</span>
+    <div className="aspect-[16/10] rounded-[10px] border border-app-border overflow-hidden flex flex-col" style={{ background: c.bg, color: c.text }} aria-hidden="true">
+      <link rel="stylesheet" href={fontUrl} />
+      <div className="flex items-center justify-between px-3 py-2 text-[9px] uppercase tracking-[0.14em]" style={{ borderBottom: `1px solid ${c.text}1a` }}>
+        <span>Shop</span>
+        <span style={{ fontFamily: `"${c.font}", serif`, fontSize: 12, letterSpacing: "0.08em" }}>{meta.name}</span>
+        <span>Cart</span>
+      </div>
+      <div className="flex-1 grid grid-cols-[1.2fr_1fr] gap-2 p-3">
+        <div className="rounded-sm flex flex-col justify-end p-2.5" style={{ background: c.text, color: c.bg }}>
+          <span className="block w-6 h-[3px] mb-1.5" style={{ background: c.accent }} />
+          <span style={{ fontFamily: `"${c.font}", serif`, fontSize: 17, lineHeight: 1.05, fontWeight: 600 }}>New season</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {[0, 1, 2, 3].map((i) => (
+            <span key={i} className="rounded-sm" style={{ background: c.surface, border: `1px solid ${c.text}12` }} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -224,10 +240,11 @@ export default function ThemesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {Object.entries(available).map(([handle, meta]) => (
             <Card key={handle} size="small" styles={{ body: { padding: 14 } }}>
-              <ThemeSwatch handle={handle} />
-              <div className="flex items-center gap-2 mt-3">
+              <ThemeSwatch handle={handle} meta={meta} />
+              <div className="flex flex-wrap items-center gap-2 mt-3">
                 <h3 className="text-sm font-semibold m-0">{meta.name}</h3>
                 <span className="text-xs text-ink-muted">v{meta.version}</span>
+                {meta.bestFor && <span className="ml-auto text-[11px] font-medium text-ink-muted bg-app-bg border border-app-border rounded-full px-2 py-0.5">{meta.bestFor}</span>}
               </div>
               <p className="text-xs text-ink-muted mt-1 mb-3">{meta.description}</p>
               <Button size="small" icon={<LayoutTemplate size={14} aria-hidden="true" />} loading={busy === `install-${handle}`} onClick={() => install(handle)}>

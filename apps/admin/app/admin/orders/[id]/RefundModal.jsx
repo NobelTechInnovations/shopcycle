@@ -94,7 +94,9 @@ export function RefundModal({ order, open, onClose, onDone, preset }) {
                 ? "This goes back to the customer's original payment method through Razorpay, usually within 5–7 business days."
                 : order.paymentMethod === "gift_card"
                   ? "This goes back onto the gift card the order was paid with."
-                  : "Cash on delivery: this records the refund. Pay the customer back yourself (UPI or bank transfer)."
+                  : ["cashfree", "payu", "stripe", "paypal"].includes(order.paymentMethod)
+                    ? `This records the refund. Send the money back from your ${{ cashfree: "Cashfree", payu: "PayU", stripe: "Stripe", paypal: "PayPal" }[order.paymentMethod]} dashboard.`
+                    : "Cash on delivery: this records the refund. Pay the customer back yourself (UPI or bank transfer)."
               : null}
           </>
         }

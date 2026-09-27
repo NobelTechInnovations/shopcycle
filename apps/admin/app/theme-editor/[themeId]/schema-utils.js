@@ -1,6 +1,6 @@
 "use client";
 
-import { extractSchema, buildDefaultSettings, resolveBlocks, mergeSettings } from "@shopcycle/theme-schema";
+import { extractSchema, buildDefaultSettings, resolveBlocks, mergeSettings, globalSectionSettings } from "@shopcycle/theme-schema";
 
 /** Every `sections/*.liquid` file in the theme, with its parsed schema —
  * this is what powers both "Add section" (list of buildable types) and the
@@ -73,7 +73,7 @@ export function hydrateTemplateDefaults(catalog, template) {
  * consistent with what the renderer actually shows. */
 export function hydrateGlobalSectionDefaults(catalog, sectionType, entry) {
   const schema = catalog[sectionType];
-  const settings = mergeSettings(schema, entry?.settings ?? entry ?? {});
+  const settings = mergeSettings(schema, globalSectionSettings(entry));
   if ((!entry?.blocks || !(entry?.block_order || []).length) && schema?.default_blocks) return { settings, ...materializeDefaultBlocks(schema) };
 
   const blockOrder = entry?.block_order || [];

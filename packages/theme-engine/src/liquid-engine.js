@@ -1,5 +1,5 @@
 const { Liquid, Tag } = require("liquidjs");
-const { stripSchema, extractSchema, mergeSettings, resolveBlocks } = require("@shopcycle/theme-schema");
+const { stripSchema, extractSchema, mergeSettings, resolveBlocks, globalSectionSettings } = require("@shopcycle/theme-schema");
 const { placeholderSvg } = require("./placeholders");
 
 /**
@@ -62,7 +62,7 @@ function createLiquidEngine(filesByPath, meta, settingsData) {
       // works unchanged here too.
       const schema = extractSchema(src);
       const overrides = (settingsData && settingsData.sections && settingsData.sections[this.sectionType]) || {};
-      const settings = mergeSettings(schema, overrides);
+      const settings = mergeSettings(schema, globalSectionSettings(overrides));
       const blocks = resolveBlocks(schema, overrides);
       const sectionContext = {
         ...ctx.environments,

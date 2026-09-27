@@ -56,7 +56,7 @@
   </div>
 
   <div class="container footer__bottom">
-    <p>© {{ 'now' | date: '%Y' }} {{ shop.name }}. {{ section.settings.copyright }}</p>
+    <p>© {{ 'now' | date: '%Y' }} {{ shop.name }}. {{ section.settings.copyright }} {{ powered_by }}</p>
     {% if section.settings.show_payments %}
       <ul class="pay-badges" aria-label="Payment methods">
         <li>UPI</li><li>Visa</li><li>Mastercard</li><li>RuPay</li>{% if shop.cod_enabled %}<li>Cash on delivery</li>{% endif %}

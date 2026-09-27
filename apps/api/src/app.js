@@ -3,11 +3,9 @@ const cors = require("@fastify/cors");
 const helmet = require("@fastify/helmet");
 const rateLimit = require("@fastify/rate-limit");
 const multipart = require("@fastify/multipart");
-const fastifyStatic = require("@fastify/static");
 const { ZodError } = require("zod");
 const { HttpError } = require("@shopcycle/utils");
 const { env } = require("./config/env");
-const { UPLOADS_ROOT } = require("./config/paths");
 
 const prismaPlugin = require("./plugins/prisma");
 const jwtAuthPlugin = require("./plugins/jwt-auth");
@@ -32,6 +30,7 @@ const taxRoutes = require("./modules/taxes/routes");
 const pageRoutes = require("./modules/pages/routes");
 const menuRoutes = require("./modules/menus/routes");
 const uploadRoutes = require("./modules/uploads/routes");
+const { uploadsServe } = require("./modules/uploads/serve");
 const teamRoutes = require("./modules/team/routes");
 const analyticsRoutes = require("./modules/analytics/routes");
 const superAdminRoutes = require("./modules/super-admin/routes");
@@ -46,6 +45,10 @@ const blogRoutes = require("./modules/blog/routes");
 const giftCardRoutes = require("./modules/gift-cards/routes");
 const searchRoutes = require("./modules/search/routes");
 const domainRoutes = require("./modules/domains/routes");
+const paymentRoutes = require("./modules/payments/routes");
+const developerAdminRoutes = require("./modules/developer/admin-routes");
+const metafieldRoutes = require("./modules/metafields/routes");
+const publicApiRoutes = require("./modules/developer/public-routes");
 const inventoryRoutes = require("./modules/inventory/routes");
 const exportRoutes = require("./modules/exports/routes");
 const emailLogRoutes = require("./modules/email-log/routes");
@@ -119,15 +122,9 @@ function buildApp() {
   app.register(jwtAuthPlugin);
   app.register(redisPlugin);
   app.register(multipart, { limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
-  app.register(fastifyStatic, {
-    root: UPLOADS_ROOT,
-    prefix: "/uploads/",
-    decorateReply: false,
-    // Uploaded files get random UUID names and are never rewritten in
-    // place, so they can be cached forever.
-    immutable: true,
-    maxAge: "365d",
-  });
+  // Uploaded images: from the disk cache, else from the database (a new
+  // deploy starts with an empty disk) — see modules/uploads/serve.js.
+  app.register(uploadsServe);
 
   app.get("/health", async () => ({ ok: true, service: "@shopcycle/api" }));
 
@@ -156,6 +153,10 @@ function buildApp() {
   app.register(giftCardRoutes, { prefix: "/api/gift-cards" });
   app.register(searchRoutes, { prefix: "/api/search" });
   app.register(domainRoutes, { prefix: "/api/store/domain" });
+  app.register(paymentRoutes, { prefix: "/api/payments" });
+  app.register(developerAdminRoutes, { prefix: "/api/developer" });
+  app.register(metafieldRoutes, { prefix: "/api/metafields" });
+  app.register(publicApiRoutes, { prefix: "/api/v1" });
   app.register(menuRoutes, { prefix: "/api/menus" });
   app.register(uploadRoutes, { prefix: "/api/files" });
   app.register(teamRoutes, { prefix: "/api/team" });

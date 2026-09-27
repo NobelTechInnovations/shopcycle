@@ -17,6 +17,8 @@ const checkoutService = require("../checkout/service");
 const appsService = require("../apps/service");
 const { computeAccessState, isStorefrontBlocked } = require("../billing/access");
 const shopperService = require("../shopper/service");
+const paymentsService = require("../payments/service");
+const metafieldService = require("../metafields/service");
 const { FULL_INCLUDE } = require("../orders/operations");
 const { publicOrder } = require("../orders/public");
 const { ensureStatusToken } = require("../orders/notify");
@@ -200,7 +202,7 @@ async function storeFacts(prisma, store) {
   const settings = storeSettings(store);
   return {
     free_shipping_above: cheapest?.freeAbove != null ? Number(cheapest.freeAbove) : null,
-    cod_enabled: checkoutService.availablePaymentMethods().some((m) => m.value === "cod"),
+    cod_enabled: paymentsService.codEnabled(store),
     return_days: Number(settings.returnWindowDays) || 0,
     low_stock: Number(settings.lowStockThreshold) || 5,
     // No tax rate configured → prices are treated as tax-inclusive (MRP).
@@ -236,6 +238,9 @@ async function bestSellers(prisma, store, allProducts, limit = 12) {
  * of which template is being rendered — cheap enough at this store's scale
  * (see the repository functions' doc note on eager-loading), and it keeps
  * this function the single place that knows the full storefront data shape. */
+const POWERED_BY =
+  '<a href="https://oyklane.com" target="_blank" rel="noopener" data-oy-powered style="display:inline!important;visibility:visible!important;opacity:1!important;color:inherit!important;font-size:inherit!important;text-decoration:underline;text-underline-offset:3px;white-space:nowrap">Powered by Oyklane.com</a>';
+
 async function buildGlobalContext(prisma, store, { slug, cartId, discountError, checkoutError, giftCardError, rootless, customer = null, themeSettings = {} } = {}) {
   const routes = buildRoutes(store.handle, { rootless });
   const [products, collections, cart, menus, apps, facts, articles] = await Promise.all([
@@ -297,7 +302,7 @@ async function buildGlobalContext(prisma, store, { slug, cartId, discountError, 
     discount_error: safe(discountError),
     checkout_error: safe(checkoutError),
     gift_card_error: safe(giftCardError),
-    payment_methods: checkoutService.availablePaymentMethods(),
+    payment_methods: await checkoutService.availablePaymentMethods(prisma, store),
     platform: { fonts_url: platform.fontsUrl(themeSettings) },
     apps,
   };
@@ -311,6 +316,77 @@ const SORTS = {
   newest: { label: "Newest", fn: (a, b) => new Date(b.created_at) - new Date(a.created_at) },
   "title-asc": { label: "Alphabetically, A–Z", fn: (a, b) => a.title.localeCompare(b.title) },
 };
+
+const SIZE_VALUE = /^(xxs|xs|s|m|l|xl|xxl|xxxl|[2-5]xl|free ?size|one ?size|\d{1,3}(\.\d)?|\d{2}\s?-\s?\d{2}|(uk|us|eu)\s?\d{1,2}(\.\d)?|\d+(\.\d+)?\s?(ml|l|g|gm|kg|cm|mm|in|inch|ct|carat)s?|\d{1,2}\s?(y|yrs?|years?|m|months?)(\s?-\s?\d{1,2}\s?(y|yrs?|years?|m|months?))?)$/i;
+const COLOUR_WORDS =
+  /\b(black|white|ivory|cream|off[- ]?white|beige|tan|camel|brown|chocolate|coffee|grey|gray|charcoal|silver|gold|rose ?gold|red|maroon|wine|burgundy|pink|blush|peach|coral|orange|rust|mustard|yellow|lime|olive|green|mint|sage|teal|turquoise|aqua|blue|navy|indigo|denim|sky|purple|lavender|lilac|violet|magenta|multi|multicolou?r|khaki|nude|stone|sand|emerald|ruby|sapphire)\b/i;
+
+const COLOUR_HEX = {
+  black: "#111111", white: "#ffffff", ivory: "#fffff0", cream: "#f3ead8", offwhite: "#f5f2ea", beige: "#d9c8a9", tan: "#c8a27a",
+  camel: "#c19a6b", brown: "#6f4e37", chocolate: "#4b2e20", coffee: "#6f4e37", grey: "#9a9a9a", gray: "#9a9a9a", charcoal: "#36454f",
+  silver: "#c0c0c0", gold: "#c9a14a", rosegold: "#b76e79", red: "#c62828", maroon: "#800000", wine: "#722f37", burgundy: "#800020",
+  pink: "#f4a7b9", blush: "#f2c6c2", peach: "#f7c5a0", coral: "#ff7f50", orange: "#f28c28", rust: "#b7410e", mustard: "#e1ad01",
+  yellow: "#f5d10f", lime: "#a4d65e", olive: "#6b7a3a", green: "#2e7d32", mint: "#aee4c8", sage: "#9caf88", teal: "#008080",
+  turquoise: "#40e0d0", aqua: "#00c4cc", blue: "#1e5bc6", navy: "#1f2a44", indigo: "#3f3d9e", denim: "#4a6fa5", sky: "#87ceeb",
+  purple: "#6a1b9a", lavender: "#b9a7e0", lilac: "#c8a2c8", violet: "#7f4fc9", magenta: "#c2185b", khaki: "#b9a66b", nude: "#e3bc9a",
+  stone: "#b7afa3", sand: "#d8c3a0", emerald: "#1f7a4d", ruby: "#9b111e", sapphire: "#0f52ba",
+  multi: "conic-gradient(#c62828, #f5d10f, #2e7d32, #1e5bc6, #6a1b9a, #c62828)",
+};
+function colourSwatch(value) {
+  const m = String(value).match(COLOUR_WORDS);
+  if (!m) return null;
+  const word = m[1].toLowerCase().replace(/[^a-z]/g, "").replace(/^multicolou?r$/, "multi");
+  return COLOUR_HEX[word] || null;
+}
+
+/**
+ * Variant titles like "M / Black" become separate pickers — Size and
+ * Colour — when every variant has the same number of parts. Names are
+ * guessed from the values (sizes, colour words); anything else is
+ * "Style". A product with one variant, or mixed titles, gets none (the
+ * page falls back to one button per variant).
+ */
+function variantOptions(product, selected) {
+  const variants = product.variants || [];
+  if (variants.length < 2) return [];
+  const split = variants.map((v) => String(v.title || "").split(" / ").map((x) => x.trim()));
+  const n = split[0].length;
+  if (!split.every((parts) => parts.length === n && parts.every(Boolean))) return [];
+  const chosen = String(selected?.title || "").split(" / ").map((x) => x.trim());
+  const used = new Set();
+  return Array.from({ length: n }, (_, i) => {
+    const values = [...new Set(split.map((parts) => parts[i]))];
+    let name = values.every((v) => SIZE_VALUE.test(v)) ? "Size" : values.every((v) => COLOUR_WORDS.test(v)) ? "Colour" : n === 1 ? "Option" : "Style";
+    if (used.has(name)) name = `${name} ${i + 1}`;
+    used.add(name);
+    return {
+      name,
+      position: i,
+      is_colour: name.startsWith("Colour"),
+      selected: chosen[i] || values[0],
+      values: values.map((value) => ({
+        value,
+        // Any in-stock variant with this value — the rest are shown struck through.
+        available: variants.some((v, k) => split[k][i] === value && v.available),
+        swatch: name.startsWith("Colour") ? colourSwatch(value) : null,
+      })),
+    };
+  });
+}
+
+/** Order lines get their product's photo and link (from this render's
+ * active products — a deleted or hidden product just shows no photo). */
+function withItemPhotos(ctx, orders) {
+  const byId = {};
+  for (const p of Object.values(ctx.all_products || {})) byId[p.id] = p;
+  for (const o of orders) {
+    for (const item of o.items || []) {
+      const p = byId[item.product_id];
+      item.image = p?.featured_image?.url || null;
+      item.url = p?.url || null;
+    }
+  }
+}
 
 /** Up to 8 products to suggest on a product page: same collection first,
  * then same category or brand, then best sellers. */
@@ -360,6 +436,9 @@ async function renderPage(
     formError,
     notice,
     localAssets = false,
+    // An absolute base for assets (the theme editor preview, which renders
+    // inside the admin — its files come from the store's own address).
+    assetBaseOverride,
     // Phase 6 — listings and the blog.
     sort,
     inStock,
@@ -374,7 +453,7 @@ async function renderPage(
   // Storefront pages load their CSS, JS and images from the store's own
   // address (the storefront app proxies them); null = straight from the
   // API, for the admin's editor preview.
-  const assetBase = localAssets ? (rootless ? "" : `/store/${store.handle}`) : null;
+  const assetBase = assetBaseOverride != null ? assetBaseOverride : localAssets ? (rootless ? "" : `/store/${store.handle}`) : null;
   const themeSettings = settingsOverride ?? theme.settingsData ?? {};
   const system = platform.isSystemTemplate(templateName);
 
@@ -404,6 +483,8 @@ async function renderPage(
     customer,
     themeSettings,
   });
+  // The platform credit every store carries (see POWERED_BY below).
+  globalContext.powered_by = POWERED_BY;
   globalContext.form_error = safe(formError);
   globalContext.notice = safe(notice);
   const routes = globalContext.routes;
@@ -414,10 +495,14 @@ async function renderPage(
     if (!found) throw new HttpError(404, `Product not found: ${slug}`);
     const collection = primaryCollection(globalContext, found);
     const selected = found.variants.find((v) => v.id === variant) || found.variants.find((v) => v.available) || found.variants[0] || null;
+    const fieldDefs = await metafieldService.list(prisma, store.id, "product");
     globalContext.product = {
       ...found,
+      // Custom data the seller marked "show on the product page".
+      specs: metafieldService.specs(fieldDefs, found.metafields.custom),
       collection: collection && { title: collection.title, slug: collection.slug, url: collection.url },
       selected_variant: selected,
+      options: variantOptions(found, selected),
       related: relatedProducts(globalContext, found, collection),
       client_json: JSON.stringify({
         currency: store.currency,
@@ -504,6 +589,7 @@ async function renderPage(
     const base = `${routes.orders_url}/${order.statusToken}`;
     globalContext.order = publicOrder(store, order, { statusUrl: base, invoiceUrl: `${base}/invoice` });
     globalContext.order.return_url = `${base}/return`;
+    withItemPhotos(globalContext, [globalContext.order]);
   }
   if (templateName === "account-login") {
     globalContext.login = {
@@ -513,6 +599,7 @@ async function renderPage(
       return_to: returnTo || null,
     };
   }
+  if (templateName === "account") globalContext.indian_states = INDIAN_STATES.map((s) => s.name);
   if (templateName === "account" && customer) {
     // Until the email is verified by a code, only orders placed while
     // signed in: anyone can type an address at sign-up.
@@ -529,8 +616,16 @@ async function renderPage(
       const token = await ensureStatusToken(prisma, o);
       list.push(publicOrder(store, o, { statusUrl: `${routes.orders_url}/${token}` }));
     }
+    withItemPhotos(globalContext, list);
     globalContext.customer.orders = list;
     globalContext.customer.orders_count = list.length;
+    globalContext.customer.open_orders = list.filter((o) => !["delivered", "cancelled", "refunded"].includes(o.status.key)).length;
+    globalContext.customer.initials = String(customer.name || customer.email || "?")
+      .split(/[\s@.]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0].toUpperCase())
+      .join("");
   }
   if (templateName === "search") {
     // No separate index to query — `all_products` is already every active
@@ -611,6 +706,15 @@ async function renderPage(
   let tail = await platform.bodyTags({ system, drawer, assetBase });
   if (templateName === "checkout") tail += checkoutEnhancements(routes, customer);
   if (tail) html = html.includes("</body>") ? html.replace("</body>", `${tail}</body>`) : html + tail;
+
+  // Every store shows "Powered by Oyklane.com". Themes print it after
+  // their copyright line; if a theme's code drops it, the platform adds it
+  // at the bottom of the page instead. Inline !important keeps a stylesheet
+  // from hiding it.
+  if (!html.includes(POWERED_BY)) {
+    const bar = `<div style="text-align:center!important;padding:14px 16px!important;font:13px/1.5 system-ui,-apple-system,sans-serif!important;display:block!important;visibility:visible!important;opacity:1!important">${POWERED_BY}</div>`;
+    html = html.includes("</body>") ? html.replace("</body>", `${bar}</body>`) : html + bar;
+  }
 
   // Uploaded images are stored with the API's address; on the storefront
   // they're served through the store's own address instead. Only this

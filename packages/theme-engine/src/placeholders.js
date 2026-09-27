@@ -11,6 +11,7 @@
  *   product-1…6    4:5   serum bottle, tote bag, sneaker, jar, mug, t-shirt
  *   collection-1…4 1:1   small arrangements of products
  *   lifestyle-1…2  16:9  wide scenes for banners and heroes
+ *   jewel-1…4      1:1   ring, pendant necklace, drop earrings, bangles
  *   image          1:1   a generic picture frame
  */
 
@@ -48,6 +49,19 @@ const LIFESTYLE = {
   2: `<rect x="0" y="0" width="1600" height="900" fill="currentColor" fill-opacity=".03"/><circle cx="1180" cy="300" r="110" fill="currentColor" fill-opacity=".12"/><path d="M0 640c220-150 420-190 640-90s420 60 620-60 300-90 340-60v470H0z" fill="currentColor" fill-opacity=".08"/><path d="M0 740c260-90 520-100 800-40s540 30 800-40v280H0z" fill="currentColor" fill-opacity=".1"/><path d="M0 640c220-150 420-190 640-90s420 60 620-60 300-90 340-60" ${STROKE} stroke-opacity=".3"/>`,
 };
 
+
+// Jewellery, for themes like Lumière (800 x 800).
+const JEWELS = {
+  // Solitaire ring
+  1: `<ellipse cx="400" cy="690" rx="170" ry="18" fill="currentColor" fill-opacity=".07"/><ellipse cx="400" cy="480" rx="170" ry="170" ${STROKE} stroke-width="26" stroke-opacity=".32"/><ellipse cx="400" cy="480" rx="170" ry="170" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="4"/><g ${LINE}><path d="M340 316l60-76 60 76-60 50z"/></g><path d="M340 316h120M372 316l28-76 28 76M400 366V316" ${STROKE} stroke-width="3"/><path d="M364 300l-30-12M436 300l30-12M400 230v-32" ${STROKE} stroke-width="3" stroke-opacity=".3"/>`,
+  // Pendant on a chain
+  2: `<path d="M200 150c20 250 110 380 200 420 90-40 180-170 200-420" fill="none" stroke="currentColor" stroke-opacity=".38" stroke-width="5" stroke-dasharray="2 10" stroke-linecap="round"/><circle cx="400" cy="578" r="12" ${LINE}/><g ${LINE}><path d="M400 600c-54 0-86 44-86 90 0 50 40 86 86 86s86-36 86-86c0-46-32-90-86-90z"/></g><circle cx="400" cy="688" r="30" ${DETAIL}/><path d="M384 676l16-14 16 14-16 30z" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-width="3" stroke-linejoin="round"/>`,
+  // Drop earrings
+  3: `${[270, 530].map((x) => `<circle cx="${x}" cy="210" r="16" ${LINE}/><path d="M${x} 226v70" ${STROKE}/><g ${LINE}><path d="M${x} 296c-46 60-70 120-70 170 0 50 32 86 70 86s70-36 70-86c0-50-24-110-70-170z"/></g><path d="M${x} 360c-22 34-34 72-34 104" ${STROKE} stroke-opacity=".25"/><circle cx="${x}" cy="480" r="22" ${DETAIL}/>`).join("")}<ellipse cx="400" cy="640" rx="230" ry="16" fill="currentColor" fill-opacity=".06"/>`,
+  // Stacked bangles
+  4: `<ellipse cx="400" cy="660" rx="220" ry="20" fill="currentColor" fill-opacity=".07"/>${[0, 1, 2].map((i) => `<ellipse cx="${400 + (i - 1) * 40}" cy="${440 - i * 30}" rx="190" ry="190" fill="none" stroke="currentColor" stroke-opacity="${0.42 - i * 0.08}" stroke-width="${i === 1 ? 22 : 10}"/>`).join("")}${[0, 1, 2, 3, 4, 5, 6, 7].map((k) => { const a = (k / 8) * Math.PI * 2; return `<circle cx="${(400 + 190 * Math.cos(a)).toFixed(1)}" cy="${(410 + 190 * Math.sin(a)).toFixed(1)}" r="6" fill="currentColor" fill-opacity=".3"/>`; }).join("")}`,
+};
+
 const IMAGE = `<rect x="150" y="190" width="500" height="420" rx="28" ${LINE}/><circle cx="300" cy="330" r="42" ${DETAIL}/><path d="M170 560l150-140 110 100 90-70 110 110" ${STROKE}/>`;
 
 function lookup(name) {
@@ -56,6 +70,7 @@ function lookup(name) {
   if (kind === "product") return { viewBox: "0 0 800 1000", body: PRODUCTS[((n - 1) % 6) + 1] };
   if (kind === "collection") return { viewBox: "0 0 800 800", body: COLLECTIONS[((n - 1) % 4) + 1] };
   if (kind === "lifestyle") return { viewBox: "0 0 1600 900", body: LIFESTYLE[((n - 1) % 2) + 1] };
+  if (kind === "jewel") return { viewBox: "0 0 800 800", body: JEWELS[((n - 1) % 4) + 1] };
   return { viewBox: "0 0 800 800", body: IMAGE };
 }
 

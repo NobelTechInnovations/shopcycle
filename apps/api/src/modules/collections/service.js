@@ -1,5 +1,6 @@
 const { HttpError, slugify } = require("@shopcycle/utils");
 const repository = require("./repository");
+const metafieldService = require("../metafields/service");
 
 async function uniqueSlug(prisma, storeId, title, excludeId) {
   const base = slugify(title) || "collection";
@@ -24,13 +25,15 @@ async function getCollection(prisma, storeId, id) {
 
 async function createCollection(prisma, storeId, input) {
   const slug = await uniqueSlug(prisma, storeId, input.title);
-  return repository.create(prisma, storeId, input, slug);
+  const metafields = await metafieldService.applyValues(prisma, storeId, "collection", input.metafields);
+  return repository.create(prisma, storeId, { ...input, metafields }, slug);
 }
 
 async function updateCollection(prisma, storeId, id, input) {
-  await getCollection(prisma, storeId, id);
+  const current = await getCollection(prisma, storeId, id);
   const slug = input.title ? await uniqueSlug(prisma, storeId, input.title, id) : undefined;
-  return repository.update(prisma, id, input, slug);
+  const metafields = await metafieldService.applyValues(prisma, storeId, "collection", input.metafields, current.metafields);
+  return repository.update(prisma, id, { ...input, metafields }, slug);
 }
 
 async function deleteCollection(prisma, storeId, id) {

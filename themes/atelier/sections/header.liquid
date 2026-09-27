@@ -1,0 +1,79 @@
+{% comment %}
+  Header: logo, menu, search, account, cart. On the home page it can sit
+  over the hero image (transparent until you scroll). On phones the menu
+  is a <details> drawer, so it works before theme.js loads.
+{% endcomment %}
+{% assign menu = linklists[section.settings.menu] %}
+{% assign overlay = false %}
+{% if section.settings.transparent and template.name == 'index' %}{% assign overlay = true %}{% endif %}
+<header class="header header--{{ section.settings.layout }}{% if section.settings.sticky %} header--sticky{% endif %}{% if overlay %} header--overlay{% endif %}" data-header>
+  <div class="container header__inner">
+    <details class="drawer" data-drawer>
+      <summary class="icon-btn drawer__toggle" aria-label="Menu">{% render 'snippets/icon', icon: 'menu' %}</summary>
+      <div class="drawer__panel">
+        <div class="drawer__top">
+          <span class="drawer__title">{{ shop.name }}</span>
+          <button type="button" class="icon-btn" data-drawer-close aria-label="Close menu">{% render 'snippets/icon', icon: 'close' %}</button>
+        </div>
+        <nav aria-label="Mobile">
+          <ul class="drawer__links">{% render 'snippets/menu-links', menu: menu %}</ul>
+        </nav>
+        <form class="drawer__search" action="{{ routes.search_url }}" method="get" role="search">
+          {% render 'snippets/icon', icon: 'search', class: 'icon icon--sm' %}
+          <input type="search" name="q" placeholder="Search" aria-label="Search products">
+        </form>
+        <div class="drawer__foot">
+          <a href="{{ routes.account_url }}">{% render 'snippets/icon', icon: 'user', class: 'icon icon--sm' %} {% if customer %}My account{% else %}Sign in{% endif %}</a>
+          {% render 'snippets/social-links' %}
+        </div>
+      </div>
+    </details>
+
+    <a class="header__logo" href="{{ routes.root_url }}">
+      {% if section.settings.logo != blank %}
+        <img src="{{ section.settings.logo | image_url }}" alt="{{ shop.name }}" style="width: {{ section.settings.logo_width }}px">
+      {% else %}
+        <span>{{ shop.name }}</span>
+      {% endif %}
+    </a>
+
+    <nav class="header__nav" aria-label="Main">
+      <ul>{% render 'snippets/menu-links', menu: menu %}</ul>
+    </nav>
+
+    <div class="header__actions">
+      <details class="search" data-search>
+        <summary class="icon-btn" aria-label="Search">{% render 'snippets/icon', icon: 'search' %}</summary>
+        <div class="search__panel">
+          <form class="container search__form" action="{{ routes.search_url }}" method="get" role="search">
+            <label class="visually-hidden" for="header-search">Search</label>
+            <input id="header-search" type="search" name="q" placeholder="Search for products" autocomplete="off">
+            <button type="submit" class="btn">Search</button>
+          </form>
+        </div>
+      </details>
+      <a class="icon-btn header__account" href="{{ routes.account_url }}" aria-label="{% if customer %}My account{% else %}Sign in{% endif %}">{% render 'snippets/icon', icon: 'user' %}</a>
+      <a class="icon-btn header__cart" href="{{ routes.cart_url }}" aria-label="Cart">
+        {% render 'snippets/icon', icon: 'bag' %}
+        <span class="header__count" data-cart-count{% if cart.item_count == 0 %} hidden{% endif %}>{{ cart.item_count }}</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+{% schema %}
+{
+  "name": "Header",
+  "settings": [
+    { "type": "image_picker", "id": "logo", "label": "Logo" },
+    { "type": "range", "id": "logo_width", "label": "Logo width (px)", "min": 60, "max": 240, "step": 10, "default": 110 },
+    { "type": "menu", "id": "menu", "label": "Menu", "default": "main-menu" },
+    { "type": "select", "id": "layout", "label": "Layout", "default": "left", "options": [
+      { "value": "left", "label": "Logo left, menu in the middle" },
+      { "value": "center", "label": "Logo centred, menu on the left" }
+    ] },
+    { "type": "checkbox", "id": "sticky", "label": "Stay at the top while scrolling", "default": true },
+    { "type": "checkbox", "id": "transparent", "label": "Sit over the hero image on the home page", "default": true }
+  ]
+}
+{% endschema %}

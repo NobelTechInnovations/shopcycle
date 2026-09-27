@@ -146,7 +146,23 @@ export const useEditorStore = create((set, get) => ({
       const sections = clone(s.settingsData.sections || {});
       sections[sectionType] = sections[sectionType] || {};
       sections[sectionType][settingId] = value;
+      // The shipped value (nested under `settings`) is superseded — drop it
+      // so there's one copy (see globalSectionSettings in theme-schema).
+      if (sections[sectionType].settings && typeof sections[sectionType].settings === "object") delete sections[sectionType].settings[settingId];
       return { settingsData: { ...s.settingsData, sections }, dirty: true };
+    }),
+
+  /** A section never edited shows its schema's default blocks without
+   * storing them; before the first block change they're written into
+   * settingsData, so the change applies to them instead of replacing them
+   * (and there's something to change). */
+  seedGlobalSectionBlocks: (sectionType, blocks, blockOrder) =>
+    set((s) => {
+      const sections = clone(s.settingsData.sections || {});
+      const entry = sections[sectionType] || {};
+      if ((entry.block_order || []).length && entry.blocks) return {};
+      sections[sectionType] = { ...entry, blocks: clone(blocks), block_order: [...blockOrder] };
+      return { settingsData: { ...s.settingsData, sections } };
     }),
 
   addGlobalSectionBlock: (sectionType, blockId, blockType, defaultSettings) =>

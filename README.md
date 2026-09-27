@@ -106,6 +106,40 @@ Environment for this:
   domains `*.oyklane.com` (wildcard SSL needs `oyklane.com` on Vercel's nameservers).
 - Admin (Vercel): `NEXT_PUBLIC_API_URL=https://api.oyklane.com`, `NEXT_PUBLIC_STOREFRONT_ROOT_DOMAIN=oyklane.com`.
 
+### Uploaded images
+
+Uploads are saved in the database (`files.data`) as well as on the API's
+disk. The disk is only a cache: Railway starts every deploy with an empty
+disk, and `/uploads/<store>/<file>` falls back to the database and re-caches
+it. On start-up the API copies any file still on its disk but missing from
+the database (uploads made before this existed). Nothing to configure. For
+large volumes, swap `modules/uploads` to S3/R2 behind the same functions.
+
+## Selling features
+
+- **Payments** (Settings ▸ Payments): each seller connects their own
+  Razorpay, Cashfree, PayU, Stripe or PayPal account, in test or live mode,
+  and turns cash on delivery on or off. Keys are stored encrypted
+  (`DATA_ENCRYPTION_KEY`) and never shown again in full. An unpaid online
+  order is cancelled and restocked after 2 hours.
+- **API & webhooks** (Settings ▸ API & webhooks): API keys (`oyk_…`, shown
+  once) with scopes — read/write products and inventory, read/write orders,
+  read customers — for `https://api.oyklane.com/api/v1/…`
+  (`Authorization: Bearer <key>`). Webhooks POST signed JSON
+  (`X-Oyklane-Signature: sha256=HMAC(secret, "<timestamp>.<body>")`) for
+  order, product and customer events, retried for about 9 hours.
+- **Custom data** (Settings ▸ Custom data): sellers add fields to products
+  and collections — text, paragraph, number, yes/no, date, link, colour,
+  image, list. They appear on the product form, in the product page's
+  Details (unless hidden), in the API, and in themes as
+  `{{ product.metafields.custom.fabric }}`.
+- **Themes**: Classic, Modern, Atelier (clothing — split hero, category
+  circles, shop-the-look) and Lumière (jewellery — serif, emerald and gold,
+  craft story, gift guide). Product, cart, checkout and account pages are
+  the platform's own on every theme; variants titled like `M / Black` get
+  separate Size and Colour pickers. Every store's footer carries
+  "Powered by Oyklane.com".
+
 ## Phase status
 
 - [x] Phase 0 — repo, tooling, docker, schema scaffold

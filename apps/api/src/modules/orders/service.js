@@ -8,6 +8,7 @@ const { createRefund } = require("./refunds");
 const { itemQuantities } = require("./quantities");
 const { returnDeadline } = require("./returns");
 const giftCards = require("../gift-cards/service");
+const webhooks = require("../developer/webhooks");
 
 function computeTotals(items, { discount = 0, shipping = 0, tax = 0 }) {
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
@@ -62,6 +63,8 @@ async function createOrder(prisma, storeId, input, { actorName } = {}) {
   );
   // A manual order created as already paid earns commission like any other.
   await syncOrderCommission(prisma, order.id);
+  webhooks.emit(prisma, storeId, "order.created", { id: order.id });
+  if (order.paymentStatus === "paid") webhooks.emit(prisma, storeId, "order.paid", { id: order.id });
   return order;
 }
 

@@ -1,7 +1,4 @@
-const crypto = require("crypto");
 const { HttpError } = require("@shopcycle/utils");
-const { env } = require("../../config/env");
-const { safeEqual } = require("../../lib/crypto");
 const { syncOrderCommission } = require("../billing/commission");
 const cartService = require("../cart/service");
 const discountService = require("../discounts/service");
@@ -11,39 +8,29 @@ const { adjustStock } = require("../../lib/inventory");
 const { addOrderEvent } = require("../orders/events");
 const notify = require("../orders/notify");
 const giftCards = require("../gift-cards/service");
+const payments = require("../payments/service");
+const webhooks = require("../developer/webhooks");
 
-function razorpayConfigured() {
-  return Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
+/** What checkout offers: cash on delivery (Settings ▸ Payments) and each
+ * gateway the seller connected with their own account — shoppers' money
+ * goes to the seller, never through the platform. */
+async function availablePaymentMethods(prisma, store) {
+  return payments.checkoutMethods(prisma, store);
 }
 
-/** Cash on Delivery needs no external service and is always offered;
- * online payment only appears once a merchant's own Razorpay keys are
- * configured (env vars, never something typed into this app) — no fake
- * "test success" button standing in for a real gateway. */
-function availablePaymentMethods() {
-  const methods = [{ value: "cod", label: "Cash on Delivery" }];
-  if (razorpayConfigured()) methods.push({ value: "razorpay", label: "Pay online (Razorpay)" });
-  return methods;
+async function getCheckoutContext(prisma, store, cartId) {
+  const cart = await cartService.getCart(prisma, store.id, cartId, store.handle);
+  return { cart, paymentMethods: await availablePaymentMethods(prisma, store) };
 }
 
-async function getCheckoutContext(prisma, storeId, cartId, handle) {
-  const cart = await cartService.getCart(prisma, storeId, cartId, handle);
-  return { cart, paymentMethods: availablePaymentMethods() };
-}
-
-async function createRazorpayOrder(amountInRupees, receipt) {
-  const amountPaise = Math.round(amountInRupees * 100);
-  const auth = Buffer.from(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`).toString("base64");
-  const res = await fetch(`${env.RAZORPAY_API_URL}/orders`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Basic ${auth}` },
-    body: JSON.stringify({ amount: amountPaise, currency: "INR", receipt }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new HttpError(502, `Razorpay order creation failed: ${body || res.statusText}`);
-  }
-  return res.json();
+/** Where a gateway sends the shopper back: the storefront's own return
+ * route, on whatever address they're shopping on (sent by the storefront). */
+function returnUrls(base, provider, orderId) {
+  const root = String(base || "").replace(/\/+$/, "");
+  return {
+    return: `${root}/checkout/return/${provider}?order=${encodeURIComponent(orderId)}`,
+    cancel: `${root}/checkout?checkoutError=${encodeURIComponent("Payment was cancelled — your order is saved; try paying again or choose another method.")}`,
+  };
 }
 
 /** Creates a real Order from the shopper's current cart — re-hydrated here
@@ -64,8 +51,12 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
   else if (input.paymentMethod === "gift_card") {
     throw new HttpError(400, "Your gift card no longer covers the whole order. Choose how to pay the rest.");
   }
-  if (input.paymentMethod === "razorpay" && !razorpayConfigured()) {
-    throw new HttpError(400, "Online payment isn't available for this store yet");
+  let gateway = null;
+  if (input.paymentMethod === "cod") {
+    if (store && !payments.codEnabled(store)) throw new HttpError(400, "Cash on delivery isn't available for this store.");
+  } else if (input.paymentMethod !== "gift_card") {
+    gateway = await payments.gateway(prisma, storeId, input.paymentMethod);
+    if (!gateway?.enabled) throw new HttpError(400, "That payment method isn't available for this store.");
   }
 
   // Only trust a session id that actually belongs to this store — it
@@ -190,27 +181,82 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     await prisma.visitorSession.update({ where: { id: session.id }, data: { customerId: customer.id } });
   }
 
+  // Online: start the payment with the seller's gateway. The order waits
+  // as "pending" until the gateway confirms it (confirmPayment below).
   let razorpay = null;
-  if (input.paymentMethod === "razorpay") {
-    const rp = await createRazorpayOrder(due, order.id);
-    razorpay = { orderId: rp.id, amount: rp.amount, currency: rp.currency, keyId: env.RAZORPAY_KEY_ID };
-    await prisma.order.update({ where: { id: order.id }, data: { razorpayOrderId: rp.id } });
+  let payment = null;
+  if (gateway) {
+    const started = await gateway.provider.start({
+      creds: gateway.creds,
+      test: gateway.test,
+      order,
+      amount: due,
+      store: store || (await prisma.store.findUnique({ where: { id: storeId } })),
+      urls: returnUrls(input.returnBase, input.paymentMethod, order.id),
+    });
+    const { ref, ...instruction } = started;
+    payment = { provider: input.paymentMethod, ...instruction };
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { paymentGatewayRef: ref, ...(input.paymentMethod === "razorpay" && { razorpayOrderId: ref }) },
+    });
+    if (started.kind === "razorpay") razorpay = { orderId: started.orderId, amount: started.amount, currency: started.currency, keyId: started.keyId };
   }
 
   // The cart's job ends here either way — COD is fully placed, and a
   // Razorpay order already exists server-side even if the shopper abandons
   // the payment modal next (their order sits pending, same as any real
   // gateway checkout that gets interrupted after the order is created).
-  await cartService.clearCart(prisma, storeId, cartId);
+  // Redirect gateways keep the cart until the payment is confirmed (a
+  // shopper who cancels on the gateway's page returns to a full cart).
+  if (!gateway || payment?.kind === "razorpay") await cartService.clearCart(prisma, storeId, cartId);
 
   // Cash on delivery is final now; an online order is confirmed (and
   // emailed) once its payment is verified.
   if (input.paymentMethod === "gift_card") await syncOrderCommission(prisma, order.id);
-  if (input.paymentMethod !== "razorpay" && store) {
+  if (!gateway && store) {
     await notify.sendOrderPlaced(prisma, store, order, log).catch((err) => log?.error({ err }, "checkout: confirmation email failed"));
   }
 
-  return { order, razorpay };
+  webhooks.emit(prisma, storeId, "order.created", { id: order.id });
+  if (input.paymentMethod === "gift_card") webhooks.emit(prisma, storeId, "order.paid", { id: order.id });
+  return { order, razorpay, payment };
+}
+
+/** Records a confirmed payment exactly once and does what a paid order
+ * needs: timeline, platform fee, confirmation email. */
+async function markOnlinePaid(prisma, order, { providerName, reference, log }) {
+  const { count } = await prisma.order.updateMany({
+    where: { id: order.id, paymentStatus: "pending" },
+    data: { paymentStatus: "paid", paymentReference: reference, ...(order.paymentMethod === "razorpay" && { razorpayPaymentId: reference }) },
+  });
+  const paid = await prisma.order.findUnique({ where: { id: order.id }, include: { customer: true, items: true } });
+  if (count === 1) {
+    await addOrderEvent(prisma, order.id, { kind: "paid", message: `Payment received online (${providerName} ${reference})` });
+    await syncOrderCommission(prisma, order.id);
+    webhooks.emit(prisma, paid.storeId, "order.paid", { id: order.id });
+    const store = await prisma.store.findUnique({ where: { id: paid.storeId }, include: { plan: true } });
+    await notify.sendOrderPlaced(prisma, store, paid, log).catch((err) => log?.error({ err }, "checkout: confirmation email failed"));
+  }
+  return paid;
+}
+
+/** The shopper is back from the gateway: ask the gateway (server to
+ * server, with the seller's keys) whether the payment for this order's
+ * gateway reference succeeded. Nothing the browser sends is trusted on its
+ * own. */
+async function confirmPayment(prisma, store, { orderId, provider, params, cartId }, { log } = {}) {
+  const order = await prisma.order.findFirst({ where: { id: orderId, storeId: store.id } });
+  if (!order || order.paymentMethod !== provider || !order.paymentGatewayRef) throw new HttpError(400, "Payment verification failed");
+  if (order.paymentStatus === "paid") return { paid: true, order };
+  const gateway = await payments.gateway(prisma, store.id, provider);
+  if (!gateway) throw new HttpError(400, "This payment method is no longer connected.");
+  const due = Math.max(0, Number(order.total) - Number(order.giftCardAmount || 0));
+  const result = await gateway.provider.confirm({ creds: gateway.creds, test: gateway.test, ref: order.paymentGatewayRef, amount: due, order }, params || {});
+  if (!result.paid) return { paid: false, order, message: result.message || "The payment wasn't completed." };
+  const paid = await markOnlinePaid(prisma, order, { providerName: gateway.provider.name, reference: result.reference, log });
+  if (cartId) await cartService.clearCart(prisma, store.id, cartId).catch(() => {});
+  return { paid: true, order: paid };
 }
 
 async function getOrderForConfirmation(prisma, storeId, id) {
@@ -223,42 +269,14 @@ async function getOrderForConfirmation(prisma, storeId, id) {
  * scheme — the only trustworthy signal that a payment actually succeeded
  * (the client-side "handler" callback firing is not, by itself, proof of
  * anything: it can be forged by anyone who can call this endpoint). */
+/** The Razorpay modal's callback (storefront /checkout/razorpay/verify). */
 async function verifyRazorpayPayment(prisma, { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature }, { log } = {}) {
-  if (!razorpayConfigured()) throw new HttpError(400, "Online payment isn't configured");
-  const expected = crypto
-    .createHmac("sha256", env.RAZORPAY_KEY_SECRET)
-    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-    .digest("hex");
-  if (!safeEqual(expected, razorpay_signature)) throw new HttpError(400, "Payment verification failed");
-
-  // The signature proves a real payment happened for `razorpay_order_id` —
-  // it says nothing about OUR order `orderId`. Without this check, a valid
-  // signature from paying for a cheap order could be replayed to mark any
-  // other (expensive) order as paid. Our order must be the one Razorpay
-  // order was created for at checkout.
   const order = await prisma.order.findUnique({ where: { id: orderId } });
-  if (!order || !order.razorpayOrderId || !safeEqual(order.razorpayOrderId, razorpay_order_id)) {
-    throw new HttpError(400, "Payment verification failed");
-  }
-  if (order.paymentStatus === "paid") {
-    // Already confirmed (a double-submitted callback) — nothing to change.
-    return prisma.order.findUnique({ where: { id: orderId }, include: { customer: true, items: true } });
-  }
-
-  // Conditional on still pending, so a double-submitted callback can't
-  // record the payment (or send the confirmation) twice.
-  const { count } = await prisma.order.updateMany({
-    where: { id: orderId, paymentStatus: "pending" },
-    data: { paymentStatus: "paid", razorpayPaymentId: razorpay_payment_id },
-  });
-  const paid = await prisma.order.findUnique({ where: { id: orderId }, include: { customer: true, items: true } });
-  if (count === 1) {
-    await addOrderEvent(prisma, orderId, { kind: "paid", message: `Payment received online (Razorpay ${razorpay_payment_id})` });
-    await syncOrderCommission(prisma, paid.id);
-    const store = await prisma.store.findUnique({ where: { id: paid.storeId }, include: { plan: true } });
-    await notify.sendOrderPlaced(prisma, store, paid, log).catch((err) => log?.error({ err }, "checkout: confirmation email failed"));
-  }
-  return paid;
+  if (!order || order.paymentMethod !== "razorpay") throw new HttpError(400, "Payment verification failed");
+  const store = await prisma.store.findUnique({ where: { id: order.storeId } });
+  const result = await confirmPayment(prisma, store, { orderId, provider: "razorpay", params: { razorpay_order_id, razorpay_payment_id, razorpay_signature } }, { log });
+  if (!result.paid) throw new HttpError(400, result.message || "Payment verification failed");
+  return prisma.order.findUnique({ where: { id: orderId }, include: { customer: true, items: true } });
 }
 
 module.exports = {
@@ -266,5 +284,6 @@ module.exports = {
   placeOrder,
   getOrderForConfirmation,
   verifyRazorpayPayment,
+  confirmPayment,
   availablePaymentMethods,
 };

@@ -36,7 +36,15 @@ function orderSource(order) {
   return order.email ? "Online store" : "Created in admin";
 }
 
-const PAYMENT_METHOD_LABEL = { cod: "Cash on delivery", razorpay: "Paid online (Razorpay)", gift_card: "Gift card" };
+const PAYMENT_METHOD_LABEL = {
+  cod: "Cash on delivery",
+  gift_card: "Gift card",
+  razorpay: "Online · Razorpay",
+  cashfree: "Online · Cashfree",
+  payu: "Online · PayU",
+  stripe: "Online · Stripe",
+  paypal: "Online · PayPal",
+};
 
 function SummaryRow({ label, value, strong, muted }) {
   return (

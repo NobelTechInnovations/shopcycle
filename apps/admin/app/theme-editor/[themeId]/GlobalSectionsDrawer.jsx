@@ -28,6 +28,7 @@ export function GlobalSectionsDrawer({ open, onClose, catalog, products, collect
   const removeGlobalSectionBlock = useEditorStore((s) => s.removeGlobalSectionBlock);
   const updateGlobalSectionBlockSetting = useEditorStore((s) => s.updateGlobalSectionBlockSetting);
   const moveGlobalSectionBlock = useEditorStore((s) => s.moveGlobalSectionBlock);
+  const seedGlobalSectionBlocks = useEditorStore((s) => s.seedGlobalSectionBlocks);
 
   return (
     <Drawer title="Global sections" open={open} onClose={onClose} width={400}>
@@ -45,6 +46,11 @@ export function GlobalSectionsDrawer({ open, onClose, catalog, products, collect
           settingsData.sections?.[t.key]
         );
         const blockTypes = schema.blocks || [];
+        // Store the default blocks being shown before changing any of them.
+        const seeded = (fn) => (...args) => {
+          seedGlobalSectionBlocks(t.key, blocks, blockOrder);
+          fn(...args);
+        };
 
         return (
           <div key={t.key} className="flex flex-col gap-4">
@@ -68,9 +74,9 @@ export function GlobalSectionsDrawer({ open, onClose, catalog, products, collect
                       className="w-36"
                       value={null}
                       options={blockTypes.map((b) => ({ value: b.type, label: b.name }))}
-                      onChange={(blockType) =>
+                      onChange={seeded((blockType) =>
                         addGlobalSectionBlock(t.key, newBlockId(), blockType, defaultBlockSettings(catalog, t.key, blockType))
-                      }
+                      )}
                     />
                   )}
                 </div>
@@ -92,7 +98,7 @@ export function GlobalSectionsDrawer({ open, onClose, catalog, products, collect
                               icon={<ChevronUp size={12} aria-hidden="true" />}
                               aria-label="Move block up"
                               disabled={idx === 0}
-                              onClick={() => moveGlobalSectionBlock(t.key, blockId, -1)}
+                              onClick={seeded(() => moveGlobalSectionBlock(t.key, blockId, -1))}
                             />
                             <Button
                               size="small"
@@ -100,7 +106,7 @@ export function GlobalSectionsDrawer({ open, onClose, catalog, products, collect
                               icon={<ChevronDown size={12} aria-hidden="true" />}
                               aria-label="Move block down"
                               disabled={idx === blockOrder.length - 1}
-                              onClick={() => moveGlobalSectionBlock(t.key, blockId, 1)}
+                              onClick={seeded(() => moveGlobalSectionBlock(t.key, blockId, 1))}
                             />
                             <Button
                               size="small"
@@ -108,7 +114,7 @@ export function GlobalSectionsDrawer({ open, onClose, catalog, products, collect
                               danger
                               icon={<Trash2 size={12} aria-hidden="true" />}
                               aria-label="Remove block"
-                              onClick={() => removeGlobalSectionBlock(t.key, blockId)}
+                              onClick={seeded(() => removeGlobalSectionBlock(t.key, blockId))}
                             />
                           </div>
                         </div>
@@ -119,7 +125,7 @@ export function GlobalSectionsDrawer({ open, onClose, catalog, products, collect
                             products={products}
                             collections={collections}
                             menus={menus}
-                            onChange={(settingId, value) => updateGlobalSectionBlockSetting(t.key, blockId, settingId, value)}
+                            onChange={seeded((settingId, value) => updateGlobalSectionBlockSetting(t.key, blockId, settingId, value))}
                           />
                         </div>
                       </div>

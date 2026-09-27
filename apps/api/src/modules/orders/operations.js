@@ -6,6 +6,7 @@ const { itemQuantities, deriveFulfillmentStatus, checkSelection } = require("./q
 const { trackingUrlFor } = require("./couriers");
 const notify = require("./notify");
 const giftCards = require("../gift-cards/service");
+const webhooks = require("../developer/webhooks");
 
 /**
  * What a merchant does with an order after it's placed: ship it (all at
@@ -98,6 +99,7 @@ async function createFulfillment(prisma, store, orderId, input, { actorName, log
     const fresh = await loadOrder(prisma, store.id, orderId);
     await notify.sendShippingUpdate(prisma, store, fresh, fulfillment, log);
   }
+  webhooks.emit(prisma, store.id, "order.fulfilled", { id: orderId });
   return fulfillment;
 }
 
@@ -151,6 +153,7 @@ async function markPaid(prisma, store, orderId, { actorName } = {}) {
     }),
   ]);
   await syncOrderCommission(prisma, orderId);
+  webhooks.emit(prisma, store.id, "order.paid", { id: orderId });
 }
 
 /**
@@ -216,6 +219,7 @@ async function cancelOrder(prisma, store, orderId, { reason, restock = true, ref
   await syncOrderCommission(prisma, orderId);
 
   if (send) await notify.sendCancelled(prisma, store, await loadOrder(prisma, store.id, orderId), reason, log);
+  webhooks.emit(prisma, store.id, "order.cancelled", { id: orderId });
 }
 
 async function addNote(prisma, store, orderId, text, { actorName } = {}) {

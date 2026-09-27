@@ -58,12 +58,27 @@ function round2(n) {
  * crashing the cart. Also resolves discount/shipping/tax against the
  * store's current configuration — see the ShippingZone/TaxRate model doc
  * comments for the "no checkout address yet" simplification this rests on. */
+/** The photo for a cart line: one whose description names the variant's
+ * option (a colour — "Pure Linen Shirt in Olive"), else the first. */
+function variantImage(variant) {
+  const images = variant.product.images || [];
+  const parts = String(variant.title || "")
+    .split(" / ")
+    .map((p) => p.trim().toLowerCase())
+    .filter((p) => p && p !== "default");
+  for (const part of parts.reverse()) {
+    const hit = images.find((img) => String(img.altText || "").toLowerCase().split(/[^a-z0-9]+/).join(" ").includes(part.split(/[^a-z0-9]+/).join(" ")));
+    if (hit) return hit.url;
+  }
+  return images[0]?.url || null;
+}
+
 async function hydrateCart(prisma, storeId, cartId, raw) {
   const variantIds = raw.items.map((i) => i.variantId);
   const variants = variantIds.length
     ? await prisma.productVariant.findMany({
         where: { id: { in: variantIds }, product: { storeId } },
-        include: { product: { include: { images: { orderBy: { position: "asc" }, take: 1 } } } },
+        include: { product: { include: { images: { orderBy: { position: "asc" }, take: 12 } } } },
       })
     : [];
   const variantsById = Object.fromEntries(variants.map((v) => [v.id, v]));
@@ -82,7 +97,7 @@ async function hydrateCart(prisma, storeId, cartId, raw) {
       productId: variant.productId,
       title: `${variant.product.title}${variant.title !== "Default" ? ` — ${variant.title}` : ""}`,
       url: `/store/__handle__/products/${variant.product.slug}`, // handle filled in by caller
-      image: variant.product.images[0]?.url || null,
+      image: variantImage(variant),
       price,
       quantity: item.quantity,
       lineTotal: price * item.quantity,

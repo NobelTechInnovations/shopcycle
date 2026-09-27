@@ -1,7 +1,8 @@
 const { z } = require("zod");
 
 const installThemeSchema = z.object({
-  handle: z.enum(["classic", "modern"]),
+  // Keep in step with MASTER_THEMES (apps/api/src/modules/themes/service.js).
+  handle: z.enum(["classic", "modern", "atelier", "lumiere"]),
 });
 
 const updateThemeSettingsSchema = z.object({

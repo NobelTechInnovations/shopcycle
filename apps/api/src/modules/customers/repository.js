@@ -1,4 +1,5 @@
 const platformCustomersService = require("../platform-customers/service");
+const webhooks = require("../developer/webhooks");
 const { SPEND_ORDER_SELECT } = require("./spend");
 
 function list(prisma, storeId, { q, page, pageSize }) {
@@ -46,7 +47,9 @@ function findByEmail(prisma, storeId, email, excludeId) {
  * this id; it only matters to super-admin's cross-store marketing view. */
 async function create(prisma, storeId, data) {
   const platformCustomerId = await platformCustomersService.linkCustomer(prisma, null, data);
-  return prisma.customer.create({ data: { ...data, storeId, platformCustomerId } });
+  const customer = await prisma.customer.create({ data: { ...data, storeId, platformCustomerId } });
+  webhooks.emit(prisma, storeId, "customer.created", { id: customer.id });
+  return customer;
 }
 
 async function update(prisma, id, data) {

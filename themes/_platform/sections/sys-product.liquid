@@ -50,7 +50,41 @@
           <p class="sys-pinfo__taxnote">{% if shop.taxes_included %}Inclusive of all taxes{% else %}Taxes calculated at checkout{% endif %}{% if shop.free_shipping_above %} · Free delivery over {{ shop.free_shipping_above | money }}{% endif %}</p>
 
           <form method="post" action="{{ routes.cart_add_url }}" class="sys-stack" style="gap:20px" data-sys-product data-product-title="{{ product.title | escape }}">
-            {% if many %}
+            {% if many and product.options.size > 0 %}
+              {% comment %}
+                One picker per option (Size, Colour…) from titles like "M / Black".
+                system.js turns the choices into the matching variant; the hidden
+                input is enabled only once it runs — without JS the plain list in
+                <noscript> is what's submitted.
+              {% endcomment %}
+              <input type="hidden" name="variantId" value="{{ current.id }}" data-sys-variant-input disabled>
+              {% for option in product.options %}
+                <fieldset class="sys-options" data-sys-option="{{ option.position }}">
+                  <legend>{{ option.name }}: <span data-sys-option-selected>{{ option.selected }}</span></legend>
+                  <div class="sys-swatches">
+                    {% for item in option.values %}
+                      <label class="sys-swatch{% if option.is_colour and item.swatch %} sys-swatch--colour{% endif %}{% unless item.available %} sys-swatch--unavailable{% endunless %}">
+                        <input type="radio" name="option{{ option.position }}" value="{{ item.value | escape }}" {% if item.value == option.selected %}checked{% endif %}>
+                        <span>{% if option.is_colour and item.swatch %}<i class="sys-swatch__dot" style="background: {{ item.swatch }}" aria-hidden="true"></i>{% endif %}{{ item.value }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+                </fieldset>
+              {% endfor %}
+              <noscript>
+                <fieldset class="sys-options">
+                  <legend>Option</legend>
+                  <div class="sys-swatches">
+                    {% for variant in product.variants %}
+                      <label class="sys-swatch{% unless variant.available %} sys-swatch--unavailable{% endunless %}">
+                        <input type="radio" name="variantId" value="{{ variant.id }}" {% if variant.id == current.id %}checked{% endif %}>
+                        <span>{{ variant.title }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+                </fieldset>
+              </noscript>
+            {% elsif many %}
               <fieldset class="sys-options">
                 <legend>Option: <span data-sys-selected>{{ current.title }}</span></legend>
                 <div class="sys-swatches">
@@ -106,10 +140,23 @@
                 </div>
               </details>
             {% endif %}
-            <details class="sys-accordion">
+            <details class="sys-accordion"{% if product.specs.size > 0 %} open{% endif %}>
               <summary>Details {% render 'snippets/sys-icon', icon: 'plus' %}</summary>
               <div class="sys-accordion__body">
                 <dl>
+                  {% comment %} The seller's own fields — Settings ▸ Custom data. {% endcomment %}
+                  {% for spec in product.specs %}
+                    <dt>{{ spec.name | escape }}</dt>
+                    <dd>
+                      {% case spec.type %}
+                        {% when 'color' %}<span class="sys-spec-swatch" style="background:{{ spec.value }}"></span>{{ spec.value }}
+                        {% when 'url' %}<a class="sys-link" href="{{ spec.value | escape }}" target="_blank" rel="noopener nofollow">Open link</a>
+                        {% when 'image' %}<a href="{{ spec.value | escape }}" target="_blank" rel="noopener"><img class="sys-spec-image" src="{{ spec.value | escape }}" alt="{{ spec.name | escape }}" loading="lazy"></a>
+                        {% when 'multiline' %}{{ spec.display | escape | newline_to_br }}
+                        {% else %}{{ spec.display | escape }}
+                      {% endcase %}
+                    </dd>
+                  {% endfor %}
                   {% if product.brand %}<dt>Brand</dt><dd>{{ product.brand }}</dd>{% endif %}
                   {% if product.category %}<dt>Category</dt><dd>{{ product.category }}</dd>{% endif %}
                   {% if product.product_type %}<dt>Type</dt><dd>{{ product.product_type }}</dd>{% endif %}

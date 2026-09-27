@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { proxyRender, API_URL, CART_COOKIE, VISITOR_COOKIE } from "@/lib/render";
 import { storefrontPath } from "@/lib/domain";
 import { shopperToken } from "@/lib/shopper";
+import { storeBase, gatewayHandoff } from "@/lib/payments";
 
 export async function GET(request, { params }) {
   const { handle } = await params;
@@ -38,6 +39,9 @@ export async function POST(request, { params }) {
     shippingCountry: form.get("shippingCountry"),
     paymentMethod: form.get("paymentMethod") || "cod",
     acceptsMarketing: form.get("acceptsMarketing") === "true",
+    // Where a payment gateway sends the shopper back — the address they're
+    // shopping on right now.
+    returnBase: storeBase(request, handle),
   };
 
   const token = await shopperToken();
@@ -62,7 +66,14 @@ export async function POST(request, { params }) {
     return NextResponse.redirect(target, { status: 303 });
   }
 
-  const { order, razorpay } = result;
+  const { order, razorpay, payment } = result;
+
+  // Gateways that take the shopper to their own page (Stripe, PayPal,
+  // Cashfree, PayU). The cart stays until the payment is confirmed, so a
+  // shopper who cancels comes back to a full cart.
+  if (payment && payment.kind !== "razorpay") {
+    return payment.kind === "redirect" ? NextResponse.redirect(payment.url, { status: 303 }) : gatewayHandoff(payment);
+  }
 
   let target;
   if (razorpay) {

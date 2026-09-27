@@ -102,7 +102,7 @@ function readableOn(color, bg, text) {
 
 const FONT_NAME = /^[A-Za-z0-9 ]{2,40}$/;
 const SANS = `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
-const SERIF_FONTS = /serif|playfair|garamond|lora|baskerville|fraunces|merriweather|cormorant|marcellus|dm serif/i;
+const SERIF_FONTS = /serif|playfair|garamond|lora|baskerville|fraunces|merriweather|cormorant|marcellus|bodoni|italiana|dm serif/i;
 function fontStack(name) {
   const clean = FONT_NAME.test(String(name || "")) ? String(name) : null;
   const fallback = clean && SERIF_FONTS.test(clean) && !/sans/i.test(clean) ? `Georgia, "Times New Roman", serif` : SANS;

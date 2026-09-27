@@ -134,23 +134,30 @@
               <p class="sys-small sys-muted" style="margin:0 0 12px">Your gift card pays {{ cart.gift_card.amount | money }}. Choose how to pay the remaining {{ cart.due | money }}.</p>
             {% endif %}
             <div class="sys-pay" role="radiogroup" aria-label="Payment method">
+              {% if payment_methods.size == 0 %}
+                <p class="sys-alert sys-alert--error" style="margin:0">This store isn't taking orders online right now — no payment method is set up. Please contact the store.</p>
+              {% endif %}
               {% for method in payment_methods %}
                 <label class="sys-pay__opt">
                   <input type="radio" name="paymentMethod" value="{{ method.value }}" {% if forloop.first %}checked{% endif %}>
                   <span class="sys-pay__label">
-                    {% if method.value == 'cod' %}
-                      <strong>Cash on delivery</strong>
-                      <span>Pay by cash or UPI when your order arrives</span>
-                    {% else %}
-                      <strong>Pay online</strong>
-                      <span>UPI, cards, net banking and wallets via Razorpay</span>
-                    {% endif %}
+                    {% case method.value %}
+                      {% when 'cod' %}<strong>Cash on delivery</strong><span>Pay by cash or UPI when your order arrives</span>
+                      {% when 'razorpay' %}<strong>Pay online</strong><span>UPI, cards, net banking and wallets · Razorpay</span>
+                      {% when 'cashfree' %}<strong>Pay online</strong><span>UPI, cards, net banking and pay later · Cashfree</span>
+                      {% when 'payu' %}<strong>Pay online</strong><span>UPI, cards, net banking and EMI · PayU</span>
+                      {% when 'stripe' %}<strong>Card</strong><span>Credit and debit cards · Stripe</span>
+                      {% when 'paypal' %}<strong>PayPal</strong><span>Pay with your PayPal account or card</span>
+                      {% else %}<strong>{{ method.label }}</strong>
+                    {% endcase %}
+                    {% if method.testMode %}<span class="sys-badge sys-badge--warning" style="margin-top:4px;align-self:flex-start">Test mode</span>{% endif %}
                   </span>
-                  {% if method.value == 'cod' %}
-                    {% render 'snippets/sys-icon', icon: 'cash' %}
-                  {% else %}
-                    <span class="sys-pay__icons" aria-hidden="true"><span>UPI</span><span>VISA</span><span>RuPay</span></span>
-                  {% endif %}
+                  {% case method.value %}
+                    {% when 'cod' %}{% render 'snippets/sys-icon', icon: 'cash' %}
+                    {% when 'stripe' %}<span class="sys-pay__icons" aria-hidden="true"><span>VISA</span><span>MC</span><span>AMEX</span></span>
+                    {% when 'paypal' %}<span class="sys-pay__icons" aria-hidden="true"><span>PayPal</span></span>
+                    {% else %}<span class="sys-pay__icons" aria-hidden="true"><span>UPI</span><span>VISA</span><span>RuPay</span></span>
+                  {% endcase %}
                 </label>
               {% endfor %}
             </div>

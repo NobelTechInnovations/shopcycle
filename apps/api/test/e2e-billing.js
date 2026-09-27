@@ -342,6 +342,9 @@ async function main() {
     });
     const handle = (await call("GET", "/api/store")).data.store.handle;
     const variantId = product.data.product?.variants?.[0]?.id;
+    // Shoppers pay into the seller's own gateway account (Settings ▸ Payments).
+    r = await call("PUT", "/api/payments/razorpay", { credentials: { keyId: "rzp_test_mock", keySecret: KEY_SECRET }, testMode: true });
+    check("seller connects their own Razorpay account", r.status === 200, r.data);
     const placeRazorpayOrder = async (qty) => {
       const cart = await call("POST", `/api/storefront/${handle}/cart/add`, { variantId, quantity: qty });
       const checkout = await call("POST", `/api/storefront/${handle}/checkout`, {

@@ -1,17 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Store, CreditCard, Users, Truck, Percent, Globe, Bell } from "lucide-react";
+import { Store, CreditCard, Users, Truck, Percent, Globe, Bell, Wallet, Braces, Code2, Search } from "lucide-react";
 
+// Shopify-style: one compact row per section, grouped, with a filter.
 export const SETTINGS_SECTIONS = [
   { href: "/admin/settings", icon: Store, label: "General", hint: "Name, currency, timezone" },
   { href: "/admin/settings/billing", icon: CreditCard, label: "Plan & billing", hint: "Plan, fees, invoices" },
-  { href: "/admin/settings/team", icon: Users, label: "Team", hint: "Staff and permissions" },
-  { href: "/admin/settings/notifications", icon: Bell, label: "Notifications", hint: "Emails, returns, invoices" },
-  { href: "/admin/settings/shipping", icon: Truck, label: "Shipping", hint: "Zones and rates" },
+  { href: "/admin/settings/team", icon: Users, label: "Users & permissions", hint: "Staff and roles" },
+  { href: "/admin/settings/payments", icon: Wallet, label: "Payments", hint: "Gateways and cash on delivery" },
+  { href: "/admin/settings/shipping", icon: Truck, label: "Shipping and delivery", hint: "Zones and rates" },
   { href: "/admin/settings/taxes", icon: Percent, label: "Taxes", hint: "Tax rates at checkout" },
   { href: "/admin/settings/domains", icon: Globe, label: "Domains", hint: "Your store's address" },
+  { href: "/admin/settings/notifications", icon: Bell, label: "Notifications", hint: "Emails, returns, invoices" },
+  { href: "/admin/settings/custom-data", icon: Braces, label: "Custom data", hint: "Extra fields for products" },
+  { href: "/admin/settings/api", icon: Code2, label: "API & webhooks", hint: "Access keys and event hooks" },
 ];
 
 function isActive(pathname, href) {
@@ -24,35 +29,40 @@ function isActive(pathname, href) {
  * of chips on narrow screens. */
 export function SettingsNav() {
   const pathname = usePathname();
+  const [q, setQ] = useState("");
+  const shown = SETTINGS_SECTIONS.filter((s) => !q || `${s.label} ${s.hint}`.toLowerCase().includes(q.toLowerCase()));
   return (
-    <nav aria-label="Settings sections">
-      <ul className="list-none m-0 p-0 flex lg:flex-col gap-1 overflow-x-auto pb-1 lg:pb-0">
-        {SETTINGS_SECTIONS.map(({ href, icon: Icon, label, hint }) => {
+    <nav aria-label="Settings sections" className="lg:bg-app-surface lg:border lg:border-app-border lg:rounded-xl lg:p-2 lg:shadow-card">
+      <label className="hidden lg:flex items-center gap-2 h-9 px-2.5 mb-1.5 rounded-lg border border-app-border bg-app-bg text-ink-muted">
+        <Search size={14} aria-hidden="true" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search settings"
+          aria-label="Search settings"
+          className="flex-1 min-w-0 bg-transparent border-0 outline-none text-sm text-ink placeholder:text-ink-subtle"
+        />
+      </label>
+      <ul className="list-none m-0 p-0 flex lg:flex-col gap-0.5 overflow-x-auto pb-1 lg:pb-0">
+        {shown.map(({ href, icon: Icon, label, hint }) => {
           const active = isActive(pathname, href);
           return (
             <li key={href} className="shrink-0">
               <Link
                 href={href}
+                title={hint}
                 aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 no-underline transition-colors ${
-                  active ? "bg-app-surface shadow-card text-ink" : "text-ink-muted hover:bg-app-surface/70 hover:text-ink"
+                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 no-underline text-[13.5px] transition-colors whitespace-nowrap ${
+                  active ? "bg-app-bg text-ink font-semibold" : "text-ink-muted hover:bg-app-bg hover:text-ink"
                 }`}
               >
-                <span
-                  className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${
-                    active ? "bg-accent-soft text-accent" : "bg-app-surface border border-app-border text-ink-muted"
-                  }`}
-                >
-                  <Icon size={16} aria-hidden="true" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[13px] font-medium whitespace-nowrap">{label}</span>
-                  <span className="hidden lg:block text-xs text-ink-subtle truncate">{hint}</span>
-                </span>
+                <Icon size={16} className={active ? "text-ink" : "text-ink-subtle"} aria-hidden="true" />
+                {label}
               </Link>
             </li>
           );
         })}
+        {shown.length === 0 && <li className="px-2.5 py-2 text-xs text-ink-muted">No settings match.</li>}
       </ul>
     </nav>
   );

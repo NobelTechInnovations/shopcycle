@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Form, Input, Select, Button, Card } from "antd";
+import { Form, Input, Select, Card, App } from "antd";
 import { PageHeader, SaveBar } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+import { ImageUploadField } from "@/components/ImageUploadField";
+import { CustomDataFields, metafieldPayload } from "@/components/CustomDataFields";
 
 export function CollectionForm({ collection }) {
   const router = useRouter();
+  const { message } = App.useApp();
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [products, setProducts] = useState([]);
@@ -22,6 +25,8 @@ export function CollectionForm({ collection }) {
         title: collection.title,
         description: collection.description,
         status: collection.status,
+        image: collection.image || null,
+        metafields: collection.metafields || {},
         productIds: collection.products.map((p) => p.productId),
       }
     : { status: "draft", productIds: [] };
@@ -29,13 +34,17 @@ export function CollectionForm({ collection }) {
   async function handleSubmit(values) {
     setSaving(true);
     try {
+      const body = { ...values, image: values.image || null, metafields: metafieldPayload(values.metafields) };
       if (isEdit) {
-        await apiFetch(`/api/collections/${collection.id}`, { method: "PATCH", body: values });
+        await apiFetch(`/api/collections/${collection.id}`, { method: "PATCH", body });
       } else {
-        await apiFetch("/api/collections", { method: "POST", body: values });
+        await apiFetch("/api/collections", { method: "POST", body });
       }
+      message.success(isEdit ? "Collection saved" : "Collection created");
       router.push("/admin/collections");
       router.refresh();
+    } catch (err) {
+      message.error(err.message || "Couldn't save the collection");
     } finally {
       setSaving(false);
     }
@@ -70,18 +79,27 @@ export function CollectionForm({ collection }) {
                 />
               </Form.Item>
             </Card>
+
+            <CustomDataFields ownerType="collection" />
           </div>
 
-          <Card size="small" title="Status">
-            <Form.Item name="status" className="mb-0">
-              <Select
-                options={[
-                  { value: "draft", label: "Draft" },
-                  { value: "active", label: "Active" },
-                ]}
-              />
-            </Form.Item>
-          </Card>
+          <div className="flex flex-col gap-6">
+            <Card size="small" title="Status">
+              <Form.Item name="status" className="mb-0">
+                <Select
+                  options={[
+                    { value: "draft", label: "Draft" },
+                    { value: "active", label: "Active" },
+                  ]}
+                />
+              </Form.Item>
+            </Card>
+            <Card size="small" title="Collection image">
+              <Form.Item name="image" className="mb-0" extra="Shown on collection tiles and at the top of the collection page.">
+                <ImageUploadField aspect="4 / 3" label="Upload image" />
+              </Form.Item>
+            </Card>
+          </div>
         </div>
 
         <SaveBar

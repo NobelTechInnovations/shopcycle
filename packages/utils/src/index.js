@@ -1,5 +1,8 @@
 function slugify(input) {
   return String(input)
+    // "Piqué" → "pique", "Lumière" → "lumiere": split accents off, drop them.
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")

@@ -1,6 +1,7 @@
 const { HttpError, slugify } = require("@shopcycle/utils");
 const { assertWithinPlanLimit } = require("../../lib/plan-limits");
 const repository = require("./repository");
+const metafieldService = require("../metafields/service");
 
 async function uniqueSlug(prisma, storeId, title, excludeId) {
   const base = slugify(title) || "product";
@@ -27,13 +28,15 @@ async function createProduct(prisma, store, input, { actorName } = {}) {
   const productCount = await repository.count(prisma, store.id);
   assertWithinPlanLimit(store.plan, productCount, "productLimit", "products");
   const slug = await uniqueSlug(prisma, store.id, input.title);
-  return repository.create(prisma, store.id, input, slug, { actorName });
+  const metafields = await metafieldService.applyValues(prisma, store.id, "product", input.metafields);
+  return repository.create(prisma, store.id, { ...input, metafields }, slug, { actorName });
 }
 
 async function updateProduct(prisma, storeId, id, input, { actorName } = {}) {
-  await getProduct(prisma, storeId, id); // 404s if not found or not owned by this store
+  const current = await getProduct(prisma, storeId, id); // 404s if not found or not owned by this store
   const slug = input.title ? await uniqueSlug(prisma, storeId, input.title, id) : undefined;
-  return repository.update(prisma, id, input, slug, { storeId, actorName });
+  const metafields = await metafieldService.applyValues(prisma, storeId, "product", input.metafields, current.metafields);
+  return repository.update(prisma, id, { ...input, metafields }, slug, { storeId, actorName });
 }
 
 async function deleteProduct(prisma, storeId, id) {

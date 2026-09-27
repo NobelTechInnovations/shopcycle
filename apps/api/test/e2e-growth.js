@@ -15,13 +15,17 @@
  * Creates throwaway stores and deletes them when done, pass or fail.
  */
 const path = require("path");
+const crypto = require("crypto");
 const { spawn } = require("child_process");
+const { startGatewaysMock } = require("./gateways-mock");
 
 const ROOT = path.resolve(__dirname, "../../..");
 require(path.join(ROOT, "apps/api/node_modules/dotenv")).config({ path: path.join(ROOT, ".env") });
 
 const API_PORT = 4199;
 const API = `http://localhost:${API_PORT}`;
+const MOCK_PORT = 4296;
+const MOCK = `http://localhost:${MOCK_PORT}`;
 const ORIGIN = process.env.ADMIN_ORIGIN || "http://localhost:3000";
 
 let pass = 0;
@@ -85,7 +89,19 @@ async function sf(method, url, body, headers = {}) {
 async function startApi() {
   const child = spawn(process.execPath, [path.join(ROOT, "apps/api/src/server.js")], {
     cwd: path.join(ROOT, "apps/api"),
-    env: { ...process.env, API_PORT: String(API_PORT), NODE_ENV: "test", JOBS_DISABLED: "true", SMTP_HOST: "", RAZORPAY_KEY_ID: "", RAZORPAY_KEY_SECRET: "" },
+    env: {
+      ...process.env,
+      API_PORT: String(API_PORT),
+      NODE_ENV: "test",
+      JOBS_DISABLED: "true",
+      SMTP_HOST: "",
+      RAZORPAY_KEY_ID: "",
+      RAZORPAY_KEY_SECRET: "",
+      CASHFREE_API_URL: `${MOCK}/pg`,
+      STRIPE_API_URL: MOCK,
+      PAYPAL_API_URL: MOCK,
+      PAYU_API_URL: `${MOCK}/payu`,
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let log = "";
@@ -113,6 +129,7 @@ const SHIP = {
 };
 
 async function main() {
+  const { server: mock } = await startGatewaysMock(MOCK_PORT);
   const api = await startApi();
   const { PrismaClient } = require(path.join(ROOT, "packages/database/node_modules/@prisma/client"));
   const prisma = new PrismaClient();
@@ -181,6 +198,7 @@ async function main() {
     const acct = String(r.data);
     check("unverified account shows its signed-in order", acct.includes(`#${signedInOrder.orderNumber}`), acct.slice(0, 300));
     check("…but not the guest order placed with its email", !acct.includes(`#${guestOrder.orderNumber}`));
+    check("account page: summary tiles, tabs and order cards with a track link", acct.includes("sys-acct__tiles") && acct.includes('data-sys-tabs') && acct.includes("sys-ocard") && /Track order|View order/.test(acct), acct.slice(0, 300));
 
     // Someone who has ordered as a guest can't claim the email by signing up.
     cartId = await freshCart();
@@ -333,6 +351,244 @@ async function main() {
     r = await owner("POST", "/api/products/bulk", { ids: [second.id], action: "delete" });
     check("bulk delete", r.data.count === 1 && !(await prisma.product.findUnique({ where: { id: second.id } })), r.data);
 
+    // ── Seller payment gateways ──
+    await owner("POST", "/api/products/bulk", { ids: [product.id], action: "activate" });
+    r = await owner("GET", "/api/payments");
+    check("payments: five gateways listed, cash on delivery on", r.data.providers?.length === 5 && r.data.cod.enabled === true, r.data);
+    r = await owner("PUT", "/api/payments/stripe", { credentials: { publishableKey: "pk_test_x", secretKey: "sk_test_bad" }, testMode: true });
+    check("wrong Stripe key is refused before saving", r.status === 400, r.data);
+    r = await owner("PUT", "/api/payments/stripe", { credentials: { publishableKey: "pk_test_x", secretKey: "sk_test_ok" }, testMode: true });
+    const stripeRow = r.data.providers?.find((p) => p.key === "stripe");
+    check("connect Stripe (checked with Stripe, then saved)", r.status === 200 && stripeRow?.enabled && stripeRow.fields.find((f) => f.key === "secretKey").saved === "•••• t_ok", stripeRow);
+    const storedGateway = await prisma.paymentProvider.findFirst({ where: { storeId: store.id, provider: "stripe" } });
+    check("gateway keys are stored encrypted", storedGateway.credentials.startsWith("enc:v1:") && !storedGateway.credentials.includes("sk_test_ok"));
+    const viewCart = await freshCart(1);
+    r = await sf("GET", `/api/storefront/${H}/render/checkout?cartId=${viewCart}`);
+    check("checkout offers the connected gateway", String(r.data).includes('value="stripe"'), String(r.data).match(/name="paymentMethod"[^>]*>/g));
+
+    const RB = "https://shop.example.test";
+    cartId = await freshCart(1);
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId, email: `pay-${stamp}@test.oyklane.dev`, ...SHIP, paymentMethod: "stripe", returnBase: RB });
+    check("Stripe checkout sends the shopper to Stripe", r.status === 201 && r.data.payment?.kind === "redirect" && r.data.payment.url.includes("checkout.stripe.test"), r.data);
+    const stripeOrder = r.data.order;
+    check("…and keeps the cart until paid", (await sf("GET", `/api/storefront/${H}/cart?cartId=${cartId}`)).data.cart.item_count === 1);
+    r = await sf("POST", `/api/storefront/${H}/checkout/payments/stripe/confirm`, { orderId: stripeOrder.id, cartId });
+    check("not paid yet → not confirmed", r.data.paid === false, r.data);
+    const session = (await prisma.order.findUnique({ where: { id: stripeOrder.id } })).paymentGatewayRef;
+    await fetch(`${MOCK}/__pay/stripe/${session}`, { method: "POST" });
+    r = await sf("POST", `/api/storefront/${H}/checkout/payments/stripe/confirm`, { orderId: stripeOrder.id, cartId, params: { session_id: session } });
+    const paidStripe = await prisma.order.findUnique({ where: { id: stripeOrder.id } });
+    check("paid on Stripe → order paid (checked with Stripe)", r.data.paid === true && paidStripe.paymentStatus === "paid" && paidStripe.paymentReference === "pi_mock_1", paidStripe);
+    check("cart cleared after payment", (await sf("GET", `/api/storefront/${H}/cart?cartId=${cartId}`)).data.cart.item_count === 0);
+    r = await sf("POST", `/api/storefront/${H}/checkout/payments/cashfree/confirm`, { orderId: stripeOrder.id });
+    check("a return for the wrong gateway is refused", r.status === 400, r.data);
+
+    r = await owner("PUT", "/api/payments/cashfree", { credentials: { appId: "cf_app", secretKey: "cf_secret_ok" }, testMode: true });
+    check("connect Cashfree", r.status === 200, r.data);
+    cartId = await freshCart(2);
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId, email: `pay2-${stamp}@test.oyklane.dev`, ...SHIP, paymentMethod: "cashfree", returnBase: RB });
+    check("Cashfree checkout hands over a payment session", r.data.payment?.kind === "cashfree" && r.data.payment.sessionId && r.data.payment.mode === "sandbox", r.data);
+    const cfOrder = r.data.order;
+    await fetch(`${MOCK}/__pay/cashfree/oy_${cfOrder.id}`, { method: "POST" });
+    r = await sf("POST", `/api/storefront/${H}/checkout/payments/cashfree/confirm`, { orderId: cfOrder.id, params: { order_id: `oy_${cfOrder.id}` } });
+    check("Cashfree payment confirmed", r.data.paid === true, r.data);
+
+    r = await owner("PUT", "/api/payments/payu", { credentials: { merchantKey: "gtKFFx", salt: "eCwWELxi42" }, testMode: true });
+    check("connect PayU", r.status === 200, r.data);
+    cartId = await freshCart(1);
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId, email: `pay3-${stamp}@test.oyklane.dev`, ...SHIP, paymentMethod: "payu", returnBase: RB });
+    const pf = r.data.payment?.fields || {};
+    const hashOk = crypto.createHash("sha512").update(`${pf.key}|${pf.txnid}|${pf.amount}|${pf.productinfo}|${pf.firstname}|${pf.email}|||||||||||eCwWELxi42`).digest("hex");
+    check("PayU checkout posts a signed form to PayU", r.data.payment?.kind === "form" && r.data.payment.action.endsWith("/_payment") && pf.hash === hashOk && pf.surl.startsWith(`${RB}/checkout/return/payu`), r.data.payment);
+    const payuOrder = r.data.order;
+    const back = { ...pf, status: "success", mihpayid: "403993715", salt: undefined };
+    delete back.salt;
+    back.hash = crypto.createHash("sha512").update(`eCwWELxi42|success|||||||||||${pf.email}|${pf.firstname}|${pf.productinfo}|${pf.amount}|${pf.txnid}|${pf.key}`).digest("hex");
+    r = await sf("POST", `/api/storefront/${H}/checkout/payments/payu/confirm`, { orderId: payuOrder.id, params: { ...back, hash: back.hash.replace(/^./, "0") } });
+    check("PayU return with a forged signature is refused", r.data.paid === false, r.data);
+    r = await sf("POST", `/api/storefront/${H}/checkout/payments/payu/confirm`, { orderId: payuOrder.id, params: back });
+    check("PayU return with PayU's signature → paid", r.data.paid === true, r.data);
+
+    r = await owner("PUT", "/api/payments/paypal", { credentials: { clientId: "pp_client", clientSecret: "pp_secret" }, testMode: true });
+    check("PayPal refused for a rupee store (PayPal doesn't take INR here)", r.status === 400 && /INR/.test(r.data.error), r.data);
+    await prisma.store.update({ where: { id: store.id }, data: { currency: "USD" } });
+    r = await owner("PUT", "/api/payments/paypal", { credentials: { clientId: "pp_client", clientSecret: "pp_secret" }, testMode: true });
+    check("connect PayPal (USD store)", r.status === 200, r.data);
+    cartId = await freshCart(1);
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId, email: `pay4-${stamp}@test.oyklane.dev`, ...SHIP, paymentMethod: "paypal", returnBase: RB });
+    const ppOrder = r.data.order;
+    const ppRef = (await prisma.order.findUnique({ where: { id: ppOrder.id } })).paymentGatewayRef;
+    check("PayPal checkout sends the shopper to PayPal", r.data.payment?.kind === "redirect" && r.data.payment.url.includes(ppRef), r.data);
+    r = await sf("POST", `/api/storefront/${H}/checkout/payments/paypal/confirm`, { orderId: ppOrder.id, params: { token: ppRef } });
+    check("not approved on PayPal → not paid", r.data.paid === false, r.data);
+    await fetch(`${MOCK}/__pay/paypal/${ppRef}`, { method: "POST" });
+    r = await sf("POST", `/api/storefront/${H}/checkout/payments/paypal/confirm`, { orderId: ppOrder.id, params: { token: ppRef } });
+    check("approved → captured → paid", r.data.paid === true, r.data);
+    r = await sf("POST", `/api/storefront/${H}/checkout/payments/paypal/confirm`, { orderId: ppOrder.id, params: { token: ppRef } });
+    check("a repeated return stays paid (captured once)", r.data.paid === true, r.data);
+    await prisma.store.update({ where: { id: store.id }, data: { currency: "INR" } });
+
+    r = await owner("PUT", "/api/payments/cod", { enabled: false });
+    cartId = await freshCart(1);
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId, email: `pay5-${stamp}@test.oyklane.dev`, ...SHIP, paymentMethod: "cod" });
+    check("cash on delivery switched off is refused at checkout", r.status === 400, r.data);
+    await owner("PUT", "/api/payments/cod", { enabled: true });
+    await owner("DELETE", "/api/payments/stripe");
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId, email: `pay6-${stamp}@test.oyklane.dev`, ...SHIP, paymentMethod: "stripe", returnBase: RB });
+    check("a disconnected gateway can't be used", r.status === 400, r.data);
+
+    // ── Public API with scoped keys ──
+    const v1 = async (method, url, token, body) => {
+      const res = await fetch(`${API}/api/v1${url}`, {
+        method,
+        headers: { ...(token && { authorization: `Bearer ${token}` }), ...(body && { "content-type": "application/json" }) },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      return { status: res.status, data: await res.json().catch(() => null) };
+    };
+    r = await owner("POST", "/api/developer/keys", { name: "Read catalogue", scopes: ["read_products"] });
+    check("create an API key (token shown once)", r.status === 201 && /^oyk_/.test(r.data.token) && r.data.key.prefix === r.data.token.slice(0, 10), r.data);
+    const readKey = r.data.token;
+    r = await owner("GET", "/api/developer/keys");
+    check("key list never shows the token", r.data.keys.length === 1 && !JSON.stringify(r.data).includes(readKey), r.data);
+    check("only a hash is stored", !(await prisma.apiKey.findFirst({ where: { storeId: store.id } })).keyHash.includes(readKey.slice(4, 20)));
+    r = await v1("GET", "/products", null);
+    check("no key → 401", r.status === 401, r.data);
+    r = await v1("GET", "/products", readKey);
+    check("read_products lists products", r.status === 200 && r.data.data.some((p) => p.id === product.id && p.variants[0].price === 1000) && r.data.total >= 1, r.data);
+    r = await v1("GET", "/orders", readKey);
+    check("…but can't read orders (scope)", r.status === 403 && /read_orders/.test(r.data.error), r.data);
+    r = await owner("POST", "/api/developer/keys", { name: "Warehouse app", scopes: ["read_orders", "write_orders", "write_products", "write_inventory", "read_customers"] });
+    const fullKey = r.data.token;
+    r = await v1("POST", "/products", fullKey, { title: "API Kurta", status: "active", variants: [{ title: "M", sku: `API-${stamp}`, price: 1499, inventoryQuantity: 5 }] });
+    check("write_products creates a product", r.status === 201 && r.data.data.title === "API Kurta" && r.data.data.handle, r.data);
+    const apiProduct = r.data.data;
+    r = await v1("POST", "/inventory/adjust", fullKey, { variant_id: apiProduct.variants[0].id, mode: "set", quantity: 12, reason: "received" });
+    check("write_inventory sets stock", r.status === 200 && r.data.data.quantity === 12, r.data);
+    r = await v1("GET", `/orders?limit=2`, fullKey);
+    check("read_orders lists orders, paginated", r.status === 200 && r.data.data.length === 2 && r.data.limit === 2 && r.data.data[0].line_items.length >= 1, r.data);
+    const someOrder = r.data.data[0];
+    check("orders never expose internal fields", !("storeId" in someOrder) && !("statusToken" in someOrder) && !("razorpayOrderId" in someOrder));
+    r = await v1("GET", `/customers?email=${encodeURIComponent(shopperEmail)}`, fullKey);
+    check("read_customers finds a customer by email", r.data.data.length === 1 && r.data.data[0].has_account === true && !("passwordHash" in r.data.data[0]), r.data);
+    const keyId = (await owner("GET", "/api/developer/keys")).data.keys.find((k) => k.name === "Read catalogue").id;
+    await owner("DELETE", `/api/developer/keys/${keyId}`);
+    r = await v1("GET", "/products", readKey);
+    check("a revoked key stops working", r.status === 401, r.data);
+
+    // ── Themes: Atelier (clothing) and Lumière (jewellery) ──
+    for (const handle of ["atelier", "lumiere"]) {
+      r = await owner("POST", "/api/themes/install", { handle });
+      check(`install the ${handle} theme`, r.status === 201 || r.status === 200, r.data);
+      const themeId = r.data.theme?.id || r.data.id;
+      r = await sf("GET", `/api/storefront/${H}/render/index?themeId=${themeId}`);
+      const home = String(r.data);
+      const marker = handle === "atelier" ? ['data-section-type="split-hero"', 'data-section-type="shop-the-look"', "circles--circle"] : ['data-section-type="craft-story"', 'data-section-type="gift-guide"', "circles--arch"];
+      check(`${handle} home page renders its own sections`, r.status === 200 && marker.every((m) => home.includes(m)), marker.filter((m) => !home.includes(m)));
+      check(`${handle} header and footer take the theme's saved settings`, home.includes("header--center") && home.includes("Powered by Oyklane.com"), home.slice(0, 200));
+      await owner("DELETE", `/api/themes/${themeId}`);
+    }
+
+    // Size / Colour pickers from "M / Black" variant titles.
+    r = await owner("POST", "/api/products", {
+      title: "Option Tee", status: "active",
+      variants: [
+        { title: "S / Black", price: 700, inventoryQuantity: 3 }, { title: "M / Black", price: 700, inventoryQuantity: 0 },
+        { title: "S / Olive Green", price: 700, inventoryQuantity: 2 }, { title: "M / Olive Green", price: 700, inventoryQuantity: 4 },
+      ],
+    });
+    const optionTee = r.data.product;
+    r = await sf("GET", `/api/storefront/${H}/render/product?slug=${optionTee.slug}`);
+    const teeHtml = String(r.data);
+    check("variant titles split into Size and Colour pickers", teeHtml.includes("Size:") && teeHtml.includes("Colour:") && teeHtml.includes('name="option1"') && teeHtml.includes("sys-swatch__dot"), teeHtml.slice(0, 200));
+    check("…with the per-variant list kept for no-JS", teeHtml.includes("<noscript>") && teeHtml.includes('data-sys-variant-input disabled'));
+
+    // Header/footer settings: shipped nested under `settings`, edited flat.
+    const liveTheme = (await owner("GET", "/api/themes")).data.themes.find((t) => t.isActive);
+    const sd = liveTheme.settingsData;
+    sd.sections.footer = { ...(sd.sections.footer || {}), settings: { ...(sd.sections.footer?.settings || {}), about: "Shipped about text" } };
+    await owner("PATCH", `/api/themes/${liveTheme.id}/settings`, { settingsData: sd });
+    r = await sf("GET", `/api/storefront/${H}/render/index`);
+    check("footer uses settings shipped nested under `settings`", String(r.data).includes("Shipped about text"));
+    sd.sections.footer.about = "Edited about text";
+    await owner("PATCH", `/api/themes/${liveTheme.id}/settings`, { settingsData: sd });
+    r = await sf("GET", `/api/storefront/${H}/render/index`);
+    check("…and a value edited in the theme editor (flat) wins", String(r.data).includes("Edited about text") && !String(r.data).includes("Shipped about text"));
+
+    // ── Custom data (metafields) ──
+    r = await owner("POST", "/api/metafields", { ownerType: "product", name: "Fabric", type: "text" });
+    check("define a product field (key from the name)", r.status === 201 && r.data.definition.key === "fabric", r.data);
+    const fabricDef = r.data.definition;
+    await owner("POST", "/api/metafields", { ownerType: "product", name: "Fit", type: "text", choices: ["Slim", "Regular"] });
+    await owner("POST", "/api/metafields", { ownerType: "product", name: "Weight (g)", type: "number" });
+    await owner("POST", "/api/metafields", { ownerType: "product", name: "Internal note", type: "text", showOnStorefront: false });
+    r = await owner("POST", "/api/metafields", { ownerType: "product", name: "fabric", type: "text" });
+    check("duplicate keys refused", r.status === 409, r.data);
+    r = await owner("PATCH", `/api/products/${product.id}`, { metafields: { fit: "Baggy" } });
+    check("a value outside the preset choices is refused", r.status === 400 && /Fit/.test(r.data.error), r.data);
+    r = await owner("PATCH", `/api/products/${product.id}`, { metafields: { fabric: "Pure linen", fit: "Slim", weight_g: "180", internal_note: "reorder in May", nope: "ignored" } });
+    check("save custom data on a product (checked, typed)", r.status === 200 && r.data.product.metafields.fabric === "Pure linen" && r.data.product.metafields.weight_g === 180 && !("nope" in r.data.product.metafields), r.data.product?.metafields);
+    r = await sf("GET", `/api/storefront/${H}/render/product?slug=${product.slug}`);
+    const productHtml = String(r.data);
+    check("product page lists visible fields under Details", productHtml.includes("Pure linen") && productHtml.includes("Weight (g)") && productHtml.includes("Slim"), productHtml.slice(0, 200));
+    check("hidden fields stay off the store", !productHtml.includes("reorder in May"));
+    r = await v1("PATCH", `/products/${product.id}`, fullKey, { metafields: { fit: "Regular" } });
+    check("public API updates one field, keeps the rest", r.status === 200 && r.data.data.metafields.fit === "Regular" && r.data.data.metafields.fabric === "Pure linen", r.data);
+    r = await owner("PATCH", `/api/products/${product.id}`, { metafields: { fabric: null } });
+    check("a blank value clears the field", r.status === 200 && !("fabric" in r.data.product.metafields) && r.data.product.metafields.fit === "Regular", r.data.product?.metafields);
+    await owner("PATCH", `/api/products/${product.id}`, { metafields: { fabric: "Linen" } });
+    r = await owner("DELETE", `/api/metafields/${fabricDef.id}`);
+    check("delete a field", r.status === 200, r.data);
+    check("…and its saved values", !("fabric" in (await prisma.product.findUnique({ where: { id: product.id } })).metafields));
+
+    // ── Webhooks ──
+    const received = [];
+    const hookServer = require("http").createServer((req, res) => {
+      let raw = "";
+      req.on("data", (c) => (raw += c));
+      req.on("end", () => {
+        received.push({ path: req.url, headers: req.headers, raw });
+        res.writeHead(req.url === "/fail" ? 500 : 200);
+        res.end("ok");
+      });
+    });
+    await new Promise((res) => hookServer.listen(4295, res));
+    try {
+      r = await owner("POST", "/api/developer/webhooks", { url: "http://localhost:4295/hook", events: ["order.created", "product.updated", "not.an.event"] });
+      check("add a webhook (signing secret shown once)", r.status === 201 && /^whsec_/.test(r.data.secret) && r.data.endpoint.events.length === 2, r.data);
+      const hookSecret = r.data.secret;
+      const hookId = r.data.endpoint.id;
+      r = await owner("POST", `/api/developer/webhooks/${hookId}/test`);
+      check("send test → delivered", r.data.delivery?.status === "success" && received.some((x) => x.headers["x-oyklane-event"] === "ping"), r.data);
+      cartId = await freshCart(1);
+      r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId, email: `hook-${stamp}@test.oyklane.dev`, ...SHIP, paymentMethod: "cod" });
+      const hookOrder = r.data.order;
+      let got = null;
+      for (let i = 0; i < 40 && !got; i += 1) {
+        got = received.find((x) => x.headers["x-oyklane-event"] === "order.created" && x.raw.includes(hookOrder.id));
+        if (!got) await new Promise((res) => setTimeout(res, 250));
+      }
+      check("order.created delivered to the endpoint", Boolean(got), received.map((x) => x.headers["x-oyklane-event"]));
+      const expectedSig = got && `sha256=${crypto.createHmac("sha256", hookSecret).update(`${got.headers["x-oyklane-timestamp"]}.${got.raw}`).digest("hex")}`;
+      check("…signed with the endpoint's secret", got && got.headers["x-oyklane-signature"] === expectedSig, got?.headers);
+      const hookBody = got && JSON.parse(got.raw);
+      check("…with the order in the API's format", hookBody?.event === "order.created" && hookBody.data.number === hookOrder.orderNumber && Array.isArray(hookBody.data.line_items), hookBody);
+      r = await owner("POST", "/api/developer/webhooks", { url: "http://localhost:4295/fail", events: ["product.updated"] });
+      await owner("PATCH", `/api/products/${product.id}`, { title: "Linen Shirt" });
+      let failed = null;
+      for (let i = 0; i < 40 && !failed; i += 1) {
+        failed = await prisma.webhookDelivery.findFirst({ where: { endpointId: r.data.endpoint.id, attempts: { gt: 0 } } });
+        if (!failed) await new Promise((res) => setTimeout(res, 250));
+      }
+      check("a failing endpoint is retried later (not dropped)", failed?.status === "pending" && failed.responseStatus === 500 && failed.nextAttemptAt > new Date(), failed);
+      r = await owner("GET", "/api/developer/webhooks");
+      check("delivery log shows recent deliveries", r.data.deliveries.length >= 3 && r.data.events.length >= 9, r.data.deliveries?.length);
+      r = await owner("POST", "/api/developer/webhooks", { url: "ftp://example.com/x", events: ["order.paid"] });
+      check("non-http webhook URLs are refused", r.status === 400, r.data);
+    } finally {
+      hookServer.close();
+    }
+
     // ── Domains ──
     r = await sf("GET", `/api/storefront/${H}/render/index`);
     check("store pages never reference the API's own address", !String(r.data).includes(`localhost:${API_PORT}`) && String(r.data).includes(`/store/${H}/oy-assets/`), String(r.data).match(/(href|src)="[^"]*assets[^"]*"/)?.[0]);
@@ -374,6 +630,7 @@ async function main() {
     console.log("      (test stores, users and their emails deleted)");
     await prisma.$disconnect();
     api.child.kill();
+    mock.close();
   }
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);

@@ -91,11 +91,151 @@
       if (selectedLabel) selectedLabel.textContent = v.title;
     }
 
-    form.querySelectorAll('input[name="variantId"]').forEach(function (radio) {
+    form.querySelectorAll('input[type="radio"][name="variantId"]').forEach(function (radio) {
       radio.addEventListener("change", function () {
         render(radio.value);
       });
     });
+
+    // Separate pickers (Size, Colour…): the chosen values make a title
+    // like "M / Black", which picks the variant.
+    var hidden = form.querySelector("[data-sys-variant-input]");
+    var groups = Array.prototype.slice.call(form.querySelectorAll("[data-sys-option]"));
+    if (!hidden || !groups.length) return;
+    hidden.disabled = false;
+    var parts = function (v) {
+      return v.title.split(" / ").map(function (s) {
+        return s.trim();
+      });
+    };
+    function chosen() {
+      return groups.map(function (g) {
+        var r = g.querySelector("input:checked");
+        return r ? r.value : null;
+      });
+    }
+    function sync() {
+      var picks = chosen();
+      var match = data.variants.filter(function (v) {
+        var p = parts(v);
+        return picks.every(function (val, i) {
+          return p[i] === val;
+        });
+      })[0];
+      groups.forEach(function (g, i) {
+        var label = g.querySelector("[data-sys-option-selected]");
+        if (label) label.textContent = picks[i] || "";
+        // Strike through values with nothing in stock alongside the other picks.
+        g.querySelectorAll("input").forEach(function (input) {
+          var trial = picks.slice();
+          trial[i] = input.value;
+          var ok = data.variants.some(function (v) {
+            var p = parts(v);
+            return v.available && trial.every(function (val, k) {
+              return p[k] === val;
+            });
+          });
+          input.closest(".sys-swatch").classList.toggle("sys-swatch--unavailable", !ok);
+        });
+      });
+      if (match) {
+        hidden.value = match.id;
+        render(match.id);
+        if (selectedLabel) selectedLabel.textContent = match.title;
+        showPhotoFor(picks);
+      } else if (button) {
+        button.disabled = true;
+        button.textContent = "Unavailable";
+        if (stockEl) {
+          stockEl.className = "sys-stock sys-stock--out";
+          stockEl.textContent = "This combination isn't available";
+        }
+      }
+    }
+    // Choosing a colour (or any value named in a photo's description, e.g.
+    // "Pure Linen Shirt in Olive") brings that photo up in the gallery.
+    var thumbs = Array.prototype.slice.call(document.querySelectorAll("[data-sys-thumb]"));
+    var lastShown = null;
+    function showPhotoFor(picks) {
+      var key = picks.join("|");
+      if (!thumbs.length || key === lastShown) return;
+      lastShown = key;
+      for (var i = picks.length - 1; i >= 0; i -= 1) {
+        var want = String(picks[i] || "").toLowerCase();
+        if (!want) continue;
+        var hit = thumbs.filter(function (t) {
+          return new RegExp("\\b" + want.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(String(t.getAttribute("data-alt") || "").toLowerCase());
+        })[0];
+        if (hit) {
+          if (hit.getAttribute("aria-current") !== "true") hit.click();
+          return;
+        }
+      }
+    }
+    groups.forEach(function (g) {
+      g.addEventListener("change", sync);
+    });
+    sync();
+  });
+
+  // ── Account tabs ───────────────────────────────────────
+  // The account page's Orders / Details / Password parts become tabs. The
+  // tab a form was sent from reopens after the page comes back (with its
+  // "saved" or error message); a #details link opens that tab.
+  document.querySelectorAll("[data-sys-tabs]").forEach(function (list) {
+    var tabs = Array.prototype.slice.call(list.querySelectorAll("[data-sys-tab]"));
+    var panels = {};
+    tabs.forEach(function (t) {
+      panels[t.getAttribute("data-sys-tab")] = document.querySelector('[data-sys-panel="' + t.getAttribute("data-sys-tab") + '"]');
+    });
+    var KEY = "oy-account-tab";
+    function show(name, focus) {
+      if (!panels[name]) name = tabs[0].getAttribute("data-sys-tab");
+      tabs.forEach(function (t) {
+        var on = t.getAttribute("data-sys-tab") === name;
+        t.setAttribute("aria-selected", on ? "true" : "false");
+        t.tabIndex = on ? 0 : -1;
+        if (on && focus) t.focus();
+        panels[t.getAttribute("data-sys-tab")].hidden = !on;
+      });
+    }
+    list.hidden = false;
+    tabs.forEach(function (t, i) {
+      t.addEventListener("click", function () {
+        show(t.getAttribute("data-sys-tab"));
+        if (history.replaceState) history.replaceState(null, "", "#" + t.getAttribute("data-sys-tab"));
+      });
+      t.addEventListener("keydown", function (e) {
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        var next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+        show(next.getAttribute("data-sys-tab"), true);
+      });
+    });
+    Object.keys(panels).forEach(function (name) {
+      var form = panels[name] && panels[name].querySelector("form");
+      if (form) form.addEventListener("submit", function () {
+        try {
+          sessionStorage.setItem(KEY, name);
+        } catch (e) {}
+      });
+    });
+    document.querySelectorAll("[data-sys-tab-link]").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        show(a.getAttribute("data-sys-tab-link"));
+        list.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+    var start = (location.hash || "").slice(1);
+    if (document.querySelector(".sys-acct .sys-alert")) {
+      try {
+        start = sessionStorage.getItem(KEY) || start;
+      } catch (e) {}
+    }
+    try {
+      sessionStorage.removeItem(KEY);
+    } catch (e) {}
+    show(start);
   });
 
   // ── Auto-submitting selects (collection sort) ──────────

@@ -1,3 +1,4 @@
+const { oyklaneAddress } = require("../../lib/storefront-url");
 const {
   installThemeSchema,
   updateThemeSettingsSchema,
@@ -104,6 +105,10 @@ async function renderDraftHandler(request, reply) {
     templateOverride: body.templateOverride,
     settingsOverride: body.settingsOverride,
     filesOverride: body.filesOverride,
+    // The preview is shown inside the admin (store.<root>), so its CSS, JS
+    // and images load from the store's own address, like the live store —
+    // never from the API's host.
+    assetBaseOverride: oyklaneAddress(request.store) || undefined,
   });
   reply.send({ html });
 }

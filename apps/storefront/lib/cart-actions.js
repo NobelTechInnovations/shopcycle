@@ -10,17 +10,25 @@ export function wantsJson(request) {
   return (request.headers.get("accept") || "").includes("application/json");
 }
 
-/** The cart as the drawer reads it — item links under this store's own
- * root (they come from the API under /store/:handle). */
+// An uploaded image on the API's host: https://<api>/uploads/<store>/<file>.
+const UPLOAD_URL = /^https?:\/\/[^/]+(\/uploads\/[A-Za-z0-9_-]+\/[^/?#]+)$/;
+
+/** The cart as the drawer reads it — item links and images under this
+ * store's own address (they come from the API under /store/:handle and
+ * the API's host; pages get the same rewrite server-side). */
 export function publicCart(cart, request, handle) {
   if (!cart) return null;
   const host = request.headers.get("host");
   return {
     ...cart,
-    items: (cart.items || []).map((item) => ({
-      ...item,
-      url: storefrontPath(host, handle, String(item.url || "").replace(/^\/store\/[^/]+/, "")),
-    })),
+    items: (cart.items || []).map((item) => {
+      const upload = String(item.image || "").match(UPLOAD_URL);
+      return {
+        ...item,
+        url: storefrontPath(host, handle, String(item.url || "").replace(/^\/store\/[^/]+/, "")),
+        ...(upload && { image: storefrontPath(host, handle, upload[1]) }),
+      };
+    }),
   };
 }
 

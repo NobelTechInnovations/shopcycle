@@ -1,0 +1,16 @@
+{% comment %}
+  A stand-in card while a section has no products to show (a new store,
+  or no collection picked yet) — like Shopify's "Example product title".
+  Pass `index` (1-based) to vary the illustration.
+{% endcomment %}
+{% assign n = index | default: 1 | minus: 1 | modulo: 6 | plus: 1 %}
+{% assign art = 'product-' | append: n %}
+{% assign prices = '1499,899,2499,649,1199,999' | split: ',' %}
+{% assign price_index = n | minus: 1 %}
+<article class="pcard pcard--placeholder" aria-label="Example product">
+  <div class="pcard__media">{{ art | placeholder_svg: 'pcard__ph' }}</div>
+  <div class="pcard__body">
+    <h3 class="pcard__title">Example product title</h3>
+    <p class="price"><span class="price__now">{{ prices[price_index] | times: 1 | money }}</span></p>
+  </div>
+</article>

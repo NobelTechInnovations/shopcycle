@@ -12,13 +12,31 @@ const { loadThemePackage } = require("./file-loader");
 const MASTER_THEMES = {
   classic: {
     name: "Classic",
-    version: "2.1.1",
+    version: "2.1.2",
     description: "Clean and versatile — slideshow, collections, product rows, offers, reviews and a journal. Suits fashion, home, beauty and gifting.",
+    bestFor: "Any shop",
+    swatch: { bg: "#FFFFFF", surface: "#F6F3EE", text: "#1A1A1A", accent: "#D2452F", font: "Fraunces" },
   },
   modern: {
     name: "Modern",
-    version: "2.0.1",
+    version: "2.0.2",
     description: "Bold and editorial for D2C brands — full-bleed hero, scrolling text, bento categories, promo tiles, reviews and FAQ.",
+    bestFor: "D2C brands",
+    swatch: { bg: "#F3F3EF", surface: "#FFFFFF", text: "#0E0E0E", accent: "#D7F75B", font: "Plus Jakarta Sans" },
+  },
+  atelier: {
+    name: "Atelier",
+    version: "1.0.0",
+    description: "Made for clothing — a split Women / Men hero, category circles, shop-the-look with product dots, tall product photos and a size-and-fit features row.",
+    bestFor: "Clothing & fashion",
+    swatch: { bg: "#FFFFFF", surface: "#F4F4F2", text: "#121212", accent: "#C8102E", font: "Archivo" },
+  },
+  lumiere: {
+    name: "Lumière",
+    version: "1.0.0",
+    description: "Quiet luxury for jewellery — serif type, emerald and gold, category arches, a craft story with facts, a gift guide and a trust row (hallmarked, certified, insured).",
+    bestFor: "Jewellery & luxury",
+    swatch: { bg: "#F5F3EF", surface: "#FFFFFF", text: "#123B30", accent: "#B8935A", font: "Cormorant Garamond" },
   },
 };
 

@@ -6,6 +6,7 @@ const {
   listProductsQuerySchema,
 } = require("@shopcycle/validation");
 const service = require("./service");
+const webhooks = require("../developer/webhooks");
 
 async function listHandler(request, reply) {
   const query = listProductsQuerySchema.parse(request.query);
@@ -21,6 +22,7 @@ async function getHandler(request, reply) {
 async function createHandler(request, reply) {
   const body = createProductSchema.parse(request.body);
   const product = await service.createProduct(request.server.prisma, request.store, body, { actorName: request.authUser?.name });
+  webhooks.emit(request.server.prisma, request.store.id, "product.created", { id: product.id });
   reply.code(201).send({ product });
 }
 
@@ -29,11 +31,14 @@ async function updateHandler(request, reply) {
   const product = await service.updateProduct(request.server.prisma, request.store.id, request.params.id, body, {
     actorName: request.authUser?.name,
   });
+  webhooks.emit(request.server.prisma, request.store.id, "product.updated", { id: product.id });
   reply.send({ product });
 }
 
 async function deleteHandler(request, reply) {
+  const doomed = await request.server.prisma.product.findFirst({ where: { id: request.params.id, storeId: request.store.id }, select: { id: true, title: true } });
   await service.deleteProduct(request.server.prisma, request.store.id, request.params.id);
+  if (doomed) webhooks.emit(request.server.prisma, request.store.id, "product.deleted", doomed);
   reply.code(204).send();
 }
 

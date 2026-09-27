@@ -353,6 +353,10 @@ async function main() {
     check("history shows the sale and the cancellation", cancelHistory.some((h) => h.reason === "order_cancelled" && h.orderNumber === o2.orderNumber), cancelHistory.slice(0, 3));
 
     // ── Online payment → full refund through Razorpay ──
+    // Shoppers pay the seller's own gateway account (Settings ▸ Payments).
+    r = await owner("PUT", "/api/payments/razorpay", { credentials: { keyId: "rzp_test_mock", keySecret: KEY_SECRET }, testMode: true });
+    check("seller connects their own Razorpay account", r.status === 200 && r.data.providers.find((p) => p.key === "razorpay")?.enabled === true, r.data);
+    check("the secret never comes back", !JSON.stringify(r.data).includes(KEY_SECRET));
     r = await sf("POST", `/api/storefront/${store.handle}/cart/add`, { variantId: vM.id, quantity: 1 });
     cartId = r.data.cart.cartId;
     r = await sf("POST", `/api/storefront/${store.handle}/checkout`, { cartId, ...shopper, shippingName: "Online Buyer", paymentMethod: "razorpay" });

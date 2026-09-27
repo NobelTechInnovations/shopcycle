@@ -294,25 +294,25 @@ enum SubscriptionStatus {
 }
 
 model Store {
-  id       String      @id @default(cuid())
-  name     String
-  handle   String      @unique
+  id               String      @id @default(cuid())
+  name             String
+  handle           String      @unique
   /// A merchant's own domain (e.g. "shop.example.com"), resolved to this
   /// store by the storefront in addition to the always-available
   /// /store/:handle path — see apps/storefront middleware.js. Optional;
   /// most stores never set one and keep using the handle path.
-  domain   String?     @unique
+  domain           String?     @unique
   /// Set when the connected domain was last seen serving this store over
   /// HTTPS (domains/service.js#status). Only then do links and the
   /// {handle}.<root> address switch to it — never to a domain that isn't
   /// live yet.
   domainVerifiedAt DateTime?
-  currency String      @default("INR")
-  timezone String      @default("Asia/Kolkata")
-  status   StoreStatus @default(active)
+  currency         String      @default("INR")
+  timezone         String      @default("Asia/Kolkata")
+  status           StoreStatus @default(active)
   /// Misc. settings that don't warrant their own column (weight unit, order
   /// number prefix, low-stock threshold, ...) — General settings tab.
-  settings Json        @default("{}")
+  settings         Json        @default("{}")
 
   // Phase 7/9 — Multi-tenant SaaS billing. `planId` null means "no plan
   // chosen yet" — see SubscriptionStatus's doc comment for the full
@@ -391,6 +391,10 @@ model Store {
   inventoryAdjustments InventoryAdjustment[]
   articles             Article[]
   giftCards            GiftCard[]
+  paymentProviders     PaymentProvider[]
+  apiKeys              ApiKey[]
+  webhookEndpoints     WebhookEndpoint[]
+  metafieldDefinitions MetafieldDefinition[]
 
   @@map("stores")
 }
@@ -574,6 +578,9 @@ model Product {
   seoDescription String?       @db.Text
   /// HSN code printed on GST invoices (e.g. "6109" for cotton T-shirts).
   hsnCode        String?
+  /// Custom data (Settings ▸ Custom data): { key: value } for this store's
+  /// product field definitions. Themes read it as product.metafields.custom.key.
+  metafields     Json          @default("{}")
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -683,6 +690,8 @@ model Collection {
   description String?          @db.Text
   image       String?
   status      CollectionStatus @default(draft)
+  /// Custom data — see Product.metafields.
+  metafields  Json             @default("{}")
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -816,6 +825,11 @@ model Order {
   paymentMethod     String  @default("cod")
   razorpayOrderId   String?
   razorpayPaymentId String?
+  /// The gateway's own id for this checkout (Cashfree/PayPal order, Stripe
+  /// session, PayU txnid, Razorpay order) — a payment return is only
+  /// accepted if it matches. `paymentReference` is the payment id once paid.
+  paymentGatewayRef String?
+  paymentReference  String?
 
   /// The storefront visitor session that placed this order, if one was
   /// tracked (see checkout/service.js) — this is the entire mechanism
@@ -1017,6 +1031,11 @@ model File {
   size      Int
   width     Int?
   height    Int?
+  /// The file's bytes. The API's own disk is only a cache: a host like
+  /// Railway starts every deploy with an empty disk, so /uploads/... is
+  /// served from here whenever the disk copy is missing
+  /// (modules/uploads/serve.js). Never selected in lists.
+  data      Bytes?
   createdAt DateTime @default(now())
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -1519,4 +1538,105 @@ model GiftCardTransaction {
   @@index([giftCardId, createdAt])
   @@index([orderId])
   @@map("gift_card_transactions")
+}
+
+/// A payment gateway a seller has connected with their own account
+/// (Settings ▸ Payments) — shoppers' money goes straight to the seller.
+/// `credentials` is a JSON object encrypted as a whole (lib/crypto.js).
+model PaymentProvider {
+  id          String   @id @default(cuid())
+  storeId     String
+  provider    String // razorpay | cashfree | payu | stripe | paypal
+  enabled     Boolean  @default(false)
+  testMode    Boolean  @default(true)
+  credentials String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, provider])
+}
+
+/// A key a seller creates for their own integrations (Settings ▸ API &
+/// webhooks). Only a SHA-256 of the token is stored; `prefix` is its first
+/// characters, to tell keys apart. `scopes` limit what it can do.
+model ApiKey {
+  id         String    @id @default(cuid())
+  storeId    String
+  name       String
+  prefix     String
+  keyHash    String    @unique
+  scopes     String[]
+  createdBy  String?
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+}
+
+/// Where a seller wants to be told about events (order paid, product
+/// updated…). Deliveries are signed with `secret` (encrypted at rest).
+model WebhookEndpoint {
+  id        String   @id @default(cuid())
+  storeId   String
+  url       String
+  events    String[]
+  secret    String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store      Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([storeId])
+}
+
+/// One attempt-tracked delivery of one event to one endpoint.
+model WebhookDelivery {
+  id             String    @id @default(cuid())
+  endpointId     String
+  event          String
+  payload        Json
+  status         String    @default("pending") // pending | success | failed
+  attempts       Int       @default(0)
+  responseStatus Int?
+  lastError      String?
+  nextAttemptAt  DateTime  @default(now())
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([endpointId, createdAt])
+}
+
+/// A seller-defined field on products or collections ("Fabric", "Care
+/// instructions", "Size chart"). Values live on the owner's `metafields`
+/// JSON, keyed by `key`.
+model MetafieldDefinition {
+  id               String   @id @default(cuid())
+  storeId          String
+  ownerType        String // product | collection
+  key              String
+  name             String
+  description      String?
+  type             String // text | multiline | number | boolean | date | url | color | image | list
+  /// For text: when set, the value must be one of these (a dropdown in the admin).
+  choices          String[] @default([])
+  /// Listed in the "Details" table on the product page.
+  showOnStorefront Boolean  @default(true)
+  position         Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, ownerType, key])
+  @@index([storeId, ownerType])
 }

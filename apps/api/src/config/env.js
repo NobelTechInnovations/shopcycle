@@ -50,6 +50,11 @@ const envSchema = z.object({
   // operator adds each domain to the Vercel project by hand.
   STOREFRONT_CNAME_TARGET: z.string().default("cname.vercel-dns.com"),
   STOREFRONT_APEX_IP: z.string().default("76.76.21.21"),
+  // Test-only: point the sellers' payment gateways at local mocks.
+  CASHFREE_API_URL: z.string().optional(),
+  PAYU_API_URL: z.string().optional(),
+  STRIPE_API_URL: z.string().optional(),
+  PAYPAL_API_URL: z.string().optional(),
   VERCEL_TOKEN: z.string().optional(),
   VERCEL_STOREFRONT_PROJECT_ID: z.string().optional(),
   VERCEL_TEAM_ID: z.string().optional(),
@@ -187,6 +192,23 @@ const isInfraDomain = (host) => INFRA_DOMAINS.some((d) => host === d || host.end
     } catch {
       /* stays unset */
     }
+  }
+}
+
+// The API's public address is baked into uploaded-image links. In
+// production it must be a real https address — never the localhost
+// default (the variable was simply not set) and never plain http, which
+// browsers block inside https pages.
+{
+  const d = parsed.data;
+  if (d.NODE_ENV === "production") {
+    if (/\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(d.API_PUBLIC_URL) && d.STOREFRONT_ROOT_DOMAIN !== "localhost") {
+      d.API_PUBLIC_URL = `https://api.${d.STOREFRONT_ROOT_DOMAIN}`;
+      console.warn(`API_PUBLIC_URL not set — using ${d.API_PUBLIC_URL}. Set it explicitly.`);
+    } else if (d.API_PUBLIC_URL.startsWith("http://")) {
+      d.API_PUBLIC_URL = d.API_PUBLIC_URL.replace(/^http:\/\//, "https://");
+    }
+    d.API_PUBLIC_URL = d.API_PUBLIC_URL.replace(/\/+$/, "");
   }
 }
 

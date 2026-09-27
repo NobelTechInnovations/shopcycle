@@ -105,6 +105,7 @@ function publicOrder(store, order, { statusUrl, invoiceUrl } = {}) {
     shippingCountry: safe(order.shippingCountry),
     items: order.items.map((i) => ({
       id: i.id,
+      product_id: i.productId || null,
       title: i.title,
       quantity: i.quantity,
       price: Number(i.price),

@@ -1,12 +1,13 @@
 const { HttpError } = require("@shopcycle/utils");
 const { adjustStock } = require("../../lib/inventory");
-const { razorpayConfigured, razorpayRequest } = require("../billing/razorpay");
+const payments = require("../payments/service");
 const { syncOrderCommission } = require("../billing/commission");
 const { formatCurrency } = require("@shopcycle/utils");
 const { addOrderEvent } = require("./events");
 const { checkSelection, itemQuantities, round2 } = require("./quantities");
 const notify = require("./notify");
 const giftCards = require("../gift-cards/service");
+const webhooks = require("../developer/webhooks");
 
 function refundDestination({ toCard, toPayment, method, currency }) {
   const payment = method === "razorpay" ? "to the original payment method" : "paid back manually";
@@ -61,11 +62,16 @@ async function createRefund(prisma, store, orderId, input, { actorName, log } = 
   let razorpayRefundId = null;
   let status = "processed";
   if (toPayment > 0 && order.paymentMethod === "razorpay" && order.razorpayPaymentId) {
-    if (!razorpayConfigured()) throw new HttpError(400, "Online refunds need Razorpay keys on this platform.");
-    const rz = await razorpayRequest(`/payments/${encodeURIComponent(order.razorpayPaymentId)}/refund`, {
+    // Through the seller's own Razorpay account (Settings ▸ Payments).
+    const gw = await payments.gateway(prisma, store.id, "razorpay");
+    if (!gw) throw new HttpError(400, "Reconnect Razorpay in Settings ▸ Payments to refund online, or refund the shopper manually.");
+    const res = await fetch(`${gw.provider.base()}/payments/${encodeURIComponent(order.razorpayPaymentId)}/refund`, {
       method: "POST",
-      body: { amount: Math.round(toPayment * 100), notes: { orderId: order.id, orderNumber: String(order.orderNumber) } },
+      headers: { "content-type": "application/json", authorization: gw.provider.auth(gw.creds) },
+      body: JSON.stringify({ amount: Math.round(toPayment * 100), notes: { orderId: order.id, orderNumber: String(order.orderNumber) } }),
     });
+    const rz = await res.json().catch(() => ({}));
+    if (!res.ok) throw new HttpError(502, rz?.error?.description || "Razorpay couldn't process this refund. Try again, or refund the shopper manually.");
     method = "razorpay";
     razorpayRefundId = rz.id || null;
     status = rz.status === "failed" ? "failed" : rz.status === "processed" ? "processed" : "pending";
@@ -126,6 +132,7 @@ async function createRefund(prisma, store, orderId, input, { actorName, log } = 
   if (input.notify !== false) {
     await notify.sendRefund(prisma, store, await loadOrder(prisma, store.id, orderId), refund, log);
   }
+  webhooks.emit(prisma, store.id, "order.refunded", { id: orderId });
   return refund;
 }
 

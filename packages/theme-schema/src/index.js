@@ -84,7 +84,22 @@ function resolveBlocks(schema, sectionEntry) {
   return order.filter((id) => blocks[id]).map((id) => mergeBlockSettings(schema, { id, ...blocks[id] }));
 }
 
+/**
+ * The settings saved for a global section (header, footer, announcement
+ * bar) in settings_data.json's `sections[type]`. Two shapes exist: a
+ * theme package ships them nested — `{ settings: {...}, blocks, block_order }`
+ * — while the theme editor saves each edit flat on the entry —
+ * `{ logo_width: 120, blocks, ... }`. Both are read; a flat (edited) value
+ * wins over the shipped one.
+ */
+function globalSectionSettings(entry) {
+  if (!entry || typeof entry !== "object") return {};
+  const { settings, blocks, block_order: order, ...flat } = entry;
+  return { ...(settings && typeof settings === "object" ? settings : {}), ...flat };
+}
+
 module.exports = {
+  globalSectionSettings,
   extractSchema,
   stripSchema,
   defaultForSetting,

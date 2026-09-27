@@ -97,6 +97,8 @@ function serializeProduct(product, handle, { rootless = false } = {}) {
     created_at: product.createdAt || null,
     seo_title: product.seoTitle || null,
     seo_description: product.seoDescription || null,
+    // Custom data (Settings ▸ Custom data): product.metafields.custom.fabric
+    metafields: { custom: product.metafields || {} },
   };
 }
 
@@ -109,6 +111,7 @@ function serializeCollection(collection, handle, { rootless = false } = {}) {
     description: collection.description || "",
     image: collection.image || null,
     url: `${root}/collections/${collection.slug}`,
+    metafields: { custom: collection.metafields || {} },
     products: (collection.products || []).map((p) => serializeProduct(p, handle, { rootless })),
   };
 }

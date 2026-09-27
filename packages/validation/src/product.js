@@ -42,6 +42,9 @@ const createProductSchema = z.object({
   variants: z.array(variantSchema).min(1, "At least one variant is required"),
   images: z.array(imageSchema).default([]),
   collectionIds: z.array(z.string()).default([]),
+  // Custom data values — checked against the store's field definitions
+  // in modules/metafields.
+  metafields: z.record(z.string().max(40), z.any()).optional(),
 });
 
 const updateProductSchema = createProductSchema.partial().extend({

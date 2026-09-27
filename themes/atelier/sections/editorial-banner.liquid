@@ -1,0 +1,61 @@
+{% comment %}
+  Editorial split: a large photo beside a story — heading, text, a button
+  and up to three figures ("12k+ happy customers").
+{% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    <div class="editorial{% if section.settings.reverse %} editorial--reverse{% endif %}">
+      <div class="editorial__media">
+        {% if section.settings.image != blank %}
+          <img src="{{ section.settings.image | image_url }}" alt="{{ section.settings.image_alt | escape }}" loading="lazy" width="1200" height="1440">
+        {% else %}
+          {{ 'lifestyle-2' | placeholder_svg }}
+        {% endif %}
+      </div>
+      <div class="editorial__body">
+        {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+        <h2 class="h1">{{ section.settings.heading }}</h2>
+        {% if section.settings.text != blank %}<div class="editorial__text">{{ section.settings.text | newline_to_br }}</div>{% endif %}
+        {% if section.blocks.size > 0 %}
+          <dl class="stats">
+            {% for block in section.blocks limit: 3 %}
+              <div class="stats__item"><dt>{{ block.settings.label }}</dt><dd>{{ block.settings.value }}</dd></div>
+            {% endfor %}
+          </dl>
+        {% endif %}
+        {% if section.settings.button_label != blank %}
+          <a class="btn" href="{{ section.settings.button_link | default: routes.all_products_url }}">{{ section.settings.button_label }}</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Image with story",
+  "settings": [
+    { "type": "image_picker", "id": "image", "label": "Image" },
+    { "type": "text", "id": "image_alt", "label": "Image description", "default": "" },
+    { "type": "checkbox", "id": "reverse", "label": "Image on the right", "default": false },
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Our story" },
+    { "type": "textarea", "id": "heading", "label": "Heading", "default": "Fewer, better things" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "We started with a simple idea: make everyday essentials that are honest about what goes into them, and built to be used for years. Every piece is made in small batches with partners we know by name." },
+    { "type": "text", "id": "button_label", "label": "Button", "default": "Read more" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "stat", "name": "Figure", "settings": [
+      { "type": "text", "id": "value", "label": "Figure", "default": "12k+" },
+      { "type": "text", "id": "label", "label": "Label", "default": "Happy customers" }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "stat", "settings": { "value": "12k+", "label": "Happy customers" } },
+    { "type": "stat", "settings": { "value": "4.8/5", "label": "Average rating" } },
+    { "type": "stat", "settings": { "value": "100%", "label": "Made in India" } }
+  ],
+  "max_blocks": 3
+}
+{% endschema %}
