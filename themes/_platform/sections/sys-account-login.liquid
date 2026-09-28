@@ -2,6 +2,7 @@
   Shopper sign-in and sign-up — one page, four modes:
     password (default) · code (email me a code, then the code step) · register
     phone (Phone Login app): number → code → [name + email → [email code]]
+      — with the app on, it's the only way in (login.phone_only)
   "Continue with Google" shows whenever the platform has Google sign-in set up.
 {% endcomment %}
 {%- capture return_field -%}{% if login.return_to %}<input type="hidden" name="return_to" value="{{ login.return_to }}">{% endif %}{%- endcapture -%}
@@ -121,7 +122,7 @@
               </form>
             {% endif %}
           </div>
-          <p class="sys-small sys-muted" style="margin-top:20px;text-align:center"><a class="sys-link" href="{{ routes.account_login_url }}{{ return_query }}">Sign in with your email instead</a></p>
+          {% unless login.phone_only %}<p class="sys-small sys-muted" style="margin-top:20px;text-align:center"><a class="sys-link" href="{{ routes.account_login_url }}{{ return_query }}">Sign in with your email instead</a></p>{% endunless %}
 
         {% elsif login.mode == "register" %}
           <h1 class="sys-h1">Create an account</h1>

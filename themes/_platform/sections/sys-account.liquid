@@ -61,7 +61,7 @@
         <div class="sys-tabs" role="tablist" aria-label="Account" data-sys-tabs hidden>
           <button type="button" class="sys-tab" role="tab" id="tab-orders" aria-controls="orders" data-sys-tab="orders">Orders{% if customer.orders_count > 0 %} <span class="sys-tab__count">{{ customer.orders_count }}</span>{% endif %}</button>
           <button type="button" class="sys-tab" role="tab" id="tab-details" aria-controls="details" data-sys-tab="details">Address &amp; details</button>
-          <button type="button" class="sys-tab" role="tab" id="tab-security" aria-controls="security" data-sys-tab="security">{% if customer.has_password %}Password{% else %}Set a password{% endif %}</button>
+          {% unless shop.phone_login %}<button type="button" class="sys-tab" role="tab" id="tab-security" aria-controls="security" data-sys-tab="security">{% if customer.has_password %}Password{% else %}Set a password{% endif %}</button>{% endunless %}
         </div>
 
         <section class="sys-acct__panel" id="orders" role="tabpanel" aria-labelledby="tab-orders" data-sys-panel="orders">
@@ -133,6 +133,7 @@
           </form>
         </section>
 
+        {% unless shop.phone_login %}
         <section class="sys-acct__panel" id="security" role="tabpanel" aria-labelledby="tab-security" data-sys-panel="security">
           <h2 class="sys-acct__panel-title">{% if customer.has_password %}Change password{% else %}Set a password{% endif %}</h2>
           <p class="sys-muted sys-small" style="margin:-6px 0 18px">
@@ -154,6 +155,7 @@
             <button type="submit" class="sys-btn sys-btn--secondary" data-busy-label="Saving…">Save password</button>
           </form>
         </section>
+        {% endunless %}
 
         <aside class="sys-acct__help">
           {% render 'snippets/sys-icon', icon: 'mail' %}

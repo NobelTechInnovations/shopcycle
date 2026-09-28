@@ -12,6 +12,7 @@ export default function CategoriesPage() {
       basePath="/admin/products/categories"
       icon={Grid3x3}
       description="Organize your catalog into categories like Tops, Spices, or Accessories."
+      hint="what each product is (Shirts, Dresses) — one per product; shoppers filter by it. For hand-picked groups, use Collections."
     />
   );
 }

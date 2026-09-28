@@ -50,6 +50,8 @@ async function load() {
     "system.js": byPath["assets/system.js"] || "",
     "cart-drawer.css": byPath["assets/cart-drawer.css"] || "",
     "cart-drawer.js": byPath["assets/cart-drawer.js"] || "",
+    "login-popup.css": byPath["assets/login-popup.css"] || "",
+    "login-popup.js": byPath["assets/login-popup.js"] || "",
   };
   const version = crypto.createHash("sha256").update(Object.values(assets).join("\n")).digest("hex").slice(0, 12);
   // Only templates/sections/snippets/layouts join a render; assets are
@@ -235,16 +237,18 @@ function cartDrawerOn(settings, templateName) {
   return (settings?.cart_type || "drawer") === "drawer" && templateName !== "cart" && templateName !== "checkout";
 }
 
-async function headTags(settings, { system, drawer, assetBase }) {
+async function headTags(settings, { system, drawer, login, assetBase }) {
   const { version } = await load();
   let tags = `<style id="oy-tokens">${tokensCss(settings)}</style>`;
   if (system) tags += `<link rel="stylesheet" href="${assetUrl("system.css", version, assetBase)}">`;
   if (drawer) tags += `<link rel="stylesheet" href="${assetUrl("cart-drawer.css", version, assetBase)}">`;
+  if (login) tags += `<link rel="stylesheet" href="${assetUrl("login-popup.css", version, assetBase)}">`;
   return tags;
 }
 
-/** `drawer` is the drawer's config (routes, currency) when it's on. */
-async function bodyTags({ system, drawer, assetBase }) {
+/** `drawer` is the drawer's config (routes, currency) when it's on;
+ * `login` the phone sign-in popup's (Phone Login app, signed out). */
+async function bodyTags({ system, drawer, login, assetBase }) {
   const { version } = await load();
   let tags = "";
   if (system) tags += `<script src="${assetUrl("system.js", version, assetBase)}" defer></script>`;
@@ -252,6 +256,10 @@ async function bodyTags({ system, drawer, assetBase }) {
     // JSON inside <script>: "<" is escaped so a value can't close the tag.
     const json = JSON.stringify(drawer).replace(/</g, "\\u003c");
     tags += `<script type="application/json" id="oy-cart-config">${json}</script><script src="${assetUrl("cart-drawer.js", version, assetBase)}" defer></script>`;
+  }
+  if (login) {
+    const json = JSON.stringify(login).replace(/</g, "\\u003c");
+    tags += `<script type="application/json" id="oy-login-config">${json}</script><script src="${assetUrl("login-popup.js", version, assetBase)}" defer></script>`;
   }
   return tags;
 }

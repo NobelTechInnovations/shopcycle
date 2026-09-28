@@ -14,7 +14,7 @@ import { apiFetch } from "@/lib/api";
  * each row with title/slug/image/_count.products), so the page is written
  * once and configured per resource instead of copied.
  */
-export function TaxonomyList({ resource, singular, plural, basePath, icon: Icon, description }) {
+export function TaxonomyList({ resource, singular, plural, basePath, icon: Icon, description, hint }) {
   const router = useRouter();
   const { confirmDialog } = useConfirmDialog();
   const [rows, setRows] = useState([]);
@@ -97,7 +97,7 @@ export function TaxonomyList({ resource, singular, plural, basePath, icon: Icon,
     <div>
       <PageHeader
         title={plural}
-        subtitle={loading ? " " : `${total} ${total === 1 ? singular.toLowerCase() : plural.toLowerCase()}${q ? " match" : ""}`}
+        subtitle={loading ? " " : `${total} ${total === 1 ? singular.toLowerCase() : plural.toLowerCase()}${q ? " match" : ""}${hint ? ` · ${hint}` : ""}`}
         actions={
           <Link href={`${basePath}/new`}>
             <Button type="primary" icon={<Plus size={15} aria-hidden="true" />}>

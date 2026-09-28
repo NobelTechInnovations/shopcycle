@@ -26,6 +26,7 @@ const { ensureStatusToken } = require("../orders/notify");
 const { esc } = require("../../emails/templates");
 const { storeSettings } = require("../../lib/store-settings");
 const messaging = require("../../lib/messaging");
+const pagePolicies = require("../pages/policies");
 const { INDIAN_STATES } = require("../../lib/indian-states");
 const blogService = require("../blog/service");
 const platform = require("./platform");
@@ -170,6 +171,29 @@ function oneClickConfig(ctx, customer, store) {
           shippingZip: customer.zip || "",
         }
       : null,
+  };
+}
+
+/**
+ * The Phone Login app's sign-in popup: with the app on, a signed-out
+ * shopper's account links open a phone → code popup instead of the sign-in
+ * page (which stays as the no-JavaScript fallback).
+ */
+function loginPopupConfig(ctx, customer, store, routes, templateName) {
+  const app = ctx.apps?.["phone-login"];
+  if (!app || customer || templateName === "account-login") return null;
+  const setting = app.channel;
+  const channels = shopperPhone.liveChannels(setting === "whatsapp" ? ["whatsapp"] : setting === "both" ? ["sms", "whatsapp"] : ["sms"]);
+  if (!channels.length) return null;
+  return {
+    storeName: store.name,
+    channels,
+    endpoint: `${routes.account_url}/phone`,
+    account: routes.account_url,
+    login: routes.account_login_url,
+    register: routes.account_register_url,
+    // "Sign in" links that carry ?return_to= go back there afterwards.
+    returns: { checkout: routes.checkout_url, cart: routes.cart_url },
   };
 }
 
@@ -435,6 +459,122 @@ function variantOptions(product, selected) {
   });
 }
 
+/**
+ * A product list as the collection and search pages show it: filtered by
+ * what the shopper ticked (price, availability, brand, category, size,
+ * colour), sorted, plus the filter panel itself — each choice with how many
+ * products have it, and links that remove one filter or all of them.
+ * `raw` is the query as it arrived (multi-values joined with "|").
+ */
+const FACET_OPTIONS = ["Size", "Colour"];
+const SIZE_ORDER = ["xxs", "xs", "s", "m", "l", "xl", "xxl", "xxxl", "2xl", "3xl", "4xl", "5xl"];
+function sizeRank(v) {
+  const i = SIZE_ORDER.indexOf(String(v).toLowerCase().replace(/\s+/g, ""));
+  if (i !== -1) return i;
+  const n = parseFloat(String(v).replace(/[^\d.]/g, ""));
+  return Number.isFinite(n) ? 100 + n : 10000;
+}
+function applyListing(products, raw, { baseUrl, keep = {}, bestSellers = [] }) {
+  const pick = (v) => String(v || "").split("|").map((x) => x.trim()).filter(Boolean).slice(0, 30);
+  const want = { brand: pick(raw.brand), category: pick(raw.category), size: pick(raw.size), colour: pick(raw.colour) };
+  const num = (v) => (v === undefined || v === null || v === "" || Number.isNaN(Number(v)) ? null : Math.max(0, Number(v)));
+  const priceMin = num(raw.price_min);
+  const priceMax = num(raw.price_max);
+  const inStock = Boolean(raw.in_stock);
+  const sortKey = SORTS[raw.sort] ? raw.sort : "featured";
+
+  const optionsOf = new Map(products.map((p) => [p.id, variantOptions(p, null)]));
+  const hasOption = (p, name, values) =>
+    (optionsOf.get(p.id) || []).some((o) => o.name === name && o.values.some((v) => values.includes(v.value)));
+  const tests = {
+    brand: (p) => want.brand.includes(p.brand),
+    category: (p) => want.category.includes(p.category),
+    size: (p) => hasOption(p, "Size", want.size),
+    colour: (p) => hasOption(p, "Colour", want.colour),
+  };
+  const passes = (p, except) =>
+    (!inStock || p.available) &&
+    (priceMin === null || p.price >= priceMin) &&
+    (priceMax === null || p.price <= priceMax) &&
+    Object.keys(tests).every((k) => k === except || !want[k].length || tests[k](p));
+
+  let list = products.filter((p) => passes(p));
+  if (sortKey === "best-selling") {
+    const rank = new Map(bestSellers.map((p, i) => [p.id, i]));
+    list = [...list].sort((a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999));
+  } else if (SORTS[sortKey].fn) {
+    list = [...list].sort(SORTS[sortKey].fn);
+  }
+
+  // Counts for each choice follow the other filters, so a choice never
+  // promises products that the rest of the selection has already ruled out.
+  const facet = (key, label, valuesOf) => {
+    const counts = new Map();
+    for (const p of products) {
+      if (!passes(p, key)) continue;
+      for (const v of new Set(valuesOf(p))) counts.set(v, (counts.get(v) || 0) + 1);
+    }
+    for (const v of want[key]) if (!counts.has(v)) counts.set(v, 0);
+    const values = [...counts.entries()]
+      .sort((a, b) => (key === "size" ? sizeRank(a[0]) - sizeRank(b[0]) : b[1] - a[1] || String(a[0]).localeCompare(String(b[0]))))
+      // Escaped for the page: values can come from the URL.
+      .map(([value, count]) => ({ value: safe(value), count, checked: want[key].includes(value), swatch: key === "colour" ? colourSwatch(value) : null }));
+    return values.length > 1 || want[key].length ? { key, label, values, active: want[key].length } : null;
+  };
+  const optionValues = (name) => (p) => ((optionsOf.get(p.id) || []).find((o) => o.name === name)?.values || []).map((v) => v.value);
+  const facets = [
+    facet("category", "Category", (p) => (p.category ? [p.category] : [])),
+    facet("brand", "Brand", (p) => (p.brand ? [p.brand] : [])),
+    ...FACET_OPTIONS.map((name) => facet(name.toLowerCase(), name, optionValues(name))),
+  ].filter(Boolean);
+
+  // Links: the current query minus one filter value (a chip's ×), or all.
+  const query = (drop) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(keep)) if (v) params.set(k, v);
+    if (sortKey !== "featured") params.set("sort", sortKey);
+    if (inStock && drop !== "in_stock") params.set("in_stock", "1");
+    if (priceMin !== null && drop !== "price") params.set("price_min", String(priceMin));
+    if (priceMax !== null && drop !== "price") params.set("price_max", String(priceMax));
+    for (const k of Object.keys(want)) {
+      for (const v of want[k]) if (!(drop && drop[0] === k && drop[1] === v)) params.append(k, v);
+    }
+    const qs = params.toString();
+    return qs ? `${baseUrl}?${qs}` : baseUrl;
+  };
+  const chips = [];
+  if (inStock) chips.push({ label: "In stock", remove_url: query("in_stock") });
+  if (priceMin !== null || priceMax !== null) {
+    chips.push({ label: priceMin !== null && priceMax !== null ? `₹${priceMin}–₹${priceMax}` : priceMin !== null ? `₹${priceMin}+` : `Up to ₹${priceMax}`, remove_url: query("price") });
+  }
+  for (const k of Object.keys(want)) for (const v of want[k]) chips.push({ label: safe(v), remove_url: query([k, v]) });
+  const prices = products.map((p) => p.price).filter((n) => Number.isFinite(n));
+  const clearParams = new URLSearchParams(Object.entries(keep).filter(([, v]) => v));
+
+  return {
+    list,
+    listing: {
+      sort: sortKey,
+      in_stock: inStock,
+      sort_options: Object.entries(SORTS).map(([value, o]) => ({ value, label: o.label })),
+      facets,
+      price: {
+        min: prices.length ? Math.floor(Math.min(...prices)) : 0,
+        max: prices.length ? Math.ceil(Math.max(...prices)) : 0,
+        from: priceMin,
+        to: priceMax,
+      },
+      active: chips,
+      active_count: chips.length,
+      clear_url: clearParams.toString() ? `${baseUrl}?${clearParams}` : baseUrl,
+      total_count: products.length,
+      keep: Object.entries(keep)
+        .filter(([, v]) => v)
+        .map(([name, value]) => ({ name, value: safe(value) })),
+    },
+  };
+}
+
 /** Order lines get their product's photo and link (from this render's
  * active products — a deleted or hidden product just shows no photo). */
 function withItemPhotos(ctx, orders) {
@@ -504,6 +644,8 @@ async function renderPage(
     // Phase 6 — listings and the blog.
     sort,
     inStock,
+    // Collection and search filters, as they came in the URL (see applyListing).
+    filters = {},
     variant,
     page,
     tag,
@@ -551,11 +693,19 @@ async function renderPage(
     customer,
     themeSettings,
   });
+  const routes = globalContext.routes;
+  // The store's published policies (Settings ▸ Policies) — linked in every
+  // footer through `powered_by`, which every theme prints, so no theme
+  // needs changing; `shop.policies` lets a theme list them its own way.
+  const policies = (await pagePolicies.published(prisma, store.id)).map((p) => ({ title: esc(p.title), url: `${routes.pages_url}/${p.slug}` }));
+  globalContext.shop.policies = policies;
+  // Phone Login app on: shoppers sign in by phone only (no passwords).
+  globalContext.shop.phone_login = Boolean(globalContext.apps?.["phone-login"]);
+  const policyLinks = policies.map((p) => `<a href="${p.url}" style="color:inherit;text-decoration:underline;text-underline-offset:3px;white-space:nowrap">${p.title}</a>`).join(" · ");
   // The platform credit every store carries (see POWERED_BY below).
-  globalContext.powered_by = POWERED_BY;
+  globalContext.powered_by = policyLinks ? `<span class="oy-policies">${policyLinks}</span> · ${POWERED_BY}` : POWERED_BY;
   globalContext.form_error = safe(formError);
   globalContext.notice = safe(notice);
-  const routes = globalContext.routes;
 
   if (templateName === "product") {
     if (!slug) throw new HttpError(400, "Missing product slug");
@@ -598,21 +748,9 @@ async function renderPage(
     if (!slug) throw new HttpError(400, "Missing collection slug");
     const found = globalContext.collections[slug];
     if (!found) throw new HttpError(404, `Collection not found: ${slug}`);
-    const sortKey = SORTS[sort] ? sort : "featured";
-    let list = [...found.products];
-    if (inStock) list = list.filter((p) => p.available);
-    if (sortKey === "best-selling") {
-      const rank = new Map(globalContext.best_sellers.map((p, i) => [p.id, i]));
-      list.sort((a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999));
-    } else if (SORTS[sortKey].fn) {
-      list.sort(SORTS[sortKey].fn);
-    }
+    const { list, listing } = applyListing(found.products, { ...filters, sort, in_stock: inStock }, { baseUrl: found.url, bestSellers: globalContext.best_sellers });
     globalContext.collection = { ...found, products: list, products_count: list.length };
-    globalContext.listing = {
-      sort: sortKey,
-      in_stock: Boolean(inStock),
-      sort_options: Object.entries(SORTS).map(([value, o]) => ({ value, label: o.label })),
-    };
+    globalContext.listing = listing;
   }
   if (templateName === "page") {
     if (!slug) throw new HttpError(400, "Missing page slug");
@@ -671,7 +809,9 @@ async function renderPage(
   if (templateName === "account-login") {
     const phoneLogin = await shopperPhone.config(prisma, store);
     const PHONE_STEPS = ["phone", "phone-code", "phone-profile", "phone-email-code"];
-    const mode = ["register", "code"].includes(loginMode) ? loginMode : loginMode === "phone" && phoneLogin.enabled ? "phone" : "password";
+    // With the Phone Login app on, shoppers sign in by phone only — no
+    // email, password or Google options (the app's whole point).
+    const mode = phoneLogin.enabled ? "phone" : ["register", "code"].includes(loginMode) ? loginMode : "password";
     globalContext.login = {
       step: mode === "phone" ? (PHONE_STEPS.includes(loginStep) ? loginStep : "phone") : loginStep === "code" ? "code" : "email",
       mode,
@@ -679,6 +819,7 @@ async function renderPage(
       phone: safe(loginPhone) || "",
       return_to: returnTo || null,
       phone_enabled: phoneLogin.enabled,
+      phone_only: phoneLogin.enabled,
       phone_channels: phoneLogin.channels,
       google_enabled: googleOAuth.configured(),
     };
@@ -721,14 +862,20 @@ async function renderPage(
           [p.title, p.brand, p.category, p.product_type, ...p.tags].some((field) => field && String(field).toLowerCase().includes(q))
         )
       : [];
-    globalContext.search = { query: safe(searchQuery?.trim()) || "", results: matches, result_count: matches.length };
+    const { list: results, listing } = applyListing(matches, { ...filters, sort, in_stock: inStock }, {
+      baseUrl: routes.search_url,
+      keep: { q: searchQuery?.trim() || "" },
+      bestSellers: globalContext.best_sellers,
+    });
+    globalContext.search = { query: safe(searchQuery?.trim()) || "", results, result_count: results.length };
+    globalContext.listing = listing;
     // Older theme copies render search through sections/product-grid.liquid,
     // which reads `collection.products`.
     globalContext.collection = {
       id: "search",
       title: q ? `Search results for "${esc(searchQuery.trim())}"` : "Search",
       slug: "search",
-      products: matches,
+      products: results,
     };
   }
   if (templateName === "blog") {
@@ -775,7 +922,8 @@ async function renderPage(
         oneClick: oneClickConfig(globalContext, customer, store),
       }
     : null;
-  const head = `${await platform.headTags(themeSettings, { system, drawer, assetBase })}${seoTags(seo)}`;
+  const login = loginPopupConfig(globalContext, customer, store, routes, templateName);
+  const head = `${await platform.headTags(themeSettings, { system, drawer, login, assetBase })}${seoTags(seo)}`;
   html = html.includes("</head>") ? html.replace("</head>", `${head}</head>`) : head + html;
 
   // Facebook Pixel / Google Analytics and their shopping events — on every
@@ -796,7 +944,7 @@ async function renderPage(
     html = html.replace("</head>", `<style>${filesOverride["assets/theme.css"]}</style></head>`);
   }
 
-  let tail = await platform.bodyTags({ system, drawer, assetBase });
+  let tail = await platform.bodyTags({ system, drawer, login, assetBase });
   if (templateName === "checkout") tail += checkoutEnhancements(routes, customer);
   if (tail) html = html.includes("</body>") ? html.replace("</body>", `${tail}</body>`) : html + tail;
 

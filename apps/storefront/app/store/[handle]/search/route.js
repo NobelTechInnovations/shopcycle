@@ -1,7 +1,8 @@
-import { proxyRender } from "@/lib/render";
+import { proxyRender, listingParams } from "@/lib/render";
 
 export async function GET(request, { params }) {
   const { handle } = await params;
-  const q = request.nextUrl.searchParams.get("q");
-  return proxyRender(handle, "search", q ? { q } : {}, request);
+  const sp = request.nextUrl.searchParams;
+  const q = sp.get("q");
+  return proxyRender(handle, "search", { ...(q && { q }), ...listingParams(sp) }, request);
 }

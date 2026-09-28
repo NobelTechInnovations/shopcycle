@@ -1,4 +1,4 @@
-{% comment %} Collection page: heading, sort + in-stock filter (GET form), grid. {% endcomment %}
+{% comment %} Collection page: heading, filters (snippets/sys-filters), sort, grid. {% endcomment %}
 <div class="sys">
   <section class="sys-section">
     <div class="sys-container">
@@ -11,39 +11,42 @@
         {% if collection.description != blank %}<p>{{ collection.description }}</p>{% endif %}
       </div>
 
-      <div class="sys-toolbar">
-        <span class="sys-muted">{{ collection.products_count }} product{% if collection.products_count != 1 %}s{% endif %}</span>
-        <form method="get" action="{{ collection.url }}">
-          <label class="sys-check" style="align-items:center">
-            <input type="checkbox" name="in_stock" value="1" data-sys-autosubmit {% if listing.in_stock %}checked{% endif %}>
-            In stock only
-          </label>
-          <label class="sys-row" style="gap:8px">
-            <span class="sys-muted">Sort by</span>
-            <select class="sys-select" name="sort" data-sys-autosubmit aria-label="Sort products">
-              {% for option in listing.sort_options %}
-                <option value="{{ option.value }}" {% if option.value == listing.sort %}selected{% endif %}>{{ option.label }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <noscript><button type="submit" class="sys-btn sys-btn--sm sys-btn--secondary">Apply</button></noscript>
-        </form>
-      </div>
+      <div class="sys-listing">
+        {% render 'snippets/sys-filters', listing: listing, action: collection.url %}
+        <div class="sys-listing__main">
+          <div class="sys-toolbar">
+            <span class="sys-muted">{{ collection.products_count }} product{% if collection.products_count != 1 %}s{% endif %}</span>
+            <label class="sys-row" style="gap:8px">
+              <span class="sys-muted">Sort by</span>
+              <select class="sys-select" name="sort" form="sys-filter-form" data-sys-autosubmit aria-label="Sort products">
+                {% for option in listing.sort_options %}
+                  <option value="{{ option.value }}" {% if option.value == listing.sort %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          {% render 'snippets/sys-filter-chips', listing: listing %}
 
-      {% if collection.products.size > 0 %}
-        <div class="sys-grid">
-          {% for item in collection.products %}
-            {% render 'snippets/sys-product-card', product: item %}
-          {% endfor %}
+          {% if collection.products.size > 0 %}
+            <div class="sys-grid sys-grid--3">
+              {% for item in collection.products %}
+                {% render 'snippets/sys-product-card', product: item %}
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="sys-empty">
+              <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'package' %}</span>
+              <h2 class="sys-h2">{% if listing.active_count > 0 %}No products match these filters{% else %}No products here yet{% endif %}</h2>
+              <p>{% if listing.active_count > 0 %}Try removing a filter or two.{% else %}Check back soon — new pieces are on the way.{% endif %}</p>
+              {% if listing.active_count > 0 %}
+                <a class="sys-btn sys-btn--secondary" href="{{ listing.clear_url }}">Clear all filters</a>
+              {% else %}
+                <a class="sys-btn sys-btn--secondary" href="{{ routes.all_products_url }}">Browse all products</a>
+              {% endif %}
+            </div>
+          {% endif %}
         </div>
-      {% else %}
-        <div class="sys-empty">
-          <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'package' %}</span>
-          <h2 class="sys-h2">{% if listing.in_stock %}Nothing in stock right now{% else %}No products here yet{% endif %}</h2>
-          <p>{% if listing.in_stock %}Try showing everything, or check back soon.{% else %}Check back soon — new pieces are on the way.{% endif %}</p>
-          <a class="sys-btn sys-btn--secondary" href="{{ routes.all_products_url }}">Browse all products</a>
-        </div>
-      {% endif %}
+      </div>
     </div>
   </section>
 </div>

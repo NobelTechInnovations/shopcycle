@@ -1,5 +1,6 @@
 const { HttpError, slugify } = require("@shopcycle/utils");
 const repository = require("./repository");
+const POLICY_SLUGS = require("./policies").POLICIES.map((p) => p.slug);
 
 async function uniqueSlug(prisma, storeId, title, excludeId) {
   const base = slugify(title) || "page";
@@ -28,8 +29,11 @@ async function createPage(prisma, storeId, input) {
 }
 
 async function updatePage(prisma, storeId, id, input) {
-  await getPage(prisma, storeId, id);
-  const slug = input.title ? await uniqueSlug(prisma, storeId, input.title, id) : undefined;
+  const existing = await getPage(prisma, storeId, id);
+  // A policy page keeps its address (the storefront footer links it there),
+  // whatever it's renamed to.
+  const fixed = POLICY_SLUGS.includes(existing.slug);
+  const slug = input.title && !fixed ? await uniqueSlug(prisma, storeId, input.title, id) : undefined;
   return repository.update(prisma, id, input, slug);
 }
 

@@ -98,7 +98,7 @@ export default function CollectionsPage() {
       <PageHeader
         title="Collections"
         subtitle={
-          loading ? " " : `${total} ${total === 1 ? "collection" : "collections"}${q ? " match" : ""} · group products for menus and category pages`
+          loading ? " " : `${total} ${total === 1 ? "collection" : "collections"}${q ? " match" : ""} · hand-picked groups for your menu and home page (Summer sale, New in) — a product can be in many`
         }
         actions={
           <Link href="/admin/collections/new">

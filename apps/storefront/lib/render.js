@@ -30,6 +30,23 @@ function errorPage(status, message) {
  * record an accurate page view (see analytics/service.js). It's optional
  * because a couple of callers (e.g. the discount/checkout POST redirects)
  * only ever call this for a GET they already know the path for. */
+/** Collection and search filters from the page's URL, for the API's
+ * render (storefront/service.js applyListing): several ticks of one filter
+ * travel joined with "|". */
+export function listingParams(sp) {
+  const out = {};
+  for (const key of ["sort", "price_min", "price_max"]) {
+    const v = sp.get(key);
+    if (v) out[key] = v.slice(0, 40);
+  }
+  if (sp.get("in_stock") === "1") out.in_stock = "1";
+  for (const key of ["brand", "category", "size", "colour"]) {
+    const values = sp.getAll(key).map((v) => v.replace(/\|/g, " ").trim()).filter(Boolean).slice(0, 30);
+    if (values.length) out[key] = values.join("|").slice(0, 500);
+  }
+  return out;
+}
+
 export async function proxyRender(handle, template, extraParams = {}, request = null) {
   const cookieStore = await cookies();
   const cartId = cookieStore.get(CART_COOKIE)?.value;

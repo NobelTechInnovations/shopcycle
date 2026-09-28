@@ -25,6 +25,12 @@ async function renderHandler(request, reply) {
     notice,
     sort,
     in_stock: inStock,
+    price_min: priceMin,
+    price_max: priceMax,
+    brand,
+    category,
+    size,
+    colour,
     variant,
     page,
     tag,
@@ -66,6 +72,11 @@ async function renderHandler(request, reply) {
     notice: typeof notice === "string" ? notice.slice(0, 300) : undefined,
     sort: typeof sort === "string" ? sort : undefined,
     inStock: inStock === "1",
+    filters: Object.fromEntries(
+      Object.entries({ price_min: priceMin, price_max: priceMax, brand, category, size, colour })
+        .filter(([, v]) => typeof v === "string" && v)
+        .map(([k, v]) => [k, v.slice(0, 500)])
+    ),
     variant: typeof variant === "string" ? variant : undefined,
     page: Number(page) || 1,
     tag: typeof tag === "string" ? tag : undefined,

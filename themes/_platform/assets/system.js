@@ -245,6 +245,22 @@
     });
   });
 
+  // ── Listing filters: a sidebar on desktop (always open), folded behind a
+  // "Filters" button on phones. Rendered open so it works without JS.
+  document.querySelectorAll("[data-sys-filters]").forEach(function (panel) {
+    if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) panel.open = false;
+  });
+  // Keep the address tidy: empty price boxes and the default sort stay out of it.
+  var filterForm = document.getElementById("sys-filter-form");
+  if (filterForm) {
+    filterForm.addEventListener("submit", function () {
+      Array.prototype.forEach.call(filterForm.elements, function (field) {
+        if ((field.name === "price_min" || field.name === "price_max") && !field.value) field.disabled = true;
+        if (field.name === "sort" && field.value === "featured") field.disabled = true;
+      });
+    });
+  }
+
   // ── Show / hide password ───────────────────────────────
   document.querySelectorAll("[data-sys-reveal]").forEach(function (btn) {
     var input = btn.parentNode.querySelector("[data-sys-password]");

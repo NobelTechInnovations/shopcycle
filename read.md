@@ -178,14 +178,30 @@ Local `.env` points at the **production** Supabase database, so every local writ
 
 - **Email is queued, never blocking**: `sendEmail` writes an EmailLog row (`queued`) and returns; an in-process worker delivers with retries (1, 5, 15 min) and the jobs tick drains leftovers. Sign-up used to hang ~2 min because Railway blocks outbound SMTP (ZeptoMail SMTP timed out).
 - The dashboard's "Confirm your email" banner shows the real status (sending / sent / couldn't send) via `GET /api/auth/email/status`.
-- **Plan choice is mandatory** for every new store (register, Google sign-up, "Create new store"): `plan` (starter/growth/pro) is required; the trial runs on it. Public `GET /api/auth/plans` feeds the picker.
+- ~~Plan choice at sign-up~~ — superseded: the plan is now chosen inside the dashboard on `/welcome` (see below).
 - Railway `SUPER_ADMIN_ORIGIN` was `http://localhost:3003` (super admin sign-in failed with "Failed to fetch"); set to `https://superadmin.oyklane.com`. The API now warns at start-up if any origin is localhost in production.
+
+### Done 27–28 Sep, second round (NOT committed yet)
+
+- **Plan choice moved into the dashboard**: sign-up (and "Create new store") no longer asks for a plan; the store starts its trial on the default plan with `settings.setup.choosePlan = true`, and the admin layout sends it to `/welcome` — step 1 choose plan (`POST /api/billing/setup/plan`), step 2 autopay (e-mandate first) or **Skip for now**. `plan` is optional again in the validation schemas.
+- **Analytics** rebuilt (`components/charts.jsx`): stat tiles with deltas vs the previous period and sparklines, area charts with hover, table view, top products/pages/sources/locations. API `GET /api/analytics/overview` returns `totals`, `previous`, `series` (every day, store timezone). Reports page uses the same components.
+- **Home dashboard**: Shopify-style performance card (Sessions / Sales / Orders / Conversion with a chart and range), "to do" chips (orders to fulfil, awaiting payment, out of / low stock → filtered lists).
+- **Products/collections**: after saving, a "Saved" panel with View on store / Duplicate / Add another; Duplicate via `/admin/products/new?from=<id>`. Custom data fields now save and fill in (FieldInput passed value/onChange through).
+- **One-Click Checkout popup** (`themes/_platform/assets/cart-drawer.js/.css`): mobile → OTP → saved addresses (from the number's past orders / verified account) → payment options → pay. API `POST /api/storefront/:handle/checkout/express/{code,verify}` (shopper/express.js); needs an SMS/WhatsApp provider in production, otherwise it skips the code. A cancelled/failed online payment (gateway cancel, Razorpay window closed, Back button) returns to the page the popup was opened on with the popup reopened at payment — never the full checkout page.
+- **Duplicate orders fixed**: an online order that wasn't paid is replaced (cancelled, restocked, hidden from "All orders", kept under "Cancelled") when the shopper checks out again from the same cart. The cart is now kept until payment is confirmed for Razorpay too.
+- **Phone Login app → phone-only sign-in**: with the app on, the storefront sign-in/register pages show phone only, and account links open a phone → code popup (`assets/login-popup.js/.css`, route `/account/phone`). The account page hides "Set a password".
+- **Filters** on collection and search pages (`snippets/sys-filters.liquid`): availability, price, category, brand, size, colour, with counts, chips and clear-all.
+- **Policies**: Settings ▸ Policies creates Refund / Shipping / Privacy / Terms pages from templates; published ones are linked in every theme's footer (through `powered_by`).
+- **New-order alerts**: the chime now also plays for orders placed since the last visit (≤30 min), only a tab that can play sound claims it, and the bell pulses when the browser still needs a click to allow sound. The new-order **email** goes to the owner's login email as well as the store's support email.
+- **Marketing site**: pricing is live from `GET /api/auth/plans` (monthly/yearly switch), new One-Click Checkout section, GST wording fixed.
+- Speed: `railway.json` moves the API to Singapore (`asia-southeast1-eqsg3a`, next deploy); Vercel functions set to `bom1` (next deploy); `app/admin/loading.jsx` shows a skeleton instantly on navigation.
 
 ### Left to do
 
 0. **Production email**: Railway blocks SMTP (outbound SMTP needs Railway Pro). Set `EMAIL_PROVIDER=zeptomail` and `ZEPTOMAIL_TOKEN=<ZeptoMail ▸ Mail Agents ▸ SMTP/API ▸ API ▸ Send Mail Token>` on Railway. The SMTP username/password in `.env` are not that token.
 1. **Commit and deploy** this work (owner decides).
 2. **Keys for the new providers** (see `.env.example`): `IMAGEKIT_*`, `GOOGLE_CLIENT_ID/SECRET` (+ both redirect URIs), `TWILIO_*` / `MSG91_*` / `META_WHATSAPP_*`, optionally `EMAIL_PROVIDER=zeptomail` + `ZEPTOMAIL_TOKEN`. Storefront (Vercel) needs `API_PUBLIC_URL` (or its `API_INTERNAL_URL` must be the public https API).
+2b. **ImageKit isn't live yet**: the code is in, but Railway has no `IMAGEKIT_PUBLIC_KEY` / `IMAGEKIT_PRIVATE_KEY` / `IMAGEKIT_URL_ENDPOINT`, so uploads still go to the database until those are set.
 3. India SMS needs **DLT registration** (MSG91 or Twilio) before real OTPs deliver.
 4. Try the One-Click popup and the phone/Google sign-in screens in a browser on a test store — **not Sonchiri**.
 5. **Deploy (billing):**
