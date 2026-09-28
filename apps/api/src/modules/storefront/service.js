@@ -25,6 +25,7 @@ const { publicOrder } = require("../orders/public");
 const { ensureStatusToken } = require("../orders/notify");
 const { esc } = require("../../emails/templates");
 const { storeSettings } = require("../../lib/store-settings");
+const messaging = require("../../lib/messaging");
 const { INDIAN_STATES } = require("../../lib/indian-states");
 const blogService = require("../blog/service");
 const platform = require("./platform");
@@ -135,19 +136,23 @@ if(f.elements.shippingName){f.elements.shippingName.addEventListener("change",fu
 
 /**
  * One-Click Checkout (the app of that name, installed from Apps): the cart
- * drawer's checkout button opens a single-step popup instead of the full
- * checkout page. "native" is Oyklane's own form; `provider` leaves room for
- * a third-party express checkout later. The popup posts to the same
- * checkout route as the full page, flagged `oneClick`, so the order records
- * that the app was used (and its fee) — the API checks the app really is
- * installed before honouring it.
+ * drawer's checkout button opens a step-by-step popup instead of the full
+ * checkout page — mobile number, a code (`otp`, when an SMS or WhatsApp
+ * provider is set up), a saved or new address, then payment. "native" is
+ * Oyklane's own popup; `provider` leaves room for a third-party express
+ * checkout later. The popup posts to the same checkout route as the full
+ * page, flagged `oneClick`, so the order records that the app was used (and
+ * its fee) — the API checks the app really is installed before honouring it.
  */
 function oneClickConfig(ctx, customer, store) {
   const app = ctx.apps?.["one-click-checkout"];
   if (!app || !ctx.payment_methods?.length) return null;
   const fields = storeSettings(store).checkout;
+  const live = messaging.channels();
   return {
     provider: app.provider || "native",
+    otp: Boolean(live.sms || live.whatsapp || env.NODE_ENV !== "production"),
+    storeName: store.name,
     fields: { phone: fields.phone, address2: fields.address2, company: fields.company, country: fields.country },
     methods: ctx.payment_methods.map((m) => ({ value: m.value, label: m.label, testMode: Boolean(m.testMode) })),
     states: INDIAN_STATES.map((st) => st.name),

@@ -3,6 +3,7 @@ const { HttpError } = require("@shopcycle/utils");
 const storefrontService = require("../storefront/service");
 const service = require("./service");
 const phone = require("./phone");
+const express = require("./express");
 const { exchangeTicket } = require("./google");
 const abandoned = require("../checkout/abandoned");
 const returns = require("../orders/returns");
@@ -91,6 +92,20 @@ async function phoneVerifyHandler(request, reply) {
     return reply.send({ token: service.signSession(request.server, store, result.customer, "phone"), customer: { id: result.customer.id, name: result.customer.name } });
   }
   reply.send({ signupTicket: phone.signupTicket(request.server, store, result.phone) });
+}
+
+// Express checkout (One-Click popup): code to the number, then its saved addresses.
+async function expressCodeHandler(request, reply) {
+  const store = await storeFor(request);
+  const body = phoneCodeSchema.parse(request.body);
+  reply.send(await express.requestCode(request.server.prisma, store, body, request.log));
+}
+
+async function expressVerifyHandler(request, reply) {
+  const store = await storeFor(request);
+  const body = phoneVerifySchema.parse(request.body);
+  await throttle(request.server, `express-verify:${store.id}:${body.phone.replace(/\D/g, "")}`, { max: 15, windowSeconds: 15 * 60 });
+  reply.send(await express.verify(request.server.prisma, store, body));
 }
 
 async function phoneCompleteHandler(request, reply) {
@@ -231,6 +246,8 @@ module.exports = {
   contactHandler,
   recoverHandler,
   phoneCodeHandler,
+  expressCodeHandler,
+  expressVerifyHandler,
   phoneVerifyHandler,
   phoneCompleteHandler,
   googleExchangeHandler,

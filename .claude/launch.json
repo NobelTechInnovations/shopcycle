@@ -9,6 +9,16 @@
         "dev"
       ],
       "port": 3000
+    },
+    {
+      "name": "www",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@shopcycle/www",
+        "dev"
+      ],
+      "port": 3004
     }
   ]
 }

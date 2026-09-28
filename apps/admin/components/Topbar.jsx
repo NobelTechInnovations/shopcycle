@@ -19,7 +19,6 @@ import { apiFetch } from "@/lib/api";
 import { storefrontUrlFor, initials } from "@/lib/storefront";
 import { CommandPalette } from "./CommandPalette";
 import { NewOrderAlerts } from "./NewOrderAlerts";
-import { PlanPicker } from "./PlanPicker";
 
 export function Topbar({ user, store, onOpenNav }) {
   const router = useRouter();
@@ -82,7 +81,7 @@ export function Topbar({ user, store, onOpenNav }) {
 
   async function handleCreateStore(values) {
     try {
-      await apiFetch("/api/auth/stores", { method: "POST", body: { storeName: values.storeName, plan: values.plan } });
+      await apiFetch("/api/auth/stores", { method: "POST", body: { storeName: values.storeName } });
       window.location.href = "/admin";
     } catch (err) {
       message.error(err.message);
@@ -214,15 +213,11 @@ export function Topbar({ user, store, onOpenNav }) {
         onCancel={() => setCreateOpen(false)}
         onOk={() => form.submit()}
         okText="Create store"
-        width={600}
         destroyOnHidden
       >
         <Form layout="vertical" form={form} onFinish={handleCreateStore} requiredMark={false}>
-          <Form.Item name="storeName" label="Store name" rules={[{ required: true, min: 2, message: "Too short" }]}>
+          <Form.Item name="storeName" label="Store name" rules={[{ required: true, min: 2, message: "Too short" }]} extra="You'll choose its plan next.">
             <Input placeholder="My New Shop" autoFocus />
-          </Form.Item>
-          <Form.Item name="plan" label="Plan" rules={[{ required: true, message: "Choose a plan" }]}>
-            <PlanPicker />
           </Form.Item>
         </Form>
       </Modal>

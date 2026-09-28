@@ -17,8 +17,13 @@ function searchFilter(q) {
   return /^\d{1,9}$/.test(digits) ? { OR: [{ orderNumber: Number(digits) }, ...byCustomer] } : { OR: byCustomer };
 }
 
+/** Set on an unpaid online order that was replaced when its shopper
+ * checked out again from the same cart (checkout/service.js). Not a real
+ * sale, so "All" leaves it out; "Cancelled" still lists it. */
+const REPLACED_REASON = "Payment not completed — the customer checked out again";
+
 const STATUS_FILTERS = {
-  all: {},
+  all: { AND: [{ OR: [{ cancelReason: null }, { cancelReason: { not: REPLACED_REASON } }] }] },
   unfulfilled: { fulfillmentStatus: { in: ["unfulfilled", "partially_fulfilled"] } },
   fulfilled: { fulfillmentStatus: "fulfilled" },
   cancelled: { fulfillmentStatus: "cancelled" },
@@ -85,4 +90,4 @@ function updateStatus(prisma, id, data) {
   return prisma.order.update({ where: { id }, data, include });
 }
 
-module.exports = { list, findById, nextOrderNumber, withNextOrderNumber, create, updateStatus };
+module.exports = { list, findById, nextOrderNumber, withNextOrderNumber, create, updateStatus, REPLACED_REASON };

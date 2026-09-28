@@ -1,4 +1,6 @@
 import { ThemeShowcase } from "./ThemeShowcase";
+import { Pricing } from "./Pricing";
+import { getPlans } from "./plans";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const DEMO_URL = process.env.NEXT_PUBLIC_DEMO_STORE_URL || "https://loomwear.oyklane.com";
@@ -16,7 +18,12 @@ const I = {
   sliders: "M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4",
   bell: "M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 21h4",
   arrow: "M5 12h14M13 6l6 6-6 6",
+  phone: "M8 2.5h8a1.5 1.5 0 0 1 1.5 1.5v16a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 20V4A1.5 1.5 0 0 1 8 2.5zM11 18.5h2",
+  shield: "M12 3l7 3v5.5c0 4.4-3 8.2-7 9.5-4-1.3-7-5.1-7-9.5V6zM9 12l2.2 2.2L15.5 10",
+  pin: "M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21zM12 7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z",
 };
+
+const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
 function Icon({ d, className }) {
   return (
@@ -26,16 +33,20 @@ function Icon({ d, className }) {
   );
 }
 
-const FAQ = [
+const faq = (pricing) => [
   ["Do I need to know how to code?", "No. Pick a theme, change its colours, fonts, photos and sections in the editor, and arrange your product page by dragging blocks. The code editor is there if you ever want it."],
   ["How do I get paid?", "Straight into your own account. Connect Razorpay, Cashfree, PayU, Stripe or PayPal (test mode first, if you like) and turn cash on delivery on or off. Oyklane never holds your money."],
   ["Can I use my own domain?", "Yes. Every store gets a free yourname.oyklane.com address. Point your own domain at it from Settings ▸ Domains — SSL is set up for you automatically."],
-  ["What does it cost?", "Starter is ₹199 a month, Growth ₹599 and Pro ₹1,299 (plus 18% GST), with a small fee per paid order: 2%, 1.5% or 0.5%. Every store starts with a 3-day free trial, then ₹99 for the first month. Pay yearly and save 20%."],
+  [
+    "What does it cost?",
+    `${pricing.plans.map((p, i) => `${i === 0 ? "" : i === pricing.plans.length - 1 ? " and " : ", "}${p.name} ${inr(p.priceMonthly)}`).join("")} a month (plus 18% GST), with a small fee per paid order: ${pricing.plans.map((p) => `${p.commissionPercent}%`).join(", ")}. Every store starts with a ${pricing.trialDays}-day free trial${pricing.introEnabled ? `, then ${inr(pricing.introPrice)} for the first month` : ""}. Pay yearly and save ${pricing.annualDiscountPercent}%.`,
+  ],
   ["Can I move my reviews and products over?", "Yes — import products from a CSV, and import your existing product reviews from a CSV matched by product. Customers' stars show up straight away."],
   ["Is it built for Indian sellers?", "From the ground up: rupee pricing, cash on delivery, UPI and Indian gateways, GST invoices with HSN codes and GSTIN, Indian states at checkout and PIN-code addresses."],
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const pricing = await getPlans();
   return (
     <>
       <header className="nav">
@@ -48,7 +59,7 @@ export default function HomePage() {
             <ul className="nav__links">
               <li><a href="#themes">Themes</a></li>
               <li><a href="#features">Features</a></li>
-              <li><a href="#payments">Payments</a></li>
+              <li><a href="#checkout">Checkout</a></li>
               <li><a href="#pricing">Pricing</a></li>
               <li><a href="#faq">FAQ</a></li>
             </ul>
@@ -66,7 +77,7 @@ export default function HomePage() {
           <div className="wrap hero__grid">
             <div className="hero__copy">
               <a href="#themes" className="pill">
-                <b>New</b> Atelier &amp; Lumière themes · Product reviews
+                <b>New</b> One-Click Checkout · Phone login for shoppers
               </a>
               <h1 className="h1">Your brand&rsquo;s store, live this week.</h1>
               <p className="lead">
@@ -81,7 +92,7 @@ export default function HomePage() {
                 </a>
               </div>
               <p className="hero__trust">
-                <span><Icon d={I.check} /> 3-day free trial</span>
+                <span><Icon d={I.check} /> {pricing.trialDays}-day free trial</span>
                 <span><Icon d={I.check} /> Cash on delivery built in</span>
                 <span><Icon d={I.check} /> Your own domain, free SSL</span>
               </p>
@@ -250,6 +261,39 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* One-click checkout */}
+        <section className="section" id="checkout">
+          <div className="wrap split split--flip">
+            <div className="head" style={{ marginBottom: 0 }}>
+              <span className="kicker">One-Click Checkout</span>
+              <h2 className="h2">Checkout in seconds, not forms.</h2>
+              <p className="lead muted">Returning buyers type their mobile number, confirm a one-time code, pick a saved address and pay — all in a popup, without leaving the page they were on.</p>
+              <ul className="ticks">
+                <li><Icon d={I.phone} /> Mobile number and a one-time code by SMS or WhatsApp</li>
+                <li><Icon d={I.pin} /> Addresses they&rsquo;ve used before, filled in for them</li>
+                <li><Icon d={I.card} /> UPI, cards and net banking from your gateways — plus cash on delivery</li>
+                <li><Icon d={I.shield} /> Phone login for shoppers: no passwords to forget</li>
+              </ul>
+            </div>
+            <div className="ck" aria-hidden="true">
+              <div className="ck__sheet">
+                <div className="ck__head"><span>Loomwear</span><em><Icon d={I.shield} /> Secure checkout</em></div>
+                <div className="ck__sum"><span>Order summary · 2 items</span><strong>₹2,299</strong></div>
+                <ol className="ck__steps"><li className="done">Mobile</li><li className="done">Address</li><li className="now">Payment</li></ol>
+                <p className="ck__title">Choose how to pay</p>
+                <div className="ck__addr"><Icon d={I.pin} /><span><b>Ananya Sharma</b>Flat 402, Lotus Residency, Indiranagar, Bengaluru 560038</span></div>
+                <div className="ck__opt is-on"><i /><span><b>UPI, cards &amp; net banking</b>Google Pay, PhonePe, Paytm, all cards</span></div>
+                <div className="ck__opt"><i /><span><b>Cash on delivery</b>Pay when your order arrives</span></div>
+                <div className="ck__pay"><Icon d={I.shield} /> Pay ₹2,299</div>
+              </div>
+              <div className="ck__otp">
+                <span>Enter the code sent to +91 98765 00001</span>
+                <div>{["4", "8", "1", "2", "9", "6"].map((d, i) => <b key={i}>{d}</b>)}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Product page spotlight */}
         <section className="section">
           <div className="wrap split">
@@ -305,64 +349,12 @@ export default function HomePage() {
           <div className="wrap">
             <div className="head head--center">
               <span className="kicker">Pricing</span>
-              <h2 className="h2">Simple plans. Try free for 3 days.</h2>
-              <p className="lead">Then ₹99 for your first month on any plan. No setup fees, no product limits, and you can change plans whenever you like.</p>
+              <h2 className="h2">Simple plans. Try free for {pricing.trialDays} days.</h2>
+              <p className="lead">
+                {pricing.introEnabled ? `Then ${inr(pricing.introPrice)} for your first month on any plan. ` : ""}No setup fees, no product limits, and you can change plans whenever you like.
+              </p>
             </div>
-            <div className="plans">
-              <div className="plan">
-                <div>
-                  <h3 className="h3">Starter</h3>
-                  <p className="muted">Everything to open your store.</p>
-                </div>
-                <p className="plan__price"><strong>₹199</strong><span className="muted">/month</span></p>
-                <ul>
-                  <li><Icon d={I.check} /> Unlimited products</li>
-                  <li><Icon d={I.check} /> All themes and the visual editor</li>
-                  <li><Icon d={I.check} /> 5 payment gateways and cash on delivery</li>
-                  <li><Icon d={I.check} /> Reviews, discount codes and blog</li>
-                  <li><Icon d={I.check} /> Your own domain with free SSL</li>
-                  <li><Icon d={I.check} /> 2 staff accounts</li>
-                  <li><Icon d={I.check} /> 2% fee per paid order</li>
-                </ul>
-                <a href={`${APP_URL}/register`} className="btn btn--ghost">Start with Starter</a>
-              </div>
-              <div className="plan plan--featured">
-                <span className="plan__badge">Most popular</span>
-                <div>
-                  <h3 className="h3">Growth</h3>
-                  <p className="muted">Marketing, reports and GST invoices for a growing brand.</p>
-                </div>
-                <p className="plan__price"><strong>₹599</strong><span className="muted">/month</span></p>
-                <ul>
-                  <li><Icon d={I.check} /> Everything in Starter</li>
-                  <li><Icon d={I.check} /> GST tax invoices to your customers</li>
-                  <li><Icon d={I.check} /> Meta Ads and WhatsApp built in</li>
-                  <li><Icon d={I.check} /> Advanced reports and CSV exports</li>
-                  <li><Icon d={I.check} /> Gift cards, segments and automations</li>
-                  <li><Icon d={I.check} /> Theme code editor</li>
-                  <li><Icon d={I.check} /> 10 staff accounts</li>
-                  <li><Icon d={I.check} /> 1.5% fee per paid order</li>
-                </ul>
-                <a href={`${APP_URL}/register`} className="btn btn--primary">Start with Growth</a>
-              </div>
-              <div className="plan">
-                <div>
-                  <h3 className="h3">Pro</h3>
-                  <p className="muted">The lowest fees, API access and priority support.</p>
-                </div>
-                <p className="plan__price"><strong>₹1,299</strong><span className="muted">/month</span></p>
-                <ul>
-                  <li><Icon d={I.check} /> Everything in Growth</li>
-                  <li><Icon d={I.check} /> API keys and webhooks</li>
-                  <li><Icon d={I.check} /> Advanced automation and integrations</li>
-                  <li><Icon d={I.check} /> Priority support</li>
-                  <li><Icon d={I.check} /> 30 staff accounts</li>
-                  <li><Icon d={I.check} /> 0.5% fee per paid order</li>
-                </ul>
-                <a href={`${APP_URL}/register`} className="btn btn--ghost">Start with Pro</a>
-              </div>
-            </div>
-            <p className="plans__note">Prices exclude 18% GST. Pay yearly and save 20%. The One-Click Checkout app adds 0.3% to the per-order fee.</p>
+            <Pricing data={pricing} appUrl={APP_URL} />
           </div>
         </section>
 
@@ -374,7 +366,7 @@ export default function HomePage() {
               <h2 className="h2">Good to know</h2>
             </div>
             <div className="faq">
-              {FAQ.map(([q, a]) => (
+              {faq(pricing).map(([q, a]) => (
                 <details key={q}>
                   <summary>{q}</summary>
                   <p>{a}</p>
@@ -410,6 +402,7 @@ export default function HomePage() {
                 <li><a href="#themes">Themes</a></li>
                 <li><a href="#features">Features</a></li>
                 <li><a href="#payments">Payments</a></li>
+                <li><a href="#checkout">One-Click Checkout</a></li>
                 <li><a href="#pricing">Pricing</a></li>
               </ul>
             </div>
@@ -431,7 +424,7 @@ export default function HomePage() {
           </div>
           <div className="footer__bottom">
             <span>© {new Date().getFullYear()} Oyklane. Made in India.</span>
-            <span>Prices in INR, GST included.</span>
+            <span>Prices in INR, plus 18% GST.</span>
           </div>
         </div>
       </footer>

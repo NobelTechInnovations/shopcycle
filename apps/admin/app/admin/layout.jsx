@@ -29,6 +29,12 @@ export default async function AdminLayout({ children }) {
     redirect("/billing");
   }
 
+  // A store created without a plan choice picks one first (and is offered
+  // autopay, which it can skip) — /welcome, also outside this layout.
+  if (me.store?.settings?.setup?.choosePlan && me.role !== "staff") {
+    redirect("/welcome");
+  }
+
   if (me.store?.status === "suspended") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-app-bg px-4">

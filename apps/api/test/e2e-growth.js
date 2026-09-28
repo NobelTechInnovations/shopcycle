@@ -423,10 +423,28 @@ async function main() {
     const back = { ...pf, status: "success", mihpayid: "403993715", salt: undefined };
     delete back.salt;
     back.hash = crypto.createHash("sha512").update(`eCwWELxi42|success|||||||||||${pf.email}|${pf.firstname}|${pf.productinfo}|${pf.amount}|${pf.txnid}|${pf.key}`).digest("hex");
-    r = await sf("POST", `/api/storefront/${H}/checkout/payments/payu/confirm`, { orderId: payuOrder.id, params: { ...back, hash: back.hash.replace(/^./, "0") } });
+    r = await sf("POST", `/api/storefront/${H}/checkout/payments/payu/confirm`, { orderId: payuOrder.id, params: { ...back, hash: (back.hash[0] === "0" ? "1" : "0") + back.hash.slice(1) } });
     check("PayU return with a forged signature is refused", r.data.paid === false, r.data);
     r = await sf("POST", `/api/storefront/${H}/checkout/payments/payu/confirm`, { orderId: payuOrder.id, params: back });
     check("PayU return with PayU's signature → paid", r.data.paid === true, r.data);
+
+    // Paying online, coming back without paying, then checking out again
+    // from the same cart: one order, not two.
+    const stockBefore = (await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity;
+    cartId = await freshCart(1);
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId, email: `retry-${stamp}@test.oyklane.dev`, ...SHIP, paymentMethod: "cashfree", returnBase: RB });
+    const firstTry = r.data.order;
+    check("online checkout keeps the cart until paid", (await sf("GET", `/api/storefront/${H}/cart?cartId=${cartId}`)).data.cart.item_count === 1);
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId, email: `retry-${stamp}@test.oyklane.dev`, ...SHIP, paymentMethod: "cod" });
+    const secondTry = r.data.order;
+    check("checking out again from the same cart places the order", r.status === 201 && secondTry && secondTry.id !== firstTry.id, r.data);
+    const replaced = await prisma.order.findUnique({ where: { id: firstTry.id } });
+    check("…the unpaid first try is cancelled", replaced.fulfillmentStatus === "cancelled" && /checked out again/.test(replaced.cancelReason || ""), replaced);
+    check("…and its stock put back (sold once, not twice)", (await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity === stockBefore - 1);
+    r = await owner("GET", "/api/orders?status=all&pageSize=50");
+    check("…All orders shows one order, not two", r.data.orders.some((o) => o.id === secondTry.id) && !r.data.orders.some((o) => o.id === firstTry.id), r.data.orders?.map((o) => o.orderNumber));
+    r = await owner("GET", "/api/orders?status=cancelled&pageSize=50");
+    check("…the replaced try is still under Cancelled", r.data.orders.some((o) => o.id === firstTry.id));
 
     r = await owner("PUT", "/api/payments/paypal", { credentials: { clientId: "pp_client", clientSecret: "pp_secret" }, testMode: true });
     check("PayPal refused for a rupee store (PayPal doesn't take INR here)", r.status === 400 && /INR/.test(r.data.error), r.data);

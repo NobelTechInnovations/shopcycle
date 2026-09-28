@@ -22,6 +22,9 @@ export default function RazorpayPayPage() {
   const rzpOrderId = searchParams.get("rzpOrderId");
   const amount = searchParams.get("amount");
   const key = searchParams.get("key");
+  // Started from the One-Click popup: a closed window or failed payment
+  // goes back to that page (popup reopened), not to the checkout page.
+  const back = searchParams.get("back");
   const [status, setStatus] = useState("loading"); // loading | opening | error
 
   useEffect(() => {
@@ -38,6 +41,26 @@ export default function RazorpayPayPage() {
     // exactly the right base for every other link on this page — no env
     // vars or host-parsing needed client-side.
     const basePath = window.location.pathname.replace(/\/checkout\/pay\/?$/, "");
+    const safeBack = back && back.startsWith("/") && !back.startsWith("//") && !back.includes("\\") ? back : null;
+    const retry = (message) => {
+      if (safeBack) {
+        const url = new URL(safeBack, window.location.origin);
+        url.searchParams.set("oyCheckout", "retry");
+        url.searchParams.set("oyError", message);
+        return url.pathname + url.search;
+      }
+      return `${basePath}/checkout?checkoutError=${encodeURIComponent(message)}`;
+    };
+    // Back from the thank-you page, or this page restored from the history:
+    // don't open the payment window again.
+    const seen = `oy-rzp-${orderId}`;
+    try {
+      if (sessionStorage.getItem(seen)) {
+        window.location.replace(retry("Payment wasn't completed. Try again, or choose another way to pay."));
+        return undefined;
+      }
+      sessionStorage.setItem(seen, "1");
+    } catch {}
 
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -56,26 +79,21 @@ export default function RazorpayPayPage() {
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ orderId, ...response }),
           });
+          // replace(): Back from the thank-you page never returns here.
           if (verifyRes.ok) {
-            window.location.href = `${basePath}/checkout/confirmation?order=${orderId}`;
+            window.location.replace(`${basePath}/checkout/confirmation?order=${orderId}`);
           } else {
-            window.location.href = `${basePath}/checkout?checkoutError=${encodeURIComponent(
-              "Payment could not be verified. Please contact us with your order number."
-            )}`;
+            window.location.replace(retry("Payment could not be verified. If you were charged, contact the store with your order number."));
           }
         },
         modal: {
           ondismiss: function handleDismiss() {
-            window.location.href = `${basePath}/checkout?checkoutError=${encodeURIComponent(
-              "Payment was cancelled."
-            )}`;
+            window.location.replace(retry("Payment was cancelled. Try again, or choose another way to pay."));
           },
         },
       });
       rzp.on("payment.failed", function handlePaymentFailed() {
-        window.location.href = `${basePath}/checkout?checkoutError=${encodeURIComponent(
-          "Payment failed. Please try again."
-        )}`;
+        window.location.replace(retry("Payment failed. Try again, or choose another way to pay."));
       });
       rzp.open();
     };
@@ -84,7 +102,7 @@ export default function RazorpayPayPage() {
     return () => {
       document.body.removeChild(script);
     };
-  }, [handle, orderId, rzpOrderId, amount, key]);
+  }, [handle, orderId, rzpOrderId, amount, key, back]);
 
   return (
     <div

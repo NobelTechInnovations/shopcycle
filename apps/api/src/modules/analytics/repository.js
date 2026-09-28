@@ -14,14 +14,6 @@ function createPageView(prisma, storeId, sessionId, path, templateName) {
   return prisma.pageView.create({ data: { storeId, sessionId, path, templateName } });
 }
 
-function countSessions(prisma, storeId, from, to) {
-  return prisma.visitorSession.count({ where: { storeId, firstSeenAt: { gte: from, lte: to } } });
-}
-
-function countPageViews(prisma, storeId, from, to) {
-  return prisma.pageView.count({ where: { storeId, createdAt: { gte: from, lte: to } } });
-}
-
 // `_count: { <field>: true }` counts non-null occurrences of that field —
 // wrong for grouping on a nullable column, where the whole point is often
 // counting the null ("Unknown country", "Direct / none source") bucket
@@ -69,37 +61,49 @@ function sessionsBySource(prisma, storeId, from, to) {
  * without revisiting this query. Column names are double-quoted because
  * the schema maps tables to snake_case but leaves columns camelCase, and
  * Postgres folds unquoted identifiers to lowercase. */
-async function sessionsPerDay(prisma, storeId, from, to) {
+// Days are the store's own calendar days (its timezone), not UTC ones —
+// an order at 11pm in India belongs to that day, not the next.
+const dayRows = (rows, key = "count") => rows.map((r) => ({ date: new Date(r.date).toISOString().slice(0, 10), [key]: Number(r[key]) }));
+
+async function sessionsPerDay(prisma, storeId, from, to, tz = "Asia/Kolkata") {
   const rows = await prisma.$queryRaw`
-    SELECT "firstSeenAt"::date as date, COUNT(*) as count
+    SELECT (("firstSeenAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz})::date as date, COUNT(*) as count
     FROM visitor_sessions
-    WHERE "storeId" = ${storeId} AND "firstSeenAt" >= ${from} AND "firstSeenAt" <= ${to}
-    GROUP BY "firstSeenAt"::date
-    ORDER BY date ASC
+    WHERE "storeId" = ${storeId} AND "firstSeenAt" >= ${from} AND "firstSeenAt" < ${to}
+    GROUP BY 1 ORDER BY 1 ASC
   `;
-  return rows.map((r) => ({ date: r.date, count: Number(r.count) }));
+  return dayRows(rows);
 }
 
-async function pageViewsPerDay(prisma, storeId, from, to) {
+async function pageViewsPerDay(prisma, storeId, from, to, tz = "Asia/Kolkata") {
   const rows = await prisma.$queryRaw`
-    SELECT "createdAt"::date as date, COUNT(*) as count
+    SELECT (("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz})::date as date, COUNT(*) as count
     FROM page_views
-    WHERE "storeId" = ${storeId} AND "createdAt" >= ${from} AND "createdAt" <= ${to}
-    GROUP BY "createdAt"::date
-    ORDER BY date ASC
+    WHERE "storeId" = ${storeId} AND "createdAt" >= ${from} AND "createdAt" < ${to}
+    GROUP BY 1 ORDER BY 1 ASC
   `;
-  return rows.map((r) => ({ date: r.date, count: Number(r.count) }));
+  return dayRows(rows);
 }
 
-async function salesPerDay(prisma, storeId, from, to) {
+/** Orders and sales per day — cancelled orders don't count as sales. */
+async function salesPerDay(prisma, storeId, from, to, tz = "Asia/Kolkata") {
   const rows = await prisma.$queryRaw`
-    SELECT "createdAt"::date as date, COUNT(*) as orders, SUM("total") as revenue
+    SELECT (("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz})::date as date, COUNT(*) as orders, COALESCE(SUM("total"), 0) as revenue
     FROM orders
-    WHERE "storeId" = ${storeId} AND "createdAt" >= ${from} AND "createdAt" <= ${to}
-    GROUP BY "createdAt"::date
-    ORDER BY date ASC
+    WHERE "storeId" = ${storeId} AND "createdAt" >= ${from} AND "createdAt" < ${to} AND "fulfillmentStatus" <> 'cancelled'
+    GROUP BY 1 ORDER BY 1 ASC
   `;
-  return rows.map((r) => ({ date: r.date, orders: Number(r.orders), revenue: Number(r.revenue) }));
+  return rows.map((r) => ({ date: new Date(r.date).toISOString().slice(0, 10), orders: Number(r.orders), revenue: Number(r.revenue) }));
+}
+
+/** Totals for a period: sessions, page views, orders and sales. */
+async function periodTotals(prisma, storeId, from, to) {
+  const [sessions, pageViews, orders] = await Promise.all([
+    prisma.visitorSession.count({ where: { storeId, firstSeenAt: { gte: from, lt: to } } }),
+    prisma.pageView.count({ where: { storeId, createdAt: { gte: from, lt: to } } }),
+    prisma.order.aggregate({ where: { storeId, createdAt: { gte: from, lt: to }, fulfillmentStatus: { not: "cancelled" } }, _count: { _all: true }, _sum: { total: true } }),
+  ]);
+  return { sessions, pageViews, orders: orders._count._all, sales: Number(orders._sum.total || 0) };
 }
 
 async function topProducts(prisma, storeId, from, to) {
@@ -107,7 +111,7 @@ async function topProducts(prisma, storeId, from, to) {
     SELECT oi."title" as title, SUM(oi."quantity") as quantity, SUM(oi."total") as revenue
     FROM order_items oi
     JOIN orders o ON o."id" = oi."orderId"
-    WHERE o."storeId" = ${storeId} AND o."createdAt" >= ${from} AND o."createdAt" <= ${to}
+    WHERE o."storeId" = ${storeId} AND o."createdAt" >= ${from} AND o."createdAt" < ${to} AND o."fulfillmentStatus" <> 'cancelled'
     GROUP BY oi."title"
     ORDER BY revenue DESC
   `;
@@ -154,8 +158,6 @@ module.exports = {
   createSession,
   touchSession,
   createPageView,
-  countSessions,
-  countPageViews,
   topPaths,
   sessionsByCountry,
   sessionsByDevice,
@@ -163,6 +165,7 @@ module.exports = {
   sessionsPerDay,
   pageViewsPerDay,
   salesPerDay,
+  periodTotals,
   topProducts,
   listCampaigns,
   findCampaignById,

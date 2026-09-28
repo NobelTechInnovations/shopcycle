@@ -5,8 +5,9 @@ const registerSchema = z.object({
   email: z.string().email("Enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   storeName: z.string().min(2, "Store name is too short").max(120),
-  // The plan's key (starter / growth / pro) — every new store picks one.
-  plan: z.string({ required_error: "Choose a plan" }).trim().min(1, "Choose a plan").max(40),
+  // The plan's key (starter / growth / pro). Optional: a store created
+  // without one picks it on its first visit to the dashboard (/welcome).
+  plan: z.string().trim().min(1).max(40).optional(),
 });
 
 const loginSchema = z.object({
@@ -16,7 +17,7 @@ const loginSchema = z.object({
 
 const createStoreSchema = z.object({
   storeName: z.string().min(2, "Store name is too short").max(120),
-  plan: z.string({ required_error: "Choose a plan" }).trim().min(1, "Choose a plan").max(40),
+  plan: z.string().trim().min(1).max(40).optional(),
 });
 
 const switchStoreSchema = z.object({

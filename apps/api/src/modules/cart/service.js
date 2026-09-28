@@ -16,7 +16,7 @@ function generateCartId() {
  * reads as empty rather than erroring: a shopper should never see a
  * broken page because their old cart cookie outlived its cart. */
 async function readRaw(prisma, storeId, cartId) {
-  const empty = { items: [], discountCode: null, giftCardId: null };
+  const empty = { items: [], discountCode: null, giftCardId: null, pendingOrderId: null };
   if (!cartId) return empty;
   const row = await prisma.cartSession.findUnique({ where: { storeId_cartId: { storeId, cartId } } });
   if (!row || row.expiresAt < new Date()) return empty;
@@ -25,12 +25,16 @@ async function readRaw(prisma, storeId, cartId) {
     items: Array.isArray(data.items) ? data.items : [],
     discountCode: data.discountCode || null,
     giftCardId: data.giftCardId || null,
+    // An online order started from this cart whose payment isn't done yet
+    // (checkout/service.js): trying again replaces it rather than adding a
+    // second order.
+    pendingOrderId: data.pendingOrderId || null,
   };
 }
 
 async function writeRaw(prisma, storeId, cartId, data) {
   const expiresAt = new Date(Date.now() + CART_TTL_MS);
-  const payload = { items: data.items || [], discountCode: data.discountCode || null, giftCardId: data.giftCardId || null };
+  const payload = { items: data.items || [], discountCode: data.discountCode || null, giftCardId: data.giftCardId || null, pendingOrderId: data.pendingOrderId || null };
   await prisma.cartSession.upsert({
     where: { storeId_cartId: { storeId, cartId } },
     update: { data: payload, expiresAt },
@@ -109,6 +113,7 @@ async function hydrateCart(prisma, storeId, cartId, raw) {
       items: raw.items.filter((i) => variantsById[i.variantId]),
       discountCode: raw.discountCode,
       giftCardId: raw.giftCardId,
+      pendingOrderId: raw.pendingOrderId,
     });
   }
 
@@ -252,6 +257,14 @@ async function removeGiftCard(prisma, storeId, cartId, handle) {
   return getCart(prisma, storeId, cartId, handle);
 }
 
+/** Marks the cart as paying for `orderId` (an online order waiting for its
+ * payment) — checking out again from it replaces that order. */
+async function setPendingOrder(prisma, storeId, cartId, orderId) {
+  if (!cartId) return;
+  const raw = await readRaw(prisma, storeId, cartId);
+  await writeRaw(prisma, storeId, cartId, { ...raw, pendingOrderId: orderId });
+}
+
 /** Called once checkout successfully places a real order — the cart's job
  * is done, and leaving the old items in place would let the same cartId
  * "place" the same order again on a page back-navigation. */
@@ -261,6 +274,7 @@ function clearCart(prisma, storeId, cartId) {
 
 module.exports = {
   getCart,
+  setPendingOrder,
   addItem,
   updateItem,
   applyDiscountCode,

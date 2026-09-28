@@ -29,7 +29,7 @@ const ONE_CLICK = {
   key: "one-click-checkout",
   name: "One-Click Checkout",
   description:
-    "Shoppers check out from the cart drawer in a single popup — details they've used before are filled in for them. Adds a small fee per order paid through it.",
+    "Shoppers check out from the cart drawer in a quick popup — mobile number, a one-time code, then their saved addresses and your payment options. Adds a small fee per order paid through it.",
   category: "checkout",
   iconKey: "credit-card",
   settingsSchema: [],

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { proxyRender, API_URL, CART_COOKIE, VISITOR_COOKIE } from "@/lib/render";
 import { storefrontPath } from "@/lib/domain";
 import { shopperToken } from "@/lib/shopper";
-import { storeBase, gatewayHandoff } from "@/lib/payments";
+import { storeBase, gatewayHandoff, safeReturnPath, retryUrl, ONE_CLICK_RETURN_COOKIE } from "@/lib/payments";
 
 export async function GET(request, { params }) {
   const { handle } = await params;
@@ -64,20 +64,35 @@ export async function POST(request, { params }) {
   }
 
   const host = request.headers.get("host");
+  // A One-Click checkout goes back to the page it started on — popup
+  // reopened — whenever it doesn't finish, never to the full checkout page.
+  const oneClickFrom = body.oneClick ? safeReturnPath(form.get("returnTo")) : null;
+  const checkoutPath = storefrontPath(host, handle, "/checkout");
 
   if (!res.ok) {
-    const target = new URL(storefrontPath(host, handle, "/checkout"), request.url);
-    target.searchParams.set("checkoutError", result?.error || "Could not place your order. Please try again.");
+    const message = result?.error || "Could not place your order. Please try again.";
+    if (oneClickFrom) return NextResponse.redirect(retryUrl(request, oneClickFrom, message), { status: 303 });
+    const target = new URL(checkoutPath, request.url);
+    target.searchParams.set("checkoutError", message);
     return NextResponse.redirect(target, { status: 303 });
   }
 
   const { order, razorpay, payment } = result;
+  const remember = (response) => {
+    if (oneClickFrom) response.cookies.set(ONE_CLICK_RETURN_COOKIE, oneClickFrom, { path: "/", httpOnly: true, sameSite: "lax", maxAge: 60 * 60 });
+    else response.cookies.set(ONE_CLICK_RETURN_COOKIE, "", { path: "/", maxAge: 0 });
+    return response;
+  };
 
   // Gateways that take the shopper to their own page (Stripe, PayPal,
   // Cashfree, PayU). The cart stays until the payment is confirmed, so a
   // shopper who cancels comes back to a full cart.
   if (payment && payment.kind !== "razorpay") {
-    return payment.kind === "redirect" ? NextResponse.redirect(payment.url, { status: 303 }) : gatewayHandoff(payment);
+    return remember(
+      payment.kind === "redirect"
+        ? NextResponse.redirect(payment.url, { status: 303 })
+        : gatewayHandoff(payment, { orderId: order.id, back: oneClickFrom ? retryUrl(request, oneClickFrom, "Payment wasn't completed.").toString() : checkoutPath })
+    );
   }
 
   let target;
@@ -87,16 +102,19 @@ export async function POST(request, { params }) {
     target.searchParams.set("rzpOrderId", razorpay.orderId);
     target.searchParams.set("amount", String(razorpay.amount));
     target.searchParams.set("key", razorpay.keyId);
+    if (oneClickFrom) target.searchParams.set("back", oneClickFrom);
+    // Razorpay's window: the cart stays until the payment is verified.
+    return remember(NextResponse.redirect(target, { status: 303 }));
   } else {
     target = new URL(storefrontPath(host, handle, "/checkout/confirmation"), request.url);
     target.searchParams.set("order", order.id);
   }
 
   const response = NextResponse.redirect(target, { status: 303 });
-  // The order is fully placed either way (COD settled, or a pending
-  // Razorpay order created) — the cart's job is done, clear its cookie too
-  // so a shopper who navigates back to the cart sees it empty rather than
-  // a cart the server has already discarded.
+  // Cash on delivery (or a gift card): the order is fully placed — the
+  // cart's job is done, clear its cookie too so a shopper who navigates
+  // back to the cart sees it empty rather than a cart the server has
+  // already discarded.
   response.cookies.set(CART_COOKIE, "", { path: "/", maxAge: 0 });
   return response;
 }

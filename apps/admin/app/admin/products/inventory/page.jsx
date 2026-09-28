@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Table, Button, Modal, Radio, InputNumber, Select, Input, Drawer, Skeleton, App } from "antd";
 import { Boxes, Search, History, SlidersHorizontal } from "lucide-react";
@@ -38,14 +38,16 @@ function StockCell({ qty, threshold }) {
   );
 }
 
-export default function InventoryPage() {
+export default function InventoryPage({ searchParams }) {
+  // /admin/products/inventory?filter=out — the Home page's to-do links.
+  const wanted = use(searchParams)?.filter;
   const { message } = App.useApp();
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({ low: 0, out: 0 });
   const [threshold, setThreshold] = useState(5);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(["low", "out"].includes(wanted) ? wanted : "all");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 25;

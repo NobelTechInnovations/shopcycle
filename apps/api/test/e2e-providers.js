@@ -333,9 +333,23 @@ async function partTwo(mock, prisma) {
     const store = r.data.store;
     created.storeIds.push(store.id);
     check("new store's trial is on the plan it chose", (await prisma.subscription.findUnique({ where: { storeId: store.id }, include: { plan: true } }))?.plan?.key === "growth");
-    r = await client()("POST", "/api/auth/register", { name: "No Plan", email: `no-plan-${stamp}@test.oyklane.dev`, password: "correct-horse-battery", storeName: `No Plan ${stamp}` });
-    check("signing up without choosing a plan is refused", r.status === 400 && /plan/i.test(JSON.stringify(r.data)), r.data);
+    // Signing up without a plan: the trial starts on the default plan and the
+    // dashboard asks for the choice first (/welcome).
+    const noPlan = client();
+    created.emails.push(`no-plan-${stamp}@test.oyklane.dev`);
+    r = await noPlan("POST", "/api/auth/register", { name: "No Plan", email: `no-plan-${stamp}@test.oyklane.dev`, password: "correct-horse-battery", storeName: `No Plan ${stamp}` });
+    check("signing up without a plan works", r.status === 201, r.data);
     if (r.data?.store?.id) created.storeIds.push(r.data.store.id);
+    r = await noPlan("GET", "/api/auth/me");
+    check("…and the store is flagged to choose its plan", r.data?.store?.settings?.setup?.choosePlan === true, r.data?.store?.settings);
+    r = await client()("POST", "/api/auth/register", { name: "Bad Plan", email: `bad-plan-${stamp}@test.oyklane.dev`, password: "correct-horse-battery", storeName: `Bad Plan ${stamp}`, plan: "nope" });
+    check("an unknown plan is refused", r.status === 400 && /plan/i.test(JSON.stringify(r.data)), r.data);
+    if (r.data?.store?.id) created.storeIds.push(r.data.store.id);
+    const pro = (await noPlan("GET", "/api/billing/plans")).data?.plans?.find((p) => p.key === "pro");
+    r = await noPlan("POST", "/api/billing/setup/plan", { planId: pro?.id, interval: "month" });
+    check("choosing the plan on /welcome switches the trial to it", r.status === 200 && r.data.billing?.subscription?.planId === pro?.id, r.data);
+    r = await noPlan("GET", "/api/auth/me");
+    check("…and clears the flag", !r.data?.store?.settings?.setup, r.data?.store?.settings);
     r = await client()("GET", "/api/auth/plans");
     check("sign-up can list the plans (public)", r.status === 200 && r.data.plans?.map((p) => p.key).join() === "starter,growth,pro" && r.data.trialDays > 0, r.data);
 
@@ -417,6 +431,30 @@ async function partTwo(mock, prisma) {
     r = await sf("/account/profile", { name: "Phone Buyer", phone: "9000000001" }, { "x-shopper-token": phoneToken });
     buyer = await prisma.customer.findUnique({ where: { id: buyer.id } });
     check("changing the number in the profile un-verifies it", r.status === 200 && buyer.phone === "9000000001" && buyer.phoneVerifiedAt === null, buyer);
+
+    // Express checkout (One-Click popup): code → the number's saved addresses
+    r = await sf("/checkout/express/code", { phone: "9811100001" });
+    check("express checkout: no code without the One-Click app", r.status === 200 && r.data.otp === false, r.data);
+    r = await owner("POST", "/api/apps/one-click-checkout/install", { settings: {} });
+    check("One-Click app installed", r.status === 200, r.data);
+    await prisma.order.create({
+      data: { storeId: store.id, orderNumber: 90001, subtotal: 100, total: 100, email: `express-${stamp}@test.oyklane.dev`, phone: "+91 98111 00001", shippingName: "Express Buyer", shippingAddress1: "7 Park Street", shippingCity: "Kolkata", shippingProvince: "West Bengal", shippingZip: "700016", shippingCountry: "IN" },
+    });
+    r = await sf("/checkout/express/code", { phone: "98111 00001" });
+    check("express checkout: code sent", r.status === 200 && r.data.otp === true && r.data.phone === "+919811100001", r.data);
+    code = await lastCode("919811100001");
+    r = await sf("/checkout/express/verify", { phone: "9811100001", code: code === "000000" ? "111111" : "000000" });
+    check("…a wrong code is refused", r.status === 400, r.data);
+    r = await sf("/checkout/express/verify", { phone: "9811100001", code });
+    check(
+      "…the right one returns the number's saved address and email",
+      r.status === 200 && r.data.addresses?.length === 1 && r.data.addresses[0].zip === "700016" && r.data.email === `express-${stamp}@test.oyklane.dev`,
+      r.data
+    );
+    r = await sf("/checkout/express/verify", { phone: "9811100001", code });
+    check("…and works only once", r.status === 400, r.data);
+    r = await sf("/checkout/express/code", { phone: "+1 415 555 0100" });
+    check("…a number outside the allowed countries checks out without a code", r.status === 200 && r.data.otp === false, r.data);
 
     // Paid app on real billing cycles (sandbox autopay + test clock)
     r = await owner("POST", "/api/billing/checkout", { method: "upi" });

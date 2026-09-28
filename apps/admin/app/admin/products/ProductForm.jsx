@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Form, Input, InputNumber, Select, Button, Card, Upload, App, Modal } from "antd";
-import { Plus, Trash2, UploadCloud, Images, Wand2, ExternalLink } from "lucide-react";
+import Link from "next/link";
+import { Plus, Trash2, UploadCloud, Images, Wand2, ExternalLink, Copy } from "lucide-react";
+import { SavedPanel } from "@/components/SavedPanel";
 import { MediaLibraryModal } from "@/components/MediaLibraryModal";
 import { CustomDataFields, metafieldPayload } from "@/components/CustomDataFields";
 import { PageHeader, StatusBadge, SaveBar } from "@shopcycle/ui";
@@ -90,13 +92,16 @@ function VariantOptionsModal({ open, onClose, onApply }) {
   );
 }
 
-export function ProductForm({ product, store }) {
+/** `template` (Duplicate): a product whose details pre-fill a new one. */
+export function ProductForm({ product, store, template, justCreated = false }) {
   const router = useRouter();
   const { message } = App.useApp();
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirty] = useState(Boolean(template));
+  const [saved, setSaved] = useState(justCreated ? "created" : null);
+  const source = product || template;
   const [images, setImages] = useState(
-    product ? product.images.map((img) => ({ uid: img.id, url: img.url })) : []
+    source ? source.images.map((img) => ({ uid: img.id, url: img.url })) : []
   );
   const [uploading, setUploading] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -115,26 +120,27 @@ export function ProductForm({ product, store }) {
     apiFetch("/api/categories?pageSize=100").then((data) => setCategories(data.categories));
   }, []);
 
-  const initialValues = product
+  const initialValues = source
     ? {
-        title: product.title,
-        description: product.description,
-        status: product.status,
-        vendor: product.vendor,
-        productType: product.productType,
-        brandId: product.brandId,
-        categoryId: product.categoryId,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        hsnCode: product.hsnCode,
-        metafields: product.metafields || {},
-        variants: product.variants.map((v) => ({
-          id: v.id,
+        title: template ? `Copy of ${template.title}` : source.title,
+        description: source.description,
+        status: template ? "draft" : source.status,
+        vendor: source.vendor,
+        productType: source.productType,
+        brandId: source.brandId,
+        categoryId: source.categoryId,
+        seoTitle: template ? undefined : source.seoTitle,
+        seoDescription: source.seoDescription,
+        hsnCode: source.hsnCode,
+        metafields: source.metafields || {},
+        // A copy gets new variants (no ids) and no SKUs — those must stay unique.
+        variants: source.variants.map((v) => ({
+          id: template ? undefined : v.id,
           title: v.title,
-          sku: v.sku,
+          sku: template ? undefined : v.sku,
           price: Number(v.price),
           comparePrice: v.comparePrice ? Number(v.comparePrice) : undefined,
-          inventoryQuantity: v.inventoryQuantity,
+          inventoryQuantity: template ? 0 : v.inventoryQuantity,
         })),
       }
     : {
@@ -173,12 +179,16 @@ export function ProductForm({ product, store }) {
       const payload = { ...values, variants, metafields: metafieldPayload(values.metafields), images: images.map((img) => ({ url: img.url })) };
       if (isEdit) {
         await apiFetch(`/api/products/${product.id}`, { method: "PATCH", body: payload });
+        // Stay on the product: the panel offers what's next.
+        setDirty(false);
+        setSaved("saved");
+        router.refresh();
       } else {
-        await apiFetch("/api/products", { method: "POST", body: payload });
+        const { product: created } = await apiFetch("/api/products", { method: "POST", body: payload });
+        setDirty(false);
+        router.replace(`/admin/products/${created.id}?saved=new`);
       }
-      message.success(isEdit ? "Product saved" : "Product added");
-      router.push("/admin/products");
-      router.refresh();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       message.error(err.message || "Couldn't save the product");
     } finally {
@@ -209,13 +219,32 @@ export function ProductForm({ product, store }) {
         backHref="/admin/products"
         meta={isEdit ? <StatusBadge status={product.status} /> : null}
         actions={
-          isEdit && store && product.status === "active" ? (
-            <Button href={`${storefrontUrlFor(store)}/products/${product.slug}`} target="_blank" icon={<ExternalLink size={14} aria-hidden="true" />}>
-              View on store
-            </Button>
+          isEdit ? (
+            <div className="flex gap-2">
+              <Link href={`/admin/products/new?from=${product.id}`}>
+                <Button icon={<Copy size={14} aria-hidden="true" />}>Duplicate</Button>
+              </Link>
+              {store && product.status === "active" && (
+                <Button href={`${storefrontUrlFor(store)}/products/${product.slug}`} target="_blank" icon={<ExternalLink size={14} aria-hidden="true" />}>
+                  View on store
+                </Button>
+              )}
+            </div>
           ) : null
         }
       />
+
+      {isEdit && saved && !dirty && (
+        <SavedPanel
+          title={saved === "created" ? "Product added" : "Changes saved"}
+          detail={product.status === "active" ? "It's live on your store." : "It's a draft — set Status to Active to show it on your store."}
+          viewUrl={store && product.status === "active" ? `${storefrontUrlFor(store)}/products/${product.slug}` : null}
+          duplicateHref={`/admin/products/new?from=${product.id}`}
+          addHref="/admin/products/new"
+          addLabel="Add another product"
+          onClose={() => setSaved(null)}
+        />
+      )}
 
       <Form form={form} layout="vertical" initialValues={initialValues} onFinish={handleSubmit} onValuesChange={() => setDirty(true)} requiredMark={false}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

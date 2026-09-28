@@ -86,6 +86,22 @@ async function billingRoutes(fastify) {
     return { result, billing: await service.overview(prisma, request.store) };
   });
 
+  // First visit after sign-up (/welcome): the owner confirms the plan the
+  // trial runs on. Switching during the trial is free (plan-change.js);
+  // keeping the default plan just clears the flag.
+  fastify.post("/setup/plan", async (request) => {
+    assertCanManage(request);
+    const body = planSchema.parse(request.body);
+    const sub = await subscriptions.forStore(prisma, request.store);
+    if (sub.planId !== body.planId || (body.interval && body.interval !== sub.interval)) {
+      await planChange.change(prisma, request.store, sub, { ...body, actorId: request.currentUser.id, log: request.log });
+    }
+    const store = await prisma.store.findUnique({ where: { id: request.store.id }, select: { settings: true } });
+    const { setup, ...settings } = store.settings || {};
+    if (setup) await prisma.store.update({ where: { id: request.store.id }, data: { settings } });
+    return { billing: await service.overview(prisma, request.store) };
+  });
+
   fastify.delete("/plan/pending", async (request) => {
     assertCanManage(request);
     const sub = await subscriptions.forStore(prisma, request.store);

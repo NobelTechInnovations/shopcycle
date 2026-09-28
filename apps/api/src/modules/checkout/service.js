@@ -11,6 +11,8 @@ const giftCards = require("../gift-cards/service");
 const payments = require("../payments/service");
 const webhooks = require("../developer/webhooks");
 const { storeSettings } = require("../../lib/store-settings");
+const { cancelOrder } = require("../orders/operations");
+const { REPLACED_REASON } = ordersRepository;
 
 /** What checkout offers: cash on delivery (Settings ▸ Payments) and each
  * gateway the seller connected with their own account — shoppers' money
@@ -28,10 +30,11 @@ async function getCheckoutContext(prisma, store, cartId) {
  * route, on whatever address they're shopping on (sent by the storefront). */
 function returnUrls(base, provider, orderId) {
   const root = String(base || "").replace(/\/+$/, "");
-  return {
-    return: `${root}/checkout/return/${provider}?order=${encodeURIComponent(orderId)}`,
-    cancel: `${root}/checkout?checkoutError=${encodeURIComponent("Payment was cancelled — your order is saved; try paying again or choose another method.")}`,
-  };
+  const back = `${root}/checkout/return/${provider}?order=${encodeURIComponent(orderId)}`;
+  // A cancel comes back through the same return route: it asks the gateway
+  // (a "cancel" can still be a finished payment) and then sends the shopper
+  // wherever they started — the one-click popup's page, or checkout.
+  return { return: back, cancel: `${back}&cancelled=1` };
 }
 
 const GSTIN = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -75,6 +78,10 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
   const raw = await cartService.readRaw(prisma, storeId, cartId);
   const cart = await cartService.hydrateCart(prisma, storeId, cartId, raw);
   if (cart.items.length === 0) throw new HttpError(400, "Your cart is empty");
+  // Checking out again after an online payment that didn't finish (the
+  // shopper came back from the gateway): that order is replaced, not kept
+  // alongside the new one — its stock and gift card money go back first.
+  if (raw.pendingOrderId && store) await replacePendingOrder(prisma, store, raw.pendingOrderId, log);
   if (cart.discount?.error) throw new HttpError(400, cart.discount.error);
   if (cart.gift_card?.error) throw new HttpError(400, `${cart.gift_card.error} Remove it from your cart to continue.`);
   // A gift card covering the whole order leaves nothing to collect.
@@ -241,16 +248,17 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
       where: { id: order.id },
       data: { paymentGatewayRef: ref, ...(input.paymentMethod === "razorpay" && { razorpayOrderId: ref }) },
     });
+    // The cart stays until the payment is confirmed; remember which order
+    // it's paying for, so a retry replaces it (see replacePendingOrder).
+    await cartService.setPendingOrder(prisma, storeId, cartId, order.id);
     if (started.kind === "razorpay") razorpay = { orderId: started.orderId, amount: started.amount, currency: started.currency, keyId: started.keyId };
   }
 
-  // The cart's job ends here either way — COD is fully placed, and a
-  // Razorpay order already exists server-side even if the shopper abandons
-  // the payment modal next (their order sits pending, same as any real
-  // gateway checkout that gets interrupted after the order is created).
-  // Redirect gateways keep the cart until the payment is confirmed (a
-  // shopper who cancels on the gateway's page returns to a full cart).
-  if (!gateway || payment?.kind === "razorpay") await cartService.clearCart(prisma, storeId, cartId);
+  // Cash on delivery (or a gift card) is fully placed: the cart's job is
+  // done. Online payments keep the cart until the payment is confirmed — a
+  // shopper who cancels on the gateway (or closes Razorpay's window) comes
+  // back to a full cart, and paying again replaces the unpaid order.
+  if (!gateway) await cartService.clearCart(prisma, storeId, cartId);
 
   // Cash on delivery is final now; an online order is confirmed (and
   // emailed) once its payment is verified.
@@ -264,6 +272,16 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
   return { order, razorpay, payment };
 }
 
+/** Cancels the cart's earlier online order if it's still unpaid (it may
+ * have been paid in the meantime — then it's a real order and stays). */
+async function replacePendingOrder(prisma, store, orderId, log) {
+  const old = await prisma.order.findFirst({ where: { id: orderId, storeId: store.id }, select: { id: true, paymentStatus: true, cancelledAt: true } });
+  if (!old || old.paymentStatus !== "pending" || old.cancelledAt) return;
+  await cancelOrder(prisma, store, old.id, { reason: REPLACED_REASON, restock: true, refund: false, notify: false }, { actorName: "Oyklane", log }).catch((err) =>
+    log?.warn({ err, orderId }, "checkout: couldn't replace the unpaid order")
+  );
+}
+
 /** Records a confirmed payment exactly once and does what a paid order
  * needs: timeline, platform fee, confirmation email. */
 async function markOnlinePaid(prisma, order, { providerName, reference, log }) {
@@ -273,7 +291,12 @@ async function markOnlinePaid(prisma, order, { providerName, reference, log }) {
   });
   const paid = await prisma.order.findUnique({ where: { id: order.id }, include: { customer: true, items: true } });
   if (count === 1) {
-    await addOrderEvent(prisma, order.id, { kind: "paid", message: `Payment received online (${providerName} ${reference})` });
+    await addOrderEvent(prisma, order.id, {
+      kind: "paid",
+      message: paid.cancelledAt
+        ? `Payment received online (${providerName} ${reference}) after the order was cancelled — refund it, or fulfil it as a new order`
+        : `Payment received online (${providerName} ${reference})`,
+    });
     await syncOrderCommission(prisma, order.id);
     webhooks.emit(prisma, paid.storeId, "order.paid", { id: order.id });
     const store = await prisma.store.findUnique({ where: { id: paid.storeId }, include: { plan: true } });
@@ -311,11 +334,11 @@ async function getOrderForConfirmation(prisma, storeId, id) {
  * (the client-side "handler" callback firing is not, by itself, proof of
  * anything: it can be forged by anyone who can call this endpoint). */
 /** The Razorpay modal's callback (storefront /checkout/razorpay/verify). */
-async function verifyRazorpayPayment(prisma, { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature }, { log } = {}) {
+async function verifyRazorpayPayment(prisma, { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature, cartId }, { log } = {}) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order || order.paymentMethod !== "razorpay") throw new HttpError(400, "Payment verification failed");
   const store = await prisma.store.findUnique({ where: { id: order.storeId } });
-  const result = await confirmPayment(prisma, store, { orderId, provider: "razorpay", params: { razorpay_order_id, razorpay_payment_id, razorpay_signature } }, { log });
+  const result = await confirmPayment(prisma, store, { orderId, provider: "razorpay", params: { razorpay_order_id, razorpay_payment_id, razorpay_signature }, cartId }, { log });
   if (!result.paid) throw new HttpError(400, result.message || "Payment verification failed");
   return prisma.order.findUnique({ where: { id: orderId }, include: { customer: true, items: true } });
 }

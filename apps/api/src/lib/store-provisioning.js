@@ -30,10 +30,12 @@ const RESERVED_HANDLES = new Set([
  * then the ₹99 first month and the regular price, like any other store.
  */
 async function provisionStore(tx, { name, ownerId, planKey, role = "owner" }) {
-  // Every new store starts on the plan its owner chose (its free trial,
-  // then the ₹99 first month, run on that plan).
+  // A store starts on the plan its owner chose (its free trial, then the
+  // ₹99 first month, run on that plan). Signing up without one starts the
+  // trial on the default plan and flags the store so the dashboard asks
+  // for the choice first (settings.setup.choosePlan → /welcome).
   const plan = planKey ? await tx.plan.findFirst({ where: { key: String(planKey), isActive: true } }) : null;
-  if (!plan) throw new HttpError(400, "Choose a plan for your store.");
+  if (planKey && !plan) throw new HttpError(400, "That plan isn't available. Choose another.");
 
   // The handle is the store's free address ({handle}.<root>). If the name
   // is taken, add a short random tag — sonchiri-2f3a — rather than a
@@ -49,12 +51,13 @@ async function provisionStore(tx, { name, ownerId, planKey, role = "owner" }) {
     data: {
       name,
       handle,
+      ...(!plan && { settings: { setup: { choosePlan: true } } }),
       storeUsers: { create: { userId: ownerId, role } },
     },
   });
 
   await themesService.installTheme(tx, store.id, "classic");
-  await subscriptions.createForStore(tx, store, { planId: plan.id });
+  await subscriptions.createForStore(tx, store, { planId: plan?.id || null });
 
   return store;
 }

@@ -7,27 +7,29 @@ import { SlidersHorizontal } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { ImageUploadField } from "./ImageUploadField";
 
-/** The input for one custom data field, by its type. */
-function FieldInput({ def }) {
+/** The input for one custom data field, by its type. `props` are the
+ * value/onChange that Form.Item gives its child — they must reach the
+ * real input, or the field never shows its saved value or saves a new one. */
+function FieldInput({ def, ...props }) {
   switch (def.type) {
     case "text":
       return def.choices?.length ? (
-        <Select allowClear placeholder="Choose…" options={def.choices.map((c) => ({ value: c, label: c }))} />
+        <Select {...props} allowClear placeholder="Choose…" options={def.choices.map((c) => ({ value: c, label: c }))} />
       ) : (
-        <Input maxLength={255} />
+        <Input {...props} maxLength={255} />
       );
     case "multiline":
-      return <Input.TextArea autoSize={{ minRows: 2, maxRows: 8 }} maxLength={5000} />;
+      return <Input.TextArea {...props} autoSize={{ minRows: 2, maxRows: 8 }} maxLength={5000} />;
     case "number":
-      return <InputNumber className="w-full" />;
+      return <InputNumber {...props} className="w-full" />;
     case "date":
-      return <Input type="date" />;
+      return <Input {...props} type="date" />;
     case "url":
-      return <Input placeholder="https://" inputMode="url" />;
+      return <Input {...props} placeholder="https://" inputMode="url" />;
     case "list":
-      return <Select mode="tags" tokenSeparators={[","]} placeholder="Type and press Enter" open={false} suffixIcon={null} />;
+      return <Select {...props} mode="tags" tokenSeparators={[","]} placeholder="Type and press Enter" open={false} suffixIcon={null} />;
     default:
-      return <Input />;
+      return <Input {...props} />;
   }
 }
 

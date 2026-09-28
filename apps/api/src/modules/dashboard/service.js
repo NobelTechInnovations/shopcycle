@@ -1,31 +1,34 @@
+const { storeSettings } = require("../../lib/store-settings");
+
+/** The Home page: what needs doing, recent orders, the setup guide. Sales
+ * and traffic come from /api/analytics/overview (the page's range picker). */
 async function getOverview(prisma, store, user) {
   const storeId = store.id;
-  const [orderAgg, orderCount, productCount, recentOrders, activeTheme, collectionCount, shippingZoneCount, customerCount] =
+  const threshold = storeSettings(store).lowStockThreshold;
+  const liveVariants = { product: { storeId, status: { not: "archived" } } };
+  const [productCount, recentOrders, activeTheme, collectionCount, shippingZoneCount, toFulfill, unpaid, outOfStock, lowStock, mandates] =
     await Promise.all([
-      prisma.order.aggregate({ where: { storeId }, _sum: { total: true } }),
-      prisma.order.count({ where: { storeId } }),
       prisma.product.count({ where: { storeId } }),
       prisma.order.findMany({
         where: { storeId },
-        include: { customer: true },
+        include: { customer: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 6,
       }),
-      prisma.theme.findFirst({ where: { storeId, isActive: true } }),
+      prisma.theme.findFirst({ where: { storeId, isActive: true }, select: { name: true } }),
       prisma.collection.count({ where: { storeId } }),
       prisma.shippingZone.count({ where: { storeId } }),
-      prisma.customer.count({ where: { storeId } }),
+      prisma.order.count({ where: { storeId, fulfillmentStatus: { in: ["unfulfilled", "partially_fulfilled"] } } }),
+      prisma.order.count({ where: { storeId, paymentStatus: "pending", fulfillmentStatus: { not: "cancelled" } } }),
+      prisma.productVariant.count({ where: { ...liveVariants, inventoryQuantity: { lte: 0 } } }),
+      prisma.productVariant.count({ where: { ...liveVariants, inventoryQuantity: { gt: 0, lte: threshold } } }),
+      prisma.mandate.count({ where: { storeId, status: { in: ["active", "pending"] } } }),
     ]);
 
   return {
     greetingName: (user?.name || "").trim().split(/\s+/)[0] || null,
     store: { name: store.name, handle: store.handle, domain: store.domain },
-    stats: {
-      sales: orderAgg._sum.total || 0,
-      orders: orderCount,
-      products: productCount,
-      customers: customerCount,
-    },
+    todo: { toFulfill, unpaid, outOfStock, lowStock, lowStockThreshold: threshold },
     recentOrders,
     storeStatus: {
       themeName: activeTheme?.name || null,
@@ -39,9 +42,7 @@ async function getOverview(prisma, store, user) {
       hasCollection: collectionCount > 0,
       hasShipping: shippingZoneCount > 0,
       // Done once the subscription is paid, or autopay is set up to pay it.
-      hasPlan:
-        ["ACTIVE", "CANCEL_SCHEDULED"].includes(store.subscription?.status) ||
-        (await prisma.mandate.count({ where: { storeId, status: { in: ["active", "pending"] } } })) > 0,
+      hasPlan: ["ACTIVE", "CANCEL_SCHEDULED"].includes(store.subscription?.status) || mandates > 0,
       hasDomain: Boolean(store.domain),
     },
   };

@@ -193,7 +193,11 @@ async function main() {
 
   // Test clock: runs the engine for the signed-in store at `when`.
   const clock = async (when, call = owner) => (await call("POST", "/api/billing/_test/clock", { now: new Date(when).toISOString() })).data;
-  const billing = async (call = owner) => (await call("GET", "/api/billing")).data;
+  const billing = async (call = owner) => {
+    const res = await call("GET", "/api/billing");
+    if (res.status !== 200) console.log(`      (GET /api/billing → ${res.status}: ${JSON.stringify(res.data).slice(0, 300)})`);
+    return res.data;
+  };
   // The latest automatic charge the engine sent to the bank.
   const lastCharge = async (storeId) => prisma.billingPayment.findFirst({ where: { storeId, purpose: "charge" }, orderBy: { createdAt: "desc" } });
   async function bankAnswers(payment, status, reason) {

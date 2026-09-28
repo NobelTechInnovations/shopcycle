@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Table, Button, App } from "antd";
@@ -30,7 +30,9 @@ function orderDate(iso) {
   return `${d.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) })}, ${time}`;
 }
 
-export default function OrdersPage() {
+export default function OrdersPage({ searchParams }) {
+  // /admin/orders?status=unfulfilled — the Home page's to-do links.
+  const wanted = use(searchParams)?.status;
   const router = useRouter();
   const { message } = App.useApp();
   const [exporting, setExporting] = useState(false);
@@ -48,7 +50,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState(TABS.some((t) => t.key === wanted) ? wanted : "all");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 20;

@@ -9,6 +9,7 @@ import { BrandMark } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 import { inr, withGst, gstOf, formatDay, daysLeft, METHODS, completeCheckout } from "@/lib/billing";
 import { BillingModeNotice } from "@/components/BillingModeNotice";
+import { PlanCards } from "@/components/PlanCards";
 
 const METHOD_ICON = { upi: Smartphone, card: CreditCard, emandate: Landmark };
 
@@ -223,59 +224,7 @@ export function CompleteSubscription({ initial, storeName, role }) {
                     />
                   )}
                 </div>
-                <div className="grid gap-3 md:grid-cols-3" role="radiogroup" aria-label="Plans">
-                  {plans.map((p, i) => {
-                    const active = p.id === selected?.id;
-                    const prev = plans[i - 1];
-                    const extra = prev ? p.features.filter((f) => !prev.features.some((x) => x.key === f.key)) : p.features;
-                    const disabled = !canChoose && !active;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={active}
-                        disabled={disabled}
-                        onClick={() => canChoose && setPlanId(p.id)}
-                        className={`text-left rounded-[14px] bg-app-surface p-5 flex flex-col transition-shadow ${
-                          active ? "border-2 border-ink shadow-raised" : "border border-app-border shadow-card hover:border-ink/40"
-                        } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                      >
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="text-base font-semibold text-ink">{p.name}</span>
-                          <span className={`w-4 h-4 rounded-full border-2 ${active ? "border-ink bg-ink" : "border-app-border"}`} aria-hidden="true" />
-                        </span>
-                        <span className="text-[13px] text-ink-muted mt-1 min-h-[2.6em]">{p.tagline}</span>
-                        <span className="mt-3 flex items-baseline gap-1">
-                          <span className="text-[26px] font-semibold text-ink tabular-nums" style={{ letterSpacing: "-0.03em" }}>
-                            {inr(price(p, interval))}
-                          </span>
-                          <span className="text-[13px] text-ink-muted">/{interval === "year" ? "year" : "month"}</span>
-                        </span>
-                        <span className="text-xs text-ink-muted">
-                          + GST{interval === "year" ? ` · ${inr(p.yearlyPerMonth)}/month, save ${inr(p.yearlySavings)}` : ""}
-                        </span>
-                        <span className="mt-3 grid gap-1 text-[13px] text-ink">
-                          <span>
-                            <strong className="font-semibold">{p.commissionPercent}%</strong> fee on checkout orders
-                          </span>
-                          <span>
-                            <strong className="font-semibold">{p.staffLimit}</strong> staff accounts · unlimited products
-                          </span>
-                        </span>
-                        <span className="mt-3 pt-3 border-t border-app-border text-xs text-ink-muted">{prev ? `Everything in ${prev.name}, plus:` : "Includes:"}</span>
-                        <ul className="mt-1.5 grid gap-1 p-0 m-0 list-none">
-                          {extra.slice(0, 7).map((f) => (
-                            <li key={f.key} className="flex items-start gap-1.5 text-[13px] text-ink">
-                              <Check size={13} className="text-status-success mt-[3px] shrink-0" aria-hidden="true" /> {f.name}
-                            </li>
-                          ))}
-                          {extra.length > 7 && <li className="text-xs text-ink-muted">+ {extra.length - 7} more</li>}
-                        </ul>
-                      </button>
-                    );
-                  })}
-                </div>
+                <PlanCards plans={plans} value={selected?.id} onChange={setPlanId} interval={interval} locked={!canChoose} />
               </section>
 
               {!oneTime && (

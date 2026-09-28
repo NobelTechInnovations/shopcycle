@@ -9,6 +9,28 @@ export function storeBase(request, handle) {
   return `${proto}://${host}${storefrontPath(host, handle, "")}`.replace(/\/+$/, "");
 }
 
+/** Where a One-Click checkout started (the page the popup opened on): a
+ * payment that doesn't finish sends the shopper back there, with the popup
+ * reopened, instead of to the full checkout page. Kept in a short-lived
+ * cookie for the gateway's return; only a same-site path is accepted. */
+export const ONE_CLICK_RETURN_COOKIE = "oy_ckret";
+
+export function safeReturnPath(value) {
+  const path = String(value || "");
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\") || path.length > 500) return null;
+  if (/\/checkout(\/|$|\?)/.test(path)) return null;
+  return path;
+}
+
+/** The page to send a shopper back to after a payment didn't finish:
+ * `path` with the One-Click popup asked to reopen and say why. */
+export function retryUrl(request, path, message) {
+  const url = new URL(path, request.url);
+  url.searchParams.set("oyCheckout", "retry");
+  if (message) url.searchParams.set("oyError", message.slice(0, 200));
+  return url;
+}
+
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 function page(title, body) {
@@ -19,9 +41,19 @@ function page(title, body) {
 <body><div class="box"><div class="spin"></div><p>Taking you to secure payment…</p>${body}</div></body></html>`;
 }
 
+/** Stops the hand-off page re-sending the shopper to the gateway when they
+ * come back to it with the browser's Back button: they go to `back` (the
+ * page they checked out from) instead. */
+function backGuard(back, orderId) {
+  const key = JSON.stringify(`oy-handoff-${orderId || ""}`);
+  const to = JSON.stringify(back || "/").replace(/</g, "\\u003c");
+  return `<script>(function(){var k=${key};try{if(sessionStorage.getItem(k)){window.__oyBack=1;location.replace(${to});return;}sessionStorage.setItem(k,"1");}catch(e){}
+window.addEventListener("pageshow",function(e){if(e.persisted)location.replace(${to});});})();</script>`;
+}
+
 /** An HTML page that hands the shopper to a gateway that needs more than
  * a plain redirect: PayU (a signed form POST) or Cashfree (its JS SDK). */
-export function gatewayHandoff(payment) {
+export function gatewayHandoff(payment, { back, orderId } = {}) {
   let html;
   if (payment.kind === "form") {
     const inputs = Object.entries(payment.fields)
@@ -29,13 +61,13 @@ export function gatewayHandoff(payment) {
       .join("");
     html = page(
       "Secure payment",
-      `<form id="pay" method="post" action="${esc(payment.action)}">${inputs}<noscript><button type="submit">Continue to payment</button></noscript></form><script>document.getElementById("pay").submit()</script>`
+      `${backGuard(back, orderId)}<form id="pay" method="post" action="${esc(payment.action)}">${inputs}<noscript><button type="submit">Continue to payment</button></noscript></form><script>if(!window.__oyBack)document.getElementById("pay").submit()</script>`
     );
   } else if (payment.kind === "cashfree") {
     html = page(
       "Secure payment",
-      `<script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script><script>
-window.addEventListener("load",function(){try{Cashfree({mode:${JSON.stringify(payment.mode)}}).checkout({paymentSessionId:${JSON.stringify(payment.sessionId).replace(/</g, "\\u003c")},redirectTarget:"_self"});}catch(e){document.querySelector("p").textContent="Couldn't open the payment page. Please go back and try again.";}});
+      `${backGuard(back, orderId)}<script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script><script>
+window.addEventListener("load",function(){if(window.__oyBack)return;try{Cashfree({mode:${JSON.stringify(payment.mode)}}).checkout({paymentSessionId:${JSON.stringify(payment.sessionId).replace(/</g, "\\u003c")},redirectTarget:"_self"});}catch(e){document.querySelector("p").textContent="Couldn't open the payment page. Please go back and try again.";}});
 </script>`
     );
   } else {

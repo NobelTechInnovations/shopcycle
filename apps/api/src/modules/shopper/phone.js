@@ -29,10 +29,15 @@ async function config(prisma, store) {
   if (!install) return { enabled: false, channels: [] };
   const setting = install.settings?.channel;
   const wanted = setting === "whatsapp" ? ["whatsapp"] : setting === "both" ? ["sms", "whatsapp"] : ["sms"];
-  const live = messaging.channels();
-  // Without a provider, codes are only logged — fine locally, useless in production.
-  const channels = wanted.filter((c) => live[c] || env.NODE_ENV !== "production");
+  const channels = liveChannels(wanted);
   return { enabled: channels.length > 0, channels };
+}
+
+/** The channels that can carry a code right now. Without a provider,
+ * codes are only logged — fine locally, useless in production. */
+function liveChannels(wanted = ["sms", "whatsapp"]) {
+  const live = messaging.channels();
+  return wanted.filter((c) => live[c] || env.NODE_ENV !== "production");
 }
 
 function parsePhone(raw) {
@@ -45,8 +50,10 @@ function parsePhone(raw) {
   return phone;
 }
 
-async function requestCode(prisma, store, { phone: rawPhone, channel }, log) {
-  const cfg = await config(prisma, store);
+/** Sends a code. `cfg` lets express checkout (One-Click app) use its own
+ * channels; Phone Login's come from its app settings. */
+async function requestCode(prisma, store, { phone: rawPhone, channel }, log, { cfg: given } = {}) {
+  const cfg = given || (await config(prisma, store));
   if (!cfg.enabled) throw new HttpError(404, "Phone sign-in isn't available in this store.");
   const ch = cfg.channels.includes(channel) ? channel : cfg.channels[0];
   const phone = parsePhone(rawPhone);
@@ -77,6 +84,14 @@ async function requestCode(prisma, store, { phone: rawPhone, channel }, log) {
  * { phone } when the number is new and sign-up must be finished. */
 async function verifyCode(prisma, store, { phone: rawPhone, code: rawCode }) {
   const phone = parsePhone(rawPhone);
+  await checkCode(prisma, store, phone, rawCode);
+  const customer = await verifiedCustomer(prisma, store, phone);
+  if (customer) return { customer: await prisma.customer.update({ where: { id: customer.id }, data: { lastSignInAt: new Date() } }) };
+  return { phone };
+}
+
+/** Uses up the latest code for `phone` if `rawCode` matches it; throws otherwise. */
+async function checkCode(prisma, store, phone, rawCode) {
   const code = String(rawCode || "").replace(/\D/g, "");
   const otp = await prisma.shopperPhoneOtp.findFirst({ where: { storeId: store.id, phone, consumedAt: null }, orderBy: { createdAt: "desc" } });
   if (!otp || otp.expiresAt < new Date() || otp.attempts >= MAX_ATTEMPTS) throw new HttpError(400, "That code has expired. Request a new one.");
@@ -88,10 +103,6 @@ async function verifyCode(prisma, store, { phone: rawPhone, code: rawCode }) {
   }
   const { count } = await prisma.shopperPhoneOtp.updateMany({ where: { id: otp.id, consumedAt: null }, data: { consumedAt: new Date() } });
   if (count !== 1) throw new HttpError(400, "That code has already been used. Request a new one.");
-
-  const customer = await verifiedCustomer(prisma, store, phone);
-  if (customer) return { customer: await prisma.customer.update({ where: { id: customer.id }, data: { lastSignInAt: new Date() } }) };
-  return { phone };
 }
 
 function verifiedCustomer(prisma, store, phone) {
@@ -153,4 +164,4 @@ async function completeSignup(fastify, store, { ticket, name, email: rawEmail, c
   return { customer: await link(prisma, store, verified, phone, cleanName) };
 }
 
-module.exports = { config, requestCode, verifyCode, signupTicket, completeSignup, APP_KEY };
+module.exports = { config, liveChannels, parsePhone, display, requestCode, verifyCode, checkCode, verifiedCustomer, signupTicket, completeSignup, APP_KEY };

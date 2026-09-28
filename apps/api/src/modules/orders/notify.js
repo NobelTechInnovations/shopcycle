@@ -28,15 +28,17 @@ async function statusUrlFor(prisma, store, order) {
   return storefrontUrl(store, `/orders/${await ensureStatusToken(prisma, order)}`);
 }
 
-/** Where a store's own alerts go: its support address, else the owner's login. */
-async function storeInbox(prisma, store) {
-  if (store.supportEmail) return store.supportEmail;
+/** Where a store's own alerts go: the owner's login email — the inbox the
+ * seller certainly reads — and the store's support address too, if it has a
+ * different one. */
+async function storeInboxes(prisma, store) {
   const owner = await prisma.storeUser.findFirst({
     where: { storeId: store.id, role: "owner" },
     include: { user: { select: { email: true } } },
     orderBy: { createdAt: "asc" },
   });
-  return owner?.user?.email || null;
+  const all = [owner?.user?.email, store.supportEmail].filter(Boolean).map((e) => e.trim().toLowerCase());
+  return [...new Set(all)];
 }
 
 async function sendToShopper(prisma, store, order, { template, subject, html, log }) {
@@ -77,13 +79,12 @@ async function sendOrderPlaced(prisma, store, order, log) {
   await sendToShopper(prisma, store, order, { template: "order_confirmation", ...confirmation, log });
 
   if (storeSettings(store).notifications.newOrderAlert) {
-    const inbox = await storeInbox(prisma, store);
-    if (inbox) {
-      const alert = templates.newOrderAlert({
-        store,
-        order,
-        adminUrl: `${env.ADMIN_ORIGIN.replace(/\/$/, "")}/admin/orders/${order.id}`,
-      });
+    const alert = templates.newOrderAlert({
+      store,
+      order,
+      adminUrl: `${env.ADMIN_ORIGIN.replace(/\/$/, "")}/admin/orders/${order.id}`,
+    });
+    for (const inbox of await storeInboxes(prisma, store)) {
       await sendEmail(prisma, { to: inbox, ...alert, template: "new_order_alert", storeId: store.id, refType: "order", refId: order.id, log });
     }
   }
@@ -128,7 +129,7 @@ async function sendReturnUpdate(prisma, store, order, returnRequest, log) {
 module.exports = {
   ensureStatusToken,
   statusUrlFor,
-  storeInbox,
+  storeInboxes,
   sendOrderPlaced,
   resendOrderConfirmation,
   sendShippingUpdate,

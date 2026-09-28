@@ -6,7 +6,6 @@ import { Form, Input, Button, Alert } from "antd";
 import { AuthShell } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 import { GoogleSignIn } from "@/components/GoogleSignIn";
-import { PlanPicker } from "@/components/PlanPicker";
 
 /** The name and email inside a Google sign-up ticket — display only; the
  * API checks the ticket's signature when the store is created. */
@@ -37,9 +36,9 @@ export default function RegisterPage() {
     setError(null);
     setLoading(true);
     try {
-      if (google) await apiFetch("/api/auth/google/register", { method: "POST", body: { ticket: google.ticket, storeName: values.storeName, plan: values.plan } });
+      if (google) await apiFetch("/api/auth/google/register", { method: "POST", body: { ticket: google.ticket, storeName: values.storeName } });
       else await apiFetch("/api/auth/register", { method: "POST", body: values });
-      router.push("/admin");
+      router.push("/welcome");
       router.refresh();
     } catch (err) {
       setError(err.message);
@@ -75,9 +74,6 @@ export default function RegisterPage() {
       <Form layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
         <Form.Item label="Store name" name="storeName" rules={[{ required: true, min: 2, message: "Store name is too short" }]}>
           <Input placeholder="Aurora Goods" autoFocus />
-        </Form.Item>
-        <Form.Item label="Choose your plan" name="plan" rules={[{ required: true, message: "Choose a plan to continue" }]}>
-          <PlanPicker />
         </Form.Item>
         {!google && (
           <>
