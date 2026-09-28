@@ -250,7 +250,7 @@ async function partOne(mock) {
   Object.assign(failing, { attempts: 3, nextAttemptAt: new Date(Date.now() - 1000) });
   await mailer.drainQueue(db);
   check("after the last retry it's marked failed", failing.status === "failed" && failing.attempts === 4 && JSON.stringify(failing.payload) === "{}", failing);
-  Object.assign(env, { EMAIL_PROVIDER: "zeptomail", ZEPTOMAIL_TOKEN: "" });
+  Object.assign(env, { EMAIL_PROVIDER: "zeptomail", ZEPTOMAIL_TOKEN: "", ZOHO_CPAAS_TOKEN: "" });
   check("a provider without its key falls back to the log", mailer.emailProvider() === "log");
   Object.assign(env, { EMAIL_PROVIDER: "log", ZEPTOMAIL_API_URL: `${MOCK}/zepto` });
 

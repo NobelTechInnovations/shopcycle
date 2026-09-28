@@ -15,6 +15,15 @@ import { useParams, useSearchParams } from "next/navigation";
  * payment against it and hand the result to a same-origin route so the API
  * is never called directly from the browser.
  */
+const RZP_METHODS = {
+  upi: { name: "Pay with UPI", instruments: [{ method: "upi" }] },
+  card: { name: "Pay with card", instruments: [{ method: "card" }] },
+  netbanking: { name: "Net banking", instruments: [{ method: "netbanking" }] },
+  wallet: { name: "Wallets", instruments: [{ method: "wallet" }] },
+  emi: { name: "EMI", instruments: [{ method: "emi" }, { method: "cardless_emi" }] },
+  paylater: { name: "Pay later", instruments: [{ method: "paylater" }] },
+};
+
 export default function RazorpayPayPage() {
   const { handle } = useParams();
   const searchParams = useSearchParams();
@@ -25,6 +34,8 @@ export default function RazorpayPayPage() {
   // Started from the One-Click popup: a closed window or failed payment
   // goes back to that page (popup reopened), not to the checkout page.
   const back = searchParams.get("back");
+  // The way to pay the shopper picked at checkout — Razorpay opens on it.
+  const method = searchParams.get("method");
   const [status, setStatus] = useState("loading"); // loading | opening | error
 
   useEffect(() => {
@@ -73,6 +84,17 @@ export default function RazorpayPayPage() {
         currency: "INR",
         order_id: rzpOrderId,
         name: "Checkout",
+        // Show only the method chosen at checkout (Razorpay's "configure
+        // payment methods": one block, default blocks hidden).
+        ...(RZP_METHODS[method] && {
+          config: {
+            display: {
+              blocks: { chosen: { name: RZP_METHODS[method].name, instruments: RZP_METHODS[method].instruments } },
+              sequence: ["block.chosen"],
+              preferences: { show_default_blocks: false },
+            },
+          },
+        }),
         handler: async function handlePaymentSuccess(response) {
           const verifyRes = await fetch(`${basePath}/checkout/razorpay/verify`, {
             method: "POST",
@@ -102,7 +124,7 @@ export default function RazorpayPayPage() {
     return () => {
       document.body.removeChild(script);
     };
-  }, [handle, orderId, rzpOrderId, amount, key, back]);
+  }, [handle, orderId, rzpOrderId, amount, key, back, method]);
 
   return (
     <div

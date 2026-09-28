@@ -24,6 +24,7 @@ async function shopperRoutes(fastify) {
   fastify.post("/:handle/checkout/contact", { config: flood }, controller.contactHandler);
   fastify.post("/:handle/checkout/express/code", { config: flood }, controller.expressCodeHandler);
   fastify.post("/:handle/checkout/express/verify", { config: flood }, controller.expressVerifyHandler);
+  fastify.post("/:handle/checkout/express/mine", { config: flood }, controller.expressMineHandler);
   fastify.post("/:handle/cart/recover", { config: flood }, controller.recoverHandler);
 }
 

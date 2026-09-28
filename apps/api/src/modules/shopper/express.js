@@ -33,10 +33,40 @@ async function requestCode(prisma, store, { phone }, log) {
   return { otp: true, ...(await phoneAuth.requestCode(prisma, store, { phone }, log, { cfg })) };
 }
 
-async function verify(prisma, store, { phone: rawPhone, code }) {
+/**
+ * Checks the code. A number that already belongs to a shopper account signs
+ * them in (`customer`, for a session); a new number gets a short-lived
+ * "verified" ticket instead — the order links it to the shopper it creates,
+ * and signs them in then (checkout/controller.js).
+ */
+async function verify(fastify, store, { phone: rawPhone, code }) {
+  const prisma = fastify.prisma;
   const phone = phoneAuth.parsePhone(rawPhone);
   await phoneAuth.checkCode(prisma, store, phone, code);
-  return { phone: phoneAuth.display(phone), ...(await savedDetails(prisma, store, phone)) };
+  const details = await savedDetails(prisma, store, phone);
+  const customer = await phoneAuth.verifiedCustomer(prisma, store, phone);
+  if (customer) {
+    await prisma.customer.update({ where: { id: customer.id }, data: { lastSignInAt: new Date() } });
+    return { phone: phoneAuth.display(phone), ...details, customer };
+  }
+  return { phone: phoneAuth.display(phone), ...details, ticket: phoneAuth.signupTicket(fastify, store, phone) };
+}
+
+/** A signed-in shopper's saved addresses: the account's own and those used
+ * with its verified number. */
+async function mine(prisma, store, customer) {
+  const phone = customer.phoneVerifiedAt ? String(customer.phone || "").replace(/\D/g, "") : "";
+  const details = phone.length >= 10 ? await savedDetails(prisma, store, phone) : { addresses: [] };
+  if (customer.address1 && !details.addresses.some((a) => key(a) === key(customer))) {
+    details.addresses.unshift({ name: customer.name, address1: customer.address1, address2: customer.address2, city: customer.city, province: customer.province, zip: customer.zip, country: customer.country || "IN" });
+  }
+  return {
+    phone: customer.phone || "",
+    verified: Boolean(customer.phoneVerifiedAt),
+    name: customer.name || details.name || "",
+    email: customer.email || details.email || "",
+    addresses: details.addresses.slice(0, MAX_ADDRESSES),
+  };
 }
 
 const key = (a) => [a.address1, a.zip].map((v) => String(v || "").toLowerCase().replace(/[^a-z0-9]/g, "")).join("|");
@@ -78,4 +108,4 @@ async function savedDetails(prisma, store, phone) {
   };
 }
 
-module.exports = { expressConfig, requestCode, verify, APP_KEY };
+module.exports = { expressConfig, requestCode, verify, mine, APP_KEY };

@@ -446,6 +446,39 @@ async function main() {
     r = await owner("GET", "/api/orders?status=cancelled&pageSize=50");
     check("…the replaced try is still under Cancelled", r.data.orders.some((o) => o.id === firstTry.id));
 
+    // Ways to pay: one per method the gateways offer, and the chosen one
+    // reaches the gateway.
+    const optCart = await freshCart(1);
+    r = await sf("GET", `/api/storefront/${H}/render/checkout?cartId=${optCart}`);
+    check("checkout lists ways to pay per method (UPI, card, …)", /value="(payu|cashfree|stripe):upi"/.test(String(r.data)) && /value="[a-z]+:card"/.test(String(r.data)), String(r.data).match(/value="[a-z]+:[a-z]+"/g));
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId: optCart, email: `mode-${stamp}@test.oyklane.dev`, ...SHIP, paymentMethod: "payu", payMode: "upi", returnBase: RB });
+    check("PayU opens on the chosen method (enforce_paymethod)", r.data.payment?.fields?.enforce_paymethod === "upi" && !String(r.data.payment?.fields?.hash || "").includes("upi"), r.data.payment?.fields);
+
+    // One-Click: a code-confirmed number signs the shopper in with the order.
+    await owner("POST", "/api/apps/one-click-checkout/install", { settings: {} });
+    const occPhone = "9844400001";
+    const occCode = async () => (await prisma.messageLog.findFirst({ where: { storeId: store.id, to: `91${occPhone}` }, orderBy: { createdAt: "desc" } }))?.body?.match(/^(\d{6})/)?.[1];
+    r = await sf("POST", `/api/storefront/${H}/checkout/express/code`, { phone: occPhone });
+    r = await sf("POST", `/api/storefront/${H}/checkout/express/verify`, { phone: occPhone, code: await occCode() });
+    check("new number verified: a ticket, no session yet", r.status === 200 && r.data.ticket && !r.data.token, r.data);
+    const occCart = await freshCart(1);
+    const occEmail = `occ-${stamp}@test.oyklane.dev`;
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId: occCart, email: occEmail, ...SHIP, phone: `+91 ${occPhone}`, paymentMethod: "cod", oneClick: true, phoneTicket: r.data.ticket });
+    check("the order signs the new shopper in", r.status === 201 && r.data.session, r.data);
+    const occCustomer = await prisma.customer.findFirst({ where: { storeId: store.id, email: occEmail } });
+    const occOrder = await prisma.order.findUnique({ where: { id: r.data.order.id } });
+    check("…their number is saved as verified, and the order is theirs", occCustomer?.phoneVerifiedAt && occCustomer.phone === `+91${occPhone}` && occOrder.customerId === occCustomer.id && occOrder.placedSignedIn, { customer: occCustomer, order: occOrder && { customerId: occOrder.customerId, placedSignedIn: occOrder.placedSignedIn } });
+    r = await sf("POST", `/api/storefront/${H}/checkout/express/code`, { phone: occPhone });
+    r = await sf("POST", `/api/storefront/${H}/checkout/express/verify`, { phone: occPhone, code: await occCode() });
+    check("next time, the code signs them straight in", r.status === 200 && r.data.token && r.data.signedIn && !r.data.ticket, r.data);
+    r = await sf("POST", `/api/storefront/${H}/checkout/express/mine`, {}, { "x-shopper-token": r.data.token });
+    check("…with their saved address ready", r.status === 200 && r.data.verified && r.data.addresses?.some((a) => a.zip === SHIP.shippingZip), r.data);
+    r = await sf("POST", `/api/storefront/${H}/checkout/express/mine`, {});
+    check("saved addresses need a signed-in shopper", r.status === 401, r.data);
+    const tamperCart = await freshCart(1);
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId: tamperCart, email: `occ2-${stamp}@test.oyklane.dev`, ...SHIP, paymentMethod: "cod", oneClick: true, phoneTicket: "not-a-ticket" });
+    check("a bad ticket just places the order (no sign-in)", r.status === 201 && !r.data.session, r.data);
+
     r = await owner("PUT", "/api/payments/paypal", { credentials: { clientId: "pp_client", clientSecret: "pp_secret" }, testMode: true });
     check("PayPal refused for a rupee store (PayPal doesn't take INR here)", r.status === 400 && /INR/.test(r.data.error), r.data);
     await prisma.store.update({ where: { id: store.id }, data: { currency: "USD" } });

@@ -10,7 +10,9 @@ const { safeEqual } = require("../../lib/crypto");
  * Every provider implements:
  *   fields                — what the seller enters (secret ones are never shown back)
  *   check(creds, test)    — a cheap authenticated call: are the keys right?
- *   start(ctx)            — begin a payment for an order; returns how the
+ *   start(ctx)            — begin a payment for an order (ctx.mode: the way
+ *                           the shopper chose at checkout — "upi", "card",
+ *                           "netbanking", … — to open the gateway on); returns how the
  *                           shopper continues: { kind: "redirect", url } |
  *                           { kind: "form", action, fields } |
  *                           { kind: "razorpay", … } | { kind: "cashfree", … }
@@ -51,7 +53,7 @@ const razorpay = {
     if (res.status === 401) throw new HttpError(400, "Razorpay rejected these keys.");
     if (!res.ok && res.status !== 404) throw new HttpError(400, `Razorpay answered ${res.status}.`);
   },
-  async start({ creds, order, amount, store }) {
+  async start({ creds, order, amount, store, mode }) {
     const res = await fetch(`${razorpay.base()}/orders`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: razorpay.auth(creds) },
@@ -59,7 +61,8 @@ const razorpay = {
     });
     const data = await json(res);
     if (!res.ok) throw new HttpError(502, `Razorpay: ${data?.error?.description || res.status}`);
-    return { ref: data.id, kind: "razorpay", orderId: data.id, amount: data.amount, currency: data.currency || "INR", keyId: creds.keyId };
+    // Checkout.js opens on the chosen method (the storefront's pay page).
+    return { ref: data.id, kind: "razorpay", orderId: data.id, amount: data.amount, currency: data.currency || "INR", keyId: creds.keyId, method: mode || null };
   },
   async confirm({ creds, ref }, params) {
     const { razorpay_order_id: rzOrder, razorpay_payment_id: rzPayment, razorpay_signature: sig } = params;
@@ -71,6 +74,7 @@ const razorpay = {
 };
 
 // ── Cashfree ─────────────────────────────────────────────────────────
+const CASHFREE_MODES = { upi: "upi", card: "cc,dc,ppc", netbanking: "nb", wallet: "app", emi: "ccemi,dcemi,cardlessemi", paylater: "paylater" };
 const cashfree = {
   key: "cashfree",
   name: "Cashfree Payments",
@@ -87,7 +91,7 @@ const cashfree = {
     const res = await fetch(`${cashfree.base(test)}/orders/oy_key_check_${Date.now()}`, { headers: cashfree.headers(c) });
     if (res.status === 401 || res.status === 403) throw new HttpError(400, "Cashfree rejected these keys — check them, and that test mode matches the keys.");
   },
-  async start({ creds, test, order, amount, store, urls }) {
+  async start({ creds, test, order, amount, store, urls, mode }) {
     const ref = `oy_${order.id}`;
     const res = await fetch(`${cashfree.base(test)}/orders`, {
       method: "POST",
@@ -102,7 +106,8 @@ const cashfree = {
           customer_phone: String(order.phone || "9999999999").replace(/\D/g, "").slice(-10),
           customer_name: order.shippingName || undefined,
         },
-        order_meta: { return_url: urls.return },
+        // Only the way the shopper chose at checkout (Cashfree's payment_methods).
+        order_meta: { return_url: urls.return, ...(CASHFREE_MODES[mode] && { payment_methods: CASHFREE_MODES[mode] }) },
       }),
     });
     const data = await json(res);
@@ -119,6 +124,7 @@ const cashfree = {
 };
 
 // ── PayU (India) ─────────────────────────────────────────────────────
+const PAYU_MODES = { upi: "upi", card: "creditcard|debitcard", netbanking: "netbanking", wallet: "cashcard", emi: "emi", paylater: "bnpl" };
 const payuHash = (s) => crypto.createHash("sha512").update(s).digest("hex");
 const payu = {
   key: "payu",
@@ -137,7 +143,7 @@ const payu = {
       throw new HttpError(400, "That doesn't look like a PayU merchant key and salt.");
     }
   },
-  async start({ creds, test, order, amount, urls }) {
+  async start({ creds, test, order, amount, urls, mode }) {
     const txnid = `oy${order.orderNumber}${crypto.randomBytes(3).toString("hex")}`;
     const f = {
       key: creds.merchantKey,
@@ -151,6 +157,8 @@ const payu = {
       furl: urls.return,
     };
     f.hash = payuHash(`${f.key}|${f.txnid}|${f.amount}|${f.productinfo}|${f.firstname}|${f.email}|||||||||||${creds.salt}`);
+    // Only the way the shopper chose at checkout (not part of the hash).
+    if (PAYU_MODES[mode]) f.enforce_paymethod = PAYU_MODES[mode];
     return { ref: txnid, kind: "form", action: `${payu.base(test)}/_payment`, fields: f };
   },
   async confirm({ creds, ref, amount }, p) {

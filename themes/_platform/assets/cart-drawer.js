@@ -493,12 +493,17 @@
   // ── One-Click Checkout ─────────────────────────────────
   // With the One-Click Checkout app installed, "Checkout" opens a popup
   // that goes step by step: mobile number → a one-time code (when the
-  // store can send one) → a saved or new address → payment. A returning
-  // buyer confirms the code, picks an address and pays. The popup posts to
-  // the store's normal checkout route (flagged oneClick); without
-  // JavaScript, or on any error, the full checkout page still works.
+  // store can send one; it also signs the shopper in) → a saved or new
+  // address → the ways to pay the store's gateways offer. A signed-in
+  // shopper starts at the address step. The popup posts to the store's
+  // normal checkout route (flagged oneClick); without JavaScript, or on any
+  // error, the full checkout page still works.
   var ONE = cfg.oneClick;
-  var REMEMBER_KEY = "oy_1click_" + (cfg.root || "").replace(/[^a-z0-9]/gi, "");
+  // Earlier versions kept the last order's details in this browser; the
+  // popup now only ever fills in a signed-in shopper's own details.
+  try {
+    localStorage.removeItem("oy_1click_" + (cfg.root || "").replace(/[^a-z0-9]/gi, ""));
+  } catch (e) {}
   var EXPRESS_URL = String(cfg.checkout || "").replace(/\/$/, "") + "/express";
   // The popup's details while a payment is in progress (this tab only) — a
   // payment that doesn't finish reopens the popup at the payment step.
@@ -509,13 +514,18 @@
     url.searchParams.delete("oyError");
     return url.pathname + url.search;
   }
-  function remembered() {
+  // Signed out (the logout page adds ?signedOut=1): nothing of theirs stays.
+  (function () {
+    var q = new URLSearchParams(location.search);
+    if (!q.has("signedOut")) return;
     try {
-      return JSON.parse(localStorage.getItem(REMEMBER_KEY) || "null");
-    } catch (e) {
-      return null;
-    }
-  }
+      sessionStorage.removeItem(RETRY_KEY);
+    } catch (e) {}
+    q.delete("signedOut");
+    try {
+      history.replaceState(history.state, "", location.pathname + (q.toString() ? "?" + q : ""));
+    } catch (e) {}
+  })();
   var ICON1 = {
     phone: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></svg>',
     pin: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
@@ -526,15 +536,13 @@
     back: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
     shield: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.4-3 8.2-7 9.5-4-1.3-7-5.1-7-9.5V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></svg>',
     plus: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+    upi: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4l-4 16M14 4l4 8-4 8"/></svg>',
+    bank: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-5 9 5M4.5 9v8M9.5 9v8M14.5 9v8M19.5 9v8M3 20h18"/></svg>',
+    emi: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M12 14h4"/></svg>',
+    later: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
   };
-  var METHOD_TEXT = {
-    cod: ["Cash on delivery", "Pay by cash or UPI when your order arrives", "cash"],
-    razorpay: ["UPI, cards & net banking", "Google Pay, PhonePe, Paytm, all cards · Razorpay", "wallet"],
-    cashfree: ["UPI, cards & net banking", "All UPI apps, cards, wallets · Cashfree", "wallet"],
-    payu: ["UPI, cards & EMI", "UPI, cards, net banking, EMI · PayU", "wallet"],
-    stripe: ["Credit or debit card", "Visa, Mastercard, Amex · Stripe", "card"],
-    paypal: ["PayPal", "PayPal balance or card", "card"],
-  };
+  var MODE_ICON = { upi: "upi", card: "card", netbanking: "bank", wallet: "wallet", emi: "emi", paylater: "later", paypal: "card", cod: "cash" };
+  var MODE_SHORT = { upi: "UPI", card: "card", netbanking: "net banking", wallet: "wallet", emi: "EMI", paylater: "Pay later", paypal: "PayPal" };
   var STEPS = ["mobile", "address", "payment"];
   var sheet = null;
   var st = null; // popup state
@@ -565,6 +573,27 @@
   }
   function addressLines(a) {
     return [a.address1, a.address2, [a.city, a.province].filter(Boolean).join(", ") + (a.zip ? " " + a.zip : "")].filter(Boolean);
+  }
+  // India Post PIN ranges → state, to fill the state in from the PIN code
+  // (the shopper can still change it).
+  var PIN_STATES = [
+    [110, 110, "Delhi"], [120, 136, "Haryana"], [140, 159, "Punjab"], [160, 160, "Chandigarh"], [161, 169, "Punjab"],
+    [170, 177, "Himachal Pradesh"], [180, 193, "Jammu and Kashmir"], [194, 194, "Ladakh"],
+    [246, 246, "Uttarakhand"], [248, 249, "Uttarakhand"], [262, 263, "Uttarakhand"], [200, 285, "Uttar Pradesh"],
+    [301, 345, "Rajasthan"], [396, 396, "Dadra and Nagar Haveli and Daman and Diu"], [360, 395, "Gujarat"],
+    [403, 403, "Goa"], [400, 445, "Maharashtra"], [450, 488, "Madhya Pradesh"], [490, 497, "Chhattisgarh"],
+    [500, 509, "Telangana"], [510, 535, "Andhra Pradesh"], [560, 591, "Karnataka"], [605, 605, "Puducherry"],
+    [600, 643, "Tamil Nadu"], [682, 682, "Lakshadweep"], [670, 695, "Kerala"], [737, 737, "Sikkim"],
+    [744, 744, "Andaman and Nicobar Islands"], [700, 743, "West Bengal"], [751, 770, "Odisha"], [781, 788, "Assam"],
+    [790, 792, "Arunachal Pradesh"], [793, 794, "Meghalaya"], [795, 795, "Manipur"], [796, 796, "Mizoram"],
+    [797, 798, "Nagaland"], [799, 799, "Tripura"], [814, 835, "Jharkhand"], [800, 855, "Bihar"],
+  ];
+  function stateForPin(pin) {
+    var n = Number(String(pin).slice(0, 3));
+    for (var i = 0; i < PIN_STATES.length; i += 1) {
+      if (n >= PIN_STATES[i][0] && n <= PIN_STATES[i][1]) return PIN_STATES[i][2];
+    }
+    return null;
   }
   function fromDetails(v) {
     if (!v || !v.shippingAddress1) return null;
@@ -709,24 +738,39 @@
     return { title: "Where should we deliver?", sub: "", body: html, cta: "Continue to payment" };
   }
 
+  function chosen() {
+    return (ONE.options || [])[st.option] || (ONE.options || [])[0] || null;
+  }
+
+  function payLabel() {
+    var due = lastCart ? (lastCart.due != null ? lastCart.due : lastCart.total) : 0;
+    var o = chosen();
+    if (!o || o.mode === "cod") return "Place order · " + money(due);
+    return ICON.lock + " Pay " + money(due) + (MODE_SHORT[o.mode] ? " with " + MODE_SHORT[o.mode] : "");
+  }
+
   function viewPayment() {
     var a = st.address;
-    var methods = ONE.methods || [];
+    var options = ONE.options || [];
     var html =
       '<div class="oy-1c__chip oy-1c__chip--addr">' + ICON1.pin + "<span><strong>" + esc(a.name) + "</strong><small>" + esc(addressLines(a).join(", ")) + "</small><small>" + esc(prettyPhone(st.phone)) + " · " + esc(st.email) + "</small></span>" +
       '<button type="button" class="oy-1c__link" data-oy-go="address">Change</button></div>' +
-      '<div class="oy-1c__label">Pay with</div><div class="oy-1c__pay" role="radiogroup" aria-label="Payment method">';
-    methods.forEach(function (m, i) {
-      var t = METHOD_TEXT[m.value] || [m.label, "", "card"];
+      '<div class="oy-1c__label">Pay with</div><div class="oy-1c__pay" role="radiogroup" aria-label="Ways to pay">';
+    options.forEach(function (o, i) {
       html +=
-        '<label class="oy-1c__opt"><input type="radio" name="paymentMethod" value="' + esc(m.value) + '"' + ((st.method ? st.method === m.value : i === 0) ? " checked" : "") + ">" +
-        '<span class="oy-1c__opt-icon">' + ICON1[t[2]] + "</span>" +
-        "<span class=\"oy-1c__opt-text\"><strong>" + esc(t[0]) + "</strong>" + (t[1] ? "<small>" + esc(t[1]) + "</small>" : "") + "</span>" +
-        (m.testMode ? '<span class="oy-1c__tag">Test mode</span>' : "") + "</label>";
+        '<label class="oy-1c__opt' + (i === 0 && o.mode === "upi" ? " is-top" : "") + '"><input type="radio" name="payOption" value="' + i + '"' + (st.option === i ? " checked" : "") + ">" +
+        '<span class="oy-1c__opt-icon">' + ICON1[MODE_ICON[o.mode] || "card"] + "</span>" +
+        '<span class="oy-1c__opt-text"><strong>' + esc(o.title) + (i === 0 && o.mode === "upi" ? ' <em class="oy-1c__pick">Fastest</em>' : "") + "</strong>" +
+        (o.subtitle ? "<small>" + esc(o.subtitle) + "</small>" : "") +
+        ((o.badges && o.badges.length) || o.testMode
+          ? '<span class="oy-1c__badges">' + (o.badges || []).map(function (b) { return "<i>" + esc(b) + "</i>"; }).join("") + (o.testMode ? '<i class="oy-1c__test">Test mode</i>' : "") + "</span>"
+          : "") +
+        "</span></label>";
     });
-    html +=
-      "</div>" +
-      '<label class="oy-1c__remember"><input type="checkbox" data-oy-1c-remember' + (st.keep ? " checked" : "") + "> Remember me on this device for faster checkout</label>";
+    if (!options.length) html += '<p class="oy-1c__fine">This store isn\'t taking payments right now.</p>';
+    html += "</div>";
+    var o = chosen();
+    if (o && o.gateway) html += '<p class="oy-1c__fine">You\'ll finish paying securely with ' + esc(o.gateway) + ".</p>";
     return { title: "Choose how to pay", sub: "", body: html, cta: "pay" };
   }
 
@@ -734,8 +778,7 @@
   function draw1c(focusSel) {
     var view = { mobile: viewMobile, otp: viewOtp, address: viewAddress, payment: viewPayment }[st.step]();
     var due = lastCart ? (lastCart.due != null ? lastCart.due : lastCart.total) : 0;
-    var method = st.method || ((ONE.methods || [])[0] || {}).value;
-    var cta = view.cta === "pay" ? (method === "cod" ? "Place order · " + money(due) : ICON.lock + " Pay " + money(due)) : view.cta;
+    var cta = view.cta === "pay" ? payLabel() : view.cta;
     var count = lastCart ? lastCart.item_count || 0 : 0;
     sheet.querySelector(".oy-1c__panel").innerHTML =
       '<header class="oy-1c__head">' +
@@ -763,7 +806,7 @@
     st.step = step;
     st.error = null;
     st.busy = null;
-    draw1c(focus || { mobile: "[data-oy-phone]", otp: "[data-oy-digit='0']", address: ".oy-1c__input, input[name=oyAddr]:checked", payment: "input[name=paymentMethod]:checked" }[step]);
+    draw1c(focus || { mobile: "[data-oy-phone]", otp: "[data-oy-digit='0']", address: ".oy-1c__input, input[name=oyAddr]:checked", payment: "input[name=payOption]:checked" }[step]);
   }
   function fail1c(msg, focus) {
     st.error = msg;
@@ -808,6 +851,8 @@
     postExpress({ action: "verify", phone: "+91" + st.phone, code: code })
       .then(function (res) {
         st.verified = true;
+        // A number with an account signs the shopper in (session cookie).
+        if (res.signedIn) st.signedIn = true;
         st.name = st.name || res.name || "";
         st.email = st.email || res.email || "";
         (res.addresses || []).forEach(function (a) {
@@ -852,8 +897,9 @@
 
   function placeOrder() {
     var a = st.address;
-    var method = st.method || ((ONE.methods || [])[0] || {}).value;
-    if (!method) return;
+    var o = chosen();
+    if (!o) return;
+    var method = o.value;
     var data = {
       email: st.email,
       phone: "+91" + st.phone,
@@ -866,19 +912,13 @@
       shippingZip: a.zip,
       shippingCountry: "IN",
       paymentMethod: method,
+      payMode: o.mode,
       oneClick: "1",
       // Where to come back to if the payment doesn't finish.
       returnTo: pagePath(),
     };
     try {
-      if (st.keep) {
-        localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email: data.email, phone: data.phone, shippingName: a.name, shippingAddress1: a.address1, shippingAddress2: a.address2 || "", company: a.company || "", shippingCity: a.city, shippingProvince: a.province, shippingZip: a.zip }));
-      } else {
-        localStorage.removeItem(REMEMBER_KEY);
-      }
-    } catch (x) {}
-    try {
-      sessionStorage.setItem(RETRY_KEY, JSON.stringify({ phone: st.phone, email: st.email, verified: st.verified, address: a, addresses: st.addresses, method: method }));
+      sessionStorage.setItem(RETRY_KEY, JSON.stringify({ phone: st.phone, email: st.email, verified: st.verified, address: a, addresses: st.addresses, mode: o.mode }));
     } catch (x) {}
     var form = document.createElement("form");
     form.method = "post";
@@ -936,24 +976,24 @@
       location.href = cfg.checkout;
       return;
     }
-    // Where we start: a signed-in shopper (their account's details) or this
-    // device's last one-click order skips straight to the address step.
-    var known = ONE.prefill && ONE.prefill.phone ? ONE.prefill : remembered();
+    // A signed-in shopper starts at the address step with their details;
+    // anyone else starts with their mobile number.
+    var me = ONE.prefill || null;
     var saved = [];
-    var mine = fromDetails(ONE.prefill) || fromDetails(remembered());
-    if (mine) saved.push(mine);
-    var phone = known ? tenDigits(known.phone) : "";
+    var own = fromDetails(me);
+    if (own) saved.push(own);
+    var phone = me ? tenDigits(me.phone) : "";
     st = {
-      step: phone.length === 10 && saved.length ? "address" : "mobile",
+      step: phone.length === 10 ? "address" : "mobile",
       phone: phone.length === 10 ? phone : "",
-      verified: false,
-      email: (known && known.email) || (ONE.prefill && ONE.prefill.email) || "",
-      name: (known && known.shippingName) || "",
+      verified: Boolean(me && me.phoneVerified),
+      signedIn: Boolean(me),
+      email: (me && me.email) || "",
+      name: (me && me.shippingName) || "",
       saved: saved,
       addresses: saved.slice(),
       pick: saved.length ? 0 : "new",
-      method: null,
-      keep: true,
+      option: 0,
       open: false,
       error: null,
       busy: null,
@@ -973,7 +1013,9 @@
       st.addresses.forEach(function (x, i) {
         if (x.address1 === r.address.address1 && x.zip === r.address.zip) st.pick = i;
       });
-      st.method = r.method || null;
+      (ONE.options || []).forEach(function (x, i) {
+        if (x.mode === r.mode) st.option = i;
+      });
     }
     sheet = document.createElement("div");
     sheet.className = "oy-1c";
@@ -1008,12 +1050,10 @@
     form.addEventListener("change", function (e) {
       var t = e.target;
       if (t.name === "oyAddr") st.pick = Number(t.value);
-      if (t.name === "paymentMethod") {
-        st.method = t.value;
-        var due = lastCart ? (lastCart.due != null ? lastCart.due : lastCart.total) : 0;
-        sheet.querySelector(".oy-1c__cta").innerHTML = t.value === "cod" ? "Place order · " + money(due) : ICON.lock + " Pay " + money(due);
+      if (t.name === "payOption") {
+        st.option = Number(t.value);
+        draw1c("input[name=payOption]:checked");
       }
-      if (t.hasAttribute("data-oy-1c-remember")) st.keep = t.checked;
     });
     // OTP boxes: one digit each, auto-advance, paste fills them all, and
     // the last digit submits.
@@ -1021,6 +1061,14 @@
       var t = e.target;
       if (t.hasAttribute("data-oy-phone")) {
         t.value = t.value.replace(/[^\d ]/g, "");
+        return;
+      }
+      // A 6-digit PIN code fills in the state (when it's still empty).
+      if (t.name === "shippingZip") {
+        t.value = digits(t.value).slice(0, 6);
+        var stateEl = form.elements.shippingProvince;
+        var guess = t.value.length === 6 && stateForPin(t.value);
+        if (guess && stateEl && !stateEl.value) stateEl.value = guess;
         return;
       }
       if (!t.hasAttribute("data-oy-digit")) return;
@@ -1061,6 +1109,25 @@
       goStep(st.step);
       if (why) fail1c(why);
     });
+    // Signed in: the addresses saved on the account and used with its number.
+    if (st.signedIn && !retry) {
+      postExpress({ action: "mine" })
+        .then(function (res) {
+          if (!sheet || !st) return;
+          st.email = st.email || res.email || "";
+          st.name = st.name || res.name || "";
+          (res.addresses || []).forEach(function (a) {
+            var dup = st.addresses.some(function (b) {
+              return digits(b.zip) === digits(a.zip) && String(b.address1).toLowerCase() === String(a.address1).toLowerCase();
+            });
+            if (!dup) st.addresses.push(a);
+          });
+          st.saved = st.addresses.slice();
+          if (st.addresses.length && st.pick === "new" && !st.draft) st.pick = 0;
+          if (st.step === "address" && !st.busy) draw1c();
+        })
+        .catch(function () {});
+    }
   }
   if (ONE) {
     // Sent back after a payment that didn't finish (the gateway's cancel,

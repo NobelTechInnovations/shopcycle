@@ -155,12 +155,13 @@ function oneClickConfig(ctx, customer, store) {
     otp: Boolean(live.sms || live.whatsapp || env.NODE_ENV !== "production"),
     storeName: store.name,
     fields: { phone: fields.phone, address2: fields.address2, company: fields.company, country: fields.country },
-    methods: ctx.payment_methods.map((m) => ({ value: m.value, label: m.label, testMode: Boolean(m.testMode) })),
+    options: (ctx.payment_options || []).map((o) => ({ value: o.value, mode: o.mode, title: o.title, subtitle: o.subtitle, badges: o.badges, testMode: Boolean(o.testMode), gateway: o.gateway })),
     states: INDIAN_STATES.map((st) => st.name),
-    // A signed-in shopper's saved details; otherwise the popup uses what
-    // this device remembered from the last one-click order, if anything.
+    // The signed-in shopper's details (their saved addresses are fetched
+    // when the popup opens). Signed out, nothing is filled in.
     prefill: customer
       ? {
+          phoneVerified: Boolean(customer.phoneVerifiedAt || customer.phone_verified),
           email: customer.email || "",
           phone: customer.phone || "",
           shippingName: customer.name || "",
@@ -379,6 +380,9 @@ async function buildGlobalContext(prisma, store, { slug, cartId, discountError, 
     checkout_error: safe(checkoutError),
     gift_card_error: safe(giftCardError),
     payment_methods: await checkoutService.availablePaymentMethods(prisma, store),
+    // One choice per way to pay (UPI, card, net banking, …, cash on
+    // delivery), from what the connected gateways offer.
+    payment_options: await paymentsService.checkoutOptions(prisma, store),
     platform: { fonts_url: platform.fontsUrl(themeSettings) },
     apps,
     // Stars under product cards (Product Reviews app, "show on cards").
@@ -827,11 +831,16 @@ async function renderPage(
   if (templateName === "account") globalContext.indian_states = INDIAN_STATES.map((s) => s.name);
   if (templateName === "account" && customer) {
     // Until the email is verified by a code, only orders placed while
-    // signed in: anyone can type an address at sign-up.
+    // signed in: anyone can type an address at sign-up. A mobile number
+    // confirmed with a code (phone sign-in, One-Click) also brings in the
+    // orders placed with that number.
+    const byEmail = customer.emailVerifiedAt ? [{ customerId: customer.id }, { email: { equals: customer.email, mode: "insensitive" } }] : [{ customerId: customer.id, placedSignedIn: true }];
+    const last10 = customer.phoneVerifiedAt ? String(customer.phone || "").replace(/\D/g, "").slice(-10) : "";
+    const byPhone = last10.length === 10
+      ? (await prisma.$queryRaw`SELECT "id" FROM orders WHERE "storeId" = ${store.id} AND right(regexp_replace(coalesce("phone", ''), '\\D', '', 'g'), 10) = ${last10} LIMIT 200`).map((r) => r.id)
+      : [];
     const orders = await prisma.order.findMany({
-      where: customer.emailVerifiedAt
-        ? { storeId: store.id, OR: [{ customerId: customer.id }, { email: { equals: customer.email, mode: "insensitive" } }] }
-        : { storeId: store.id, customerId: customer.id, placedSignedIn: true },
+      where: { storeId: store.id, OR: [...byEmail, ...(byPhone.length ? [{ id: { in: byPhone } }] : [])] },
       include: FULL_INCLUDE,
       orderBy: { createdAt: "desc" },
       take: 50,

@@ -1,6 +1,7 @@
 const { HttpError } = require("@shopcycle/utils");
 const { encryptSecret, decryptSecret } = require("../../lib/crypto");
 const { PROVIDERS, PROVIDER_KEYS } = require("./providers");
+const methods = require("./methods");
 
 /**
  * Settings ▸ Payments: which gateways a seller has connected, and cash on
@@ -78,7 +79,20 @@ async function save(prisma, store, key, input) {
     create: { storeId: store.id, provider: key, ...data },
     update: data,
   });
+  // Which ways to pay these keys offer (UPI, cards, …) — shown at checkout.
+  await refreshMethods(prisma, store.id, key, creds, testMode);
   return listForAdmin(prisma, store);
+}
+
+/** Asks the gateway what it offers and keeps the answer on the store
+ * (settings.gatewayMethods), read fresh so other settings aren't lost. */
+async function refreshMethods(prisma, storeId, key, creds, test, log) {
+  const modes = await methods.discover(key, creds, test, log);
+  const fresh = await prisma.store.findUnique({ where: { id: storeId }, select: { settings: true } });
+  const settings = fresh?.settings && typeof fresh.settings === "object" ? fresh.settings : {};
+  const gatewayMethods = { ...(settings.gatewayMethods || {}), [key]: { modes, test: Boolean(test), checkedAt: new Date().toISOString() } };
+  await prisma.store.update({ where: { id: storeId }, data: { settings: { ...settings, gatewayMethods } } });
+  return modes;
 }
 
 async function setEnabled(prisma, store, key, enabled) {
@@ -111,6 +125,49 @@ async function checkoutMethods(prisma, store) {
   return methods;
 }
 
+const refreshing = new Set(); // gateways being asked right now (this process)
+
+const OPTION_TEXT = {
+  upi: { title: "UPI", subtitle: "Google Pay, PhonePe, Paytm or any UPI app", badges: ["GPay", "PhonePe", "Paytm"] },
+  card: { title: "Credit or debit card", subtitle: "Visa, Mastercard, RuPay", badges: ["VISA", "Mastercard", "RuPay"] },
+  netbanking: { title: "Net banking", subtitle: "All major Indian banks", badges: [] },
+  wallet: { title: "Wallets", subtitle: "Paytm, PhonePe, Amazon Pay and more", badges: [] },
+  emi: { title: "EMI", subtitle: "Easy instalments on cards", badges: [] },
+  paylater: { title: "Pay later", subtitle: "Simpl, LazyPay and more", badges: [] },
+  paypal: { title: "PayPal", subtitle: "PayPal balance or card", badges: ["PayPal"] },
+  cod: { title: "Cash on delivery", subtitle: "Pay by cash or UPI when your order arrives", badges: [] },
+};
+
+/**
+ * Checkout's ways to pay, one per method — UPI, card, net banking, wallets,
+ * EMI, pay later (each from the first connected gateway that offers it),
+ * then cash on delivery. `value` is the gateway, `mode` the method it's
+ * asked to open on. A gateway not asked yet (or a day ago) is asked in the
+ * background; until then its typical methods are shown.
+ */
+async function checkoutOptions(prisma, store, { log } = {}) {
+  const rows = await prisma.paymentProvider.findMany({ where: { storeId: store.id, enabled: true }, orderBy: { createdAt: "asc" } });
+  const known = (store.settings && store.settings.gatewayMethods) || {};
+  const byMode = new Map();
+  for (const r of rows) {
+    if (!PROVIDERS[r.provider]) continue;
+    const saved = known[r.provider];
+    const fresh = saved && saved.test === r.testMode && Date.now() - new Date(saved.checkedAt).getTime() < methods.STALE_MS;
+    const flight = `${store.id}:${r.provider}`;
+    if (!fresh && !refreshing.has(flight)) {
+      refreshing.add(flight);
+      refreshMethods(prisma, store.id, r.provider, readCreds(r), r.testMode, log)
+        .catch(() => {})
+        .finally(() => refreshing.delete(flight));
+    }
+    const modes = saved?.modes?.length ? saved.modes : methods.DEFAULTS[r.provider] || [];
+    for (const mode of modes) if (!byMode.has(mode)) byMode.set(mode, { value: r.provider, mode, testMode: r.testMode, gateway: PROVIDERS[r.provider].name });
+  }
+  const options = methods.MODES.filter((m) => byMode.has(m)).map((m) => ({ ...byMode.get(m), ...OPTION_TEXT[m], ...(m === "card" && byMode.get(m).value === "stripe" && { subtitle: "Visa, Mastercard, Amex" }) }));
+  if (codEnabled(store)) options.push({ value: "cod", mode: "cod", testMode: false, gateway: null, ...OPTION_TEXT.cod });
+  return options;
+}
+
 /** A gateway's decrypted config, for starting or confirming a payment. */
 async function gateway(prisma, storeId, key) {
   const row = await prisma.paymentProvider.findUnique({ where: { storeId_provider: { storeId, provider: key } } });
@@ -118,4 +175,4 @@ async function gateway(prisma, storeId, key) {
   return { provider: PROVIDERS[key], creds: readCreds(row), test: row.testMode, enabled: row.enabled };
 }
 
-module.exports = { listForAdmin, save, setEnabled, remove, setCod, checkoutMethods, gateway, codEnabled };
+module.exports = { listForAdmin, save, setEnabled, remove, setCod, checkoutMethods, checkoutOptions, refreshMethods, gateway, codEnabled };

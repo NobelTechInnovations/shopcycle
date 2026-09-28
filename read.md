@@ -196,6 +196,15 @@ Local `.env` points at the **production** Supabase database, so every local writ
 - **Marketing site**: pricing is live from `GET /api/auth/plans` (monthly/yearly switch), new One-Click Checkout section, GST wording fixed.
 - Speed: `railway.json` moves the API to Singapore (`asia-southeast1-eqsg3a`, next deploy); Vercel functions set to `bom1` (next deploy); `app/admin/loading.jsx` shows a skeleton instantly on navigation.
 
+### Done 28 Sep, third round (NOT committed yet)
+
+- **Test store** (the only one to use for trying things; its login is in `.env` comments): `ui-test-1790529796`. Has One-Click Checkout, Phone Login and PayU (test mode) connected, sample products for filters.
+- **Checkout sign-in fixed**: the popup no longer remembers details in the browser (that made it look signed in when it wasn't). Confirming the mobile code signs the shopper in — at once if the number has an account, or with the order (a short-lived "number confirmed" ticket in an HttpOnly cookie links the number to the new customer). Signing out clears the session, the cart and any checkout in progress. A phone-verified shopper's account lists orders placed with that number.
+- **Ways to pay per gateway** (`payments/methods.js`): each gateway is asked what it offers (Razorpay `GET /v1/methods`, PayU `get_checkout_details`, Cashfree `/pg/eligibility/payment_methods`; Stripe = card, PayPal = PayPal), kept in `store.settings.gatewayMethods`, refreshed on save and daily; typical defaults when a gateway can't be asked. Checkout (popup and page) shows UPI / card / net banking / wallets / EMI / pay later / COD separately, and the gateway opens on the chosen one (Razorpay `config.display` block, PayU `enforce_paymethod`, Cashfree `order_meta.payment_methods`). ⚠️ PayU's old public test key is refused by its lookup API ("Invalid Hash"), so on the test store PayU shows its defaults; a real merchant key gets the real list.
+- **Checkout page redesigned** (`sections/sys-checkout.liquid`): numbered cards (Contact, Delivery address, Payment), icons in fields, PIN code fills in the state, per-method payment options, "Pay ₹X with UPI" button that stays in reach on phones, policies linked in the agreement line.
+- **Marketing site plans**: refreshed every minute, and at once when Super admin saves a plan if `WWW_REVALIDATE_URL` (e.g. `https://oyklane.com/api/revalidate`) and `REVALIDATE_SECRET` (same value on the API and the www project) are set.
+- Local dev tip: `.env` now has Zoho WhatsApp keys, so a local API would send **real** WhatsApp codes. Run it with `EMAIL_PROVIDER=log SMS_PROVIDER=log WHATSAPP_PROVIDER=log` when testing with made-up numbers (the e2e tests already force this).
+
 ### Left to do
 
 0. **Production email**: Railway blocks SMTP (outbound SMTP needs Railway Pro). Set `EMAIL_PROVIDER=zeptomail` and `ZEPTOMAIL_TOKEN=<ZeptoMail ▸ Mail Agents ▸ SMTP/API ▸ API ▸ Send Mail Token>` on Railway. The SMTP username/password in `.env` are not that token.

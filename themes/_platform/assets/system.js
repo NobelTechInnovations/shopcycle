@@ -261,6 +261,45 @@
     });
   }
 
+  // ── Checkout: the state from the PIN code, and the pay button naming the
+  // chosen way to pay ("Pay ₹1,299 with UPI").
+  var PIN_STATES = [
+    [110, 110, "Delhi"], [120, 136, "Haryana"], [140, 159, "Punjab"], [160, 160, "Chandigarh"], [161, 169, "Punjab"],
+    [170, 177, "Himachal Pradesh"], [180, 193, "Jammu and Kashmir"], [194, 194, "Ladakh"],
+    [246, 246, "Uttarakhand"], [248, 249, "Uttarakhand"], [262, 263, "Uttarakhand"], [200, 285, "Uttar Pradesh"],
+    [301, 345, "Rajasthan"], [396, 396, "Dadra and Nagar Haveli and Daman and Diu"], [360, 395, "Gujarat"],
+    [403, 403, "Goa"], [400, 445, "Maharashtra"], [450, 488, "Madhya Pradesh"], [490, 497, "Chhattisgarh"],
+    [500, 509, "Telangana"], [510, 535, "Andhra Pradesh"], [560, 591, "Karnataka"], [605, 605, "Puducherry"],
+    [600, 643, "Tamil Nadu"], [682, 682, "Lakshadweep"], [670, 695, "Kerala"], [737, 737, "Sikkim"],
+    [744, 744, "Andaman and Nicobar Islands"], [700, 743, "West Bengal"], [751, 770, "Odisha"], [781, 788, "Assam"],
+    [790, 792, "Arunachal Pradesh"], [793, 794, "Meghalaya"], [795, 795, "Manipur"], [796, 796, "Mizoram"],
+    [797, 798, "Nagaland"], [799, 799, "Tripura"], [814, 835, "Jharkhand"], [800, 855, "Bihar"],
+  ];
+  document.querySelectorAll("[data-sys-checkout]").forEach(function (form) {
+    var pin = form.querySelector("[data-sys-pin]");
+    var state = form.querySelector("[data-sys-state]");
+    if (pin && state) {
+      pin.addEventListener("input", function () {
+        var d = pin.value.replace(/\D/g, "");
+        if (d.length !== 6 || state.value) return;
+        var n = Number(d.slice(0, 3));
+        for (var i = 0; i < PIN_STATES.length; i += 1) {
+          if (n >= PIN_STATES[i][0] && n <= PIN_STATES[i][1]) {
+            state.value = PIN_STATES[i][2];
+            break;
+          }
+        }
+      });
+    }
+    var text = form.querySelector("[data-sys-pay-text]");
+    if (text) {
+      form.addEventListener("change", function (e) {
+        var label = e.target.getAttribute && e.target.getAttribute("data-pay-label");
+        if (label) text.textContent = label;
+      });
+    }
+  });
+
   // ── Show / hide password ───────────────────────────────
   document.querySelectorAll("[data-sys-reveal]").forEach(function (btn) {
     var input = btn.parentNode.querySelector("[data-sys-password]");

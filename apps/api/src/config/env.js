@@ -120,6 +120,12 @@ const envSchema = z.object({
   ZEPTOMAIL_TOKEN: z.string().optional(),
   ZEPTOMAIL_API_URL: z.string().default("https://cpaas.zoho.in/v1.1/email"),
   BREVO_API_KEY: z.string().optional(),
+
+  // The marketing site's home page shows the plans; when Super admin saves a
+  // plan the API tells it to refresh at once (apps/www/app/api/revalidate).
+  // Both unset: the site still refreshes its prices every minute.
+  WWW_REVALIDATE_URL: z.string().optional(),
+  REVALIDATE_SECRET: z.string().optional(),
   BREVO_API_URL: z.string().default("https://api.brevo.com/v3/smtp/email"),
 
   // Where uploaded images are stored (modules/uploads). Unset: ImageKit when

@@ -105,7 +105,16 @@ async function expressVerifyHandler(request, reply) {
   const store = await storeFor(request);
   const body = phoneVerifySchema.parse(request.body);
   await throttle(request.server, `express-verify:${store.id}:${body.phone.replace(/\D/g, "")}`, { max: 15, windowSeconds: 15 * 60 });
-  reply.send(await express.verify(request.server.prisma, store, body));
+  const { customer, ...result } = await express.verify(request.server, store, body);
+  // A number that belongs to an account signs the shopper in (the
+  // storefront keeps the token in its HttpOnly session cookie).
+  reply.send(customer ? { ...result, token: service.signSession(request.server, store, customer, "phone"), signedIn: true } : result);
+}
+
+async function expressMineHandler(request, reply) {
+  const store = await storeFor(request);
+  const customer = await requireShopper(request, store);
+  reply.send(await express.mine(request.server.prisma, store, customer));
 }
 
 async function phoneCompleteHandler(request, reply) {
@@ -248,6 +257,7 @@ module.exports = {
   phoneCodeHandler,
   expressCodeHandler,
   expressVerifyHandler,
+  expressMineHandler,
   phoneVerifyHandler,
   phoneCompleteHandler,
   googleExchangeHandler,

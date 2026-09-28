@@ -1,7 +1,12 @@
 {% comment %}
   Checkout — rendered inside the platform's distraction-free checkout
-  layout (layout/sys-checkout.liquid), not the theme's. One form, one
-  submit; system.js stops a double click from placing two orders.
+  layout (layout/sys-checkout.liquid), not the theme's. One page, three
+  numbered steps (contact, delivery, payment), one submit; system.js stops
+  a double click from placing two orders, fills the state in from the PIN
+  code and names the chosen way to pay on the button.
+  Ways to pay come from payment_options — one per method the store's
+  gateways offer (UPI, card, net banking, …) plus cash on delivery; each
+  radio's value is "gateway:method" (the storefront splits it).
   Marketing consent is an unticked box, as India's DPDP Act expects.
 {% endcomment %}
 {% capture summary_items %}
@@ -22,7 +27,7 @@
     {% if cart.discount and cart.discount.amount > 0 %}
       <div class="sys-sumrow sys-sumrow--saving"><span>Discount ({{ cart.discount.code }})</span><span class="sys-num">−{{ cart.discount.amount | money }}</span></div>
     {% endif %}
-    <div class="sys-sumrow"><span>Delivery</span><span class="sys-num">{% if cart.shipping %}{% if cart.shipping.amount > 0 %}{{ cart.shipping.amount | money }}{% else %}Free{% endif %}{% else %}Free{% endif %}</span></div>
+    <div class="sys-sumrow"><span>Delivery</span><span class="sys-num">{% if cart.shipping %}{% if cart.shipping.amount > 0 %}{{ cart.shipping.amount | money }}{% else %}<span class="sys-co__free">Free</span>{% endif %}{% else %}<span class="sys-co__free">Free</span>{% endif %}</span></div>
     {% if cart.tax %}<div class="sys-sumrow"><span>{{ cart.tax.name }}</span><span class="sys-num">{{ cart.tax.amount | money }}</span></div>{% endif %}
     <div class="sys-sumrow sys-sumrow--total"><span>Total</span><span class="sys-num">{{ cart.total | money }}</span></div>
     {% if cart.gift_card and cart.gift_card.amount > 0 %}
@@ -35,7 +40,7 @@
 {% if cart.items.size > 0 %}
   <details class="sys-mobile-summary">
     <summary>
-      <span class="sys-row" style="gap:8px">{% render 'snippets/sys-icon', icon: 'bag' %} Show order summary {% render 'snippets/sys-icon', icon: 'chevron-down' %}</span>
+      <span class="sys-row" style="gap:8px">{% render 'snippets/sys-icon', icon: 'bag' %} Order summary · {{ cart.item_count }} item{% if cart.item_count != 1 %}s{% endif %} {% render 'snippets/sys-icon', icon: 'chevron-down' %}</span>
       <strong class="sys-num">{{ cart.due | money }}</strong>
     </summary>
     <div class="sys-mobile-summary__body">
@@ -47,84 +52,91 @@
   <div class="sys-checkout-wrap">
     <div class="sys-container">
       <div class="sys-checkout">
-        <form method="post" action="{{ routes.checkout_url }}" class="sys-checkout__main" data-sys-once>
+        <form method="post" action="{{ routes.checkout_url }}" class="sys-checkout__main sys-co" data-sys-once data-sys-checkout>
           {% if checkout_error %}<p class="sys-alert sys-alert--error" role="alert" style="margin:0">{{ checkout_error }}</p>{% endif %}
+          {% comment %} Which fields show, and which are required: Settings ▸ Checkout (checkout_fields). {% endcomment %}
+          {% assign cf = checkout_fields %}
 
-          <div class="sys-step">
-            <div class="sys-step__head">
-              <h2>Contact</h2>
+          <section class="sys-co__step" aria-labelledby="co-contact">
+            <header class="sys-co__head">
+              <span class="sys-co__num" aria-hidden="true">1</span>
+              <h2 id="co-contact">Contact</h2>
               {% if customer %}
-                <span class="sys-small sys-muted">Signed in as {{ customer.email }}</span>
+                <span class="sys-co__aside">{% render 'snippets/sys-icon', icon: 'user' %} {{ customer.email | default: customer.phone }}</span>
               {% else %}
-                <a class="sys-link sys-small" href="{{ routes.account_login_url }}?return_to=checkout">Sign in for faster checkout</a>
+                <a class="sys-link sys-small sys-co__aside" href="{{ routes.account_login_url }}?return_to=checkout">Have an account? Sign in</a>
               {% endif %}
-            </div>
-            {% comment %} Which fields show, and which are required: Settings ▸ Checkout (checkout_fields). {% endcomment %}
-            {% assign cf = checkout_fields %}
+            </header>
             <div class="sys-fields{% if cf.phone != 'hidden' %} sys-fields--2{% endif %}">
-              <label class="sys-field">
-                <span class="sys-label">Email</span>
-                <input class="sys-input" type="email" name="email" required autocomplete="email" value="{{ customer.email }}" placeholder="you@example.com">
-              </label>
               {% if cf.phone != 'hidden' %}
                 <label class="sys-field">
                   <span class="sys-label">Mobile number{% if cf.phone == 'optional' %} <span class="sys-muted" style="font-weight:400">(optional)</span>{% endif %}</span>
-                  <input class="sys-input" type="tel" name="phone" {% if cf.phone == 'required' %}required{% endif %} autocomplete="tel" inputmode="tel" value="{{ customer.phone }}" placeholder="10-digit mobile number">
+                  <span class="sys-co__control">{% render 'snippets/sys-icon', icon: 'phone' %}<input class="sys-input" type="tel" name="phone" {% if cf.phone == 'required' %}required{% endif %} autocomplete="tel" inputmode="tel" value="{{ customer.phone }}" placeholder="10-digit mobile number"></span>
                 </label>
               {% endif %}
+              <label class="sys-field">
+                <span class="sys-label">Email</span>
+                <span class="sys-co__control">{% render 'snippets/sys-icon', icon: 'mail' %}<input class="sys-input" type="email" name="email" required autocomplete="email" value="{{ customer.email }}" placeholder="you@example.com"></span>
+              </label>
             </div>
+            <p class="sys-co__hint">Order updates and your receipt go here — use them to track this order later.</p>
             {% if cf.marketing != 'hidden' %}
               <label class="sys-check">
                 <input type="checkbox" name="acceptsMarketing" value="true">
                 <span>Email me news and offers from {{ shop.name }}. You can unsubscribe any time.</span>
               </label>
             {% endif %}
-          </div>
+          </section>
 
-          <div class="sys-step">
-            <div class="sys-step__head"><h2>Delivery</h2></div>
+          <section class="sys-co__step" aria-labelledby="co-delivery">
+            <header class="sys-co__head">
+              <span class="sys-co__num" aria-hidden="true">2</span>
+              <h2 id="co-delivery">Delivery address</h2>
+            </header>
             <div class="sys-fields">
               <label class="sys-field">
                 <span class="sys-label">Full name</span>
-                <input class="sys-input" type="text" name="shippingName" required autocomplete="name" value="{{ customer.name }}">
+                <span class="sys-co__control">{% render 'snippets/sys-icon', icon: 'user' %}<input class="sys-input" type="text" name="shippingName" required autocomplete="name" value="{{ customer.name }}" placeholder="First and last name"></span>
               </label>
-              <label class="sys-field">
-                <span class="sys-label">Address</span>
-                <input class="sys-input" type="text" name="shippingAddress1" required autocomplete="address-line1" value="{{ customer.address1 }}" placeholder="House number, street, area">
-              </label>
-              {% if cf.address2 != 'hidden' %}
+              <div class="sys-fields sys-fields--2">
                 <label class="sys-field">
-                  <span class="sys-label">Apartment, landmark{% if cf.address2 == 'optional' %} <span class="sys-muted" style="font-weight:400">(optional)</span>{% endif %}</span>
-                  <input class="sys-input" type="text" name="shippingAddress2" {% if cf.address2 == 'required' %}required{% endif %} autocomplete="address-line2" value="{{ customer.address2 }}">
+                  <span class="sys-label">PIN code</span>
+                  <span class="sys-co__control">{% render 'snippets/sys-icon', icon: 'pin' %}<input class="sys-input" type="text" name="shippingZip" required autocomplete="postal-code" inputmode="numeric" maxlength="10" value="{{ customer.zip }}" placeholder="6-digit PIN" data-sys-pin></span>
                 </label>
-              {% endif %}
-              <div class="sys-fields sys-fields--3">
                 <label class="sys-field">
                   <span class="sys-label">City</span>
                   <input class="sys-input" type="text" name="shippingCity" required autocomplete="address-level2" value="{{ customer.city }}">
                 </label>
-                <label class="sys-field">
-                  <span class="sys-label">State</span>
-                  <input class="sys-input" type="text" name="shippingProvince" required autocomplete="address-level1" list="sys-states" value="{{ customer.province }}">
-                </label>
-                <label class="sys-field">
-                  <span class="sys-label">PIN code</span>
-                  <input class="sys-input" type="text" name="shippingZip" required autocomplete="postal-code" inputmode="numeric" maxlength="10" value="{{ customer.zip }}">
-                </label>
               </div>
-              {% if cf.country == 'india' %}
-                <input type="hidden" name="shippingCountry" value="IN">
-              {% else %}
+              <label class="sys-field">
+                <span class="sys-label">House no., building, street, area</span>
+                <input class="sys-input" type="text" name="shippingAddress1" required autocomplete="address-line1" value="{{ customer.address1 }}" placeholder="Flat 402, Lotus Residency, MG Road">
+              </label>
+              {% if cf.address2 != 'hidden' %}
                 <label class="sys-field">
-                  <span class="sys-label">Country</span>
-                  <select class="sys-select" name="shippingCountry" required autocomplete="country">
-                    {% assign selected_country = customer.country | default: 'IN' %}
-                    {% for country in checkout_countries %}
-                      <option value="{{ country.code }}" {% if country.code == selected_country %}selected{% endif %}>{{ country.name }}</option>
-                    {% endfor %}
-                  </select>
+                  <span class="sys-label">Landmark{% if cf.address2 == 'optional' %} <span class="sys-muted" style="font-weight:400">(optional)</span>{% endif %}</span>
+                  <input class="sys-input" type="text" name="shippingAddress2" {% if cf.address2 == 'required' %}required{% endif %} autocomplete="address-line2" value="{{ customer.address2 }}" placeholder="Near City Hospital">
                 </label>
               {% endif %}
+              <div class="sys-fields{% if cf.country != 'india' %} sys-fields--2{% endif %}">
+                <label class="sys-field">
+                  <span class="sys-label">State</span>
+                  <input class="sys-input" type="text" name="shippingProvince" required autocomplete="address-level1" list="sys-states" value="{{ customer.province }}" data-sys-state>
+                </label>
+                {% if cf.country == 'india' %}
+                  <input type="hidden" name="shippingCountry" value="IN">
+                {% else %}
+                  <label class="sys-field">
+                    <span class="sys-label">Country</span>
+                    <select class="sys-select" name="shippingCountry" required autocomplete="country">
+                      {% assign selected_country = customer.country | default: 'IN' %}
+                      {% for country in checkout_countries %}
+                        <option value="{{ country.code }}" {% if country.code == selected_country %}selected{% endif %}>{{ country.name }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                {% endif %}
+              </div>
               {% if cf.company != 'hidden' or cf.gstin != 'hidden' %}
                 <div class="sys-fields{% if cf.company != 'hidden' and cf.gstin != 'hidden' %} sys-fields--2{% endif %}">
                   {% if cf.company != 'hidden' %}
@@ -151,58 +163,73 @@
                 {% for state in indian_states %}<option value="{{ state }}"></option>{% endfor %}
               </datalist>
             </div>
-          </div>
+          </section>
 
-          <div class="sys-step">
-            <div class="sys-step__head">
-              <h2>Payment</h2>
-              <span class="sys-secure">{% render 'snippets/sys-icon', icon: 'lock' %} Secure</span>
-            </div>
+          <section class="sys-co__step" aria-labelledby="co-payment">
+            <header class="sys-co__head">
+              <span class="sys-co__num" aria-hidden="true">3</span>
+              <h2 id="co-payment">Payment</h2>
+              <span class="sys-co__aside sys-secure">{% render 'snippets/sys-icon', icon: 'lock' %} Secure</span>
+            </header>
+            {% capture first_label %}Place order · {{ cart.due | money }}{% endcapture %}
             {% if cart.due <= 0 %}
               <div class="sys-alert sys-alert--success" role="status" style="margin:0">
                 {% render 'snippets/sys-icon', icon: 'gift' %} Your gift card covers the whole order — there's nothing more to pay.
               </div>
               <input type="hidden" name="paymentMethod" value="gift_card">
             {% else %}
-            {% if cart.gift_card and cart.gift_card.amount > 0 %}
-              <p class="sys-small sys-muted" style="margin:0 0 12px">Your gift card pays {{ cart.gift_card.amount | money }}. Choose how to pay the remaining {{ cart.due | money }}.</p>
-            {% endif %}
-            <div class="sys-pay" role="radiogroup" aria-label="Payment method">
-              {% if payment_methods.size == 0 %}
-                <p class="sys-alert sys-alert--error" style="margin:0">This store isn't taking orders online right now — no payment method is set up. Please contact the store.</p>
+              {% if cart.gift_card and cart.gift_card.amount > 0 %}
+                <p class="sys-small sys-muted" style="margin:0 0 12px">Your gift card pays {{ cart.gift_card.amount | money }}. Choose how to pay the remaining {{ cart.due | money }}.</p>
               {% endif %}
-              {% for method in payment_methods %}
-                <label class="sys-pay__opt">
-                  <input type="radio" name="paymentMethod" value="{{ method.value }}" {% if forloop.first %}checked{% endif %}>
-                  <span class="sys-pay__label">
-                    {% case method.value %}
-                      {% when 'cod' %}<strong>Cash on delivery</strong><span>Pay by cash or UPI when your order arrives</span>
-                      {% when 'razorpay' %}<strong>Pay online</strong><span>UPI, cards, net banking and wallets · Razorpay</span>
-                      {% when 'cashfree' %}<strong>Pay online</strong><span>UPI, cards, net banking and pay later · Cashfree</span>
-                      {% when 'payu' %}<strong>Pay online</strong><span>UPI, cards, net banking and EMI · PayU</span>
-                      {% when 'stripe' %}<strong>Card</strong><span>Credit and debit cards · Stripe</span>
-                      {% when 'paypal' %}<strong>PayPal</strong><span>Pay with your PayPal account or card</span>
-                      {% else %}<strong>{{ method.label }}</strong>
-                    {% endcase %}
-                    {% if method.testMode %}<span class="sys-badge sys-badge--warning" style="margin-top:4px;align-self:flex-start">Test mode</span>{% endif %}
-                  </span>
-                  {% case method.value %}
-                    {% when 'cod' %}{% render 'snippets/sys-icon', icon: 'cash' %}
-                    {% when 'stripe' %}<span class="sys-pay__icons" aria-hidden="true"><span>VISA</span><span>MC</span><span>AMEX</span></span>
-                    {% when 'paypal' %}<span class="sys-pay__icons" aria-hidden="true"><span>PayPal</span></span>
-                    {% else %}<span class="sys-pay__icons" aria-hidden="true"><span>UPI</span><span>VISA</span><span>RuPay</span></span>
-                  {% endcase %}
-                </label>
-              {% endfor %}
-            </div>
+              <div class="sys-co__pays" role="radiogroup" aria-label="Ways to pay">
+                {% if payment_options.size == 0 %}
+                  <p class="sys-alert sys-alert--error" style="margin:0">This store isn't taking orders online right now — no payment method is set up. Please contact the store.</p>
+                {% endif %}
+                {% for option in payment_options %}
+                  {% capture pay_label %}{% if option.mode == 'cod' %}Place order · {{ cart.due | money }}{% else %}Pay {{ cart.due | money }}{% case option.mode %}{% when 'upi' %} with UPI{% when 'card' %} by card{% when 'netbanking' %} with net banking{% when 'wallet' %} with a wallet{% when 'emi' %} on EMI{% when 'paylater' %} with Pay later{% when 'paypal' %} with PayPal{% endcase %}{% endif %}{% endcapture %}
+                  {% if forloop.first %}{% assign first_label = pay_label %}{% endif %}
+                  <label class="sys-co__pay">
+                    <input type="radio" name="paymentMethod" value="{{ option.value }}:{{ option.mode }}" data-pay-label="{{ pay_label | strip }}" {% if forloop.first %}checked{% endif %}>
+                    <span class="sys-co__pay-icon">
+                      {% case option.mode %}
+                        {% when 'upi' %}{% render 'snippets/sys-icon', icon: 'upi' %}
+                        {% when 'netbanking' %}{% render 'snippets/sys-icon', icon: 'bank' %}
+                        {% when 'wallet' %}{% render 'snippets/sys-icon', icon: 'wallet' %}
+                        {% when 'emi' %}{% render 'snippets/sys-icon', icon: 'emi' %}
+                        {% when 'paylater' %}{% render 'snippets/sys-icon', icon: 'clock' %}
+                        {% when 'cod' %}{% render 'snippets/sys-icon', icon: 'cash' %}
+                        {% else %}{% render 'snippets/sys-icon', icon: 'card' %}
+                      {% endcase %}
+                    </span>
+                    <span class="sys-co__pay-text">
+                      <strong>{{ option.title }}{% if forloop.first and option.mode == 'upi' %} <em class="sys-co__pick">Fastest</em>{% endif %}</strong>
+                      {% if option.subtitle %}<small>{{ option.subtitle }}</small>{% endif %}
+                      {% if option.badges.size > 0 or option.testMode %}<span class="sys-co__badges">{% for b in option.badges %}<i aria-hidden="true">{{ b }}</i>{% endfor %}{% if option.testMode %}<i class="sys-co__test">Test mode</i>{% endif %}</span>{% endif %}
+                    </span>
+                  </label>
+                {% endfor %}
+              </div>
             {% endif %}
-          </div>
+          </section>
 
-          <button type="submit" class="sys-btn sys-btn--lg sys-btn--block" data-busy-label="Placing your order…">{% if cart.due <= 0 %}Place order{% else %}Place order · {{ cart.due | money }}{% endif %}</button>
-          <p class="sys-small sys-muted" style="text-align:center">By placing your order you agree to {{ shop.name }}'s terms and privacy policy.</p>
+          <div class="sys-co__submit">
+            <button type="submit" class="sys-btn sys-btn--lg sys-btn--block sys-co__cta" data-busy-label="Placing your order…" data-sys-pay-button>
+              {% render 'snippets/sys-icon', icon: 'lock' %} <span data-sys-pay-text>{% if cart.due <= 0 %}Place order{% else %}{{ first_label | strip }}{% endif %}</span>
+            </button>
+            <p class="sys-co__legal">
+              By placing your order you agree to {{ shop.name }}'s
+              {% if shop.policies.size > 0 %}{% for policy in shop.policies %}<a href="{{ policy.url }}" target="_blank" rel="noopener">{{ policy.title }}</a>{% unless forloop.last %}, {% endunless %}{% endfor %}{% else %}terms and privacy policy{% endif %}.
+            </p>
+            <ul class="sys-co__trust" aria-label="Why it's safe">
+              <li>{% render 'snippets/sys-icon', icon: 'shield' %} Secure, encrypted payment</li>
+              {% if shop.return_days > 0 %}<li>{% render 'snippets/sys-icon', icon: 'return' %} {{ shop.return_days }}-day returns</li>{% endif %}
+              <li>{% render 'snippets/sys-icon', icon: 'truck' %} Tracked delivery</li>
+            </ul>
+          </div>
         </form>
 
         <aside class="sys-checkout__aside" aria-label="Order summary">
+          <h2 class="sys-co__aside-title">Order summary</h2>
           {{ summary_items }}
           <div class="sys-stack" style="gap:10px;margin-top:20px">{% render 'snippets/sys-gift-card', back: 'checkout', slot: 'aside' %}</div>
           <div class="sys-stack" style="gap:8px;margin-top:24px">

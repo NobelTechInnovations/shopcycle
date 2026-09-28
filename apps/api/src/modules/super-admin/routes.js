@@ -1,3 +1,4 @@
+const { env } = require("../../config/env");
 const controller = require("./controller");
 const security = require("./security");
 const { overview } = require("./overview");
@@ -35,6 +36,14 @@ const AUDIT_ACTIONS = {
   "PUT /billing/plans/:id/features": "billing.plan_features",
 };
 
+/** Asks the marketing site to show the new prices (fire and forget). */
+function refreshMarketingSite(log) {
+  if (!env.WWW_REVALIDATE_URL || !env.REVALIDATE_SECRET) return;
+  fetch(env.WWW_REVALIDATE_URL, { method: "POST", headers: { authorization: `Bearer ${env.REVALIDATE_SECRET}` }, signal: AbortSignal.timeout(8000) }).catch((err) =>
+    log?.warn({ err: err.message }, "couldn't refresh the marketing site's prices")
+  );
+}
+
 async function superAdminRoutes(fastify) {
   // Its own cookie, not the seller admin's — see authenticateSuperAdmin's
   // doc comment in plugins/jwt-auth.js.
@@ -48,6 +57,8 @@ async function superAdminRoutes(fastify) {
     if (request.method === "GET" || reply.statusCode >= 400) return;
     const route = request.routeOptions?.url?.replace(/^\/api\/super-admin/, "") || request.url;
     if (route.startsWith("/security")) return;
+    // Plans or pricing changed: the marketing site's prices refresh now.
+    if (/^\/(billing\/)?(plans|settings)/.test(route)) refreshMarketingSite(request.log);
     const key = `${request.method} ${route}`;
     await recordAudit(request, {
       scope: "platform",

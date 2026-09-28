@@ -12,6 +12,8 @@ const payments = require("../payments/service");
 const webhooks = require("../developer/webhooks");
 const { storeSettings } = require("../../lib/store-settings");
 const { cancelOrder } = require("../orders/operations");
+const shopperService = require("../shopper/service");
+const shopperPhone = require("../shopper/phone");
 const { REPLACED_REASON } = ordersRepository;
 
 /** What checkout offers: cash on delivery (Settings ▸ Payments) and each
@@ -72,7 +74,7 @@ function applyCheckoutFields(store, input) {
  * (never trusting client-submitted totals) so the price/discount/shipping/
  * tax actually charged is always what the store's current configuration
  * says it should be, not whatever the checkout form happened to render. */
-async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopper = null, log } = {}) {
+async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopper = null, verifiedPhone = null, log } = {}) {
   input = { ...input, email: String(input.email).trim().toLowerCase() };
   if (store) input = applyCheckoutFields(store, input);
   const raw = await cartService.readRaw(prisma, storeId, cartId);
@@ -133,11 +135,23 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
   // A verified sign-in phone (Phone Login) is never replaced by the
   // delivery phone typed here — the order keeps its own copy.
   if (existingCustomer?.phoneVerifiedAt) delete customerFields.phone;
+  // A mobile number confirmed with a code at checkout (One-Click popup),
+  // typed on this order too: this shopper can be signed in — as the new
+  // customer, one with no history yet, or the account that already owns
+  // that verified number. Never into an account with a history of its own.
+  const phoneMatches = verifiedPhone && input.phone && String(input.phone).replace(/\D/g, "").slice(-10) === String(verifiedPhone).slice(-10);
+  const canSignIn =
+    phoneMatches &&
+    !signedIn &&
+    (!existingCustomer ||
+      (existingCustomer.phoneVerifiedAt && String(existingCustomer.phone || "").replace(/\D/g, "").slice(-10) === String(verifiedPhone).slice(-10)) ||
+      (await shopperService.claimable(prisma, existingCustomer)));
   const customer = !existingCustomer
     ? await customersRepository.create(prisma, storeId, { email: input.email, ...customerFields })
-    : (existingCustomer.passwordHash || existingCustomer.phoneVerifiedAt) && !signedIn
+    : (existingCustomer.passwordHash || existingCustomer.phoneVerifiedAt) && !signedIn && !canSignIn
       ? existingCustomer
       : await customersRepository.update(prisma, existingCustomer.id, customerFields);
+  const signIn = canSignIn && store ? await shopperPhone.link(prisma, store, customer, verifiedPhone, input.shippingName) : null;
 
   const orderItems = cart.items.map((item) => ({
     productId: item.productId,
@@ -172,7 +186,7 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     sessionId: session?.id || null,
     giftCardAmount: giftCard?.amount || 0,
     giftCardId: giftCard?.id || null,
-    placedSignedIn: signedIn,
+    placedSignedIn: signedIn || Boolean(signIn),
     ...(due <= 0 && { paymentStatus: "paid" }),
     // Oyklane's fee terms for this order, fixed now (billing/commission.js).
     ...(await feeSnapshot(prisma, storeId, { oneClick: Boolean(input.oneClick) })),
@@ -241,6 +255,7 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
       amount: due,
       store: store || (await prisma.store.findUnique({ where: { id: storeId } })),
       urls: returnUrls(input.returnBase, input.paymentMethod, order.id),
+      mode: input.payMode,
     });
     const { ref, ...instruction } = started;
     payment = { provider: input.paymentMethod, ...instruction };
@@ -251,7 +266,7 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     // The cart stays until the payment is confirmed; remember which order
     // it's paying for, so a retry replaces it (see replacePendingOrder).
     await cartService.setPendingOrder(prisma, storeId, cartId, order.id);
-    if (started.kind === "razorpay") razorpay = { orderId: started.orderId, amount: started.amount, currency: started.currency, keyId: started.keyId };
+    if (started.kind === "razorpay") razorpay = { orderId: started.orderId, amount: started.amount, currency: started.currency, keyId: started.keyId, method: started.method };
   }
 
   // Cash on delivery (or a gift card) is fully placed: the cart's job is
@@ -269,7 +284,7 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
 
   webhooks.emit(prisma, storeId, "order.created", { id: order.id });
   if (input.paymentMethod === "gift_card") webhooks.emit(prisma, storeId, "order.paid", { id: order.id });
-  return { order, razorpay, payment };
+  return { order, razorpay, payment, signIn };
 }
 
 /** Cancels the cart's earlier online order if it's still unpaid (it may

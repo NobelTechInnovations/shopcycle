@@ -7,18 +7,18 @@ const FALLBACK = {
   introPrice: 99,
   annualDiscountPercent: 20,
   plans: [
-    { key: "starter", name: "Starter", tagline: "Everything to open your store.", priceMonthly: 199, priceYearly: 1910, commissionPercent: 2, staffLimit: 2, features: [] },
-    { key: "growth", name: "Growth", tagline: "Marketing, reports and GST invoices for a growing brand.", priceMonthly: 599, priceYearly: 5750, commissionPercent: 1.5, staffLimit: 10, features: [] },
-    { key: "pro", name: "Pro", tagline: "The lowest fees, API access and priority support.", priceMonthly: 1299, priceYearly: 12470, commissionPercent: 0.5, staffLimit: 30, features: [] },
+    { key: "starter", name: "Starter", tagline: "Everything to open your store.", priceMonthly: 599, priceYearly: 5750.4, commissionPercent: 2, staffLimit: 2, features: [] },
+    { key: "growth", name: "Growth", tagline: "Marketing, reports and GST invoices for a growing brand.", priceMonthly: 1199, priceYearly: 11510.4, commissionPercent: 1.5, staffLimit: 10, features: [] },
+    { key: "pro", name: "Pro", tagline: "The lowest fees, API access and priority support.", priceMonthly: 1999, priceYearly: 19190.4, commissionPercent: 0.5, staffLimit: 30, features: [] },
   ],
 };
 
 /** The plans exactly as Super admin ▸ Plans has them (the public sign-up
- * endpoint), refreshed every 10 minutes — the page never shows a stale price
- * for long, and never waits on the API per visit. */
+ * endpoint), refreshed every minute — and at once when Super admin saves a
+ * plan (app/api/revalidate). The page never waits on the API per visit. */
 export async function getPlans() {
   try {
-    const res = await fetch(`${API_URL}/api/auth/plans`, { next: { revalidate: 600 } });
+    const res = await fetch(`${API_URL}/api/auth/plans`, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(String(res.status));
     const data = await res.json();
     if (!data?.plans?.length) throw new Error("no plans");

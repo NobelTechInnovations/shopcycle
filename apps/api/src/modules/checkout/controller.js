@@ -3,6 +3,7 @@ const { checkoutSchema, verifyRazorpayPaymentSchema } = require("@shopcycle/vali
 const storefrontService = require("../storefront/service");
 const service = require("./service");
 const shopperService = require("../shopper/service");
+const shopperPhone = require("../shopper/phone");
 
 async function getHandler(request, reply) {
   const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
@@ -14,12 +15,21 @@ async function placeOrderHandler(request, reply) {
   const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
   const body = checkoutSchema.parse(request.body);
   const shopper = await shopperService.customerFromToken(request.server, store, request.headers["x-shopper-token"]);
-  const result = await service.placeOrder(request.server.prisma, store.id, body.cartId, store.handle, body, {
+  // A number confirmed with a code in the One-Click popup: the order links
+  // it to its shopper and signs them in (the storefront sets the session).
+  let verifiedPhone = null;
+  if (body.phoneTicket) {
+    try {
+      verifiedPhone = shopperPhone.readTicket(request.server, store, body.phoneTicket);
+    } catch {}
+  }
+  const { signIn, ...result } = await service.placeOrder(request.server.prisma, store.id, body.cartId, store.handle, body, {
     store,
     shopper,
+    verifiedPhone,
     log: request.log,
   });
-  reply.code(201).send(result);
+  reply.code(201).send(signIn ? { ...result, session: shopperService.signSession(request.server, store, signIn, "phone") } : result);
 }
 
 /** Back from a gateway (the storefront's /checkout/return/:provider). */

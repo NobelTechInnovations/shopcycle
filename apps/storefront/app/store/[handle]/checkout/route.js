@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { proxyRender, API_URL, CART_COOKIE, VISITOR_COOKIE } from "@/lib/render";
 import { storefrontPath } from "@/lib/domain";
-import { shopperToken } from "@/lib/shopper";
+import { shopperToken, setShopperCookie, clearCookie, PHONE_TICKET_COOKIE } from "@/lib/shopper";
 import { storeBase, gatewayHandoff, safeReturnPath, retryUrl, ONE_CLICK_RETURN_COOKIE } from "@/lib/payments";
 
 export async function GET(request, { params }) {
@@ -41,9 +41,15 @@ export async function POST(request, { params }) {
     shippingProvince: form.get("shippingProvince"),
     shippingZip: form.get("shippingZip"),
     shippingCountry: form.get("shippingCountry"),
-    paymentMethod: form.get("paymentMethod") || "cod",
+    // The checkout page sends "gateway:method" (e.g. "razorpay:upi"); the
+    // One-Click popup sends the two separately.
+    paymentMethod: String(form.get("paymentMethod") || "cod").split(":")[0],
+    payMode: form.get("payMode") || String(form.get("paymentMethod") || "").split(":")[1] || undefined,
     acceptsMarketing: form.get("acceptsMarketing") === "true",
     oneClick: form.get("oneClick") === "1",
+    // The popup's "number confirmed" ticket (HttpOnly cookie): the order
+    // links the number to its shopper and signs them in.
+    ...(form.get("oneClick") === "1" && cookieStore.get(PHONE_TICKET_COOKIE)?.value && { phoneTicket: cookieStore.get(PHONE_TICKET_COOKIE).value }),
     // Where a payment gateway sends the shopper back — the address they're
     // shopping on right now.
     returnBase: storeBase(request, handle),
@@ -77,8 +83,16 @@ export async function POST(request, { params }) {
     return NextResponse.redirect(target, { status: 303 });
   }
 
-  const { order, razorpay, payment } = result;
+  const { order, razorpay, payment, session } = result;
+  const signIn = (response) => {
+    if (session) {
+      setShopperCookie(response, request, handle, session);
+      clearCookie(response, request, handle, PHONE_TICKET_COOKIE);
+    }
+    return response;
+  };
   const remember = (response) => {
+    signIn(response);
     if (oneClickFrom) response.cookies.set(ONE_CLICK_RETURN_COOKIE, oneClickFrom, { path: "/", httpOnly: true, sameSite: "lax", maxAge: 60 * 60 });
     else response.cookies.set(ONE_CLICK_RETURN_COOKIE, "", { path: "/", maxAge: 0 });
     return response;
@@ -102,6 +116,7 @@ export async function POST(request, { params }) {
     target.searchParams.set("rzpOrderId", razorpay.orderId);
     target.searchParams.set("amount", String(razorpay.amount));
     target.searchParams.set("key", razorpay.keyId);
+    if (razorpay.method) target.searchParams.set("method", razorpay.method);
     if (oneClickFrom) target.searchParams.set("back", oneClickFrom);
     // Razorpay's window: the cart stays until the payment is verified.
     return remember(NextResponse.redirect(target, { status: 303 }));
@@ -110,7 +125,7 @@ export async function POST(request, { params }) {
     target.searchParams.set("order", order.id);
   }
 
-  const response = NextResponse.redirect(target, { status: 303 });
+  const response = signIn(NextResponse.redirect(target, { status: 303 }));
   // Cash on delivery (or a gift card): the order is fully placed — the
   // cart's job is done, clear its cookie too so a shopper who navigates
   // back to the cart sees it empty rather than a cart the server has

@@ -164,4 +164,4 @@ async function completeSignup(fastify, store, { ticket, name, email: rawEmail, c
   return { customer: await link(prisma, store, verified, phone, cleanName) };
 }
 
-module.exports = { config, liveChannels, parsePhone, display, requestCode, verifyCode, checkCode, verifiedCustomer, signupTicket, completeSignup, APP_KEY };
+module.exports = { config, liveChannels, parsePhone, display, requestCode, verifyCode, checkCode, verifiedCustomer, signupTicket, readTicket, link, completeSignup, APP_KEY };

@@ -21,6 +21,8 @@ const checkoutSchema = z.object({
   // "gift_card" only when a gift card covers the whole order — the API
   // decides that from the cart, whatever the form says.
   paymentMethod: z.enum(["cod", "gift_card", "razorpay", "cashfree", "payu", "stripe", "paypal"]).default("cod"),
+  // The way to pay the shopper picked (UPI, card, …): the gateway opens on it.
+  payMode: z.enum(["upi", "card", "netbanking", "wallet", "emi", "paylater", "paypal", "cod"]).optional().catch(undefined),
   // The storefront address the shopper is on — where a gateway sends them
   // back after paying (…/checkout/return/:provider).
   returnBase: z.string().url().max(500).optional(),
@@ -29,6 +31,9 @@ const checkoutSchema = z.object({
   // Placed through the One-Click Checkout popup (the app must be
   // installed — the API checks; the order records it and its fee).
   oneClick: z.boolean().default(false),
+  // Proof the shopper confirmed this mobile number with a code in the
+  // One-Click popup (a signed, short-lived ticket; the API checks it).
+  phoneTicket: z.string().max(4000).optional(),
 });
 
 const verifyRazorpayPaymentSchema = z.object({
