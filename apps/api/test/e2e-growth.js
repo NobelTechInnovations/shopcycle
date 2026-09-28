@@ -167,7 +167,7 @@ async function main() {
 
     // An empty store's home page still shows product slots (example cards).
     r = await sf("GET", `/api/storefront/${H}/render/index`);
-    check("empty store home shows placeholder illustrations", r.status === 200 && String(r.data).includes("placeholder-svg"), String(r.data).slice(0, 200));
+    check("empty store home shows placeholder illustrations", r.status === 200 && String(r.data).includes("placeholder-svg"), typeof r.data === "string" ? r.data.slice(0, 200) : { status: r.status, data: r.data });
     check("cart drawer is on by default (config on the page)", String(r.data).includes('id="oy-cart-config"') && String(r.data).includes("cart-drawer.js"));
     r = await sf("GET", `/api/storefront/${H}/render/cart`);
     check("no cart drawer on the cart page itself", !String(r.data).includes('id="oy-cart-config"'));
@@ -383,7 +383,7 @@ async function main() {
     check("gateway keys are stored encrypted", storedGateway.credentials.startsWith("enc:v1:") && !storedGateway.credentials.includes("sk_test_ok"));
     const viewCart = await freshCart(1);
     r = await sf("GET", `/api/storefront/${H}/render/checkout?cartId=${viewCart}`);
-    check("checkout offers the connected gateway", String(r.data).includes('value="stripe"'), String(r.data).match(/name="paymentMethod"[^>]*>/g));
+    check("checkout offers the connected gateway", String(r.data).includes('value="stripe:card"'), String(r.data).match(/name="paymentMethod"[^>]*>/g));
 
     const RB = "https://shop.example.test";
     cartId = await freshCart(1);
