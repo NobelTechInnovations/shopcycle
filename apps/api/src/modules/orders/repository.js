@@ -1,3 +1,5 @@
+const { PLACED } = require("./placed");
+
 const include = {
   customer: true,
   items: true,
@@ -18,12 +20,11 @@ function searchFilter(q) {
 }
 
 /** Set on an unpaid online order that was replaced when its shopper
- * checked out again from the same cart (checkout/service.js). Not a real
- * sale, so "All" leaves it out; "Cancelled" still lists it. */
+ * checked out again from the same cart (checkout/service.js). */
 const REPLACED_REASON = "Payment not completed — the customer checked out again";
 
 const STATUS_FILTERS = {
-  all: { AND: [{ OR: [{ cancelReason: null }, { cancelReason: { not: REPLACED_REASON } }] }] },
+  all: {},
   unfulfilled: { fulfillmentStatus: { in: ["unfulfilled", "partially_fulfilled"] } },
   fulfilled: { fulfillmentStatus: "fulfilled" },
   cancelled: { fulfillmentStatus: "cancelled" },
@@ -31,10 +32,10 @@ const STATUS_FILTERS = {
 };
 
 function list(prisma, storeId, { status, q, page, pageSize }) {
+  // Unpaid online checkouts never show here (orders/placed.js).
   const where = {
     storeId,
-    ...STATUS_FILTERS[status],
-    ...searchFilter(q),
+    AND: [PLACED, STATUS_FILTERS[status] || {}, searchFilter(q) || {}],
   };
 
   return Promise.all([

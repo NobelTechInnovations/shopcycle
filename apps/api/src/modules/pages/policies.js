@@ -56,6 +56,8 @@ function template(key, store) {
 <ul><li>To process, deliver and support your orders</li><li>To send order updates by email, SMS or WhatsApp</li><li>To send offers — only if you've agreed to receive them; you can unsubscribe any time</li><li>To keep our store secure and improve it</li></ul>
 <h2>Sharing</h2>
 <p>We share only what's needed with the partners who help us run the store — our e-commerce platform, payment gateways, couriers and messaging providers. We don't sell your personal information.</p>
+<h2>Faster checkout</h2>
+<p>Our store runs on Oyklane. When you confirm your mobile number with a one-time code at checkout, the delivery addresses you've used with that number on other stores on Oyklane may be offered to you, so you don't have to type them again. They're shown only to you, and we receive one only if you choose it for your order.</p>
 <h2>Cookies</h2>
 <p>We use cookies to keep your cart and sign-in working and, if enabled, to measure visits and ads.</p>
 <h2>Your choices</h2>

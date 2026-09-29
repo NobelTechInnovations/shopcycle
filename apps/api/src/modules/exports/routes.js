@@ -1,3 +1,4 @@
+const { PLACED } = require("../orders/placed");
 const { z } = require("zod");
 const { HttpError, slugify } = require("@shopcycle/utils");
 const entitlements = require("../billing/entitlements");
@@ -115,7 +116,7 @@ async function exportProducts(prisma, storeId) {
 
 async function exportOrders(prisma, storeId) {
   const orders = await prisma.order.findMany({
-    where: { storeId },
+    where: { storeId, ...PLACED },
     include: { items: true, customer: { select: { name: true } } },
     orderBy: { orderNumber: "asc" },
   });

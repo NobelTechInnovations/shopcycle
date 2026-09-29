@@ -14,6 +14,7 @@ const { storeSettings } = require("../../lib/store-settings");
 const { cancelOrder } = require("../orders/operations");
 const shopperService = require("../shopper/service");
 const shopperPhone = require("../shopper/phone");
+const abandoned = require("./abandoned");
 const { REPLACED_REASON } = ordersRepository;
 
 /** What checkout offers: cash on delivery (Settings ▸ Payments) and each
@@ -266,6 +267,10 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     // The cart stays until the payment is confirmed; remember which order
     // it's paying for, so a retry replaces it (see replacePendingOrder).
     await cartService.setPendingOrder(prisma, storeId, cartId, order.id);
+    // Until it's paid it isn't an order (orders/placed.js): if the shopper
+    // doesn't finish paying, this cart is what shows — under Abandoned
+    // checkouts, with who they are, and gets the one reminder.
+    if (store) await abandoned.captureContact(prisma, store, { cartId, email: input.email, name: input.shippingName }).catch(() => {});
     if (started.kind === "razorpay") razorpay = { orderId: started.orderId, amount: started.amount, currency: started.currency, keyId: started.keyId, method: started.method };
   }
 
@@ -335,6 +340,9 @@ async function confirmPayment(prisma, store, { orderId, provider, params, cartId
   if (!result.paid) return { paid: false, order, message: result.message || "The payment wasn't completed." };
   const paid = await markOnlinePaid(prisma, order, { providerName: gateway.provider.name, reference: result.reference, log });
   if (cartId) await cartService.clearCart(prisma, store.id, cartId).catch(() => {});
+  // A gateway that posts back from its own site (PayU) arrives without the
+  // shopper's cookies, so also clear the cart that was paying for this order.
+  await prisma.cartSession.deleteMany({ where: { storeId: store.id, data: { path: ["pendingOrderId"], equals: order.id } } }).catch(() => {});
   return { paid: true, order: paid };
 }
 

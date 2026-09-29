@@ -1,3 +1,4 @@
+const { PLACED } = require("../orders/placed");
 const platformCustomersService = require("../platform-customers/service");
 const webhooks = require("../developer/webhooks");
 const { SPEND_ORDER_SELECT } = require("./spend");
@@ -11,7 +12,7 @@ function list(prisma, storeId, { q, page, pageSize }) {
   return Promise.all([
     prisma.customer.findMany({
       where,
-      include: { orders: { select: SPEND_ORDER_SELECT } },
+      include: { orders: { where: PLACED, select: SPEND_ORDER_SELECT } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -23,7 +24,7 @@ function list(prisma, storeId, { q, page, pageSize }) {
 function findById(prisma, storeId, id) {
   return prisma.customer.findFirst({
     where: { id, storeId },
-    include: { orders: { orderBy: { createdAt: "desc" } } },
+    include: { orders: { where: PLACED, orderBy: { createdAt: "desc" } } },
   });
 }
 

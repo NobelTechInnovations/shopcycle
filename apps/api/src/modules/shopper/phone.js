@@ -29,7 +29,10 @@ async function config(prisma, store) {
   if (!install) return { enabled: false, channels: [] };
   const setting = install.settings?.channel;
   const wanted = setting === "whatsapp" ? ["whatsapp"] : setting === "both" ? ["sms", "whatsapp"] : ["sms"];
-  const channels = liveChannels(wanted);
+  // The chosen channel may not be set up on the platform (SMS with only a
+  // WhatsApp provider, say): then codes go by whichever channel is.
+  const chosen = liveChannels(wanted);
+  const channels = chosen.length ? chosen : liveChannels();
   return { enabled: channels.length > 0, channels };
 }
 

@@ -61,6 +61,7 @@ export default function AbandonedCheckoutsPage() {
         <div className="min-w-0">
           <div className="font-medium text-ink truncate">{row.name || row.email}</div>
           {row.name && <div className="text-xs text-ink-muted truncate">{row.email}</div>}
+          {row.paymentAttempted && <div className="text-xs text-status-warning">Online payment not completed</div>}
         </div>
       ),
     },

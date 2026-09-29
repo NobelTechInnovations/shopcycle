@@ -70,6 +70,8 @@ async function listAbandonedCheckouts(prisma, store, { page = 1, pageSize = 20 }
       updatedAt: row.updatedAt,
       reminderSentAt: row.reminderSentAt,
       recoveredAt: row.recoveredAt,
+      // They got as far as paying online, and the payment didn't finish.
+      paymentAttempted: Boolean(row.data?.pendingOrderId),
       itemCount: cart.item_count,
       items: cart.items.map((i) => ({ title: i.title, quantity: i.quantity, image: i.image, lineTotal: i.lineTotal })),
       subtotal: cart.subtotal,

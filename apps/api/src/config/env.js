@@ -344,6 +344,18 @@ if (parsed.data.BILLING_SANDBOX && parsed.data.NODE_ENV === "production") {
       console.warn(`${key} is ${d[key]} — the real ${key.replace(/_ORIGIN$/, "").toLowerCase().replace(/_/g, " ")} app can't call this API until it's set to its https:// address.`);
     }
   }
+  // One-time codes (Phone Login, One-Click Checkout) need a working SMS or
+  // WhatsApp provider; a half-set one is silently treated as "none".
+  if (d.NODE_ENV === "production") {
+    const zohoKey = d.ZEPTOMAIL_TOKEN || d.ZOHO_CPAAS_TOKEN;
+    if (d.WHATSAPP_PROVIDER === "zoho" && !(zohoKey && d.ZOHO_WHATSAPP_FROM)) {
+      console.warn("WHATSAPP_PROVIDER is zoho but ZOHO_CPAAS_TOKEN or ZOHO_WHATSAPP_FROM is missing — WhatsApp codes are off.");
+    }
+    // The code template itself is set in Super admin ▸ Messaging (or ZOHO_WHATSAPP_TEMPLATE_KEY).
+    const anySms = d.SMS_PROVIDER || d.MSG91_AUTH_KEY || d.TWILIO_ACCOUNT_SID;
+    const anyWhatsapp = d.WHATSAPP_PROVIDER || d.ZOHO_WHATSAPP_TEMPLATE_KEY || d.META_WHATSAPP_TOKEN || d.TWILIO_WHATSAPP_FROM;
+    if (!anySms && !anyWhatsapp) console.warn("No SMS or WhatsApp provider set — Phone Login and One-Click Checkout can't send codes.");
+  }
 }
 
 module.exports = { env: parsed.data, isInfraDomain };

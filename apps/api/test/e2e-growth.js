@@ -444,7 +444,28 @@ async function main() {
     r = await owner("GET", "/api/orders?status=all&pageSize=50");
     check("…All orders shows one order, not two", r.data.orders.some((o) => o.id === secondTry.id) && !r.data.orders.some((o) => o.id === firstTry.id), r.data.orders?.map((o) => o.orderNumber));
     r = await owner("GET", "/api/orders?status=cancelled&pageSize=50");
-    check("…the replaced try is still under Cancelled", r.data.orders.some((o) => o.id === firstTry.id));
+    check("…nor under Cancelled — an unpaid online try was never an order", !r.data.orders.some((o) => o.id === firstTry.id));
+
+    // An online payment that isn't finished: not in Orders, but the cart is
+    // an abandoned checkout (with who it was); paying makes it an order.
+    const abCart = await freshCart(1);
+    const abEmail = `unpaid-${stamp}@test.oyklane.dev`;
+    r = await sf("POST", `/api/storefront/${H}/checkout`, { cartId: abCart, email: abEmail, ...SHIP, paymentMethod: "cashfree", returnBase: RB });
+    const unpaid = r.data.order;
+    r = await owner("GET", "/api/orders?status=all&pageSize=50");
+    check("an unpaid online order isn't in Orders", !r.data.orders.some((o) => o.id === unpaid.id));
+    r = await owner("GET", "/api/orders?status=unpaid&pageSize=50");
+    check("…not even under Unpaid (that's cash on delivery)", !r.data.orders.some((o) => o.id === unpaid.id));
+    r = await owner("GET", "/api/orders/abandoned");
+    const ab = (r.data.checkouts || []).find((c) => c.email === abEmail);
+    check("…its cart is an abandoned checkout, marked payment not completed", ab && ab.paymentAttempted === true, r.data.checkouts?.map((c) => c.email));
+    await fetch(`${MOCK}/__pay/cashfree/oy_${unpaid.id}`, { method: "POST" });
+    r = await sf("POST", `/api/storefront/${H}/checkout/payments/cashfree/confirm`, { orderId: unpaid.id, params: { order_id: `oy_${unpaid.id}` } });
+    check("paid (a return without the shopper's cookies, like PayU's)", r.data.paid === true, r.data);
+    r = await owner("GET", "/api/orders?status=all&pageSize=50");
+    check("…now it's in Orders", r.data.orders.some((o) => o.id === unpaid.id));
+    r = await owner("GET", "/api/orders/abandoned");
+    check("…and no longer an abandoned checkout", !(r.data.checkouts || []).some((c) => c.email === abEmail));
 
     // Ways to pay: one per method the gateways offer, and the chosen one
     // reaches the gateway.

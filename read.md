@@ -205,10 +205,21 @@ Local `.env` points at the **production** Supabase database, so every local writ
 - **Marketing site plans**: refreshed every minute, and at once when Super admin saves a plan if `WWW_REVALIDATE_URL` (e.g. `https://oyklane.com/api/revalidate`) and `REVALIDATE_SECRET` (same value on the API and the www project) are set.
 - Local dev tip: `.env` now has Zoho WhatsApp keys, so a local API would send **real** WhatsApp codes. Run it with `EMAIL_PROVIDER=log SMS_PROVIDER=log WHATSAPP_PROVIDER=log` when testing with made-up numbers (the e2e tests already force this).
 
+### Done 29 Sep (NOT committed yet)
+
+- **Why codes weren't sent in production**: Railway has `WHATSAPP_PROVIDER=zoho`, `ZOHO_CPAAS_TOKEN`, `ZOHO_WHATSAPP_FROM` but not `ZOHO_WHATSAPP_TEMPLATE_KEY`, so WhatsApp counted as "not set up" → Phone Login off (email sign-in showed) and the One-Click popup skipped the code. The API now warns about this at start-up. Also: Phone Login set to SMS with only WhatsApp working now falls back to WhatsApp instead of switching off.
+- **Unpaid online orders are not orders**: an online checkout whose payment didn't finish is left out of Orders (every tab), Home, analytics, exports, customer totals and the shopper's account (`orders/placed.js`); its cart shows under Abandoned checkouts ("Online payment not completed") and gets the reminder. Paying later turns it into an order and removes the abandoned checkout.
+- **PayU cancel → back to where they were**: PayU returns with a cross-site POST, which carries no cookies, so the return route couldn't tell where the shopper started and fell back to the checkout page. It now checks the payment and bounces to a same-site GET that does have the cookies → back to the page with the popup reopened.
+- **One-Click everywhere**: the popup script loads on every page but checkout whenever the app is on (also the cart page, and themes set to the full cart page); any "Checkout" link opens the popup.
+- **Saved addresses across Oyklane stores**: a shopper new to a store who confirms their number sees the addresses they used on other Oyklane stores (marked as such). The privacy policy template says so — stores that already created their policy should add that paragraph.
+- **Payment brand marks** (Google Pay, PhonePe, Paytm, Visa, Mastercard, Amex, Amazon Pay, PayPal from Simple Icons, CC0; UPI and RuPay as text marks) in the popup and on the checkout page.
+- **Super admin ▸ Messaging** (`lib/whatsapp-templates.js`, `super-admin/messaging.js`): the WhatsApp templates every store shares live in `platform_settings` (key `whatsapp_templates`), not in Railway. Only the **verification code** is wired: Zoho template key, the name of its code placeholder, on/off, "Send test code", and the last ten WhatsApp messages. Railway keeps just the account (`ZOHO_CPAAS_TOKEN`) and the number (`ZOHO_WHATSAPP_FROM`); `ZOHO_WHATSAPP_TEMPLATE_KEY` is only a fallback while the field is empty. Changes reach every API instance within a minute. ⚠️ Local dev shares the production database: saving there changes production.
+- **Order / shipped / delivered WhatsApp messages are not built yet.** The owner decided they're a paid feature of the **Phone Login app (₹299)**, not free — add them as new types in `whatsapp-templates.js` TYPES and send them only for stores with that app installed.
+
 ### Left to do
 
 0. **Production email**: Railway blocks SMTP (outbound SMTP needs Railway Pro). Set `EMAIL_PROVIDER=zeptomail` and `ZEPTOMAIL_TOKEN=<ZeptoMail ▸ Mail Agents ▸ SMTP/API ▸ API ▸ Send Mail Token>` on Railway. The SMTP username/password in `.env` are not that token.
-1. **Commit and deploy** this work (owner decides).
+1. **Commit and deploy** this work (owner decides). Then in Super admin ▸ Messaging enter the approved Zoho **OTP template key** (and its placeholder name), Save, and "Send test code" to your own number — until then production WhatsApp codes stay off.
 2. **Keys for the new providers** (see `.env.example`): `IMAGEKIT_*`, `GOOGLE_CLIENT_ID/SECRET` (+ both redirect URIs), `TWILIO_*` / `MSG91_*` / `META_WHATSAPP_*`, optionally `EMAIL_PROVIDER=zeptomail` + `ZEPTOMAIL_TOKEN`. Storefront (Vercel) needs `API_PUBLIC_URL` (or its `API_INTERNAL_URL` must be the public https API).
 2b. **ImageKit isn't live yet**: the code is in, but Railway has no `IMAGEKIT_PUBLIC_KEY` / `IMAGEKIT_PRIVATE_KEY` / `IMAGEKIT_URL_ENDPOINT`, so uploads still go to the database until those are set.
 3. India SMS needs **DLT registration** (MSG91 or Twilio) before real OTPs deliver.

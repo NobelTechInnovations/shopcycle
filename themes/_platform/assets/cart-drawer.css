@@ -996,6 +996,12 @@ html.oy-1c-open {
   color: var(--oy-text, #111);
   margin-bottom: 2px;
 }
+.oy-1c__net {
+  margin-top: 4px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--oy-muted, #777);
+}
 .oy-1c__add {
   display: flex;
   align-items: center;
@@ -1202,4 +1208,49 @@ html.oy-1c-open {
   .oy-1c__panel {
     transition: none;
   }
+}
+
+/* Payment brand marks */
+.oy-1c__badges .oy-1c__brand-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px 2px 5px;
+  border: 1px solid var(--oy-line, #e4e4e4);
+  border-radius: 6px;
+  background: var(--oy-bg, #fff);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--oy-muted, #555);
+  white-space: nowrap;
+}
+.oy-1c__badges .oy-1c__brand-chip svg {
+  flex: none;
+}
+.oy-mark {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.oy-mark--upi {
+  color: #097939;
+}
+.oy-mark--upi::after {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 2px;
+  border-left: 5px solid #ed752e;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  vertical-align: 0;
+}
+.oy-mark--rupay {
+  color: #1c3a78;
+}
+.oy-1c__opt-icon .oy-mark {
+  font-size: 13px;
 }

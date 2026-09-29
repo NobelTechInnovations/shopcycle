@@ -27,6 +27,7 @@ const { esc } = require("../../emails/templates");
 const { storeSettings } = require("../../lib/store-settings");
 const messaging = require("../../lib/messaging");
 const pagePolicies = require("../pages/policies");
+const { PLACED } = require("../orders/placed");
 const { INDIAN_STATES } = require("../../lib/indian-states");
 const blogService = require("../blog/service");
 const platform = require("./platform");
@@ -184,7 +185,8 @@ function loginPopupConfig(ctx, customer, store, routes, templateName) {
   const app = ctx.apps?.["phone-login"];
   if (!app || customer || templateName === "account-login") return null;
   const setting = app.channel;
-  const channels = shopperPhone.liveChannels(setting === "whatsapp" ? ["whatsapp"] : setting === "both" ? ["sms", "whatsapp"] : ["sms"]);
+  const chosen = shopperPhone.liveChannels(setting === "whatsapp" ? ["whatsapp"] : setting === "both" ? ["sms", "whatsapp"] : ["sms"]);
+  const channels = chosen.length ? chosen : shopperPhone.liveChannels();
   if (!channels.length) return null;
   return {
     storeName: store.name,
@@ -840,7 +842,7 @@ async function renderPage(
       ? (await prisma.$queryRaw`SELECT "id" FROM orders WHERE "storeId" = ${store.id} AND right(regexp_replace(coalesce("phone", ''), '\\D', '', 'g'), 10) = ${last10} LIMIT 200`).map((r) => r.id)
       : [];
     const orders = await prisma.order.findMany({
-      where: { storeId: store.id, OR: [...byEmail, ...(byPhone.length ? [{ id: { in: byPhone } }] : [])] },
+      where: { storeId: store.id, ...PLACED, OR: [...byEmail, ...(byPhone.length ? [{ id: { in: byPhone } }] : [])] },
       include: FULL_INCLUDE,
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -917,7 +919,13 @@ async function renderPage(
 
   // Head: design tokens from the theme's settings, the platform
   // stylesheet (platform pages), and search/social tags.
-  const drawer = platform.cartDrawerOn(themeSettings, templateName)
+  // The cart drawer (the theme's "Cart type"), and the One-Click popup —
+  // which runs from the same script on every page but checkout, so a
+  // store whose theme uses the full cart page still gets the popup
+  // (drawerOff: only its checkout links are taken over).
+  const drawerOn = platform.cartDrawerOn(themeSettings, templateName);
+  const oneClick = templateName !== "checkout" ? oneClickConfig(globalContext, customer, store) : null;
+  const drawer = drawerOn || oneClick
     ? {
         add: routes.cart_add_url,
         update: routes.cart_update_url,
@@ -928,7 +936,8 @@ async function renderPage(
         root: routes.root_url,
         currency: store.currency,
         freeShippingAbove: globalContext.shop.free_shipping_above,
-        oneClick: oneClickConfig(globalContext, customer, store),
+        oneClick,
+        drawerOff: !drawerOn,
       }
     : null;
   const login = loginPopupConfig(globalContext, customer, store, routes, templateName);

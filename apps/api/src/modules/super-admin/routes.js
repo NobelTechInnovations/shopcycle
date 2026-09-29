@@ -4,6 +4,7 @@ const security = require("./security");
 const { overview } = require("./overview");
 const { recordAudit } = require("../../lib/audit");
 const billingAdmin = require("./billing");
+const messagingAdmin = require("./messaging");
 
 // Human-readable audit action names for platform mutations. Anything
 // mutating that isn't listed still gets logged, under "METHOD /route" — a
@@ -34,6 +35,8 @@ const AUDIT_ACTIONS = {
   "PATCH /billing/settings": "billing.settings",
   "PATCH /billing/plans/:id": "billing.plan_update",
   "PUT /billing/plans/:id/features": "billing.plan_features",
+  "PUT /messaging/templates": "messaging.templates",
+  "POST /messaging/test": "messaging.test_send",
 };
 
 /** Asks the marketing site to show the new prices (fire and forget). */
@@ -82,6 +85,9 @@ async function superAdminRoutes(fastify) {
 
   // Billing engine controls (billing/admin.js).
   fastify.register(billingAdmin, { prefix: "/billing" });
+
+  // WhatsApp templates shared by every store (messaging.js).
+  fastify.register(messagingAdmin, { prefix: "/messaging" });
 
   fastify.get("/apps", controller.listAppsHandler);
   fastify.post("/apps", controller.createAppHandler);

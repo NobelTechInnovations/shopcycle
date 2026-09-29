@@ -131,7 +131,7 @@ const OPTION_TEXT = {
   upi: { title: "UPI", subtitle: "Google Pay, PhonePe, Paytm or any UPI app", badges: ["GPay", "PhonePe", "Paytm"] },
   card: { title: "Credit or debit card", subtitle: "Visa, Mastercard, RuPay", badges: ["VISA", "Mastercard", "RuPay"] },
   netbanking: { title: "Net banking", subtitle: "All major Indian banks", badges: [] },
-  wallet: { title: "Wallets", subtitle: "Paytm, PhonePe, Amazon Pay and more", badges: [] },
+  wallet: { title: "Wallets", subtitle: "Paytm, PhonePe, Amazon Pay and more", badges: ["Paytm", "PhonePe", "Amazon Pay"] },
   emi: { title: "EMI", subtitle: "Easy instalments on cards", badges: [] },
   paylater: { title: "Pay later", subtitle: "Simpl, LazyPay and more", badges: [] },
   paypal: { title: "PayPal", subtitle: "PayPal balance or card", badges: ["PayPal"] },
@@ -163,7 +163,7 @@ async function checkoutOptions(prisma, store, { log } = {}) {
     const modes = saved?.modes?.length ? saved.modes : methods.DEFAULTS[r.provider] || [];
     for (const mode of modes) if (!byMode.has(mode)) byMode.set(mode, { value: r.provider, mode, testMode: r.testMode, gateway: PROVIDERS[r.provider].name });
   }
-  const options = methods.MODES.filter((m) => byMode.has(m)).map((m) => ({ ...byMode.get(m), ...OPTION_TEXT[m], ...(m === "card" && byMode.get(m).value === "stripe" && { subtitle: "Visa, Mastercard, Amex" }) }));
+  const options = methods.MODES.filter((m) => byMode.has(m)).map((m) => ({ ...byMode.get(m), ...OPTION_TEXT[m], ...(m === "card" && byMode.get(m).value === "stripe" && { subtitle: "Visa, Mastercard, Amex", badges: ["VISA", "Mastercard", "Amex"] }) }));
   if (codEnabled(store)) options.push({ value: "cod", mode: "cod", testMode: false, gateway: null, ...OPTION_TEXT.cod });
   return options;
 }

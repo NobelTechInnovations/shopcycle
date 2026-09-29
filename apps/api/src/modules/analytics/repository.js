@@ -1,3 +1,4 @@
+const { PLACED, PROVIDER_KEYS } = require("../orders/placed");
 function findSession(prisma, storeId, id) {
   return prisma.visitorSession.findFirst({ where: { id, storeId } });
 }
@@ -85,12 +86,14 @@ async function pageViewsPerDay(prisma, storeId, from, to, tz = "Asia/Kolkata") {
   return dayRows(rows);
 }
 
-/** Orders and sales per day — cancelled orders don't count as sales. */
+/** Orders and sales per day — cancelled orders, and online checkouts that
+ * were never paid (orders/placed.js), don't count as sales. */
 async function salesPerDay(prisma, storeId, from, to, tz = "Asia/Kolkata") {
   const rows = await prisma.$queryRaw`
     SELECT (("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz})::date as date, COUNT(*) as orders, COALESCE(SUM("total"), 0) as revenue
     FROM orders
     WHERE "storeId" = ${storeId} AND "createdAt" >= ${from} AND "createdAt" < ${to} AND "fulfillmentStatus" <> 'cancelled'
+      AND NOT ("paymentStatus" = 'pending' AND "paymentMethod" = ANY(${PROVIDER_KEYS}))
     GROUP BY 1 ORDER BY 1 ASC
   `;
   return rows.map((r) => ({ date: new Date(r.date).toISOString().slice(0, 10), orders: Number(r.orders), revenue: Number(r.revenue) }));
@@ -101,7 +104,7 @@ async function periodTotals(prisma, storeId, from, to) {
   const [sessions, pageViews, orders] = await Promise.all([
     prisma.visitorSession.count({ where: { storeId, firstSeenAt: { gte: from, lt: to } } }),
     prisma.pageView.count({ where: { storeId, createdAt: { gte: from, lt: to } } }),
-    prisma.order.aggregate({ where: { storeId, createdAt: { gte: from, lt: to }, fulfillmentStatus: { not: "cancelled" } }, _count: { _all: true }, _sum: { total: true } }),
+    prisma.order.aggregate({ where: { storeId, createdAt: { gte: from, lt: to }, fulfillmentStatus: { not: "cancelled" }, ...PLACED }, _count: { _all: true }, _sum: { total: true } }),
   ]);
   return { sessions, pageViews, orders: orders._count._all, sales: Number(orders._sum.total || 0) };
 }
@@ -112,6 +115,7 @@ async function topProducts(prisma, storeId, from, to) {
     FROM order_items oi
     JOIN orders o ON o."id" = oi."orderId"
     WHERE o."storeId" = ${storeId} AND o."createdAt" >= ${from} AND o."createdAt" < ${to} AND o."fulfillmentStatus" <> 'cancelled'
+      AND NOT (o."paymentStatus" = 'pending' AND o."paymentMethod" = ANY(${PROVIDER_KEYS}))
     GROUP BY oi."title"
     ORDER BY revenue DESC
   `;

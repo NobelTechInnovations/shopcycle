@@ -1,11 +1,13 @@
 const phoneAuth = require("./phone");
+const { PROVIDER_KEYS } = require("../orders/placed");
 
 /**
  * Express checkout (the One-Click Checkout app's popup): the shopper types
  * their mobile number, confirms it with a code, and gets back the delivery
- * addresses used with that number in this store — so a returning buyer
- * just picks one and pays. The code is what makes showing them safe: only
- * the phone's owner sees what was delivered to it.
+ * addresses used with that number in this store — or, if they're new here,
+ * on other stores on Oyklane — so a returning buyer just picks one and
+ * pays. The code is what makes showing them safe: only the phone's owner
+ * sees what was delivered to it.
  *
  * Codes share Phone Login's store (limits, expiry, attempts) but not its
  * app: One-Click only needs an SMS or WhatsApp provider.
@@ -101,11 +103,27 @@ async function savedDetails(prisma, store, phone) {
   for (const o of orders) {
     add({ name: o.shippingName, address1: o.shippingAddress1, address2: o.shippingAddress2, city: o.shippingCity, province: o.shippingProvince, zip: o.shippingZip, country: o.shippingCountry || "IN" });
   }
-  return {
-    name: customer?.name || orders[0]?.shippingName || "",
-    email: customer?.email || orders[0]?.email || "",
-    addresses,
-  };
+  if (addresses.length || customer) {
+    return { name: customer?.name || orders[0]?.shippingName || "", email: customer?.email || orders[0]?.email || "", addresses };
+  }
+
+  // New to this store: the addresses this number has used on other stores
+  // on Oyklane (only ever shown to the number's owner, after their code;
+  // the store sees one only if they order with it). Marked `network`.
+  const elsewhere = await prisma.$queryRaw`
+    SELECT "email", "shippingName", "shippingAddress1", "shippingAddress2", "shippingCity", "shippingProvince", "shippingZip", "shippingCountry"
+    FROM orders
+    WHERE "storeId" <> ${store.id}
+      AND "shippingAddress1" IS NOT NULL
+      AND right(regexp_replace(coalesce("phone", ''), '\\D', '', 'g'), 10) = ${last10}
+      AND NOT ("paymentStatus" = 'pending' AND "paymentMethod" = ANY(${PROVIDER_KEYS}))
+    ORDER BY "createdAt" DESC
+    LIMIT 25
+  `;
+  for (const o of elsewhere) {
+    add({ name: o.shippingName, address1: o.shippingAddress1, address2: o.shippingAddress2, city: o.shippingCity, province: o.shippingProvince, zip: o.shippingZip, country: o.shippingCountry || "IN", network: true });
+  }
+  return { name: elsewhere[0]?.shippingName || "", email: elsewhere[0]?.email || "", addresses };
 }
 
 module.exports = { expressConfig, requestCode, verify, mine, APP_KEY };

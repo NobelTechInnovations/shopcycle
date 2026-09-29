@@ -1,4 +1,5 @@
 const { env } = require("../config/env");
+const templates = require("./whatsapp-templates");
 
 /**
  * The one way the platform sends SMS and WhatsApp messages (one-time
@@ -20,8 +21,10 @@ function smsProvider() {
 const zohoToken = () => String(env.ZOHO_CPAAS_TOKEN || env.ZEPTOMAIL_TOKEN || "").replace(/^Zoho-enczapikey\s+/i, "").trim();
 
 function whatsappProvider() {
-  const p = env.WHATSAPP_PROVIDER || (env.ZOHO_WHATSAPP_TEMPLATE_KEY ? "zoho" : env.META_WHATSAPP_TOKEN ? "meta" : env.TWILIO_WHATSAPP_FROM ? "twilio" : "log");
-  if (p === "zoho" && !(zohoToken() && env.ZOHO_WHATSAPP_FROM && env.ZOHO_WHATSAPP_TEMPLATE_KEY)) return "log";
+  // Zoho's code template is set in Super admin ▸ Messaging (whatsapp-templates.js).
+  const zohoReady = zohoToken() && env.ZOHO_WHATSAPP_FROM && templates.otpTemplate();
+  const p = env.WHATSAPP_PROVIDER || (zohoReady ? "zoho" : env.META_WHATSAPP_TOKEN ? "meta" : env.TWILIO_WHATSAPP_FROM ? "twilio" : "log");
+  if (p === "zoho" && !zohoReady) return "log";
   if (p === "twilio" && !(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_WHATSAPP_FROM)) return "log";
   if (p === "meta" && !(env.META_WHATSAPP_TOKEN && env.META_WHATSAPP_PHONE_NUMBER_ID && env.META_WHATSAPP_OTP_TEMPLATE)) return "log";
   return p;
@@ -30,6 +33,19 @@ function whatsappProvider() {
 /** Which channels can actually deliver a code right now. */
 function channels() {
   return { sms: smsProvider() !== "log", whatsapp: whatsappProvider() !== "log" };
+}
+
+/** What Super admin ▸ Messaging shows about the WhatsApp setup — never the token. */
+function whatsappStatus() {
+  const t = templates.cached().otp;
+  return {
+    provider: whatsappProvider(),
+    forced: env.WHATSAPP_PROVIDER || null,
+    zohoAccount: Boolean(zohoToken()),
+    from: env.ZOHO_WHATSAPP_FROM || null,
+    otpTemplateFrom: t?.templateKey ? "super_admin" : env.ZOHO_WHATSAPP_TEMPLATE_KEY ? "env" : null,
+    sms: smsProvider(),
+  };
 }
 
 async function request(url, { headers = {}, body, form = false }) {
@@ -74,9 +90,10 @@ const SENDERS = {
   whatsapp: {
     async zoho({ to, code }) {
       const from = env.ZOHO_WHATSAPP_FROM.startsWith("+") ? env.ZOHO_WHATSAPP_FROM : `+${env.ZOHO_WHATSAPP_FROM}`;
+      const t = templates.otpTemplate();
       const data = await request(`${env.ZOHO_CPAAS_API_URL.replace(/\/$/, "")}/whatsapp`, {
         headers: { authorization: `Zoho-enczapikey ${zohoToken()}` },
-        body: { from, to: `+${to}`, template_key: env.ZOHO_WHATSAPP_TEMPLATE_KEY, merge_info: { [env.ZOHO_WHATSAPP_MERGE_KEY]: code } },
+        body: { from, to: `+${to}`, template_key: t.templateKey, merge_info: { [t.vars.code || "code"]: code } },
       });
       return data.request_id || data.data?.[0]?.message_id || data.message_id || null;
     },
@@ -112,6 +129,7 @@ const SENDERS = {
  * @returns {{ status: "sent"|"logged"|"failed", provider: string, error?: string }}
  */
 async function sendOtp(prisma, { to, code, channel = "sms", storeId = null, storeName = "Oyklane", log }) {
+  templates.cached(prisma); // keeps Super admin's templates fresh (background, once a minute)
   const provider = channel === "whatsapp" ? whatsappProvider() : smsProvider();
   const text = `${code} is your ${storeName} sign-in code. It expires in 10 minutes. Don't share it with anyone.`;
   let status = "logged";
@@ -138,4 +156,4 @@ async function sendOtp(prisma, { to, code, channel = "sms", storeId = null, stor
   return { status, provider, ...(error && { error }) };
 }
 
-module.exports = { sendOtp, channels, smsProvider, whatsappProvider };
+module.exports = { sendOtp, channels, smsProvider, whatsappProvider, whatsappStatus };

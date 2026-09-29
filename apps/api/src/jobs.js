@@ -6,6 +6,7 @@ const { cancelOrder } = require("./modules/orders/operations");
 const { PROVIDER_KEYS } = require("./modules/payments/providers");
 const billingEngine = require("./modules/billing/engine");
 const { drainQueue } = require("./lib/mailer");
+const whatsappTemplates = require("./lib/whatsapp-templates");
 
 // The billing engine bills real stores, and local development shares the
 // production database — so it runs only in production unless BILLING_JOBS
@@ -80,6 +81,8 @@ function startJobs(fastify) {
         fastify.log.error({ err }, "jobs: billing engine failed");
       }
     }
+    // Super admin's WhatsApp templates, in case another API process changed them.
+    await whatsappTemplates.load(fastify.prisma).catch(() => {});
     try {
       const sent = await drainQueue(fastify.prisma, { log: fastify.log });
       if (sent) fastify.log.info({ sent }, "jobs: queued emails delivered");

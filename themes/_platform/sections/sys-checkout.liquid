@@ -192,7 +192,7 @@
                     <input type="radio" name="paymentMethod" value="{{ option.value }}:{{ option.mode }}" data-pay-label="{{ pay_label | strip }}" {% if forloop.first %}checked{% endif %}>
                     <span class="sys-co__pay-icon">
                       {% case option.mode %}
-                        {% when 'upi' %}{% render 'snippets/sys-icon', icon: 'upi' %}
+                        {% when 'upi' %}<b class="sys-mark sys-mark--upi">UPI</b>
                         {% when 'netbanking' %}{% render 'snippets/sys-icon', icon: 'bank' %}
                         {% when 'wallet' %}{% render 'snippets/sys-icon', icon: 'wallet' %}
                         {% when 'emi' %}{% render 'snippets/sys-icon', icon: 'emi' %}
@@ -204,7 +204,7 @@
                     <span class="sys-co__pay-text">
                       <strong>{{ option.title }}{% if forloop.first and option.mode == 'upi' %} <em class="sys-co__pick">Fastest</em>{% endif %}</strong>
                       {% if option.subtitle %}<small>{{ option.subtitle }}</small>{% endif %}
-                      {% if option.badges.size > 0 or option.testMode %}<span class="sys-co__badges">{% for b in option.badges %}<i aria-hidden="true">{{ b }}</i>{% endfor %}{% if option.testMode %}<i class="sys-co__test">Test mode</i>{% endif %}</span>{% endif %}
+                      {% if option.badges.size > 0 or option.testMode %}<span class="sys-co__badges">{% for b in option.badges %}{% render 'snippets/sys-pay-logo', name: b %}{% endfor %}{% if option.testMode %}<i class="sys-co__test">Test mode</i>{% endif %}</span>{% endif %}
                     </span>
                   </label>
                 {% endfor %}

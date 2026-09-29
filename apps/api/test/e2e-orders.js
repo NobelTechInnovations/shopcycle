@@ -271,8 +271,12 @@ async function main() {
     check("timeline records the order", order.events.some((e) => e.kind === "placed"), order.events);
     const confirmation = await prisma.emailLog.findFirst({ where: { refId: orderId, template: "order_confirmation" } });
     check("order confirmation emailed to the shopper", confirmation?.to === shopper.email, confirmation);
-    const alert = await prisma.emailLog.findFirst({ where: { refId: orderId, template: "new_order_alert" } });
-    check("new-order alert emailed to the store", alert?.to === "help@orders-e2e.test", alert);
+    const alerts = await prisma.emailLog.findMany({ where: { refId: orderId, template: "new_order_alert" }, select: { to: true } });
+    check(
+      "new-order alert emailed to the owner and the store's support address",
+      alerts.length === 2 && alerts.some((a) => a.to === "help@orders-e2e.test") && alerts.some((a) => a.to !== "help@orders-e2e.test"),
+      alerts
+    );
     const statusToken = (await prisma.order.findUnique({ where: { id: orderId } })).statusToken;
     check("order has a status-page token", typeof statusToken === "string" && statusToken.length >= 20, statusToken);
     check("confirmation email links to the status page", String(confirmation?.html).includes(`/orders/${statusToken}`));

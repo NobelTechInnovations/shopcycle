@@ -1,3 +1,4 @@
+const { PLACED } = require("../orders/placed");
 const { storeSettings } = require("../../lib/store-settings");
 
 /** The Home page: what needs doing, recent orders, the setup guide. Sales
@@ -10,7 +11,7 @@ async function getOverview(prisma, store, user) {
     await Promise.all([
       prisma.product.count({ where: { storeId } }),
       prisma.order.findMany({
-        where: { storeId },
+        where: { storeId, ...PLACED },
         include: { customer: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
         take: 6,
@@ -18,8 +19,8 @@ async function getOverview(prisma, store, user) {
       prisma.theme.findFirst({ where: { storeId, isActive: true }, select: { name: true } }),
       prisma.collection.count({ where: { storeId } }),
       prisma.shippingZone.count({ where: { storeId } }),
-      prisma.order.count({ where: { storeId, fulfillmentStatus: { in: ["unfulfilled", "partially_fulfilled"] } } }),
-      prisma.order.count({ where: { storeId, paymentStatus: "pending", fulfillmentStatus: { not: "cancelled" } } }),
+      prisma.order.count({ where: { storeId, fulfillmentStatus: { in: ["unfulfilled", "partially_fulfilled"] }, ...PLACED } }),
+      prisma.order.count({ where: { storeId, paymentStatus: "pending", fulfillmentStatus: { not: "cancelled" }, ...PLACED } }),
       prisma.productVariant.count({ where: { ...liveVariants, inventoryQuantity: { lte: 0 } } }),
       prisma.productVariant.count({ where: { ...liveVariants, inventoryQuantity: { gt: 0, lte: threshold } } }),
       prisma.mandate.count({ where: { storeId, status: { in: ["active", "pending"] } } }),

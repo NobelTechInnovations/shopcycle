@@ -2843,3 +2843,48 @@ details.sys-disclose summary::-webkit-details-marker {
     height: 36px;
   }
 }
+
+/* Payment brand marks (snippets/sys-pay-logo) */
+.sys-co__badges .sys-brand-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px 2px 5px;
+  border: 1px solid var(--oy-line);
+  border-radius: 6px;
+  background: var(--oy-bg);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--oy-muted);
+  white-space: nowrap;
+}
+.sys-co__badges .sys-brand-chip svg {
+  flex: none;
+}
+.sys-mark {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.sys-mark--upi {
+  color: #097939;
+}
+.sys-mark--upi::after {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 2px;
+  border-left: 5px solid #ed752e;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  vertical-align: 0;
+}
+.sys-mark--rupay {
+  color: #1c3a78;
+}
+.sys-co__pay-icon .sys-mark {
+  font-size: 13px;
+}

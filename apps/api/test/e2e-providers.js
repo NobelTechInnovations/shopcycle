@@ -286,6 +286,22 @@ async function partOne(mock) {
   r = await messaging.sendOtp(fakePrisma, { to: "919876543210", code: "555666", channel: "whatsapp" });
   c = mock.last(/^\/zoho\//);
   check("Zoho CPaaS WhatsApp: API key, from number, template key, code in merge_info", r.status === "sent" && c.headers.authorization === "Zoho-enczapikey zoho-key" && json(c).from === "+15554330409" && json(c).to === "+919876543210" && json(c).template_key === "tpl_login" && json(c).merge_info.otp === "555666", json(c));
+
+  // Super admin ▸ Messaging: the saved template wins over the variable.
+  const whatsappTemplates = require(path.join(ROOT, "apps/api/src/lib/whatsapp-templates"));
+  const settingsDb = { platformSetting: { upsert: async () => ({}) } };
+  await whatsappTemplates.save(settingsDb, { otp: { templateKey: "  tpl_from_console ", enabled: true, vars: { code: "otp_code" } } });
+  r = await messaging.sendOtp(fakePrisma, { to: "919876543210", code: "777888", channel: "whatsapp" });
+  c = mock.last(/^\/zoho\//);
+  check("Zoho: Super admin's template key and placeholder are used (trimmed)", r.status === "sent" && json(c).template_key === "tpl_from_console" && json(c).merge_info.otp_code === "777888", json(c));
+  const st = messaging.whatsappStatus();
+  check("messaging status: provider, account and sender shown, template source is Super admin, no token", st.provider === "zoho" && st.zohoAccount && st.from === "+15554330409" && st.otpTemplateFrom === "super_admin" && !JSON.stringify(st).includes("zoho-key"), st);
+  await whatsappTemplates.save(settingsDb, { otp: { templateKey: "tpl_from_console", enabled: false } });
+  check("switching the code template off turns WhatsApp codes off", !messaging.channels().whatsapp && messaging.whatsappProvider() === "log");
+  await whatsappTemplates.save(settingsDb, { otp: { templateKey: "" } });
+  check("an empty template in Super admin falls back to ZOHO_WHATSAPP_TEMPLATE_KEY", messaging.whatsappProvider() === "zoho" && messaging.whatsappStatus().otpTemplateFrom === "env");
+  Object.assign(env, { ZOHO_WHATSAPP_TEMPLATE_KEY: "" });
+  check("no template anywhere: WhatsApp codes off", messaging.whatsappProvider() === "log");
   Object.assign(env, { SMS_PROVIDER: "log", WHATSAPP_PROVIDER: "log" });
 
   // Image CDN signatures
