@@ -9,7 +9,7 @@ import { App } from "antd";
 export function useConfirmDialog() {
   const { modal } = App.useApp();
 
-  function confirmDialog({ title, description, okText = "Confirm", danger = false, onConfirm }) {
+  function confirmDialog({ title, description, okText = "Confirm", danger = false, onConfirm, onCancel }) {
     modal.confirm({
       title,
       content: description,
@@ -17,6 +17,7 @@ export function useConfirmDialog() {
       cancelText: "Cancel",
       okButtonProps: { danger },
       onOk: onConfirm,
+      onCancel,
     });
   }
 

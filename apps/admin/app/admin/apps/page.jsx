@@ -1,299 +1,234 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Card, Button, Modal, Form, Input, InputNumber, Select, Switch, Tag, App } from "antd";
-import { Plus, Trash2, Crown, Lock } from "lucide-react";
-import { useConfirmDialog, PageHeader, AppIcon, useHasMounted } from "@shopcycle/ui";
-import { apiFetch } from "@/lib/api";
-import { inr } from "@/lib/billing";
-import { PixelSetup } from "./PixelSetup";
+import { useRouter } from "next/navigation";
+import { Button, Input, Tag, Skeleton } from "antd";
+import { Search, Crown, Lock, Check, ArrowRight, Sparkles } from "lucide-react";
+import { PageHeader, EmptyState } from "@shopcycle/ui";
+import { useApps, appHref, detailsHref, APP_CATEGORIES, rupees } from "@/lib/apps";
+import { useAppActions } from "@/components/apps/useAppActions";
+import { AppTile } from "@/components/apps/AppTile";
 
-// A handful of apps have a full dedicated panel (Connect flow, campaign
-// builder, message composer — see MetaConnectPanel) instead of the
-// generic settingsSchema install form every other app in this catalog
-// uses. Keyed by App.key; anything not listed here stays on the generic
-// Configure/Install flow below.
-const DEDICATED_PANELS = {
-  "meta-ads": "/admin/apps/meta-ads",
-  whatsapp: "/admin/apps/whatsapp",
-  "product-reviews": "/admin/apps/reviews",
-};
-
-/** One field inside a repeater row — same small set of primitive types as
- * the top-level SettingsField, just nested under a Form.List's [name, key]. */
-function RepeaterSubField({ field, name }) {
-  switch (field.type) {
-    case "textarea":
-      return (
-        <Form.Item name={name} label={field.label} className="mb-2">
-          <Input.TextArea rows={2} placeholder={field.placeholder} />
-        </Form.Item>
-      );
-    case "select":
-      return (
-        <Form.Item name={name} label={field.label} className="mb-2">
-          <Select options={(field.options || []).map(optionOf)} />
-        </Form.Item>
-      );
-    case "checkbox":
-      return (
-        <Form.Item name={name} label={field.label} valuePropName="checked" className="mb-2">
-          <Switch />
-        </Form.Item>
-      );
-    case "number":
-      return (
-        <Form.Item name={name} label={field.label} className="mb-2">
-          <InputNumber className="w-full" min={field.min} max={field.max} />
-        </Form.Item>
-      );
-    default:
-      return (
-        <Form.Item name={name} label={field.label} className="mb-2">
-          <Input placeholder={field.placeholder} />
-        </Form.Item>
-      );
+function PriceTag({ app }) {
+  if (app.priceMonthly) {
+    return (
+      <span className="text-[12px] text-ink-muted" title="Plus GST, billed with your plan">
+        {rupees(app.priceMonthly)}/month
+      </span>
+    );
   }
+  return <span className="text-[12px] text-ink-muted">Free</span>;
 }
 
-/**
- * "Add as many as you like" list — this is what makes a widget-style app
- * (e.g. Customer Reviews: add every review once, here, instead of a theme
- * section where each review is its own block a merchant has to add in the
- * theme editor) actually usable. Backed by antd's Form.List, so it's plain
- * nested form state — submits as an array under `field.id`.
- */
-function RepeaterField({ field }) {
+function AppCard({ app }) {
+  const router = useRouter();
+  const { install } = useAppActions();
+  const [busy, setBusy] = useState(false);
+  const needsSetup = (app.settingsSchema || []).length > 0;
+
+  async function onInstall(e) {
+    e.preventDefault();
+    if (needsSetup) return router.push(detailsHref(app));
+    setBusy(true);
+    const ok = await install(app);
+    setBusy(false);
+    if (ok) router.push(appHref(app));
+  }
+
   return (
-    <Form.Item label={field.label} className="mb-4">
-      <Form.List name={field.id}>
-        {(rows, { add, remove }) => (
-          <div className="flex flex-col gap-3">
-            {rows.map(({ key, name }) => (
-              <div key={key} className="border border-app-border rounded-md p-3 relative">
-                <Button
-                  size="small"
-                  type="text"
-                  danger
-                  icon={<Trash2 size={12} aria-hidden="true" />}
-                  aria-label="Remove"
-                  className="absolute top-2 right-2"
-                  onClick={() => remove(name)}
-                />
-                {(field.fields || []).map((sub) => (
-                  <RepeaterSubField key={sub.id} field={sub} name={[name, sub.id]} />
-                ))}
-              </div>
-            ))}
-            <Button size="small" icon={<Plus size={14} aria-hidden="true" />} onClick={() => add(field.defaults || {})}>
-              Add {field.itemLabel || "item"}
-            </Button>
+    <Link
+      href={detailsHref(app)}
+      className="group flex flex-col bg-app-surface border border-app-border rounded-[14px] p-[18px] no-underline shadow-card hover:shadow-raised hover:border-[#DADAE0] transition-all"
+    >
+      <div className="flex items-start gap-3">
+        <AppTile app={app} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <p className="m-0 font-semibold text-[15px] text-ink truncate">{app.name}</p>
+            {app.installed && <Check size={14} className="text-status-success shrink-0" aria-label="Installed" />}
           </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[12px] text-ink-subtle">{APP_CATEGORIES[app.category] || "Other"}</span>
+            <span className="text-ink-subtle text-[10px]">•</span>
+            <PriceTag app={app} />
+          </div>
+        </div>
+        {app.premium && (
+          <Tag className="!mr-0 !border-0 !bg-accent-soft !text-accent inline-flex items-center gap-1">
+            <Crown size={11} aria-hidden="true" /> Growth+
+          </Tag>
         )}
-      </Form.List>
-    </Form.Item>
+      </div>
+      <p className="text-[13px] text-ink-muted mt-3 mb-4 leading-relaxed line-clamp-3">{app.description}</p>
+      <div className="flex items-center justify-between gap-2 mt-auto">
+        {app.installed ? (
+          <>
+            <span className="text-[12px] font-medium text-status-success inline-flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-status-success" aria-hidden="true" /> Installed
+            </span>
+            <Button size="small" onClick={(e) => { e.preventDefault(); router.push(appHref(app)); }}>
+              Open
+            </Button>
+          </>
+        ) : app.locked ? (
+          <>
+            <span className="text-[12px] text-ink-muted">On Growth and Pro</span>
+            <Button size="small" icon={<Lock size={12} aria-hidden="true" />} onClick={(e) => { e.preventDefault(); router.push("/admin/settings/billing"); }}>
+              Upgrade
+            </Button>
+          </>
+        ) : (
+          <>
+            <span className="text-[12px] text-ink-subtle group-hover:text-ink inline-flex items-center gap-1 transition-colors">
+              Details <ArrowRight size={12} aria-hidden="true" />
+            </span>
+            <Button size="small" type="primary" loading={busy} onClick={onInstall}>
+              {needsSetup ? "Set up" : "Install"}
+            </Button>
+          </>
+        )}
+      </div>
+    </Link>
   );
 }
 
-const optionOf = (o) => (typeof o === "object" ? o : { value: o, label: String(o) });
-
-function SettingsField({ field }) {
-  if (field.type === "repeater") {
-    return <RepeaterField key={field.id} field={field} />;
-  }
-  if (field.type === "select") {
-    const options = (field.options || []).map(optionOf);
-    return (
-      <Form.Item key={field.id} name={field.id} label={field.label} initialValue={options[0]?.value} rules={[{ required: true, message: "Required" }]}>
-        <Select options={options} />
-      </Form.Item>
-    );
-  }
-  if (field.type === "textarea") {
-    return (
-      <Form.Item key={field.id} name={field.id} label={field.label}>
-        <Input.TextArea rows={4} placeholder={field.placeholder} />
-      </Form.Item>
-    );
-  }
+function FeaturedFlow({ app }) {
+  const router = useRouter();
+  const { install } = useAppActions();
+  const [busy, setBusy] = useState(false);
+  if (!app) return null;
   return (
-    <Form.Item key={field.id} name={field.id} label={field.label} rules={[{ required: true, message: "Required" }]}>
-      <Input placeholder={field.placeholder} />
-    </Form.Item>
+    <section className="relative overflow-clip rounded-[16px] mb-6 p-6 sm:p-7 text-white" style={{ background: "radial-gradient(120% 140% at 0% 0%, #7C5CFF 0%, #4C33C9 45%, #111114 100%)" }}>
+      <div className="absolute -right-10 -top-10 w-56 h-56 rounded-full opacity-30" style={{ background: "radial-gradient(circle, #2DD4BF 0%, transparent 70%)" }} aria-hidden="true" />
+      <div className="relative flex flex-col md:flex-row md:items-center gap-5">
+        <div className="flex-1 min-w-0">
+          <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] bg-white/15 rounded-full px-2.5 py-1">
+            <Sparkles size={12} aria-hidden="true" /> New app
+          </span>
+          <h2 className="text-[22px] font-semibold mt-3 mb-1.5" style={{ letterSpacing: "-0.02em" }}>
+            Flow — emails that send themselves
+          </h2>
+          <p className="text-[14px] text-white/80 m-0 max-w-xl leading-relaxed">
+            Thank first-time buyers, ask for reviews after delivery, win back quiet customers and follow up abandoned checkouts. Pick a recipe, switch it on.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          {app.installed ? (
+            <Button size="large" className="!bg-white !text-ink !border-white font-semibold" onClick={() => router.push(appHref(app))}>
+              Open Flow
+            </Button>
+          ) : (
+            <Button
+              size="large"
+              loading={busy}
+              className="!bg-white !text-ink !border-white font-semibold"
+              onClick={async () => {
+                setBusy(true);
+                const ok = await install(app);
+                setBusy(false);
+                if (ok) router.push(appHref(app));
+              }}
+            >
+              Install free
+            </Button>
+          )}
+          <Button size="large" ghost onClick={() => router.push(detailsHref(app))}>
+            Learn more
+          </Button>
+        </div>
+      </div>
+      <ol className="relative hidden md:flex flex-wrap items-center gap-2 mt-6 mb-0 p-0 list-none text-[12.5px]" aria-label="An example flow">
+        {["Order delivered", "Wait 3 days", "Not refunded?", "Email: How was it?"].map((step, i) => (
+          <li key={step} className="flex items-center gap-2">
+            <span className="rounded-lg bg-white/10 border border-white/20 px-3 py-1.5 backdrop-blur-sm">{step}</span>
+            {i < 3 && <ArrowRight size={14} className="text-white/60" aria-hidden="true" />}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
 export default function AppsPage() {
-  const mounted = useHasMounted();
-  const { message } = App.useApp();
-  const { confirmDialog } = useConfirmDialog();
-  const [apps, setApps] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [configuring, setConfiguring] = useState(null);
-  const [form] = Form.useForm();
+  const { apps, loading } = useApps();
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState("all");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiFetch("/api/apps");
-      setApps(data.apps);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // Back from "Continue with Facebook": reopen that app's setup.
-  useEffect(() => {
-    const key = new URLSearchParams(window.location.search).get("setup");
-    if (!key || !apps.length) return;
-    const app = apps.find((a) => a.key === key);
-    if (app) {
-      openConfigure(app);
-      window.history.replaceState(null, "", "/admin/apps");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const categories = useMemo(() => {
+    const present = [...new Set((apps || []).map((a) => a.category))];
+    return present.sort((a, b) => Object.keys(APP_CATEGORIES).indexOf(a) - Object.keys(APP_CATEGORIES).indexOf(b));
   }, [apps]);
 
-  function openConfigure(app) {
-    setConfiguring(app);
-    form.resetFields();
-    form.setFieldsValue(app.settings || {});
-  }
+  const shown = useMemo(() => {
+    const words = q.trim().toLowerCase();
+    return (apps || [])
+      .filter((a) => (cat === "all" ? true : cat === "installed" ? a.installed : a.category === cat))
+      .filter((a) => !words || `${a.name} ${a.description} ${a.category}`.toLowerCase().includes(words))
+      .sort((a, b) => Number(b.installed) - Number(a.installed) || a.name.localeCompare(b.name));
+  }, [apps, q, cat]);
 
-  // `app` defaults to the one open in the Configure modal; apps with no
-  // settings (Meta Ads, WhatsApp) install straight from their card and
-  // pass themselves in — there's no modal, so `configuring` is null then.
-  async function install(values, app) {
-    try {
-      await apiFetch(`/api/apps/${app.key}/install`, { method: "POST", body: { settings: values } });
-      message.success(app.installed ? `${app.name} saved` : `${app.name} installed`);
-      setConfiguring(null);
-      form.resetFields();
-      load();
-    } catch (err) {
-      message.error(err.message);
-    }
-  }
-
-  function handleInstall(values, app = configuring) {
-    if (!app.priceMonthly || app.installed) return install(values, app);
-    confirmDialog({
-      title: `Install ${app.name} for ${inr(app.priceMonthly)}/month?`,
-      description: `${inr(app.priceMonthly)} + GST is added to your next bill for this billing period, and to every billing period the app stays installed. Removing it stops future charges; a period already added is still payable.`,
-      okText: "Install",
-      onConfirm: () => install(values, app),
-    });
-  }
-
-  function handleUninstall(app) {
-    confirmDialog({
-      title: `Remove ${app.name}?`,
-      description: app.priceMonthly
-        ? `This stops it on your storefront immediately and stops future charges. This billing period's ${inr(app.priceMonthly)} + GST stays on your next bill.`
-        : "This stops it from running on your storefront immediately.",
-      okText: "Remove",
-      danger: true,
-      onConfirm: async () => {
-        await apiFetch(`/api/apps/${app.key}/uninstall`, { method: "POST" });
-        load();
-      },
-    });
-  }
+  const installedCount = (apps || []).filter((a) => a.installed).length;
+  const pill = (key, label, count) => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => setCat(key)}
+      aria-pressed={cat === key}
+      className={`h-8 px-3 rounded-full text-[13px] border cursor-pointer transition-colors ${cat === key ? "bg-ink text-white border-ink" : "bg-app-surface text-ink-muted border-app-border hover:text-ink hover:border-[#D4D4DA]"}`}
+    >
+      {label}
+      {count !== undefined && <span className={`ml-1.5 ${cat === key ? "text-white/70" : "text-ink-subtle"}`}>{count}</span>}
+    </button>
+  );
 
   return (
     <div>
-      <PageHeader title="Apps" />
-      <p className="text-sm text-ink-muted -mt-3 mb-6">
-        Add features to your store. Marketing apps come with the Growth and Pro plans.
-      </p>
+      <PageHeader title="Apps" subtitle="Add features to your store. Installed apps are pinned in your sidebar." />
+      <FeaturedFlow app={(apps || []).find((a) => a.key === "flow")} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {apps.map((app) => (
-          <Card
-            key={app.id}
-            size="small"
-            loading={loading}
-            className="!shadow-card hover:!shadow-raised transition-shadow"
-            styles={{ body: { padding: 18, height: "100%", display: "flex", flexDirection: "column" } }}
-          >
-            <div className="flex items-start justify-between gap-2 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-app-bg border border-app-border flex items-center justify-center">
-                <AppIcon iconKey={app.iconKey} size={19} className="text-ink" />
-              </div>
-              <div className="flex gap-1.5">
-                {app.premium && (
-                  <Tag className="!mr-0 !border-0 !bg-accent-soft !text-accent inline-flex items-center gap-1">
-                    <Crown size={11} aria-hidden="true" /> Growth+
-                  </Tag>
-                )}
-                {app.priceMonthly && (
-                  <Tag className="!mr-0" title="Plus GST, billed with your subscription">
-                    {inr(app.priceMonthly)}/mo
-                  </Tag>
-                )}
-                {app.installed && (
-                  <Tag color="success" className="!mr-0">
-                    Installed
-                  </Tag>
-                )}
-              </div>
-            </div>
-            <p className="font-semibold text-[15px] text-ink m-0">{app.name}</p>
-            <p className="text-[13px] text-ink-muted mt-1 mb-4 leading-relaxed line-clamp-3">{app.description}</p>
-            <div className="flex gap-2 mt-auto">
-              {app.locked && !app.installed ? (
-                <Link href="/admin/settings/billing">
-                  <Button icon={<Lock size={13} aria-hidden="true" />}>Upgrade to install</Button>
-                </Link>
-              ) : app.installed ? (
-                <>
-                  {DEDICATED_PANELS[app.key] ? (
-                    <Link href={DEDICATED_PANELS[app.key]}>
-                      <Button type="primary">Open</Button>
-                    </Link>
-                  ) : (
-                    app.settingsSchema.length > 0 && <Button onClick={() => openConfigure(app)}>Configure</Button>
-                  )}
-                  <Button danger type="text" onClick={() => handleUninstall(app)}>
-                    Remove
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  type="primary"
-                  onClick={() => (app.settingsSchema.length > 0 ? openConfigure(app) : handleInstall({}, app))}
-                >
-                  Install
-                </Button>
-              )}
-            </div>
-          </Card>
-        ))}
+      <div className="flex flex-col md:flex-row md:items-center gap-3 mb-5">
+        <Input
+          allowClear
+          prefix={<Search size={15} className="text-ink-subtle" aria-hidden="true" />}
+          placeholder="Search apps"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="md:max-w-xs"
+          aria-label="Search apps"
+        />
+        <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Filter apps">
+          {pill("all", "All")}
+          {pill("installed", "Installed", installedCount)}
+          {categories.map((c) => pill(c, APP_CATEGORIES[c] || c))}
+        </div>
       </div>
 
-      {mounted && (
-        <Modal
-          title={configuring ? `Configure ${configuring.name}` : ""}
-          open={Boolean(configuring)}
-          onCancel={() => setConfiguring(null)}
-          onOk={() => form.submit()}
-          okText={configuring?.installed ? "Save" : "Install"}
-          forceRender
-        >
-          <Form layout="vertical" form={form} onFinish={handleInstall} requiredMark={false}>
-            {configuring?.key === "facebook-pixel" ? (
-              <PixelSetup key={configuring.id} form={form} />
-            ) : (
-              configuring?.settingsSchema.map((field) => <SettingsField key={field.id} field={field} />)
-            )}
-          </Form>
-        </Modal>
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="bg-app-surface border border-app-border rounded-[14px] p-5">
+              <Skeleton avatar active paragraph={{ rows: 2 }} />
+            </div>
+          ))}
+        </div>
+      ) : shown.length ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {shown.map((app) => (
+            <AppCard key={app.id} app={app} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState icon={<Search />} title="No apps match" description={cat === "installed" ? "You haven't installed any apps yet." : "Try another word or category."} />
       )}
+
+      <p className="text-[13px] text-ink-muted mt-8">
+        Missing something your store needs?{" "}
+        <Link href="/admin/support?new=feature" className="text-ink font-medium">
+          Tell us
+        </Link>{" "}
+        — new apps are on the way.
+      </p>
     </div>
   );
 }

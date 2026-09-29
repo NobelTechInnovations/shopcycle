@@ -24,6 +24,7 @@ const EVENTS = [
   { key: "order.created", label: "Order created", group: "Orders" },
   { key: "order.paid", label: "Order paid", group: "Orders" },
   { key: "order.fulfilled", label: "Order shipped", group: "Orders" },
+  { key: "order.delivered", label: "Order delivered", group: "Orders" },
   { key: "order.cancelled", label: "Order cancelled", group: "Orders" },
   { key: "order.refunded", label: "Order refunded", group: "Orders" },
   { key: "product.created", label: "Product created", group: "Products" },
@@ -128,10 +129,17 @@ async function attempt(prisma, delivery, endpoint) {
   return ok;
 }
 
+// In-process listeners for the same events (Flow automations — flows/engine.js).
+const listeners = [];
+function onEvent(fn) {
+  listeners.push(fn);
+}
+
 /** Records the event for every endpoint that wants it and tries to deliver
  * straight away (in the background). Never throws into the caller — a
  * webhook problem must not break checkout or an admin action. */
 function emit(prisma, storeId, event, subject) {
+  for (const fn of listeners) setImmediate(() => Promise.resolve().then(() => fn(prisma, storeId, event, subject)).catch(() => {}));
   setImmediate(async () => {
     try {
       const endpoints = await prisma.webhookEndpoint.findMany({ where: { storeId, enabled: true, events: { has: event } } });
@@ -231,4 +239,4 @@ async function redeliver(prisma, storeId, deliveryId) {
   return prisma.webhookDelivery.findUnique({ where: { id: fresh.id } });
 }
 
-module.exports = { EVENTS, EVENT_KEYS, emit, processDue, list, create, update, remove, ping, redeliver, ORDER_INCLUDE, PRODUCT_INCLUDE };
+module.exports = { EVENTS, EVENT_KEYS, emit, onEvent, processDue, list, create, update, remove, ping, redeliver, ORDER_INCLUDE, PRODUCT_INCLUDE };

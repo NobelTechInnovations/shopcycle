@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, ConfigProvider } from "antd";
-import { Building2, CreditCard, Grid3x3, Users, LogOut, ShieldCheck, ScrollText, Mail, LayoutDashboard, Wallet, MessageCircle } from "lucide-react";
+import { Building2, CreditCard, Grid3x3, Users, LogOut, ShieldCheck, ScrollText, Mail, LayoutDashboard, Wallet, MessageCircle, LifeBuoy } from "lucide-react";
 import { BrandMark } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
@@ -37,6 +37,11 @@ const NAV_ITEMS = [
     key: "/customers",
     icon: <Users size={16} aria-hidden="true" />,
     label: <Link href="/customers">Customers</Link>,
+  },
+  {
+    key: "/support",
+    icon: <LifeBuoy size={16} aria-hidden="true" />,
+    label: <Link href="/support">Support</Link>,
   },
   { type: "divider", style: { borderColor: "rgba(255,255,255,0.08)", margin: "8px 12px" } },
   {

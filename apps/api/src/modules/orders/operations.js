@@ -117,6 +117,7 @@ async function updateFulfillment(prisma, store, orderId, fulfillmentId, action, 
     });
     await addOrderEvent(prisma, orderId, { kind: "delivered", message: "Shipment delivered", actorName, meta: { fulfillmentId } });
     if (send) await notify.sendDelivered(prisma, store, order, log);
+    webhooks.emit(prisma, store.id, "order.delivered", { id: orderId });
     return updated;
   }
 

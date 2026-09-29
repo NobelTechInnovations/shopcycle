@@ -5,6 +5,7 @@ const { overview } = require("./overview");
 const { recordAudit } = require("../../lib/audit");
 const billingAdmin = require("./billing");
 const messagingAdmin = require("./messaging");
+const supportAdmin = require("./support");
 
 // Human-readable audit action names for platform mutations. Anything
 // mutating that isn't listed still gets logged, under "METHOD /route" — a
@@ -37,6 +38,12 @@ const AUDIT_ACTIONS = {
   "PUT /billing/plans/:id/features": "billing.plan_features",
   "PUT /messaging/templates": "messaging.templates",
   "POST /messaging/test": "messaging.test_send",
+  "POST /support/tickets/:id/reply": "support.reply",
+  "PATCH /support/tickets/:id": "support.ticket_update",
+  "POST /support/articles": "support.article_create",
+  "PATCH /support/articles/:id": "support.article_update",
+  "DELETE /support/articles/:id": "support.article_delete",
+  "PUT /support/settings": "support.settings",
 };
 
 /** Asks the marketing site to show the new prices (fire and forget). */
@@ -88,6 +95,9 @@ async function superAdminRoutes(fastify) {
 
   // WhatsApp templates shared by every store (messaging.js).
   fastify.register(messagingAdmin, { prefix: "/messaging" });
+
+  // Seller tickets, help articles and the Help assistant (support.js).
+  fastify.register(supportAdmin, { prefix: "/support" });
 
   fastify.get("/apps", controller.listAppsHandler);
   fastify.post("/apps", controller.createAppHandler);

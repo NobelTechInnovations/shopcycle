@@ -7,11 +7,15 @@ const { PROVIDER_KEYS } = require("./modules/payments/providers");
 const billingEngine = require("./modules/billing/engine");
 const { drainQueue } = require("./lib/mailer");
 const whatsappTemplates = require("./lib/whatsapp-templates");
+const flowsEngine = require("./modules/flows/engine");
 
 // The billing engine bills real stores, and local development shares the
 // production database — so it runs only in production unless BILLING_JOBS
 // says otherwise (config/env.js).
 const billingJobsOn = () => (env.BILLING_JOBS ? env.BILLING_JOBS === "true" : env.NODE_ENV === "production");
+// Same for Flow runs that finished waiting: a local API would otherwise pick
+// up production's runs and, with email set to "log", never really send them.
+const flowJobsOn = () => (env.FLOW_JOBS ? env.FLOW_JOBS === "true" : env.NODE_ENV === "production");
 
 /** Online orders whose payment was never completed (the shopper closed the
  * gateway's page) hold stock and any gift card money — after two hours
@@ -66,6 +70,14 @@ function startJobs(fastify) {
       if (released) fastify.log.info({ released }, "jobs: unpaid online orders released");
     } catch (err) {
       fastify.log.error({ err }, "jobs: releasing unpaid orders failed");
+    }
+    if (flowJobsOn()) {
+      try {
+        const ran = await flowsEngine.processDue(fastify.prisma, { log: fastify.log });
+        if (ran) fastify.log.info({ ran }, "jobs: flow runs resumed");
+      } catch (err) {
+        fastify.log.error({ err }, "jobs: flow runs failed");
+      }
     }
     try {
       const result = await webhooksService.processDue(fastify.prisma);

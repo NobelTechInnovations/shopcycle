@@ -6,6 +6,7 @@ const { storeSettings } = require("../../lib/store-settings");
 const { computeAccess } = require("../billing/access");
 const templates = require("../../emails/templates");
 const cartService = require("../cart/service");
+const webhooks = require("../developer/webhooks");
 
 /**
  * Abandoned checkouts. A cart becomes a "checkout" once the shopper
@@ -109,7 +110,6 @@ async function sweepAbandonedCheckouts(prisma, { delayMinutes = DEFAULT_DELAY_MI
     if (count !== 1) continue;
 
     const store = row.store;
-    if (!storeSettings(store).notifications.abandonedCheckout) continue;
     if (store.status !== "active" || !computeAccess(store.subscription, { storeStatus: store.status }).storefront) continue;
     // They may have ordered with a different cart since — don't nag.
     const ordered = await prisma.order.findFirst({
@@ -117,6 +117,9 @@ async function sweepAbandonedCheckouts(prisma, { delayMinutes = DEFAULT_DELAY_MI
       select: { id: true },
     });
     if (ordered) continue;
+    // The store's own Flow automations (e.g. a second reminder a day later).
+    webhooks.emit(prisma, store.id, "checkout.abandoned", { id: row.cartId });
+    if (!storeSettings(store).notifications.abandonedCheckout) continue;
 
     const cart = await cartService.hydrateCart(prisma, store.id, row.cartId, {
       items: Array.isArray(row.data?.items) ? row.data.items : [],

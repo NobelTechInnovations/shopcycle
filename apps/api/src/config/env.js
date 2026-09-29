@@ -85,6 +85,9 @@ const envSchema = z.object({
   // Unset: on in production, off elsewhere — local and production share a
   // database, so a laptop must never bill real stores. "true" forces it on.
   BILLING_JOBS: z.enum(["true", "false"]).optional(),
+  // Flow runs whose Wait is over are resumed by the jobs tick — production
+  // only by default, for the same reason (jobs.js).
+  FLOW_JOBS: z.enum(["true", "false"]).optional(),
   // Tests only: POST /api/billing/_test/clock runs the engine for the
   // caller's store at a chosen time. Never available in production.
   BILLING_TEST_CLOCK: z
@@ -127,6 +130,15 @@ const envSchema = z.object({
   WWW_REVALIDATE_URL: z.string().optional(),
   REVALIDATE_SECRET: z.string().optional(),
   BREVO_API_URL: z.string().default("https://api.brevo.com/v3/smtp/email"),
+
+  // The seller Help assistant (modules/support) answers with Claude. Unset:
+  // it answers with the best-matching help articles instead. The model can
+  // be changed in Super admin ▸ Support ▸ Assistant.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_API_URL: z.string().default("https://api.anthropic.com/v1/messages"),
+  SUPPORT_AI_MODEL: z.string().default("claude-opus-5-5"),
+  // Where new seller tickets are emailed (also Super admin ▸ Support ▸ Assistant).
+  SUPPORT_INBOX: z.string().optional(),
 
   // Where uploaded images are stored (modules/uploads). Unset: ImageKit when
   // its keys are set, else Cloudinary when its keys are set, else the

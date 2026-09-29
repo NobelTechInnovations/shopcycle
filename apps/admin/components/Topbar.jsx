@@ -14,14 +14,17 @@ import {
   ExternalLink,
   MonitorSmartphone,
   Menu,
+  LifeBuoy,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { storefrontUrlFor, initials } from "@/lib/storefront";
 import { CommandPalette } from "./CommandPalette";
 import { NewOrderAlerts } from "./NewOrderAlerts";
+import { useHelp } from "./help/HelpDrawer";
 
 export function Topbar({ user, store, onOpenNav }) {
   const router = useRouter();
+  const { openHelp } = useHelp();
   const { message } = App.useApp();
   const [stores, setStores] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -169,6 +172,16 @@ export function Topbar({ user, store, onOpenNav }) {
       </button>
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => openHelp()}
+          aria-label="Help"
+          title="Help (?)"
+          className="h-9 px-2.5 rounded-md flex items-center gap-1.5 text-sm text-ink bg-transparent border border-transparent cursor-pointer hover:bg-app-bg hover:border-app-border transition-colors"
+        >
+          <LifeBuoy size={16} aria-hidden="true" />
+          <span className="hidden md:inline">Help</span>
+        </button>
         {store && <NewOrderAlerts storeId={store.id} />}
         {store && (
           <Button

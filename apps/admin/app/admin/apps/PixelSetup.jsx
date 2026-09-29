@@ -40,7 +40,7 @@ export function PixelSetup({ form }) {
   }, []);
 
   function connect() {
-    sessionStorage.setItem("meta-connect-return-to", "/admin/apps?setup=facebook-pixel");
+    sessionStorage.setItem("meta-connect-return-to", "/admin/apps/details/facebook-pixel");
     sessionStorage.setItem("meta-connect-endpoint", "/api/apps/facebook-pixel/connect");
     window.location.href = info.authorizeUrl;
   }

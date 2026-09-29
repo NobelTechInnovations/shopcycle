@@ -15,6 +15,10 @@ import {
   Puzzle,
   Quote,
   Smartphone,
+  Workflow,
+  LifeBuoy,
+  Gift,
+  ShieldCheck,
 } from "lucide-react";
 import { APP_ICON_KEYS } from "@shopcycle/utils";
 
@@ -39,6 +43,10 @@ const ICON_COMPONENTS = {
   puzzle: Puzzle,
   quote: Quote,
   smartphone: Smartphone,
+  workflow: Workflow,
+  "life-buoy": LifeBuoy,
+  gift: Gift,
+  shield: ShieldCheck,
 };
 
 export const APP_ICONS = ICON_COMPONENTS;

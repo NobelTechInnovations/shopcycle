@@ -55,6 +55,10 @@ const inventoryRoutes = require("./modules/inventory/routes");
 const exportRoutes = require("./modules/exports/routes");
 const emailLogRoutes = require("./modules/email-log/routes");
 const billingRoutes = require("./modules/billing/routes");
+const flowsRoutes = require("./modules/flows/routes");
+const flowsEngine = require("./modules/flows/engine");
+const supportRoutes = require("./modules/support/routes");
+const publicAppsRoutes = require("./modules/apps/public-routes");
 
 // The browser origins allowed to call this API with credentials. Every
 // shopper-facing request reaches the API server-to-server (the storefront
@@ -176,6 +180,11 @@ function buildApp() {
   app.register(metaAdsRoutes, { prefix: "/api/meta-ads" });
   app.register(whatsappRoutes, { prefix: "/api/whatsapp" });
   app.register(platformCustomersRoutes, { prefix: "/api/super-admin/platform-customers" });
+  app.register(flowsRoutes, { prefix: "/api/flows" });
+  app.register(supportRoutes, { prefix: "/api/support" });
+  app.register(publicAppsRoutes, { prefix: "/api/public" });
+  // Flow automations react to the same store events webhooks carry.
+  flowsEngine.register(app.log);
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) {

@@ -432,7 +432,96 @@ function billingNotice({ storeName, title, lines = [], rows = [], cta, ctaUrl })
   };
 }
 
+/**
+ * An email a seller wrote in the Flow app. `text` is their words with
+ * {{placeholders}}: it's escaped first, then each placeholder becomes its
+ * (escaped) value — so nothing a shopper typed, like their name, can add
+ * markup. Blank lines start a new paragraph.
+ */
+function fillText(text, vars, { discountCode } = {}) {
+  return esc(text).replace(/\{\{\s*([a-z_.]+)\s*\}\}/g, (all, key) => {
+    if (key === "discount_code") {
+      return discountCode
+        ? `<strong style="display:inline-block;padding:2px 8px;border:1px dashed ${MUTED};border-radius:6px;font:700 14px ${FONT};letter-spacing:0.04em">${esc(discountCode)}</strong>`
+        : "";
+    }
+    return key in vars ? esc(vars[key]) : "";
+  });
+}
+
+function flowEmail({ store, vars, subject, heading: title, text, discountCode, buttonLabel, buttonUrl, order, cartItems, cartTotal, currency }) {
+  const paragraphs = String(text || "")
+    .split(/\n\s*\n/)
+    .map((para) => para.trim())
+    .filter(Boolean)
+    .map((para) => p(fillText(para, vars, { discountCode }).replace(/\n/g, "<br>")))
+    .join("");
+  const summary = order
+    ? orderSummary(order)
+    : cartItems?.length
+      ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px">${itemRows(cartItems, currency)}</table>${
+          cartTotal != null ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px">${summaryRow("Total", money(cartTotal, currency), true)}</table>` : ""
+        }`
+      : "";
+  const plainSubject = String(subject || "").replace(/\{\{\s*([a-z_.]+)\s*\}\}/g, (all, key) => (key === "discount_code" ? discountCode || "" : vars[key] ?? ""));
+  return {
+    subject: plainSubject.replace(/\s+/g, " ").trim(),
+    html: layout({
+      brand: store.name,
+      preheader: String(text || "").replace(/\{\{[^}]*\}\}/g, "").split("\n").find((l) => l.trim().length > 20)?.trim().slice(0, 120) || "",
+      body: [title ? heading(fillText(title, vars, { discountCode })) : "", paragraphs, buttonLabel && buttonUrl ? button(buttonUrl, buttonLabel) : "", summary].join(""),
+      footer: storeFooter(store),
+    }),
+  };
+}
+
+/** A note to the store owner from one of their flows. */
+function flowOwnerNote({ store, vars, subject, text, adminUrl }) {
+  const plainSubject = String(subject || "").replace(/\{\{\s*([a-z_.]+)\s*\}\}/g, (all, key) => vars[key] ?? "");
+  const body = String(text || "")
+    .split(/\n\s*\n/)
+    .filter((x) => x.trim())
+    .map((para) => p(fillText(para.trim(), vars).replace(/\n/g, "<br>")))
+    .join("");
+  return {
+    subject: plainSubject.trim(),
+    html: layout({
+      brand: "Oyklane",
+      preheader: plainSubject,
+      body: `${heading(esc(plainSubject))}${body}${adminUrl ? button(adminUrl, "Open in your admin") : ""}`,
+      footer: `Sent by a flow in ${esc(store.name)}'s Flow app. Turn it off in Apps ▸ Flow.`,
+    }),
+  };
+}
+
+/** Seller support: a ticket was opened, answered, or replied to. `message`
+ * is plain text (a seller's or the team's words) shown as a quoted block. */
+function supportTicketEmail({ title, intro, message, author, cta, ctaUrl, footer, extra = "" }) {
+  const quoted = message
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 10px"><tr><td style="border-left:3px solid ${LINE};padding:4px 0 4px 14px">
+  ${author ? `<p style="margin:0 0 6px;font:600 13px ${FONT};color:${MUTED}">${esc(author)}</p>` : ""}
+  ${String(message)
+    .split(/\n\s*\n/)
+    .filter((x) => x.trim())
+    .map((para) => p(esc(para.trim()).replace(/\n/g, "<br>"), "margin-bottom:10px"))
+    .join("")}
+</td></tr></table>`
+    : "";
+  return {
+    subject: title,
+    html: layout({
+      brand: "Oyklane Support",
+      preheader: intro || "",
+      body: `${heading(esc(title))}${intro ? p(esc(intro)) : ""}${quoted}${extra}${cta && ctaUrl ? button(ctaUrl, cta) : ""}`,
+      footer: footer || "Oyklane Support — reply from your dashboard's Help page, or just reply to this email.",
+    }),
+  };
+}
+
 module.exports = {
+  supportTicketEmail,
+  flowEmail,
+  flowOwnerNote,
   billingNotice,
   giftCardIssued,
   esc,

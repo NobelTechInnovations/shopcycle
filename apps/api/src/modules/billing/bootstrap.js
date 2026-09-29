@@ -59,6 +59,17 @@ const PHONE_LOGIN = {
   ],
 };
 
+// Email automations (modules/flows). Free unless the super admin prices it.
+const FLOW = {
+  key: "flow",
+  name: "Flow",
+  description:
+    "Automate emails to your customers: thank first-time buyers, ask for reviews after delivery, win back quiet customers, follow up abandoned checkouts — or build your own from triggers, waits and conditions.",
+  category: "automation",
+  iconKey: "workflow",
+  settingsSchema: [],
+};
+
 async function seedCatalog(prisma, { log } = {}) {
   const have = new Set((await prisma.feature.findMany({ select: { key: true } })).map((f) => f.key));
   const missing = FEATURES.filter((f) => !have.has(f.key));
@@ -106,6 +117,8 @@ async function seedCatalog(prisma, { log } = {}) {
   await prisma.platformSetting.upsert({ where: { key: "billing" }, update: {}, create: { key: "billing", value: DEFAULTS } });
   await prisma.app.upsert({ where: { key: ONE_CLICK.key }, update: {}, create: ONE_CLICK });
   await prisma.app.upsert({ where: { key: PHONE_LOGIN.key }, update: {}, create: PHONE_LOGIN });
+  await prisma.app.upsert({ where: { key: FLOW.key }, update: {}, create: FLOW });
+  await require("../support/articles").seedArticles(prisma, { log });
 }
 
 /** A trial for every store that has no subscription yet. A store already
@@ -136,4 +149,4 @@ async function bootstrap(prisma, { log } = {}) {
   await migrateStores(prisma, { log });
 }
 
-module.exports = { bootstrap, seedCatalog, migrateStores, ONE_CLICK, PHONE_LOGIN };
+module.exports = { bootstrap, seedCatalog, migrateStores, ONE_CLICK, PHONE_LOGIN, FLOW };

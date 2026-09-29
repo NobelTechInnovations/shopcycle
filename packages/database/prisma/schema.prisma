@@ -328,6 +328,158 @@ model CartSession {
   @@map("cart_sessions")
 }
 
+// ─────────────────────────────────────────────
+// Flow app — a store's email automations (modules/flows)
+// ─────────────────────────────────────────────
+
+/// "When this happens, do these steps": a trigger (order placed, shipped,
+/// delivered, customer signed up, checkout abandoned, ...) and an ordered
+/// list of steps — wait, check a condition, email the customer, email the
+/// owner. See flows/catalog.js for the shapes.
+model Flow {
+  id          String    @id @default(cuid())
+  storeId     String
+  name        String
+  trigger     String
+  /// [{ id, type: "wait" | "condition" | "send_email" | "notify_owner", ... }]
+  steps       Json      @default("[]")
+  enabled     Boolean   @default(false)
+  /// The ready-made recipe it started from, if any.
+  templateKey String?
+  runsCount   Int       @default(0)
+  emailsSent  Int       @default(0)
+  lastRunAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  store Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  runs  FlowRun[]
+
+  @@index([storeId, trigger, enabled])
+  @@map("flows")
+}
+
+/// One trip through a Flow for one order, customer or checkout — at most
+/// one per flow and subject, so an event seen twice never emails twice.
+model FlowRun {
+  id          String    @id @default(cuid())
+  flowId      String
+  storeId     String
+  /// "order" | "customer" | "cart"
+  subjectType String
+  subjectId   String
+  /// running → waiting (a Wait step, until nextRunAt) → done | stopped | failed
+  status      String    @default("running")
+  /// The step to run next (its id — steps can be edited while a run waits).
+  stepId      String?
+  nextRunAt   DateTime?
+  /// [{ at, stepId, type, result, detail }]
+  log         Json      @default("[]")
+  error       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  flow Flow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  @@unique([flowId, subjectType, subjectId])
+  @@index([status, nextRunAt])
+  @@index([storeId, createdAt])
+  @@map("flow_runs")
+}
+
+// ─────────────────────────────────────────────
+// Seller support — the assistant answers first, then a ticket (modules/support)
+// ─────────────────────────────────────────────
+
+/// A help-centre article, written in Super admin ▸ Support. The assistant
+/// answers sellers from these, and sellers can browse them.
+model SupportArticle {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  title      String
+  category   String   @default("general")
+  /// Markdown-ish: paragraphs, "- " lists, **bold**, [links](/admin/...).
+  body       String   @db.Text
+  keywords   String[] @default([])
+  published  Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  views      Int      @default(0)
+  helpful    Int      @default(0)
+  notHelpful Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([published, category])
+  @@map("support_articles")
+}
+
+/// A seller's conversation with the assistant — kept so the platform can
+/// see what sellers ask and how often the answer was enough.
+model SupportChat {
+  id        String   @id @default(cuid())
+  storeId   String
+  userId    String
+  /// [{ role: "user" | "assistant", content, at, articles?: [slug] }]
+  messages  Json     @default("[]")
+  /// true "That solved it" · false went on to a ticket · null no answer yet
+  resolved  Boolean?
+  ticketId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+  @@index([createdAt])
+  @@map("support_chats")
+}
+
+/// A seller's request to the Oyklane team. Replies go out by email and
+/// show in the seller's admin (Help ▸ Tickets).
+model SupportTicket {
+  id            String   @id @default(cuid())
+  /// Shown as #(1000 + number).
+  number        Int      @unique @default(autoincrement())
+  storeId       String
+  userId        String
+  /// Where replies are emailed — the seller's login email when they opened it.
+  email         String
+  name          String
+  subject       String
+  category      String   @default("general")
+  /// low | normal | high | urgent
+  priority      String   @default("normal")
+  /// open (waiting on us) | waiting (on the seller) | resolved | closed
+  status        String   @default("open")
+  chatId        String?
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  store    Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
+
+  @@index([storeId, createdAt])
+  @@index([status, lastMessageAt])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id         String   @id @default(cuid())
+  ticketId   String
+  /// seller | support | system
+  author     String
+  authorName String
+  authorId   String?
+  body       String   @db.Text
+  createdAt  DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@map("support_messages")
+}
+
 /// Append-only record of sensitive actions — every platform-console
 /// mutation (suspending a store, editing plans/apps) and security events
 /// (2FA changes, sign-out-everywhere). Deliberately no foreign keys: the
@@ -487,6 +639,9 @@ model Store {
   webhookEndpoints     WebhookEndpoint[]
   metafieldDefinitions MetafieldDefinition[]
   productReviews       ProductReview[]
+  flows                Flow[]
+  supportChats         SupportChat[]
+  supportTickets       SupportTicket[]
 
   // Billing engine (modules/billing) — one subscription per store.
   subscription           Subscription?
