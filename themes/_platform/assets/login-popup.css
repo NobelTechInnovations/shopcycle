@@ -298,3 +298,14 @@ html.oy-lg-open {
     transition: none;
   }
 }
+
+/* "Sign in with your email instead" inside the error, when a phone code
+   couldn't be sent. */
+.oy-lg__link--strong {
+  display: block;
+  margin-top: 8px;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

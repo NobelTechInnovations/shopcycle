@@ -278,13 +278,23 @@ function Assistant() {
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-[15px] font-semibold text-ink m-0">Help assistant</h2>
-            <p className="text-[13px] text-ink-muted m-0">{meta.configured ? "Claude is connected (ANTHROPIC_API_KEY)." : "No ANTHROPIC_API_KEY on the server — sellers get help-centre articles instead."}</p>
+            <p className="text-[13px] text-ink-muted m-0">
+              {meta.configured
+                ? meta.provider === "nvidia"
+                  ? "Connected to NVIDIA (Nemotron) with the server's NVIDIA key."
+                  : "Connected to Claude with the server's ANTHROPIC_API_KEY."
+                : "No AI key on the server (NVIDIA_API_KEY or ANTHROPIC_API_KEY) — sellers get help-centre articles instead."}
+            </p>
           </div>
           <Form.Item name="aiEnabled" valuePropName="checked" className="!mb-0">
             <Switch checkedChildren="On" unCheckedChildren="Off" disabled={!meta.configured} />
           </Form.Item>
         </div>
-        <Form.Item name="model" label="Model" extra={`Empty uses the server's SUPPORT_AI_MODEL (${meta.defaultModel}).`}>
+        <Form.Item
+          name="model"
+          label="Model"
+          extra={`Empty uses ${meta.defaultModel}. ${meta.provider === "nvidia" ? "NVIDIA model ids look like nvidia/nemotron-3-ultra-550b-a55b." : "Claude model ids look like claude-sonnet-5."}`}
+        >
           <Input placeholder={meta.defaultModel} />
         </Form.Item>
         <Form.Item name="instructions" label="Extra guidance for the assistant" extra="Known issues, current offers, how to phrase things — added to every answer's instructions.">

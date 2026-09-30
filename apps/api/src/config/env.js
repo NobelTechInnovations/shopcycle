@@ -131,12 +131,17 @@ const envSchema = z.object({
   REVALIDATE_SECRET: z.string().optional(),
   BREVO_API_URL: z.string().default("https://api.brevo.com/v3/smtp/email"),
 
-  // The seller Help assistant (modules/support) answers with Claude. Unset:
-  // it answers with the best-matching help articles instead. The model can
-  // be changed in Super admin ▸ Support ▸ Assistant.
+  // The seller Help assistant (modules/support, lib/ai.js): NVIDIA's hosted
+  // models (Nemotron 3 Ultra by default) or Claude. With neither key it
+  // answers with the best-matching help articles instead. An "nvapi-" key is
+  // used with NVIDIA even if it was saved as ANTHROPIC_API_KEY. The model
+  // can be changed in Super admin ▸ Support ▸ Assistant.
+  AI_PROVIDER: z.enum(["nvidia", "anthropic"]).optional(),
+  NVIDIA_API_KEY: z.string().optional(),
+  NVIDIA_API_URL: z.string().default("https://integrate.api.nvidia.com/v1/chat/completions"),
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_API_URL: z.string().default("https://api.anthropic.com/v1/messages"),
-  SUPPORT_AI_MODEL: z.string().default("claude-opus-5-5"),
+  SUPPORT_AI_MODEL: z.string().optional(),
   // Where new seller tickets are emailed (also Super admin ▸ Support ▸ Assistant).
   SUPPORT_INBOX: z.string().optional(),
 

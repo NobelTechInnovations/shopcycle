@@ -141,7 +141,8 @@ async function endTrial(prisma, store, sub, { now, log }) {
   const cycle = await cycles.firstCycle(prisma, store, sub, sub.plan, sub.trialEndsAt);
   if (cycle.status === "processing" || cycle.status === "paid") return false; // waiting on the bank
   const mandate = await charges.activeMandate(prisma, sub.id);
-  if (mandate && cycle.status === "due") {
+  // Nothing to collect (a free plan with no orders yet) needs no mandate.
+  if (cycle.status === "due" && (mandate || num(cycle.total) < 1)) {
     await charges.chargeCycle(prisma, cycle.id, { now, log });
     return true;
   }
@@ -252,7 +253,7 @@ async function owed(prisma, store, sub) {
   if (open) return num(open.total);
   const settings = await getSettings(prisma);
   const { regularPrice } = require("./pricing");
-  return tax(regularPrice(sub, sub.plan, sub.interval, settings), settings.taxRate, store.billingState).total;
+  return tax(regularPrice(sub, sub.plan, sub.interval, settings, new Date()), settings.taxRate, store.billingState).total;
 }
 
 /** Grace over: the dashboard locks; the storefront stays live. */

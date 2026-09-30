@@ -32,6 +32,12 @@ async function billingAdminRoutes(fastify) {
   action("/suspend", z.object({ reason }), (r, b) => admin.suspend(prisma, r.params.storeId, { ...b, actorId: actor(r) }));
   action("/restore", z.object({ reason }), (r, b) => admin.restore(prisma, r.params.storeId, { ...b, actorId: actor(r) }));
   action("/access", z.object({ until: z.string().nullable().optional(), reason }), (r, b) => admin.grantAccess(prisma, r.params.storeId, { ...b, actorId: actor(r) }));
+  // No plan fee until a date — order commission and paid apps still billed.
+  action(
+    "/free-plan",
+    z.object({ until: z.string().nullable().optional(), note: reason, keepOpen: z.boolean().optional() }),
+    (r, b) => admin.setFreePlan(prisma, r.params.storeId, { ...b, actorId: actor(r) })
+  );
   action("/extend-trial", z.object({ days: z.coerce.number().int(), reason }), (r, b) => admin.extendTrial(prisma, r.params.storeId, { ...b, actorId: actor(r) }));
   action("/plan", z.object({ planId: z.string().min(1), interval: z.enum(["month", "year"]).optional(), reason }), (r, b) => admin.changePlan(prisma, r.params.storeId, { ...b, actorId: actor(r) }));
   action(

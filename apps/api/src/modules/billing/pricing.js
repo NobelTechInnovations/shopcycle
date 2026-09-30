@@ -33,11 +33,19 @@ function addInterval(date, interval, count = 1) {
 
 const addDays = (date, days) => new Date(new Date(date).getTime() + days * DAY);
 
+/** Admin free plan: no plan fee for a period starting at `at`. Order
+ * commission and paid apps are still billed. */
+function isFreePlan(sub, at = new Date()) {
+  return Boolean(sub?.freePlanUntil && new Date(at) < new Date(sub.freePlanUntil));
+}
+
 /**
- * The price of the next regular period, honouring an admin promotion
- * (a fixed price for the next N periods).
+ * The price of the next regular period starting at `at`: ₹0 on an admin
+ * free plan, else an admin promotion (a fixed price for the next N
+ * periods), else the plan's price.
  */
-function regularPrice(sub, plan, interval, settings) {
+function regularPrice(sub, plan, interval, settings, at = new Date()) {
+  if (isFreePlan(sub, at)) return 0;
   if (sub.promoPrice != null && (sub.promoCyclesLeft == null || sub.promoCyclesLeft > 0)) return round2(num(sub.promoPrice));
   return periodPrice(plan, interval, settings);
 }
@@ -64,4 +72,4 @@ function proration({ fromPlan, fromInterval, toPlan, toInterval, periodStart, pe
   return { charge: Math.max(0, charge), credit, newPeriod, share };
 }
 
-module.exports = { periodPrice, dailyRate, addInterval, addDays, regularPrice, proration, DAY };
+module.exports = { periodPrice, dailyRate, addInterval, addDays, regularPrice, isFreePlan, proration, DAY };

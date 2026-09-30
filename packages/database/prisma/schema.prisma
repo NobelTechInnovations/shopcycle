@@ -2080,6 +2080,10 @@ model Subscription {
   promoPrice          Decimal?         @db.Decimal(10, 2)
   promoCyclesLeft     Int?
   promoNote           String?
+  /// Admin: no plan fee for periods that start before this moment —
+  /// checkout fees (order commission) and paid apps are still billed.
+  freePlanUntil       DateTime?
+  freePlanNote        String?
   provider            String           @default("razorpay")
   providerCustomerId  String?
   /// Engine claim — one process works on a subscription at a time.

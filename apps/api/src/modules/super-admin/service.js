@@ -1,5 +1,6 @@
 const { HttpError } = require("@shopcycle/utils");
 const repository = require("./repository");
+const { storefrontBaseUrl, oyklaneAddress } = require("../../lib/storefront-url");
 
 // The console's older status tabs, from the billing engine's statuses.
 const LEGACY_STATUS = {
@@ -21,6 +22,10 @@ async function listCompanies(prisma) {
     name: s.name,
     handle: s.handle,
     domain: s.domain,
+    // Where the store is live: its own domain once verified, else its Oyklane address.
+    url: storefrontBaseUrl(s) || null,
+    oyklaneUrl: oyklaneAddress(s),
+    domainLive: Boolean(s.domain && s.domainVerifiedAt),
     status: s.status,
     plan: s.subscription?.plan || (s.plan ? { id: s.plan.id, name: s.plan.name } : null),
     // Billing state for the platform console's tabs and badges — what an

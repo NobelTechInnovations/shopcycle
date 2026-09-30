@@ -22,6 +22,7 @@ const AUDIT_ACTIONS = {
   "POST /billing/subscriptions/:storeId/suspend": "billing.suspend",
   "POST /billing/subscriptions/:storeId/restore": "billing.restore",
   "POST /billing/subscriptions/:storeId/access": "billing.grant_access",
+  "POST /billing/subscriptions/:storeId/free-plan": "billing.free_plan",
   "POST /billing/subscriptions/:storeId/extend-trial": "billing.extend_trial",
   "POST /billing/subscriptions/:storeId/plan": "billing.change_plan",
   "POST /billing/subscriptions/:storeId/promo": "billing.promo",

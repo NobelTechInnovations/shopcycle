@@ -2,7 +2,8 @@
   Shopper sign-in and sign-up — one page, four modes:
     password (default) · code (email me a code, then the code step) · register
     phone (Phone Login app): number → code → [name + email → [email code]]
-      — with the app on, it's the only way in (login.phone_only)
+      — with the app on it's the way in (login.phone_only); an emailed code
+      (mode code) is offered only when a phone code can't be sent
   "Continue with Google" shows whenever the platform has Google sign-in set up.
 {% endcomment %}
 {%- capture return_field -%}{% if login.return_to %}<input type="hidden" name="return_to" value="{{ login.return_to }}">{% endif %}{%- endcapture -%}
@@ -122,7 +123,13 @@
               </form>
             {% endif %}
           </div>
-          {% unless login.phone_only %}<p class="sys-small sys-muted" style="margin-top:20px;text-align:center"><a class="sys-link" href="{{ routes.account_login_url }}{{ return_query }}">Sign in with your email instead</a></p>{% endunless %}
+          {% if login.phone_only %}
+            {% if form_error != blank and login.step == "phone" %}
+              <p class="sys-small sys-muted" style="margin-top:20px;text-align:center">Code not arriving? <a class="sys-link" href="{{ routes.account_login_url }}?mode=code{% if login.return_to %}&return_to={{ login.return_to }}{% endif %}">Sign in with your email instead</a></p>
+            {% endif %}
+          {% else %}
+            <p class="sys-small sys-muted" style="margin-top:20px;text-align:center"><a class="sys-link" href="{{ routes.account_login_url }}{{ return_query }}">Sign in with your email instead</a></p>
+          {% endif %}
 
         {% elsif login.mode == "register" %}
           <h1 class="sys-h1">Create an account</h1>
@@ -170,7 +177,11 @@
               <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Sending…">Email me a code</button>
             </form>
           </div>
-          <p class="sys-small sys-muted" style="margin-top:20px;text-align:center"><a class="sys-link" href="{{ routes.account_login_url }}{{ return_query }}">Sign in with a password instead</a></p>
+          {% if login.phone_only %}
+            <p class="sys-small sys-muted" style="margin-top:20px;text-align:center"><a class="sys-link" href="{{ routes.account_login_url }}?mode=phone{% if login.return_to %}&return_to={{ login.return_to }}{% endif %}">Sign in with your phone instead</a></p>
+          {% else %}
+            <p class="sys-small sys-muted" style="margin-top:20px;text-align:center"><a class="sys-link" href="{{ routes.account_login_url }}{{ return_query }}">Sign in with a password instead</a></p>
+          {% endif %}
 
         {% else %}
           <h1 class="sys-h1">Sign in</h1>

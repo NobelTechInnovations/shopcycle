@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, Dropdown, Tooltip } from "antd";
 import { BrandMark, AppIcon } from "@shopcycle/ui";
+import { BrandGlyph } from "@/components/apps/AppTile";
+import { APP_BRANDS } from "@/components/apps/brand-logos";
 import {
   Home,
   ShoppingCart,
@@ -141,7 +143,7 @@ function PinnedApp({ app, active }) {
         }`}
       >
         <span className={`w-[22px] h-[22px] shrink-0 rounded-[7px] flex items-center justify-center ${active ? "bg-white text-accent shadow-card" : "bg-app-bg text-ink-muted border border-app-border"}`}>
-          <AppIcon iconKey={app.iconKey} size={12} />
+          {APP_BRANDS[app.key] ? <BrandGlyph app={app} size={13} /> : <AppIcon iconKey={app.iconKey} size={12} />}
         </span>
         <span className="truncate">{app.name}</span>
       </Link>

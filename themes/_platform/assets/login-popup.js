@@ -2,8 +2,10 @@
  * Oyklane phone sign-in popup — on when the store has the Phone Login app
  * and the shopper is signed out. Account links (the header's account icon,
  * "Sign in", "Create account") open this popup: mobile number → a code by
- * SMS or WhatsApp → for a new number, name and email → signed in. Without
- * JavaScript the links still go to the sign-in page, which asks the same.
+ * SMS or WhatsApp → for a new number, name and email → signed in. If the
+ * phone code can't be sent, the shopper can sign in with an emailed code
+ * instead. Without JavaScript the links still go to the sign-in page,
+ * which asks the same.
  * Config: <script type="application/json" id="oy-login-config">.
  */
 (function () {
@@ -34,6 +36,7 @@
     x: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     back: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
     phone: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></svg>',
+    mail: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M4 6.5l8 6 8-6"/></svg>',
   };
 
   var sheet = null;
@@ -98,6 +101,22 @@
         cta: "Continue",
       };
     }
+    if (st.step === "email") {
+      return {
+        title: "Sign in with your email",
+        sub: "We'll email you a one-time code instead.",
+        body: '<label class="oy-lg__field"><span>Email</span><input class="oy-lg__input" type="email" name="email" autocomplete="email" required maxlength="200" placeholder="you@example.com" value="' + esc(st.email) + '"></label>',
+        cta: "Email me a code",
+      };
+    }
+    if (st.step === "email-login") {
+      return {
+        title: "Check your email",
+        sub: "Enter the code we sent to <strong>" + esc(st.email) + '</strong> <button type="button" class="oy-lg__link" data-go-email>Change</button>',
+        body: codeBoxes(),
+        cta: "Sign in",
+      };
+    }
     if (st.step === "email-code") {
       return {
         title: "Confirm your email",
@@ -130,10 +149,13 @@
       (st.step !== "phone" ? '<button type="button" class="oy-lg__icon" data-go="phone" aria-label="Back">' + ICON.back + "</button>" : '<span class="oy-lg__brand">' + esc(cfg.storeName || "") + "</span>") +
       '<button type="button" class="oy-lg__icon" data-close aria-label="Close">' + ICON.x + "</button></header>" +
       '<div class="oy-lg__body">' +
-      '<span class="oy-lg__badge">' + ICON.phone + "</span>" +
+      '<span class="oy-lg__badge">' + (st.step === "email" || st.step === "email-login" ? ICON.mail : ICON.phone) + "</span>" +
       '<h2 id="oy-lg-title" class="oy-lg__title">' + v.title + "</h2>" +
       '<p class="oy-lg__sub">' + v.sub + "</p>" +
-      '<p class="oy-lg__error" role="alert"' + (st.error ? "" : " hidden") + ">" + esc(st.error || "") + "</p>" +
+      '<p class="oy-lg__error" role="alert"' + (st.error ? "" : " hidden") + ">" + esc(st.error || "") +
+      // A phone code that couldn't be sent: offer the emailed code right there.
+      (st.error && st.step === "phone" && st.sendFailed ? ' <button type="button" class="oy-lg__link oy-lg__link--strong" data-go-email>Sign in with your email instead</button>' : "") +
+      "</p>" +
       v.body +
       '<button type="submit" class="oy-lg__cta"' + (st.busy ? " disabled" : "") + ">" + (st.busy ? '<span class="oy-lg__spin" aria-hidden="true"></span> ' + esc(st.busy) : esc(v.cta)) + "</button>" +
       (st.step === "phone" ? '<p class="oy-lg__fine">By continuing you agree to receive a one-time code on this number.</p>' : "") +
@@ -180,7 +202,22 @@
       })
       .catch(function (err) {
         st.step = "phone";
+        st.sendFailed = true;
         fail(err.message);
+      });
+  }
+
+  function sendEmailCode() {
+    st.busy = "Sending code…";
+    draw();
+    post({ action: "email-send", email: st.email })
+      .then(function (res) {
+        st.email = res.email || st.email;
+        go("email-login", "[data-digit='0']");
+      })
+      .catch(function (err) {
+        st.step = "email";
+        fail(err.message, "input[name=email]");
       });
   }
 
@@ -219,12 +256,17 @@
       if (ch) st.channel = ch.value;
       return sendCode();
     }
-    if (st.step === "code" || st.step === "email-code") {
+    if (st.step === "email") {
+      st.email = form.elements.email.value.trim();
+      if (!form.elements.email.checkValidity() || !st.email) return fail("Enter a valid email.", "input[name=email]");
+      return sendEmailCode();
+    }
+    if (st.step === "code" || st.step === "email-code" || st.step === "email-login") {
       var code = Array.prototype.map.call(form.querySelectorAll("[data-digit]"), function (b) {
         return b.value;
       }).join("");
       if (code.length !== 6) return fail("Enter all 6 digits of the code.", "[data-digit='0']");
-      return submitCode(st.step === "code" ? "verify" : "email-code", code);
+      return submitCode(st.step === "code" ? "verify" : st.step === "email-login" ? "email-verify" : "email-code", code);
     }
     if (st.step === "profile") {
       st.name = form.elements.name.value.trim();
@@ -261,7 +303,7 @@
 
   function open(href) {
     goTo = href;
-    st = { step: "phone", typed: "", phone: "", channel: cfg.channels[0], name: "", email: "", error: null, busy: null };
+    st = { step: "phone", typed: "", phone: "", channel: cfg.channels[0], name: "", email: "", error: null, busy: null, sendFailed: false };
     sheet = document.createElement("div");
     sheet.className = "oy-lg";
     sheet.innerHTML = '<div class="oy-lg__scrim" data-close></div><form class="oy-lg__panel" role="dialog" aria-modal="true" aria-labelledby="oy-lg-title" novalidate></form>';
@@ -270,6 +312,7 @@
     var form = sheet.querySelector("form");
     sheet.addEventListener("click", function (e) {
       if (e.target.closest("[data-close]")) return close();
+      if (e.target.closest("[data-go-email]")) return go("email", "input[name=email]");
       if (e.target.closest("[data-go]")) return go("phone");
       if (e.target.closest("[data-resend-now]")) return sendCode();
     });

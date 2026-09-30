@@ -43,6 +43,9 @@ function whatsappStatus() {
     forced: env.WHATSAPP_PROVIDER || null,
     zohoAccount: Boolean(zohoToken()),
     from: env.ZOHO_WHATSAPP_FROM || null,
+    // Meta's free test numbers are +1 555 …: they only reach a few
+    // allow-listed phones and have tight limits — not for real shoppers.
+    testNumber: /^1555\d{7}$/.test(String(env.ZOHO_WHATSAPP_FROM || "").replace(/\D/g, "")),
     otpTemplateFrom: t?.templateKey ? "super_admin" : env.ZOHO_WHATSAPP_TEMPLATE_KEY ? "env" : null,
     sms: smsProvider(),
   };

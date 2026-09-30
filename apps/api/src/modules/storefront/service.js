@@ -815,9 +815,10 @@ async function renderPage(
   if (templateName === "account-login") {
     const phoneLogin = await shopperPhone.config(prisma, store);
     const PHONE_STEPS = ["phone", "phone-code", "phone-profile", "phone-email-code"];
-    // With the Phone Login app on, shoppers sign in by phone only — no
-    // email, password or Google options (the app's whole point).
-    const mode = phoneLogin.enabled ? "phone" : ["register", "code"].includes(loginMode) ? loginMode : "password";
+    // With the Phone Login app on, shoppers sign in by phone — no password
+    // or Google options (the app's whole point). An emailed code stays as the
+    // fallback for when a phone code can't be sent.
+    const mode = phoneLogin.enabled ? (loginMode === "code" ? "code" : "phone") : ["register", "code"].includes(loginMode) ? loginMode : "password";
     globalContext.login = {
       step: mode === "phone" ? (PHONE_STEPS.includes(loginStep) ? loginStep : "phone") : loginStep === "code" ? "code" : "email",
       mode,

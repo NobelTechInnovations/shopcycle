@@ -7,6 +7,7 @@ import {
   setShopperCookie,
   visitorAllowed,
   LOGIN_PHONE_COOKIE,
+  LOGIN_EMAIL_COOKIE,
   PHONE_TICKET_COOKIE,
   PHONE_PROFILE_COOKIE,
 } from "@/lib/shopper";
@@ -18,12 +19,15 @@ import {
  *   { action: "verify", code }           → { done } | { profile: true }
  *   { action: "profile", name, email }   → { done } | { emailCode: email }
  *   { action: "email-code", code }       → { done }
+ * and, when a phone code can't be sent, sign-in by an emailed code:
+ *   { action: "email-send", email }      → { email }
+ *   { action: "email-verify", code }     → { done }
  * The number, the "number verified" ticket and the profile live in
  * HttpOnly cookies between steps (never in the page); { done } means the
  * session cookie is set.
  */
 const STEP_MAX_AGE = 20 * 60;
-const STEP_COOKIES = [LOGIN_PHONE_COOKIE, PHONE_TICKET_COOKIE, PHONE_PROFILE_COOKIE];
+const STEP_COOKIES = [LOGIN_PHONE_COOKIE, LOGIN_EMAIL_COOKIE, PHONE_TICKET_COOKIE, PHONE_PROFILE_COOKIE];
 
 function fail(message, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -67,6 +71,27 @@ export async function POST(request, { params }) {
     const response = NextResponse.json({ profile: true });
     response.cookies.set(PHONE_TICKET_COOKIE, res.data.signupTicket, cookieOptions(request, handle, STEP_MAX_AGE));
     return response;
+  }
+
+  // The email fallback — the same emailed-code sign-in as the sign-in page.
+  if (body.action === "email-send") {
+    if (!visitorAllowed(request, "sign-in-code", { max: 10, windowMs: 10 * 60 * 1000 })) {
+      return fail("Too many sign-in attempts from this device. Try again in a few minutes.", 429);
+    }
+    const email = str(body.email, 200).toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail("Enter a valid email.");
+    const res = await apiPost(handle, "/account/code", { email });
+    if (!res.ok) return fail(res.data?.error || "We couldn't email a code. Try again.", res.status);
+    const response = NextResponse.json({ email });
+    response.cookies.set(LOGIN_EMAIL_COOKIE, email, cookieOptions(request, handle, STEP_MAX_AGE));
+    return response;
+  }
+  if (body.action === "email-verify") {
+    const email = jar.get(LOGIN_EMAIL_COOKIE)?.value;
+    if (!email) return fail("Your sign-in timed out. Enter your email again.");
+    const res = await apiPost(handle, "/account/code/verify", { email, code: str(body.code, 12) });
+    if (!res.ok || !res.data?.token) return fail(res.data?.error || "That code didn't work.", res.ok ? 400 : res.status);
+    return done(res.data.token);
   }
 
   const ticket = jar.get(PHONE_TICKET_COOKIE)?.value;

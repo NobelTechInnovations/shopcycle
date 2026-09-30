@@ -23,6 +23,12 @@ function Field({ label, children }) {
 const ACTIONS = {
   "extend-trial": { title: "Extend the trial", ok: "Extend", fields: ["days", "reason"] },
   access: { title: "Grant temporary access", ok: "Grant access", fields: ["until", "reason"], help: "Full access to dashboard and storefront until this date, whatever the billing state." },
+  "free-plan": {
+    title: "Free plan — no monthly fee",
+    ok: "Start free plan",
+    fields: ["until", "note", "keepOpen"],
+    help: "Every billing period that starts before this date costs ₹0 for the plan. Order commission (the plan's %) and paid apps are still billed on each cycle, as for every store. Unpaid plan charges from before are re-priced to ₹0.",
+  },
   plan: { title: "Change plan", ok: "Change plan", fields: ["planId", "interval", "reason"], help: "Takes effect now, with no charge or proration." },
   promo: { title: "Promotional price", ok: "Save price", fields: ["price", "cycles", "note"], help: "A price before GST for the next renewals. Leave the price empty to remove the promotion." },
   suspend: { title: "Suspend for billing", ok: "Suspend", danger: true, fields: ["reason"], help: "Dashboard locked, storefront offline, checkout closed." },
@@ -96,6 +102,8 @@ export default function SubscriptionDetailPage({ params }) {
     { key: "retry", label: "Retry the unpaid charge" },
     { key: "extend-trial", label: "Extend trial" },
     { key: "access", label: "Grant temporary access" },
+    { key: "free-plan", label: s.freePlan ? "Change free plan" : "Free plan (no monthly fee)" },
+    ...(s.freePlan ? [{ key: "end-free-plan", label: "End free plan" }] : []),
     { key: "plan", label: "Change plan" },
     { key: "promo", label: "Promotional price" },
     { key: "entitlements", label: "Grant feature or limit" },
@@ -108,9 +116,11 @@ export default function SubscriptionDetailPage({ params }) {
   function onMenu({ key }) {
     if (key === "remind") return act("/remind", {}, "Reminder sent");
     if (key === "retry") return act("/retry", {}, "Charge sent to the bank");
+    if (key === "end-free-plan") return act("/free-plan", { until: null }, "Free plan ended — the next renewal is at the plan price");
     form.resetFields();
     if (key === "plan") form.setFieldsValue({ planId: s.plan.id, interval: s.interval });
     if (key === "promo" && s.promo) form.setFieldsValue({ price: s.promo.price, cycles: s.promo.cyclesLeft, note: s.promo.note });
+    if (key === "free-plan" && s.freePlan) form.setFieldsValue({ note: s.freePlan.note });
     setAction(key);
   }
 
@@ -152,6 +162,7 @@ export default function SubscriptionDetailPage({ params }) {
           <Field label="Grace ends">{day(s.graceEndsAt)}</Field>
           <Field label="Access granted until">{day(s.accessGrantedUntil)}</Field>
           <Field label="Promotion">{s.promo ? `${inr(s.promo.price)} × ${s.promo.cyclesLeft ?? "∞"}` : "—"}</Field>
+          <Field label="Free plan">{s.freePlan ? `until ${day(s.freePlan.until)} · commission only` : "—"}</Field>
           <Field label="Staff">
             {d.staff.used} / {d.staff.limit}
           </Field>
@@ -357,6 +368,11 @@ export default function SubscriptionDetailPage({ params }) {
                 <InputNumber min={1} max={36} className="!w-full" />
               </Form.Item>
             </div>
+          )}
+          {chosen?.fields.includes("keepOpen") && (
+            <Form.Item name="keepOpen" label="Keep the dashboard open even if a commission payment fails" valuePropName="checked" initialValue={false} extra="For your own store or a partner. Commission stays owed either way.">
+              <Switch />
+            </Form.Item>
           )}
           {chosen?.fields.includes("note") && (
             <Form.Item name="note" label="Note (shown to the seller)">

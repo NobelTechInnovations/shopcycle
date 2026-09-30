@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { APP_CATEGORY, APP_TILE } from "../data/apps";
+import { APP_CATEGORY, APP_LOGO } from "../data/apps";
+import { Logo } from "../components/Logo";
 
 const price = (n) => `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 })}/month`;
 
@@ -24,13 +25,11 @@ export function AppsBrowser({ apps, appUrl }) {
       </div>
       <div className="cards">
         {shown.map((a) => {
-          const tile = APP_TILE[a.key] || { mono: a.name.slice(0, 1), color: "#475569" };
+          const logo = APP_LOGO[a.key] || { icon: "puzzle" };
           return (
             <article className="card" key={a.key}>
               <div className="card__top">
-                <span className="logo-tile" aria-hidden="true">
-                  <i style={{ background: tile.color }}>{tile.mono}</i>
-                </span>
+                <Logo {...logo} size={48} />
                 {a.priceMonthly ? <span className="badge badge--paid">{price(a.priceMonthly)}</span> : <span className="badge badge--built">Free</span>}
               </div>
               <h3>{a.name}</h3>

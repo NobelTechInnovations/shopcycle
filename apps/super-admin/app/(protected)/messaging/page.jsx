@@ -7,6 +7,17 @@ import { PageHeader, EmptyState, StatusBadge, useHasMounted } from "@shopcycle/u
 import { apiFetch } from "@/lib/api";
 
 const PROVIDERS = { zoho: "Zoho CPaaS", meta: "Meta WhatsApp Cloud", twilio: "Twilio", log: "Off — codes are only logged" };
+
+/** What a provider's error usually means, in plain words. */
+function explain(error) {
+  const e = String(error || "");
+  if (/429|resource limit|limit exhausted|rate limit/i.test(e)) return "Zoho's limit is used up: top up WhatsApp credits in Zoho CPaaS, and send from your real business number — Meta's +1 555 test number only reaches allow-listed phones.";
+  if (/placeholder/i.test(e)) return "The template's placeholder name doesn't match — check it in Zoho ▸ Templates.";
+  if (/template/i.test(e)) return "Zoho doesn't know that template key — copy it again from Zoho ▸ Templates (it must be approved).";
+  if (/401|403|auth|token|unauthori/i.test(e)) return "Zoho refused the account key — check ZOHO_CPAAS_TOKEN on Railway.";
+  if (/number|recipient|invalid.*to/i.test(e)) return "Zoho refused the number — it must include the country code.";
+  return null;
+}
 const COMING = [
   { label: "Order confirmed", hint: "Order number, total and a link to track it." },
   { label: "Shipped", hint: "Courier and tracking number." },
@@ -111,6 +122,11 @@ export default function MessagingPage() {
             ok
             value={live ? <Tag color="green" className="!m-0">{PROVIDERS[status.provider] || status.provider}</Tag> : <Tag className="!m-0">{PROVIDERS.log}</Tag>}
           />
+          {status.testNumber && (
+            <div className="mt-3 rounded-lg border border-[#F5D9A8] bg-[#FFF8EC] px-3 py-2.5 text-[12.5px] text-ink">
+              <strong>{status.from} is Meta&rsquo;s test number.</strong> It can only message a few phones you&rsquo;ve allow-listed, with tight daily limits — shoppers won&rsquo;t get codes. In Zoho CPaaS ▸ WhatsApp ▸ Configuration choose <strong>Add number</strong>, verify your business number, then set <code>ZOHO_WHATSAPP_FROM</code> on Railway to it.
+            </div>
+          )}
           {status.forced === "log" && (
             <p className="text-[12px] text-ink-muted mt-2 mb-0">WHATSAPP_PROVIDER=log on this server keeps every code local (development).</p>
           )}
@@ -197,7 +213,20 @@ export default function MessagingPage() {
               { title: "To", dataIndex: "to", render: (v) => <span className="tabular-nums">{v}</span> },
               { title: "Status", render: (_, r) => <span title={r.error || undefined}><StatusBadge status={r.status} /></span> },
               { title: "Through", dataIndex: "provider", responsive: ["md"], render: (v) => PROVIDERS[v]?.split(" —")[0] || v },
-              { title: "Problem", dataIndex: "error", responsive: ["lg"], render: (v) => (v ? <span className="text-[12px] text-status-danger">{v.slice(0, 120)}</span> : "—") },
+              {
+                title: "Problem",
+                dataIndex: "error",
+                responsive: ["lg"],
+                render: (v) =>
+                  v ? (
+                    <span className="block max-w-[420px]">
+                      <span className="text-[12px] text-status-danger">{v.slice(0, 120)}</span>
+                      {explain(v) && <span className="block text-[12px] text-ink-muted mt-0.5">{explain(v)}</span>}
+                    </span>
+                  ) : (
+                    "—"
+                  ),
+              },
               { title: "When", dataIndex: "createdAt", render: (v) => <span className="text-[13px] text-ink-muted tabular-nums">{when(v)}</span> },
             ]}
             locale={{ emptyText: <EmptyState icon={<MessageCircle />} title="No WhatsApp messages yet" description="Sign-in and checkout codes appear here." /> }}

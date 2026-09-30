@@ -145,6 +145,8 @@ function serialize(sub, { settings } = {}) {
     dunningNextAt: sub.dunningNextAt,
     accessGrantedUntil: sub.accessGrantedUntil,
     promo: sub.promoPrice != null ? { price: num(sub.promoPrice), cyclesLeft: sub.promoCyclesLeft, note: sub.promoNote } : null,
+    // Admin free plan: no plan fee until then; order commission still billed.
+    freePlan: sub.freePlanUntil && new Date(sub.freePlanUntil) > new Date() ? { until: sub.freePlanUntil, note: sub.freePlanNote } : null,
     providerCustomerId: sub.providerCustomerId,
     createdAt: sub.createdAt,
   };

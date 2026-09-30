@@ -13,7 +13,8 @@ const { getSupportSettings, modelFor } = require("./settings");
  * Payments", not a generic essay. When the assistant can't help, the
  * seller opens a ticket with the conversation attached.
  *
- * Without ANTHROPIC_API_KEY (or with the assistant switched off) the
+ * Without an AI key (NVIDIA_API_KEY or ANTHROPIC_API_KEY — lib/ai.js), or
+ * with the assistant switched off, the
  * seller gets the best-matching articles instead.
  */
 

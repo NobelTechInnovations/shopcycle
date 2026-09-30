@@ -25,18 +25,19 @@ export async function getApps() {
 
 export const APP_CATEGORY = { automation: "Automation", checkout: "Checkout", customers: "Customers", marketing: "Marketing", analytics: "Analytics", utility: "Utilities", other: "Other" };
 
-// Monogram tiles for app cards (the admin uses real icons; the site keeps it light).
-export const APP_TILE = {
-  flow: { mono: "F", color: "#7C5CFF" },
-  "one-click-checkout": { mono: "1", color: "#8B5CF6" },
-  "phone-login": { mono: "OTP", color: "#0EA5E9" },
-  "product-reviews": { mono: "★", color: "#F5A524" },
-  "facebook-pixel": { mono: "M", color: "#0866FF" },
-  "google-analytics": { mono: "GA", color: "#F9AB00" },
-  "meta-ads": { mono: "Ad", color: "#1877F2" },
-  whatsapp: { mono: "WB", color: "#128C7E" },
-  "customer-reviews": { mono: "“", color: "#DB2777" },
-  "custom-scripts": { mono: "</>", color: "#334155" },
+// Each app's logo (components/Logo.jsx): the brand's own mark for apps that
+// connect a brand, an icon for Oyklane's own apps.
+export const APP_LOGO = {
+  flow: { icon: "flow" },
+  "one-click-checkout": { icon: "bolt" },
+  "phone-login": { icon: "phone" },
+  "product-reviews": { icon: "star" },
+  "facebook-pixel": { brand: "meta" },
+  "google-analytics": { brand: "googleanalytics" },
+  "meta-ads": { brand: "facebook" },
+  whatsapp: { brand: "whatsapp" },
+  "customer-reviews": { icon: "chat" },
+  "custom-scripts": { icon: "code" },
 };
 
 /** What's being built next — shown as "coming soon", never as available. */

@@ -79,6 +79,9 @@ function check(label, ok, detail) {
   }
 }
 const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const withGst = (n) => r2(n + r2(n * 0.18));
+// Live plan prices, read once the test signs in.
+const P = {};
 const near = (a, b, tol = 0.011) => Math.abs(Number(a) - Number(b)) < tol;
 const within = (d, target, ms) => Math.abs(new Date(d).getTime() - new Date(target).getTime()) < ms;
 
@@ -224,8 +227,12 @@ async function main() {
     check("trial is 3 days", within(b.subscription?.trialEndsAt, Date.now() + 3 * DAY, 5 * 60000), b.subscription?.trialEndsAt);
     check("trial starts on Growth", b.subscription?.plan?.key === "growth", b.subscription?.plan);
     check("₹99 intro offer available", b.subscription?.introAvailable === true && b.settings?.introPrice === 99, b.settings);
-    check("Starter ₹199 / Growth ₹599 / Pro ₹1,299", plans.starter?.priceMonthly === 199 && plans.growth?.priceMonthly === 599 && plans.pro?.priceMonthly === 1299, Object.values(plans).map((p) => p.priceMonthly));
-    check("yearly = monthly × 12 × 80%", plans.starter?.priceYearly === 1910.4 && plans.growth?.priceYearly === 5750.4 && plans.pro?.priceYearly === 12470.4, Object.values(plans).map((p) => p.priceYearly));
+    // Prices come from Super admin ▸ Plans, so the test reads them rather than assuming them.
+    P.starter = plans.starter?.priceMonthly;
+    P.growth = plans.growth?.priceMonthly;
+    P.pro = plans.pro?.priceMonthly;
+    check(`Starter ₹${P.starter} < Growth ₹${P.growth} < Pro ₹${P.pro}`, P.starter > 0 && P.starter < P.growth && P.growth < P.pro, Object.values(plans).map((p) => p.priceMonthly));
+    check("yearly = monthly × 12 × 80%", ["starter", "growth", "pro"].every((k) => plans[k]?.priceYearly === r2(P[k] * 12 * 0.8)), Object.values(plans).map((p) => p.priceYearly));
     check("commission 2% / 1.5% / 0.5%", plans.starter?.commissionPercent === 2 && plans.growth?.commissionPercent === 1.5 && plans.pro?.commissionPercent === 0.5);
     check("staff 2 / 10 / 30, no product limit", plans.starter?.staffLimit === 2 && plans.growth?.staffLimit === 10 && plans.pro?.staffLimit === 30 && plans.pro?.productLimit == null);
     check("GST shown separately: ₹99 → ₹116.82", plans.starter?.withTax?.intro === 116.82 && b.settings?.taxRate === 18, plans.starter?.withTax);
@@ -362,7 +369,7 @@ async function main() {
     await clock(periodEnd.getTime() + 60000);
     charge = await lastCharge(store.id);
     cycle = await prisma.billingCycle.findUnique({ where: { id: charge.cycleId } });
-    check("renewal: Pro ₹1,299 + GST = ₹1,532.82", cycle?.kind === "regular" && Number(cycle.planAmount) === 1299 && Number(cycle.total) === 1532.82, cycle);
+    check(`renewal: Pro ₹${P.pro} + GST = ₹${withGst(P.pro)}`, cycle?.kind === "regular" && Number(cycle.planAmount) === P.pro && Number(cycle.total) === withGst(P.pro), cycle);
     w = await bankAnswers(charge, "failed", "Insufficient funds");
     b = await billing();
     check("failed payment → GRACE_PERIOD", b.subscription?.status === "GRACE_PERIOD" && b.subscription?.consecutiveFailures === 1, b.subscription);
@@ -409,7 +416,7 @@ async function main() {
 
     // ── Pay → back online, cycle re-anchored ─────────────────────────
     r = await owner("POST", "/api/billing/checkout", {});
-    check("pay-now checkout for what's owed", r.status === 200 && r.data.amount === 1532.82 && !r.data.checkout?.recurring, r.data);
+    check("pay-now checkout for what's owed", r.status === 200 && r.data.amount === withGst(P.pro) && !r.data.checkout?.recurring, r.data);
     r = await payCheckout(r.data.checkout, "upi");
     b = r.data.billing;
     check("paid → ACTIVE again", b?.subscription?.status === "ACTIVE" && b.subscription.consecutiveFailures === 0, b?.subscription);
@@ -434,16 +441,41 @@ async function main() {
     await clock(new Date(b.subscription.currentPeriodEnd).getTime() + 60000);
     charge = await lastCharge(store.id);
     cycle = await prisma.billingCycle.findUnique({ where: { id: charge.cycleId } });
-    check("renewal on Starter: ₹199 + GST = ₹234.82", Number(cycle?.planAmount) === 199 && Number(cycle?.total) === 234.82, cycle);
+    check(`renewal on Starter: ₹${P.starter} + GST = ₹${withGst(P.starter)}`, Number(cycle?.planAmount) === P.starter && Number(cycle?.total) === withGst(P.starter), cycle);
     await bankAnswers(charge, "captured");
     b = await billing();
     check("now on Starter", b.subscription?.plan?.key === "starter" && b.subscription?.status === "ACTIVE", b.subscription);
+
+    // ── Order commission rides on the next monthly bill ───────────────
+    // The owner's example: a monthly plan and ₹50,000 of orders in a month —
+    // the next renewal charges the plan price plus the plan's % of those orders.
+    r = await owner("POST", "/api/products", { title: "Silk Saree", status: "active", variants: [{ title: "One size", sku: `SAREE-${stamp}`, price: 25000, inventoryQuantity: 10 }] });
+    const sareeVariant = r.data.product?.variants?.[0]?.id;
+    let monthSales = 0;
+    for (let i = 0; i < 2; i += 1) {
+      const add = await sf("POST", `/api/storefront/${store.handle}/cart/add`, { variantId: sareeVariant, quantity: 1 });
+      const placed = (await sf("POST", `/api/storefront/${store.handle}/checkout`, { cartId: add.data.cart?.cartId, ...shopper, paymentMethod: "cod" })).data.order;
+      await owner("POST", `/api/orders/${placed.id}/mark-paid`, {});
+      monthSales += Number((await prisma.order.findUnique({ where: { id: placed.id } })).total);
+    }
+    const monthFee = r2(monthSales * 0.02);
+    check(`₹${monthSales} of paid orders on Starter → ₹${monthFee} commission accrued`, monthSales >= 50000 && (await prisma.commissionTransaction.aggregate({ where: { storeId: store.id, status: "accrued" }, _sum: { baseFee: true } }))._sum.baseFee?.toString() === String(monthFee), monthSales);
+    b = await billing();
+    check("the next bill shows the plan plus the commission", b.next?.planAmount === P.starter && b.next?.fees === monthFee && b.next?.total === withGst(P.starter + monthFee), b.next);
+    await clock(new Date(b.subscription.currentPeriodEnd).getTime() + 60000);
+    charge = await lastCharge(store.id);
+    cycle = await prisma.billingCycle.findUnique({ where: { id: charge.cycleId } });
+    check(`renewal = ₹${P.starter} plan + ₹${monthFee} commission, GST on top = ₹${withGst(P.starter + monthFee)}`, cycle?.kind === "regular" && Number(cycle.planAmount) === P.starter && Number(cycle.feesAmount) === monthFee && Number(cycle.total) === withGst(P.starter + monthFee), cycle);
+    await bankAnswers(charge, "captured");
+    check("that month's commission is marked paid on the renewal invoice", (await prisma.commissionTransaction.count({ where: { storeId: store.id, cycleId: cycle.id, status: "paid" } })) === 2);
+    b = await billing();
+    check("nothing carried over to the bill after", b.next?.fees === 0 && b.subscription?.status === "ACTIVE", b.next);
 
     // ── Upgrade now, prorated ────────────────────────────────────────
     r = await owner("POST", "/api/billing/plan/preview", { planId: plans.growth.id });
     const pv = r.data.preview;
     check("upgrade applies now with a prorated charge", pv?.type === "upgrade" && pv?.appliesAt === "now" && pv.charge?.subtotal > 0 && pv.charge?.credit > 0, pv);
-    check("proration = new plan for the rest of the period − credit", near(pv.charge.subtotal, 599 * pv.charge.share - 199 * pv.charge.share, 0.02), pv.charge);
+    check("proration = new plan for the rest of the period − credit", near(pv.charge.subtotal, P.growth * pv.charge.share - P.starter * pv.charge.share, 0.02), pv.charge);
     r = await owner("POST", "/api/billing/plan", { planId: plans.growth.id });
     check("on Growth immediately", r.data.billing?.subscription?.plan?.key === "growth", r.data.billing?.subscription);
     charge = await lastCharge(store.id);
@@ -456,8 +488,8 @@ async function main() {
     // ── Monthly → yearly starts a yearly period now ───────────────────
     r = await owner("POST", "/api/billing/plan/preview", { planId: plans.growth.id, interval: "year" });
     const yv = r.data.preview;
-    check("monthly → yearly is an upgrade with a new period", yv?.type === "upgrade" && yv?.newPeriod && near(yv.charge.planAmount, 5750.4), yv);
-    check("credit for what was paid this month", yv.charge.credit > 0 && near(yv.charge.subtotal, 5750.4 - yv.charge.credit), yv.charge);
+    check("monthly → yearly is an upgrade with a new period", yv?.type === "upgrade" && yv?.newPeriod && near(yv.charge.planAmount, r2(P.growth * 12 * 0.8)), yv);
+    check("credit for what was paid this month", yv.charge.credit > 0 && near(yv.charge.subtotal, r2(P.growth * 12 * 0.8) - yv.charge.credit), yv.charge);
     r = await owner("POST", "/api/billing/plan", { planId: plans.growth.id, interval: "year" });
     b = r.data.billing;
     check("now yearly, period a year out", b?.subscription?.interval === "year" && within(b.subscription.currentPeriodEnd, Date.now() + 365 * DAY, 2 * DAY), b?.subscription);
@@ -504,9 +536,9 @@ async function main() {
     r = await owner("GET", "/api/products");
     check("expired grace over → dashboard locked", r.status === 402, r.status);
     b = await billing();
-    check("reactivation quote at the regular price", b.due?.kind === "reactivation" && b.due.planAmount === 5750.4, b.due);
+    check("reactivation quote at the regular price", b.due?.kind === "reactivation" && b.due.planAmount === r2(P.growth * 12 * 0.8), b.due);
     r = await owner("POST", "/api/billing/checkout", { planId: plans.growth.id, interval: "month", method: "card" });
-    check("reactivating sets up autopay again (card), charging the first month", r.status === 200 && r.data.checkout?.recurring === "1" && r.data.amount === 706.82, r.data);
+    check("reactivating sets up autopay again (card), charging the first month", r.status === 200 && r.data.checkout?.recurring === "1" && r.data.amount === withGst(P.growth), r.data);
     r = await payCheckout(r.data.checkout, "card");
     b = r.data.billing;
     check("reactivated → ACTIVE, monthly, period from today", b?.subscription?.status === "ACTIVE" && b.subscription.interval === "month" && within(b.subscription.currentPeriodStart, Date.now(), 5 * 60000), b?.subscription);
@@ -559,6 +591,42 @@ async function main() {
     check("admin plan change", (await prisma.subscription.findUnique({ where: { storeId: store2.id } })).planId === plans.pro.id);
     const reminded = await admin.remind(prisma, store2.id, { actorId: adminUser });
     check("reminder triggered by hand", reminded.type === "trial_ending", reminded);
+
+    // ── Free plan: no plan fee for a while, order commission still billed ─
+    await admin.setFreePlan(prisma, store2.id, { until: new Date(Date.now() + 120 * DAY).toISOString(), note: "Owner's own store", actorId: adminUser });
+    let s2 = await prisma.subscription.findUnique({ where: { storeId: store2.id } });
+    check("free plan set with a note", Boolean(s2.freePlanUntil) && s2.freePlanNote === "Owner's own store", s2);
+    await owner("POST", "/api/auth/switch-store", { storeId: store2.id });
+    b = await billing();
+    check("the seller sees the free plan, and ₹0 plan fee on the next bill", Boolean(b.subscription?.freePlan?.until) && b.next?.planAmount === 0 && b.next?.freePlan === true, [b.subscription?.freePlan, b.next]);
+    await clock(new Date(s2.trialEndsAt).getTime() + 60000);
+    s2 = await prisma.subscription.findUnique({ where: { storeId: store2.id } });
+    let freeCycle = await prisma.billingCycle.findFirst({ where: { subscriptionId: s2.id }, orderBy: { createdAt: "desc" } });
+    check("trial ends into a free period — nothing owed, no card needed", s2.status === "ACTIVE" && freeCycle?.kind === "regular" && Number(freeCycle.planAmount) === 0 && freeCycle.status === "waived" && freeCycle.meta?.freePlan === true, [s2.status, freeCycle]);
+    check("the ₹99 first-month offer is kept for later", !s2.introUsedAt);
+    r = await owner("POST", "/api/products", { title: "Free Plan Kurta", status: "active", variants: [{ title: "M", sku: `FREE-${stamp}`, price: 20000, inventoryQuantity: 5 }] });
+    const kurtaVariant = r.data.product?.variants?.[0]?.id;
+    const addK = await sf("POST", `/api/storefront/${store2.handle}/cart/add`, { variantId: kurtaVariant, quantity: 1 });
+    const kurtaOrder = (await sf("POST", `/api/storefront/${store2.handle}/checkout`, { cartId: addK.data.cart?.cartId, ...shopper, paymentMethod: "cod" })).data.order;
+    await owner("POST", `/api/orders/${kurtaOrder.id}/mark-paid`, {});
+    const freeSales = Number((await prisma.order.findUnique({ where: { id: kurtaOrder.id } })).total);
+    const freeFee = r2(freeSales * 0.005);
+    await clock(new Date(s2.currentPeriodEnd).getTime() + 60000);
+    freeCycle = await prisma.billingCycle.findFirst({ where: { subscriptionId: s2.id }, orderBy: { createdAt: "desc" } });
+    check(`free-plan renewal: ₹0 plan + ₹${freeFee} commission (Pro 0.5%) + GST`, freeCycle?.kind === "regular" && Number(freeCycle.planAmount) === 0 && Number(freeCycle.feesAmount) === freeFee && Number(freeCycle.total) === withGst(freeFee), freeCycle);
+    s2 = await prisma.subscription.findUnique({ where: { storeId: store2.id } });
+    check("commission unpaid without autopay → the usual grace period", s2.status === "GRACE_PERIOD", s2.status);
+    await clock(new Date(s2.graceEndsAt).getTime() + 60000);
+    b = await billing();
+    check("grace over → dashboard locked like any store", b.access?.dashboard === false, b.access);
+    const re = await admin.setFreePlan(prisma, store2.id, { until: new Date(Date.now() + 120 * DAY).toISOString(), keepOpen: true, actorId: adminUser });
+    b = await billing();
+    check("“keep the dashboard open” option lifts the lock (commission still owed)", b.access?.dashboard === true && Boolean(b.due) && re.repriced === 0, [b.access, b.due]);
+    await admin.setFreePlan(prisma, store2.id, { until: null, actorId: adminUser });
+    s2 = await prisma.subscription.findUnique({ where: { storeId: store2.id } });
+    b = await billing();
+    check("ending the free plan brings back the plan price", !s2.freePlanUntil && !s2.accessGrantedUntil && !b.subscription?.freePlan, s2);
+    await owner("POST", "/api/auth/switch-store", { storeId: store.id });
 
     const events = await prisma.subscriptionEvent.findMany({ where: { storeId: store.id, actorType: "admin" } });
     check("every admin action logged on the subscription", ["admin.suspended", "admin.restored", "admin.promo_set", "admin.access_granted"].every((t) => events.some((e) => e.type === t)), events.map((e) => e.type));

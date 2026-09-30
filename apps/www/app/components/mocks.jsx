@@ -1,4 +1,5 @@
 import { Icon, I } from "./Icon";
+import { Mark } from "./Logo";
 
 /* Product mockups drawn in HTML — they read like the real screens and stay
    sharp at any size. Decorative: each has an aria-label saying what it shows. */
@@ -46,11 +47,12 @@ export function CheckoutMock() {
         <div className="ck__opt is-on">
           <i />
           <span><b>UPI</b><span>Pay by any UPI app</span></span>
-          <span className="ck__brands"><u>GPay</u><u>PhonePe</u><u>Paytm</u></span>
+          <span className="ck__brands"><Mark brand="googlepay" size={18} /><Mark brand="phonepe" size={18} /><Mark brand="paytm" size={18} /></span>
         </div>
         <div className="ck__opt">
           <i />
           <span><b>Cards</b><span>Visa, Mastercard, RuPay</span></span>
+          <span className="ck__brands"><Mark brand="visa" size={18} /><Mark brand="mastercard" size={18} /></span>
         </div>
         <div className="ck__opt">
           <i />

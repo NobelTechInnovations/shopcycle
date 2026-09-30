@@ -1,6 +1,6 @@
 const { HttpError } = require("@shopcycle/utils");
 const { getSettings, saveSettings } = require("./settings");
-const { periodPrice, addInterval, addDays, DAY } = require("./pricing");
+const { periodPrice, isFreePlan, addInterval, addDays, DAY } = require("./pricing");
 const { num, round2, tax } = require("./money");
 const { transition, logEvent, syncStorePlan, S, UNPAID } = require("./state");
 const { notify } = require("./notifications");
@@ -29,7 +29,7 @@ async function overview(prisma) {
 
   const [byStatus, paying, captured30, capturedMonth, capturedAll, gst30, gstMonth, failed30, mandateGroups, refunds, feeGroups, renewals, atRisk, limitRequests, webhookBacklog] = await Promise.all([
     prisma.subscription.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.subscription.findMany({ where: { status: { in: [S.ACTIVE, S.CANCEL_SCHEDULED, S.GRACE_PERIOD] } }, select: { interval: true, promoPrice: true, promoCyclesLeft: true, plan: { select: { priceMonthly: true } } } }),
+    prisma.subscription.findMany({ where: { status: { in: [S.ACTIVE, S.CANCEL_SCHEDULED, S.GRACE_PERIOD] } }, select: { interval: true, promoPrice: true, promoCyclesLeft: true, freePlanUntil: true, plan: { select: { priceMonthly: true } } } }),
     prisma.billingPayment.aggregate({ where: { status: { in: ["captured", "partially_refunded", "refunded"] }, capturedAt: { gte: since30 } }, _sum: { amount: true, refundedAmount: true }, _count: { _all: true } }),
     prisma.billingPayment.aggregate({ where: { status: { in: ["captured", "partially_refunded", "refunded"] }, capturedAt: { gte: monthStart } }, _sum: { amount: true, refundedAmount: true } }),
     prisma.billingPayment.aggregate({ where: { status: { in: ["captured", "partially_refunded", "refunded"] } }, _sum: { amount: true, refundedAmount: true } }),
@@ -58,7 +58,7 @@ async function overview(prisma) {
   // MRR: what the paying subscriptions bring in per month, before tax.
   let mrr = 0;
   for (const s of paying) {
-    const price = s.promoPrice != null && (s.promoCyclesLeft == null || s.promoCyclesLeft > 0) ? num(s.promoPrice) : periodPrice(s.plan, s.interval, settings);
+    const price = isFreePlan(s, now) ? 0 : s.promoPrice != null && (s.promoCyclesLeft == null || s.promoCyclesLeft > 0) ? num(s.promoPrice) : periodPrice(s.plan, s.interval, settings);
     mrr += s.interval === "year" ? price / 12 : price;
   }
   mrr = round2(mrr);
@@ -122,6 +122,7 @@ async function listSubscriptions(prisma, { status, q, page = 1, pageSize = 25 } 
       consecutiveFailures: s.consecutiveFailures,
       accessGrantedUntil: s.accessGrantedUntil,
       promo: s.promoPrice != null ? { price: num(s.promoPrice), cyclesLeft: s.promoCyclesLeft } : null,
+      freePlanUntil: isFreePlan(s) ? s.freePlanUntil : null,
       mandate: s.mandates[0] ? { status: s.mandates[0].status, method: s.mandates[0].method, label: s.mandates[0].paymentMethod?.label || s.mandates[0].method } : null,
       access: computeAccess(s, { storeStatus: s.store.status }),
       createdAt: s.createdAt,
@@ -240,6 +241,52 @@ async function grantAccess(prisma, storeId, { until, reason, actorId }) {
   if (date && !(date > new Date())) throw new HttpError(400, "Pick a date in the future.");
   await prisma.subscription.update({ where: { id: sub.id }, data: { accessGrantedUntil: date } });
   await logEvent(prisma, sub, date ? "admin.access_granted" : "admin.access_revoked", { ...admin(actorId), data: { until: date, reason } });
+}
+
+/**
+ * Free plan until a date: every period that starts before it costs ₹0 for
+ * the plan — order commission and paid apps are still billed on each cycle,
+ * as usual. Unpaid plan charges from before are re-priced to match. With
+ * `keepOpen`, the dashboard also stays open if a commission payment fails.
+ * `until: null` ends it; the next renewal is at the normal price.
+ */
+async function setFreePlan(prisma, storeId, { until, note, keepOpen = false, actorId }) {
+  const { sub } = await loadSub(prisma, storeId);
+  const date = until ? new Date(until) : null;
+  const now = new Date();
+  if (date && !(date > now)) throw new HttpError(400, "Pick an end date in the future.");
+  if (date && date > addDays(now, 5 * 366)) throw new HttpError(400, "A free plan can run for up to 5 years.");
+  const cleanNote = note ? String(note).slice(0, 200) : null;
+  await prisma.subscription.update({
+    where: { id: sub.id },
+    data: {
+      freePlanUntil: date,
+      freePlanNote: date ? cleanNote : null,
+      ...(date && keepOpen && { accessGrantedUntil: date }),
+      ...(!date && sub.accessGrantedUntil && sub.freePlanUntil && new Date(sub.accessGrantedUntil).getTime() === new Date(sub.freePlanUntil).getTime() && { accessGrantedUntil: null }),
+    },
+  });
+  await logEvent(prisma, sub, date ? "admin.free_plan_set" : "admin.free_plan_ended", { ...admin(actorId), data: { until: date, note: cleanNote, keepOpen: Boolean(keepOpen) } });
+  if (!date) return { repriced: 0 };
+
+  // Plan charges still unpaid for periods inside the free time → ₹0 plan;
+  // what's left (commission, apps) stays owed. Nothing left → settled.
+  const settings = await getSettings(prisma);
+  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  const open = await prisma.billingCycle.findMany({ where: { subscriptionId: sub.id, status: { in: ["due", "failed"] }, kind: { in: ["intro", "regular", "reactivation"] } } });
+  let repriced = 0;
+  for (const c of open) {
+    if (!(new Date(c.periodStart) < date) || num(c.planAmount) === 0) continue;
+    const subtotal = round2(Math.max(0, num(c.feesAmount) + num(c.appsAmount)));
+    const t = tax(subtotal, settings.taxRate, store.billingState);
+    await prisma.billingCycle.update({
+      where: { id: c.id },
+      data: { planAmount: 0, creditAmount: 0, subtotal, taxAmount: t.amount, total: t.total, meta: { ...(c.meta || {}), freePlan: true, repricedFrom: num(c.planAmount) } },
+    });
+    repriced += 1;
+    if (t.total < 1) await charges.chargeCycle(prisma, c.id, { now });
+  }
+  return { repriced };
 }
 
 /** More trial days — also reopens a trial that ended unpaid. */
@@ -494,6 +541,7 @@ module.exports = {
   suspend,
   restore,
   grantAccess,
+  setFreePlan,
   extendTrial,
   changePlan,
   setPromo,

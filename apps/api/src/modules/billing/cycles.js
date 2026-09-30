@@ -1,6 +1,6 @@
 const { round2, num, tax } = require("./money");
 const { getSettings } = require("./settings");
-const { regularPrice, addInterval } = require("./pricing");
+const { regularPrice, isFreePlan, addInterval } = require("./pricing");
 const commission = require("./commission");
 const appCharges = require("./app-charges");
 
@@ -55,7 +55,9 @@ async function createCycle(prisma, { store, sub, kind, planId, interval, periodS
  * the intro offer is off or was already used by this store. */
 async function firstCycle(prisma, store, sub, plan, start) {
   const settings = await getSettings(prisma);
-  if (settings.introEnabled && !sub.introUsedAt) {
+  // On an admin free plan the first period is free too — and the ₹99 offer
+  // stays unused for when the free plan ends.
+  if (settings.introEnabled && !sub.introUsedAt && !isFreePlan(sub, start)) {
     return createCycle(prisma, {
       store,
       sub,
@@ -78,7 +80,8 @@ async function firstCycle(prisma, store, sub, plan, start) {
 async function regularCycle(prisma, store, sub, plan, start, { interval } = {}) {
   const settings = await getSettings(prisma);
   const iv = interval || sub.interval;
-  const promo = sub.promoPrice != null && (sub.promoCyclesLeft == null || sub.promoCyclesLeft > 0);
+  const free = isFreePlan(sub, start);
+  const promo = !free && sub.promoPrice != null && (sub.promoCyclesLeft == null || sub.promoCyclesLeft > 0);
   return createCycle(prisma, {
     store,
     sub,
@@ -87,11 +90,11 @@ async function regularCycle(prisma, store, sub, plan, start, { interval } = {}) 
     interval: iv,
     periodStart: start,
     periodEnd: addInterval(start, iv),
-    planAmount: regularPrice(sub, plan, iv, settings),
+    planAmount: regularPrice(sub, plan, iv, settings, start),
     includeFees: true,
     appsBoundary: start,
     key: `regular:${sub.id}:${new Date(start).toISOString()}`,
-    meta: promo ? { promo: true, promoNote: sub.promoNote || null } : {},
+    meta: free ? { freePlan: true, freePlanUntil: sub.freePlanUntil, note: sub.freePlanNote || null } : promo ? { promo: true, promoNote: sub.promoNote || null } : {},
   });
 }
 
@@ -116,7 +119,7 @@ async function reactivationCycle(prisma, store, sub, plan, interval, now = new D
     interval,
     periodStart: now,
     periodEnd: addInterval(now, interval),
-    planAmount: regularPrice(sub, plan, interval, settings),
+    planAmount: regularPrice(sub, plan, interval, settings, now),
     includeFees: true,
     appsBoundary: now,
     key: `reactivation:${sub.id}:${now.getTime()}`,
@@ -180,12 +183,12 @@ async function estimateNext(prisma, store, sub, plan, { settings } = {}) {
   let kind = "regular";
   if (sub.status === "TRIALING") {
     date = sub.trialEndsAt;
-    kind = s.introEnabled && !sub.introUsedAt ? "intro" : "regular";
-    planAmount = kind === "intro" ? Number(s.introPrice) : regularPrice(sub, plan, sub.interval, s);
+    kind = s.introEnabled && !sub.introUsedAt && !isFreePlan(sub, date) ? "intro" : "regular";
+    planAmount = kind === "intro" ? Number(s.introPrice) : regularPrice(sub, plan, sub.interval, s, date);
   } else if (["ACTIVE"].includes(sub.status) && sub.autoRenew) {
     date = sub.nextBillingAt;
     const nextPlan = sub.pendingPlanId ? await prisma.plan.findUnique({ where: { id: sub.pendingPlanId } }) : plan;
-    planAmount = regularPrice(sub, nextPlan || plan, sub.pendingInterval || sub.interval, s);
+    planAmount = regularPrice(sub, nextPlan || plan, sub.pendingInterval || sub.interval, s, date);
   } else {
     return null;
   }
@@ -193,7 +196,7 @@ async function estimateNext(prisma, store, sub, plan, { settings } = {}) {
   const apps = await appCharges.pendingTotal(prisma, store.id, date);
   const subtotal = round2(planAmount + feeAmount + apps);
   const t = tax(subtotal, s.taxRate, store.billingState);
-  return { date, kind, planAmount: round2(planAmount), fees: feeAmount, feeOrders: fees.count, apps, subtotal, taxRate: Number(s.taxRate), tax: t.amount, total: t.total };
+  return { date, kind, freePlan: isFreePlan(sub, date), planAmount: round2(planAmount), fees: feeAmount, feeOrders: fees.count, apps, subtotal, taxRate: Number(s.taxRate), tax: t.amount, total: t.total };
 }
 
 function serializeCycle(c) {

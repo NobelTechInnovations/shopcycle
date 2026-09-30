@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Icon, I } from "../components/Icon";
 import { APP_URL } from "../components/site";
 import { CATEGORIES, INTEGRATIONS, STATUS_LABEL } from "../data/integrations";
+import { Logo } from "../components/Logo";
 
 export const metadata = {
   title: "Integrations",
@@ -12,9 +13,7 @@ function Card({ x }) {
   return (
     <article className="card">
       <div className="card__top">
-        <span className="logo-tile" aria-hidden="true">
-          <i style={{ background: x.color }}>{x.mono}</i>
-        </span>
+        <Logo {...x.logo} size={48} title={x.name} />
         <span className={`badge badge--${x.status}`}>{STATUS_LABEL[x.status]}</span>
       </div>
       <h3>{x.name}</h3>
@@ -26,7 +25,8 @@ function Card({ x }) {
 export default function IntegrationsPage() {
   const featured = INTEGRATIONS.find((x) => x.featured);
   const popular = INTEGRATIONS.filter((x) => x.popular && !x.featured);
-  const hero = INTEGRATIONS.filter((x) => x.status !== "soon").slice(0, 15);
+  // The hero shows real brands first.
+  const hero = [...INTEGRATIONS.filter((x) => x.logo.brand || x.logo.word), ...INTEGRATIONS.filter((x) => x.logo.icon)].filter((x) => x.status !== "soon").slice(0, 15);
 
   return (
     <>
@@ -51,9 +51,7 @@ export default function IntegrationsPage() {
         </div>
         <div className="hex" aria-hidden="true">
           {hero.map((x) => (
-            <span key={x.name} className="logo-tile" title={x.name}>
-              <i style={{ background: x.color }}>{x.mono}</i>
-            </span>
+            <Logo key={x.name} {...x.logo} size={72} title={x.name} className="float-tile" />
           ))}
         </div>
       </section>

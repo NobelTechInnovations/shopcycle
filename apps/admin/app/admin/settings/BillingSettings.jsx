@@ -227,7 +227,13 @@ export function BillingSettings() {
           <Stat label="Checkout fee" value={`${sub.plan?.commissionPercent ?? "—"}% per order`} sub={b.entitlements?.features ? "on orders placed at checkout" : null} />
           <Stat label="Autopay" value={b.mandate ? b.mandate.label : "Not set up"} sub={b.mandate ? (b.mandate.status === "active" ? `since ${formatDay(b.mandate.activatedAt)}` : "waiting for your bank") : null} />
         </div>
-        {sub.promo && (
+        {sub.freePlan && (
+          <p className="text-[13px] text-ink mt-4 mb-0 rounded-lg bg-accent-soft px-3 py-2">
+            <strong>Free plan until {formatDay(sub.freePlan.until)}</strong> — no monthly plan fee. The {sub.plan?.commissionPercent}% checkout fee on paid orders is still billed with each cycle
+            {sub.freePlan.note ? ` · ${sub.freePlan.note}` : ""}.
+          </p>
+        )}
+        {sub.promo && !sub.freePlan && (
           <p className="text-[13px] text-ink mt-4 mb-0">
             Special price: {inr(sub.promo.price)} + GST for {sub.promo.cyclesLeft == null ? "every renewal" : `the next ${sub.promo.cyclesLeft} renewal${sub.promo.cyclesLeft === 1 ? "" : "s"}`}
             {sub.promo.note ? ` · ${sub.promo.note}` : ""}.

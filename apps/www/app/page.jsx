@@ -7,21 +7,23 @@ import { APP_URL, DEMO_URL, inr } from "./components/site";
 import { HeroShowcase } from "./components/HeroShowcase";
 import { EditorMock, CheckoutMock, FlowMock, HelpMock } from "./components/mocks";
 import { INTEGRATIONS } from "./data/integrations";
+import { Logo, Mark } from "./components/Logo";
 
 const MARQUEE = [
-  ["Razorpay", "R", "#2B7BF6"],
-  ["Cashfree", "C", "#6C3BF5"],
-  ["PayU", "P", "#1FB45F"],
-  ["Stripe", "S", "#635BFF"],
-  ["PayPal", "PP", "#1A5ED6"],
-  ["UPI", "U", "#0F766E"],
-  ["Cash on delivery", "₹", "#16A34A"],
-  ["Meta Pixel", "M", "#0866FF"],
-  ["Google Analytics", "GA", "#F9AB00"],
-  ["WhatsApp", "WA", "#25D366"],
-  ["Shiprocket", "SR", "#7B3FE4"],
-  ["Delhivery", "D", "#E11D48"],
-  ["Google sign-in", "G", "#EA4335"],
+  ["Razorpay", { brand: "razorpay" }],
+  ["Cashfree", { word: "cashfree" }],
+  ["PayU", { word: "payu" }],
+  ["Stripe", { brand: "stripe" }],
+  ["PayPal", { brand: "paypal" }],
+  ["UPI", { word: "upi" }],
+  ["Google Pay", { brand: "googlepay" }],
+  ["PhonePe", { brand: "phonepe" }],
+  ["Paytm", { brand: "paytm" }],
+  ["Meta", { brand: "meta" }],
+  ["Google Analytics", { brand: "googleanalytics" }],
+  ["WhatsApp", { brand: "whatsapp" }],
+  ["Shiprocket", { word: "shiprocket" }],
+  ["Delhivery", { word: "delhivery" }],
 ];
 
 const faq = (pricing) => [
@@ -39,7 +41,8 @@ const faq = (pricing) => [
 
 export default async function HomePage() {
   const pricing = await getPlans();
-  const cloud = INTEGRATIONS.filter((x) => x.status !== "soon").slice(0, 16);
+  // Real brands for the cloud — the ones a seller recognises.
+  const cloud = INTEGRATIONS.filter((x) => x.status !== "soon" && (x.logo.brand || x.logo.word)).slice(0, 16);
   return (
     <>
       {/* ── Hero ── */}
@@ -85,9 +88,9 @@ export default async function HomePage() {
         <div className="marquee" aria-label="Works with">
           <p className="marquee__label">Works with the tools Indian brands use</p>
           <div className="marquee__track">
-            {[...MARQUEE, ...MARQUEE].map(([name, mono, color], i) => (
+            {[...MARQUEE, ...MARQUEE].map(([name, logo], i) => (
               <span className="marquee__item" key={i} aria-hidden={i >= MARQUEE.length ? "true" : undefined}>
-                <i style={{ background: color }}>{mono}</i>
+                <Logo {...logo} size={30} />
                 {name}
               </span>
             ))}
@@ -212,13 +215,22 @@ export default async function HomePage() {
               <h3 className="h3">Get paid your way</h3>
               <p>Razorpay, Cashfree, PayU, Stripe and PayPal — straight to your account, with every method your gateway offers shown with its logo. Cash on delivery on or off in one switch.</p>
               <div className="tile__demo mini-chips">
-                <span>UPI</span>
-                <span>Google Pay</span>
-                <span>PhonePe</span>
-                <span>Cards</span>
-                <span>Net banking</span>
-                <span>Wallets</span>
-                <span>Cash on delivery</span>
+                <span><Mark word="upi" /> UPI</span>
+                <span><Mark brand="googlepay" /> Google Pay</span>
+                <span><Mark brand="phonepe" /> PhonePe</span>
+                <span><Mark brand="paytm" /> Paytm</span>
+                <span><Mark brand="visa" /> Visa</span>
+                <span><Mark brand="mastercard" /> Mastercard</span>
+                <span><Mark word="rupay" /> RuPay</span>
+                <span><Mark brand="amazonpay" /> Amazon Pay</span>
+                <span><Mark word="cod" /> Cash on delivery</span>
+              </div>
+              <div className="tile__demo pay-logos">
+                <Logo brand="razorpay" size={40} />
+                <Logo word="cashfree" size={40} />
+                <Logo word="payu" size={40} />
+                <Logo brand="stripe" size={40} />
+                <Logo brand="paypal" size={40} />
               </div>
             </article>
             <article className="tile">
@@ -273,9 +285,7 @@ export default async function HomePage() {
           </div>
           <div className="int-cloud" data-reveal aria-hidden="true">
             {cloud.map((x) => (
-              <span key={x.name} className="logo-tile" title={x.name}>
-                <i style={{ background: x.color }}>{x.mono}</i>
-              </span>
+              <Logo key={x.name} {...x.logo} size={84} title={x.name} className="float-tile" />
             ))}
           </div>
           <p style={{ textAlign: "center" }}>

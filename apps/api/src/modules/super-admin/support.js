@@ -1,7 +1,6 @@
 const { z } = require("zod");
 const { HttpError, slugify } = require("@shopcycle/utils");
 const ai = require("../../lib/ai");
-const { env } = require("../../config/env");
 const tickets = require("../support/tickets");
 const articles = require("../support/articles");
 const { getSupportSettings, saveSupportSettings, modelFor, inboxFor } = require("../support/settings");
@@ -29,7 +28,7 @@ async function supportAdminRoutes(fastify) {
     const settings = await getSupportSettings(prisma);
     return {
       stats: await tickets.stats(prisma),
-      assistant: { configured: ai.aiConfigured(), enabled: settings.aiEnabled, model: modelFor(settings), defaultModel: env.SUPPORT_AI_MODEL },
+      assistant: { configured: ai.aiConfigured(), provider: ai.aiProvider(), enabled: settings.aiEnabled, model: modelFor(settings), defaultModel: ai.defaultModel() },
       inbox: await inboxFor(prisma, settings),
     };
   });
@@ -94,7 +93,7 @@ async function supportAdminRoutes(fastify) {
   });
 
   // ── Assistant settings ─────────────────────────────────────────────
-  fastify.get("/settings", async () => ({ settings: await getSupportSettings(prisma), configured: ai.aiConfigured(), defaultModel: env.SUPPORT_AI_MODEL }));
+  fastify.get("/settings", async () => ({ settings: await getSupportSettings(prisma), configured: ai.aiConfigured(), provider: ai.aiProvider(), defaultModel: ai.defaultModel() }));
 
   fastify.put("/settings", async (request) => {
     const body = z

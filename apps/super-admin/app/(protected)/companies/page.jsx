@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Table, Button, App } from "antd";
-import { Store, CreditCard, Hourglass, AlertTriangle, Search } from "lucide-react";
+import { Store, CreditCard, Hourglass, AlertTriangle, Search, ExternalLink } from "lucide-react";
 import { PageHeader, StatusBadge, ListCard, SearchInput, EmptyState, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
@@ -121,9 +121,26 @@ export default function CompaniesPage() {
           </span>
           <div className="min-w-0">
             <div className="font-medium text-ink truncate">{name}</div>
-            <div className="text-xs text-ink-muted font-mono truncate">
-              {row.domain || (ROOT_DOMAIN === "localhost" ? row.handle : `${row.handle}.${ROOT_DOMAIN}`)}
-            </div>
+            {row.url ? (
+              <a
+                href={row.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-xs text-accent hover:underline font-mono truncate max-w-[260px]"
+                title={row.domain && !row.domainLive ? `${row.domain} isn't live yet — opens ${row.url}` : row.url}
+              >
+                {row.url.replace(/^https?:\/\//, "")}
+                <ExternalLink size={11} aria-hidden="true" className="shrink-0" />
+              </a>
+            ) : (
+              <div className="text-xs text-ink-muted font-mono truncate">
+                {row.domain || (ROOT_DOMAIN === "localhost" ? row.handle : `${row.handle}.${ROOT_DOMAIN}`)}
+              </div>
+            )}
+            {row.domain && row.oyklaneUrl && row.url !== row.oyklaneUrl && (
+              <div className="text-[11px] text-ink-subtle font-mono truncate">{row.oyklaneUrl.replace(/^https?:\/\//, "")}</div>
+            )}
           </div>
         </div>
       ),

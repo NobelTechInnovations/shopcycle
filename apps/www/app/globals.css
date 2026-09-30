@@ -24,9 +24,125 @@
   --radius: 16px;
   --radius-sm: 10px;
   --shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7), 0 10px 30px -15px rgba(0, 0, 0, 0.6);
+  --glass: rgba(255, 255, 255, 0.04);
+  --glass-2: rgba(255, 255, 255, 0.08);
+  --glass-3: rgba(255, 255, 255, 0.18);
+  --nav-bg: rgba(7, 7, 12, 0.72);
+  --menu-bg: #12121c;
+  --float-bg: rgba(17, 17, 26, 0.94);
+  --panel-bg: linear-gradient(180deg, rgba(23, 23, 34, 0.96), rgba(13, 13, 20, 0.96));
+  --card-bg: linear-gradient(180deg, rgba(23, 23, 34, 0.9), rgba(13, 13, 20, 0.9));
+  --featured-bg: linear-gradient(180deg, rgba(27, 23, 44, 0.95), rgba(13, 13, 20, 0.95));
+  --footer-fade: rgba(11, 11, 18, 0.9);
+  --code-bg: #0a0a10;
+  --pill-on-bg: #fff;
+  --pill-on-fg: #0b0b12;
+  --violet-ink: #c9bcff;
+  --eyebrow-icon: #fff;
+  --grid-line: rgba(255, 255, 255, 0.028);
+  --glow-1: rgba(124, 92, 255, 0.28);
+  --glow-2: rgba(45, 212, 191, 0.1);
   --font-display: "Bricolage Grotesque", "Inter", system-ui, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: dark;
+}
+
+/* ── Light theme ─────────────────────────────────────────────────────
+   Same layout, light palette. Chosen with the sun/moon button in the nav
+   (remembered), else the visitor's system setting. */
+:root[data-theme="light"] {
+  --bg: #fbfaff;
+  --bg-2: #f4f3fa;
+  --surface: #ffffff;
+  --surface-2: #f5f4fb;
+  --surface-3: #ecebf5;
+  --line: rgba(17, 17, 20, 0.08);
+  --line-2: rgba(17, 17, 20, 0.14);
+  --text: #0f0f14;
+  --muted: #55556a;
+  --subtle: #85859b;
+  --violet-soft: rgba(124, 92, 255, 0.1);
+  --teal: #0f8b7a;
+  --teal-soft: rgba(15, 139, 122, 0.1);
+  --lime: #4d7c0f;
+  --amber: #b45309;
+  --grad: linear-gradient(92deg, #7c5cff 0%, #5b3fe0 40%, #0f8b7a 100%);
+  --shadow: 0 30px 70px -34px rgba(46, 32, 110, 0.35), 0 10px 24px -16px rgba(46, 32, 110, 0.18);
+  --glass: rgba(17, 17, 20, 0.03);
+  --glass-2: rgba(17, 17, 20, 0.06);
+  --glass-3: rgba(17, 17, 20, 0.16);
+  --nav-bg: rgba(251, 250, 255, 0.82);
+  --menu-bg: #ffffff;
+  --float-bg: rgba(255, 255, 255, 0.96);
+  --panel-bg: linear-gradient(180deg, #ffffff, #f8f7fd);
+  --card-bg: #ffffff;
+  --featured-bg: linear-gradient(180deg, #f6f2ff, #ffffff);
+  --footer-fade: rgba(244, 243, 250, 0.9);
+  --code-bg: #f4f3fa;
+  --pill-on-bg: #0f0f14;
+  --pill-on-fg: #ffffff;
+  --violet-ink: #5b3fe0;
+  --eyebrow-icon: #5b3fe0;
+  --grid-line: rgba(17, 17, 20, 0.04);
+  --glow-1: rgba(124, 92, 255, 0.16);
+  --glow-2: rgba(45, 212, 191, 0.12);
+  color-scheme: light;
+}
+:root[data-theme="light"] .btn--ghost:hover {
+  border-color: rgba(17, 17, 20, 0.24);
+}
+:root[data-theme="light"] .brand-tile {
+  box-shadow: 0 10px 22px -16px rgba(46, 32, 110, 0.35), inset 0 0 0 1px rgba(17, 17, 20, 0.08);
+}
+:root[data-theme="light"] .tile,
+:root[data-theme="light"] .card,
+:root[data-theme="light"] .plan,
+:root[data-theme="light"] .faq details {
+  box-shadow: 0 1px 2px rgba(17, 17, 20, 0.04);
+}
+/* The closing call to action stays dark in both themes. */
+:root[data-theme="light"] .cta {
+  --text: #f4f4f7;
+  --muted: #b9b9cb;
+  --line-2: rgba(255, 255, 255, 0.16);
+  --glass: rgba(255, 255, 255, 0.06);
+  --glass-2: rgba(255, 255, 255, 0.1);
+  --grad: linear-gradient(92deg, #c9bcff 0%, #8b6cff 38%, #2dd4bf 100%);
+  background:
+    radial-gradient(600px 300px at 50% 0%, rgba(139, 108, 255, 0.45), transparent 70%),
+    radial-gradient(500px 260px at 50% 120%, rgba(45, 212, 191, 0.3), transparent 70%),
+    #14121f;
+  color: var(--text);
+}
+
+/* Theme switch in the nav */
+.theme-toggle {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--glass);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.theme-toggle:hover {
+  background: var(--glass-2);
+}
+.theme-toggle svg {
+  width: 17px;
+  height: 17px;
+}
+.theme-toggle .sun {
+  display: none;
+}
+:root[data-theme="light"] .theme-toggle .sun {
+  display: block;
+}
+:root[data-theme="light"] .theme-toggle .moon {
+  display: none;
 }
 
 *,
@@ -55,10 +171,10 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(900px 520px at 50% -120px, rgba(124, 92, 255, 0.28), transparent 70%),
-    radial-gradient(600px 400px at 90% 10%, rgba(45, 212, 191, 0.1), transparent 70%),
-    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px) 0 0 / 56px 56px,
-    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px) 0 0 / 56px 56px;
+    radial-gradient(900px 520px at 50% -120px, var(--glow-1), transparent 70%),
+    radial-gradient(600px 400px at 90% 10%, var(--glow-2), transparent 70%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 56px 56px;
   mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 100%);
 }
 img {
@@ -159,7 +275,7 @@ button {
   place-items: center;
   background: linear-gradient(145deg, rgba(139, 108, 255, 0.35), rgba(45, 212, 191, 0.2));
   border: 1px solid var(--line-2);
-  color: #fff;
+  color: var(--eyebrow-icon);
   box-shadow: 0 10px 30px -10px rgba(139, 108, 255, 0.6);
 }
 .eyebrow__icon svg {
@@ -198,13 +314,13 @@ button {
   box-shadow: 0 16px 40px -12px rgba(124, 92, 255, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 .btn--ghost {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass);
   border-color: var(--line-2);
   color: var(--text);
 }
 .btn--ghost:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.22);
+  background: var(--glass-2);
+  border-color: var(--glass-3);
 }
 .btn--light {
   background: #fff;
@@ -244,7 +360,7 @@ button {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(7, 7, 12, 0.72);
+  background: var(--nav-bg);
   backdrop-filter: saturate(160%) blur(14px);
   -webkit-backdrop-filter: saturate(160%) blur(14px);
   border-bottom: 1px solid var(--line);
@@ -306,7 +422,7 @@ button {
 .nav__link[aria-current="page"],
 .nav__links > li:focus-within > .nav__link {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-2);
 }
 .nav__link svg {
   width: 14px;
@@ -322,7 +438,7 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
-  background: #12121c;
+  background: var(--menu-bg);
   border: 1px solid var(--line-2);
   border-radius: 18px;
   isolation: isolate;
@@ -356,7 +472,7 @@ button {
   transition: background 0.15s;
 }
 .menu-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-2);
 }
 .menu-item__icon {
   flex: none;
@@ -366,7 +482,7 @@ button {
   display: grid;
   place-items: center;
   background: var(--violet-soft);
-  color: #c9bcff;
+  color: var(--violet-ink);
 }
 .menu-item__icon svg {
   width: 18px;
@@ -378,7 +494,11 @@ button {
   font-weight: 600;
   color: var(--text);
 }
-.menu-item span {
+.menu-item__text {
+  display: block;
+  min-width: 0;
+}
+.menu-item__text small {
   display: block;
   font-size: 12.5px;
   line-height: 1.45;
@@ -405,7 +525,7 @@ button {
   height: 42px;
   border-radius: 10px;
   border: 1px solid var(--line-2);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass);
   cursor: pointer;
   place-items: center;
 }
@@ -430,7 +550,7 @@ button {
   padding: 6px 6px 6px 8px;
   border-radius: 999px;
   border: 1px solid var(--line-2);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass);
   font-size: 13.5px;
   color: var(--muted);
   transition: border-color 0.2s, background 0.2s;
@@ -453,7 +573,7 @@ button {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-2);
 }
 .pill__go svg {
   width: 13px;
@@ -504,7 +624,7 @@ button {
   padding: 0 13px;
   border-radius: 999px;
   border: 1px solid var(--line-2);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass);
   font-size: 13px;
   letter-spacing: 0;
   text-transform: none;
@@ -541,7 +661,7 @@ button {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--glass-3);
 }
 .browser__url {
   flex: 1;
@@ -549,7 +669,7 @@ button {
   margin: 0 auto;
   height: 24px;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-2);
   font-size: 12px;
   color: var(--subtle);
   display: grid;
@@ -583,7 +703,7 @@ button {
   padding: 5px;
   border-radius: 14px;
   border: 1px solid var(--line-2);
-  background: rgba(17, 17, 26, 0.8);
+  background: var(--float-bg);
   margin-bottom: 18px;
   flex-wrap: wrap;
   justify-content: center;
@@ -608,7 +728,7 @@ button {
   height: 15px;
 }
 .showcase__tab[aria-selected="true"] {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-2);
   color: var(--text);
 }
 .showcase__tab .bar {
@@ -660,7 +780,7 @@ button {
   border-radius: 50%;
   border: 0;
   padding: 0;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--glass-3);
   cursor: pointer;
 }
 .dots button[aria-current="true"] {
@@ -699,19 +819,9 @@ button {
   align-items: center;
   gap: 10px;
   font: 600 18px/1 var(--font-display);
-  color: rgba(244, 244, 247, 0.55);
+  color: var(--muted);
   white-space: nowrap;
   letter-spacing: -0.01em;
-}
-.marquee__item i {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  font: 700 11px/1 var(--font-body);
-  font-style: normal;
-  color: #fff;
 }
 @keyframes marquee {
   to {
@@ -796,7 +906,7 @@ button {
 .panel {
   border-radius: 18px;
   border: 1px solid var(--line-2);
-  background: linear-gradient(180deg, rgba(23, 23, 34, 0.96), rgba(13, 13, 20, 0.96));
+  background: var(--panel-bg);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -864,7 +974,7 @@ button {
   padding: 0 10px;
   border-radius: 9px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass);
   font-size: 13px;
 }
 .block .grip {
@@ -1058,7 +1168,7 @@ button {
   top: 30px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: rgba(17, 17, 26, 0.92);
+  background: var(--float-bg);
   border: 1px solid var(--line-2);
   box-shadow: var(--shadow);
   font-size: 12px;
@@ -1076,7 +1186,7 @@ button {
   border-radius: 7px;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-2);
   border: 1px solid var(--line-2);
   color: var(--text);
   font-size: 15px;
@@ -1090,7 +1200,7 @@ button {
   gap: 10px;
   padding: 11px 14px;
   border-radius: 14px;
-  background: rgba(17, 17, 26, 0.94);
+  background: var(--float-bg);
   border: 1px solid var(--line-2);
   box-shadow: var(--shadow);
   font-size: 12.5px;
@@ -1127,8 +1237,8 @@ button {
 .flow {
   padding: 28px 22px 30px;
   background:
-    radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px) 0 0 / 18px 18px,
-    linear-gradient(180deg, rgba(23, 23, 34, 0.96), rgba(13, 13, 20, 0.96));
+    radial-gradient(var(--glass-2) 1px, transparent 1px) 0 0 / 18px 18px,
+    var(--panel-bg);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1190,7 +1300,7 @@ button {
 }
 .fnode--mail .fnode__icon {
   background: var(--violet-soft);
-  color: #c9bcff;
+  color: var(--violet-ink);
 }
 .fnode .sent {
   margin-left: auto;
@@ -1267,8 +1377,8 @@ button {
 }
 .msg--me {
   align-self: flex-end;
-  background: #fff;
-  color: #111114;
+  background: var(--pill-on-bg);
+  color: var(--pill-on-fg);
   border-bottom-right-radius: 4px;
 }
 .msg--ai {
@@ -1282,7 +1392,7 @@ button {
   padding-left: 18px;
 }
 .msg--ai b {
-  color: #fff;
+  color: var(--text);
 }
 .chat__foot {
   display: flex;
@@ -1349,7 +1459,7 @@ button {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--glass);
 }
 .tiles small {
   font-size: 11.5px;
@@ -1394,7 +1504,7 @@ button {
   grid-column: span 2;
   border-radius: 20px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(23, 23, 34, 0.9), rgba(13, 13, 20, 0.9));
+  background: var(--card-bg);
   padding: 26px;
   position: relative;
   overflow: hidden;
@@ -1417,7 +1527,7 @@ button {
   display: grid;
   place-items: center;
   background: var(--violet-soft);
-  color: #c9bcff;
+  color: var(--violet-ink);
   margin-bottom: 18px;
 }
 .tile__icon svg {
@@ -1454,7 +1564,7 @@ button {
   margin: 18px 0 0;
   padding: 14px 16px;
   border-radius: 12px;
-  background: #0a0a10;
+  background: var(--code-bg);
   border: 1px solid var(--line);
   font: 12.5px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--muted);
@@ -1478,42 +1588,94 @@ button {
   border-radius: 8px;
   border: 1px solid var(--line-2);
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass);
 }
 
 /* ── Integrations teaser ───────────────────────────────────────── */
 .int-cloud {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
+  justify-items: center;
   gap: 14px;
   max-width: 880px;
   margin: 50px auto 36px;
 }
-.int-cloud .logo-tile:nth-child(odd) {
+.int-cloud .float-tile:nth-child(odd) {
   transform: translateY(14px);
 }
-.logo-tile {
-  aspect-ratio: 1;
-  border-radius: 18px;
-  border: 1px solid var(--line-2);
-  background: var(--surface-2);
-  display: grid;
+.brand-tile {
+  --s: 44px;
+  width: var(--s);
+  height: var(--s);
+  flex: none;
+  display: inline-grid;
   place-items: center;
-  font: 700 17px/1 var(--font-display);
-  color: #fff;
-  box-shadow: 0 16px 30px -18px rgba(0, 0, 0, 0.9);
+  border-radius: calc(var(--s) * 0.26);
+  background: #fff;
+  box-shadow: 0 12px 26px -16px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(17, 17, 20, 0.07);
+  overflow: hidden;
   transition: transform 0.25s;
 }
-.logo-tile:hover {
+.brand-tile svg {
+  width: 56%;
+  height: 56%;
+}
+.brand-tile--word span {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.brand-tile--word em {
+  font-style: normal;
+}
+.brand-tile--feature {
+  background: linear-gradient(145deg, #8b6cff, #5b6cf6 60%, #3fb8c8);
+  color: #fff;
+  box-shadow: 0 12px 26px -14px rgba(124, 92, 255, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.brand-tile--feature svg {
+  width: 46%;
+  height: 46%;
+}
+.float-tile:hover {
   transform: translateY(-4px) !important;
 }
-.logo-tile i {
-  width: 58%;
-  height: 58%;
-  border-radius: 12px;
-  display: grid;
+.mark {
+  flex: none;
+  vertical-align: -3px;
+}
+.mark--word {
+  font: 800 10.5px/1 var(--font-display);
+  letter-spacing: -0.01em;
+}
+/* Marks inside chips sit on a small white plate, so dark brand colours
+   (Paytm, Visa, UPI) stay visible on the dark theme. */
+.mini-chips .mark,
+.ck__brands .mark {
+  box-sizing: content-box;
+  padding: 3px;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(17, 17, 20, 0.08);
+}
+.mini-chips .mark--word {
+  display: inline-grid;
   place-items: center;
-  font-style: normal;
+  height: 16px;
+  padding: 3px 5px;
+}
+.mini-chips span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.pay-logos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
 }
 
 /* ── Themes (ThemeShowcase) ────────────────────────────────────── */
@@ -1537,7 +1699,7 @@ button {
   padding: 16px 18px;
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--glass);
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
 }
@@ -1607,7 +1769,7 @@ button {
   padding: 5px;
   border-radius: 14px;
   border: 1px solid var(--line-2);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass);
 }
 .billing-switch button {
   height: 40px;
@@ -1623,8 +1785,8 @@ button {
   gap: 8px;
 }
 .billing-switch button.is-on {
-  background: #fff;
-  color: #0b0b12;
+  background: var(--pill-on-bg);
+  color: var(--pill-on-fg);
   font-weight: 600;
 }
 .billing-switch .save {
@@ -1652,17 +1814,18 @@ button {
   padding: 28px;
   border-radius: 22px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(23, 23, 34, 0.92), rgba(13, 13, 20, 0.92));
+  background: var(--card-bg);
 }
 .plan--featured {
   border-color: rgba(139, 108, 255, 0.6);
   background:
     radial-gradient(400px 220px at 50% 0%, rgba(139, 108, 255, 0.22), transparent 70%),
-    linear-gradient(180deg, rgba(27, 23, 44, 0.95), rgba(13, 13, 20, 0.95));
+    var(--featured-bg);
   box-shadow: 0 30px 80px -40px rgba(124, 92, 255, 0.8);
 }
 .plan__badge {
   position: absolute;
+  color: #fff;
   top: -12px;
   left: 28px;
   font-size: 12px;
@@ -1739,12 +1902,12 @@ button {
 .faq details {
   border-radius: 16px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--glass);
   transition: border-color 0.2s, background 0.2s;
 }
 .faq details[open] {
   border-color: var(--line-2);
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--glass);
 }
 .faq summary {
   list-style: none;
@@ -1801,7 +1964,7 @@ button {
   border-top: 1px solid var(--line);
   padding: 64px 0 36px;
   margin-top: 40px;
-  background: linear-gradient(180deg, transparent, rgba(11, 11, 18, 0.9));
+  background: linear-gradient(180deg, transparent, var(--footer-fade));
 }
 .footer__grid {
   display: grid;
@@ -1842,7 +2005,9 @@ button {
 
 /* ── Inner pages (Integrations, Apps, Pricing) ─────────────────── */
 .page-hero {
-  padding: 80px 0 56px;
+  /* Top and bottom only — the .wrap container keeps its side padding. */
+  padding-top: 80px;
+  padding-bottom: 56px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 40px;
@@ -1866,11 +2031,8 @@ button {
   gap: 14px;
   justify-content: end;
 }
-.hex .logo-tile {
-  border-radius: 20px;
-}
-.hex .logo-tile:nth-child(5n + 2),
-.hex .logo-tile:nth-child(5n + 4) {
+.hex .float-tile:nth-child(5n + 2),
+.hex .float-tile:nth-child(5n + 4) {
   transform: translateY(34px);
 }
 .lib {
@@ -1896,7 +2058,7 @@ button {
 }
 .lib__nav a:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass);
 }
 .lib__nav a span {
   color: var(--subtle);
@@ -1930,7 +2092,7 @@ button {
   padding: 20px;
   border-radius: 18px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(23, 23, 34, 0.85), rgba(13, 13, 20, 0.85));
+  background: var(--card-bg);
   transition: border-color 0.2s, transform 0.2s;
 }
 .card:hover {
@@ -1942,11 +2104,6 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-}
-.card .logo-tile {
-  width: 46px;
-  border-radius: 13px;
-  font-size: 14px;
 }
 .card h3 {
   margin: 0;
@@ -1981,10 +2138,10 @@ button {
 }
 .badge--app {
   background: var(--violet-soft);
-  color: #c9bcff;
+  color: var(--violet-ink);
 }
 .badge--soon {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-2);
   color: var(--muted);
 }
 .badge--paid {
@@ -2019,15 +2176,15 @@ button {
   padding: 0 16px;
   border-radius: 999px;
   border: 1px solid var(--line-2);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass);
   color: var(--muted);
   cursor: pointer;
   font-size: 14px;
 }
 .filters button[aria-pressed="true"] {
-  background: #fff;
-  color: #0b0b12;
-  border-color: #fff;
+  background: var(--pill-on-bg);
+  color: var(--pill-on-fg);
+  border-color: var(--pill-on-bg);
   font-weight: 600;
 }
 .roadmap {
@@ -2108,7 +2265,7 @@ html:not(.js) [data-reveal] {
     z-index: 49;
     overflow-y: auto;
     padding: 12px 20px 40px;
-    background: rgba(7, 7, 12, 0.98);
+    background: var(--menu-bg);
     backdrop-filter: blur(10px);
   }
   .mobile-menu a {
@@ -2139,6 +2296,9 @@ html:not(.js) [data-reveal] {
   .hex {
     justify-content: start;
     grid-template-columns: repeat(5, 56px);
+  }
+  .hex .brand-tile {
+    --s: 56px !important;
   }
   .lib {
     grid-template-columns: 1fr;
@@ -2184,6 +2344,9 @@ html:not(.js) [data-reveal] {
   }
   .int-cloud {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .int-cloud .brand-tile {
+    --s: 64px !important;
   }
   .editor,
   .dash {

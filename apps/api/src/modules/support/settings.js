@@ -66,8 +66,16 @@ async function saveSupportSettings(prisma, input, actorId) {
   return value;
 }
 
-/** The model actually used: Super admin's choice, else SUPPORT_AI_MODEL. */
-const modelFor = (settings) => settings.model || env.SUPPORT_AI_MODEL;
+/** The model actually used: Super admin's choice, else SUPPORT_AI_MODEL,
+ * else the provider's default — ignoring a choice made for the other
+ * provider (a Claude model name while the key is NVIDIA's, or back). */
+function modelFor(settings) {
+  const ai = require("../../lib/ai");
+  const fits = (m) => m && (ai.aiProvider() === "anthropic" ? !m.includes("/") : m.includes("/"));
+  if (fits(settings.model)) return settings.model;
+  if (fits(env.SUPPORT_AI_MODEL)) return env.SUPPORT_AI_MODEL;
+  return ai.defaultModel();
+}
 
 /** Where new tickets are emailed. */
 async function inboxFor(prisma, settings) {

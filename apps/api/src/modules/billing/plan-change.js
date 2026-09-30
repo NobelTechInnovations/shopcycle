@@ -1,6 +1,6 @@
 const { HttpError } = require("@shopcycle/utils");
 const { getSettings } = require("./settings");
-const { periodPrice, dailyRate, proration } = require("./pricing");
+const { periodPrice, dailyRate, proration, isFreePlan } = require("./pricing");
 const { tax, num, round2 } = require("./money");
 const { transition, syncStorePlan, S } = require("./state");
 const entitlements = require("./entitlements");
@@ -10,8 +10,9 @@ const charges = require("./charges");
 /**
  * Changing plan or billing interval. One policy everywhere:
  *
- *   Free window (trial, the ₹99 first month, or before paying again after
- *   the subscription lapsed) → switches at once, nothing charged now.
+ *   Free window (trial, the ₹99 first month, an admin free plan, or before
+ *   paying again after the subscription lapsed) → switches at once,
+ *   nothing charged now.
  *   Upgrade (a higher price per day, or monthly → yearly) → at once, with
  *   a prorated charge: the new plan for the rest of the period minus
  *   credit for the unused part of what was paid. Monthly → yearly starts
@@ -64,7 +65,10 @@ async function preview(prisma, store, sub, { planId, interval, now = new Date() 
   const trialRunning = sub.status === S.TRIALING && sub.trialEndsAt && new Date(sub.trialEndsAt) > now;
   const lapsed = [S.PENDING_PAYMENT, S.EXPIRED, S.CANCELLED].includes(sub.status);
   const suspendedClear = sub.status === S.SUSPENDED && !(await cycles.outstanding(prisma, sub.id));
-  if (trialRunning || lapsed || suspendedClear || (await inIntroMonth(prisma, sub, now))) {
+  // An admin free plan: switching costs nothing either (the order
+  // commission follows the new plan's rate from now on).
+  const freePlan = isFreePlan(sub, now) && ![S.GRACE_PERIOD, S.PAST_DUE].includes(sub.status);
+  if (trialRunning || lapsed || suspendedClear || freePlan || (await inIntroMonth(prisma, sub, now))) {
     return { ...base, type: "free", appliesAt: "now", effectiveDate: now, charge: null };
   }
   if ([S.GRACE_PERIOD, S.PAST_DUE, S.SUSPENDED].includes(sub.status)) {

@@ -98,7 +98,9 @@ async function sf(method, url, body) {
   }
 }
 
-/** Plays Anthropic's Messages API: streams a fixed answer in pieces. */
+/** Plays NVIDIA's OpenAI-compatible chat API: streams a fixed answer in
+ * pieces, with thinking the seller must never see (reasoning_content and
+ * an inline <think> block). */
 function startAiMock() {
   const calls = [];
   const server = http.createServer((req, res) => {
@@ -106,19 +108,19 @@ function startAiMock() {
     req.on("data", (d) => (body += d));
     req.on("end", () => {
       const json = JSON.parse(body || "{}");
-      calls.push({ headers: req.headers, body: json });
+      calls.push({ path: req.url, headers: req.headers, body: json });
       const last = json.messages?.[json.messages.length - 1]?.content || "";
       if (last.includes("FAIL-AI")) {
         res.writeHead(500, { "content-type": "application/json" });
-        res.end(JSON.stringify({ type: "error", error: { type: "api_error", message: "overloaded" } }));
+        res.end(JSON.stringify({ error: { message: "overloaded" } }));
         return;
       }
       res.writeHead(200, { "content-type": "text/event-stream" });
-      const pieces = ["Go to **Settings ▸ Payments**", " and choose **Connect** on Razorpay.", " Paste your Key ID and Key Secret."];
-      res.write(`event: message_start\ndata: ${JSON.stringify({ type: "message_start", message: { id: "msg_1" } })}\n\n`);
-      res.write(`event: content_block_start\ndata: ${JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } })}\n\n`);
-      for (const text of pieces) res.write(`event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } })}\n\n`);
-      res.write(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+      const chunk = (delta) => res.write(`data: ${JSON.stringify({ id: "c1", object: "chat.completion.chunk", choices: [{ index: 0, delta }] })}\n\n`);
+      chunk({ role: "assistant", reasoning_content: "The seller wants Razorpay. Secret reasoning." });
+      chunk({ content: "<think>internal notes</think>" });
+      for (const text of ["Go to **Settings ▸ Payments**", " and choose **Connect** on Razorpay.", " Paste your Key ID and Key Secret."]) chunk({ content: text });
+      res.write("data: [DONE]\n\n");
       res.end();
     });
   });
@@ -134,8 +136,10 @@ async function startApi() {
       API_PORT: String(API_PORT),
       NODE_ENV: "test",
       JOBS_DISABLED: "true",
-      ANTHROPIC_API_KEY: "test-ai-key",
-      ANTHROPIC_API_URL: `${AI}/v1/messages`,
+      ANTHROPIC_API_KEY: "",
+      NVIDIA_API_KEY: "nvapi-test-key",
+      NVIDIA_API_URL: `${AI}/v1/chat/completions`,
+      SUPPORT_AI_MODEL: "",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -366,17 +370,18 @@ async function main() {
     r = await owner("POST", "/api/support/ask", { question: "How do I connect Razorpay?" }, { raw: true });
     let s = parseStream(r.text);
     check("answer streams as newline-delimited JSON", r.status === 200 && /ndjson/.test(r.headers.get("content-type")) && s.start && s.done, r.text.slice(0, 300));
-    check("the streamed answer is the AI's, in pieces", s.answer === ai.answer && s.events.filter((e) => e.type === "delta").length === 3, s.answer);
+    check("the streamed answer is the AI's, in pieces — its thinking never shown", s.answer === ai.answer && !/Secret reasoning|internal notes|<think>/.test(r.text), s.answer);
     check("matching articles come with it", s.start.articles.some((x) => x.slug === "connect-payments"), s.start.articles);
     const call = ai.calls[ai.calls.length - 1];
-    check("Claude called with the key, a model and streaming", call.headers["x-api-key"] === "test-ai-key" && call.headers["anthropic-version"] && typeof call.body.model === "string" && call.body.model.length > 3 && call.body.stream === true, { h: call.headers, model: call.body.model });
-    check("the prompt knows the store (no gateway yet) and has the article", call.body.system.includes(store.name) && /Online payment gateways: none connected/.test(call.body.system) && call.body.system.includes("Connect a payment gateway") && call.body.system.includes("Flow"), call.body.system.slice(0, 500));
+    const system = call.body.messages?.[0]?.content || "";
+    check("NVIDIA called with the key, Nemotron 3 Ultra, streaming, thinking off", call.path === "/v1/chat/completions" && call.headers.authorization === "Bearer nvapi-test-key" && call.body.model === "nvidia/nemotron-3-ultra-550b-a55b" && call.body.stream === true && call.body.chat_template_kwargs?.enable_thinking === false, { h: call.headers.authorization, model: call.body.model });
+    check("the prompt knows the store (no gateway yet) and has the article", call.body.messages[0].role === "system" && system.includes(store.name) && /Online payment gateways: none connected/.test(system) && system.includes("Connect a payment gateway") && system.includes("Flow"), system.slice(0, 500));
     const chatId = s.start.chatId;
 
     r = await owner("POST", "/api/support/ask", { question: "and PayU?", chatId }, { raw: true });
     s = parseStream(r.text);
     const follow = ai.calls[ai.calls.length - 1].body.messages;
-    check("follow-up sends the conversation, alternating turns", follow.length === 3 && follow[0].role === "user" && follow[1].role === "assistant" && follow[2].content === "and PayU?", follow);
+    check("follow-up sends the conversation, alternating turns", follow.length === 4 && follow[0].role === "system" && follow[1].role === "user" && follow[2].role === "assistant" && follow[3].content === "and PayU?", follow.map((m) => m.role));
 
     r = await owner("POST", "/api/support/ask", { question: "FAIL-AI how do I add a product with sizes?" }, { raw: true });
     s = parseStream(r.text);
