@@ -99,7 +99,7 @@ export function ThemeShowcase({ demoUrl, appUrl }) {
             ))}
             <span>Colours, fonts and every section are yours to change.</span>
           </span>
-          {t.demo ? (
+          {t.demo && demoUrl ? (
             <a className="btn btn--ghost btn--sm" href={demoUrl} target="_blank" rel="noopener">
               Visit the live demo store ↗
             </a>

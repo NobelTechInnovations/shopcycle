@@ -1,23 +1,32 @@
 import "./globals.css";
+import { SiteNav } from "./components/SiteNav";
+import { SiteFooter } from "./components/SiteFooter";
+import { Reveal } from "./components/Reveal";
 
 export const metadata = {
-  title: "Oyklane — Launch a store that sells",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://oyklane.com"),
+  title: {
+    default: "Oyklane — Build the store. Grow the brand.",
+    template: "%s · Oyklane",
+  },
   description:
-    "Oyklane is the commerce platform for Indian brands: beautiful themes, cash on delivery and five payment gateways, GST invoices, reviews and a no-code editor — live in an afternoon.",
+    "Oyklane is the commerce platform for Indian brands: a store you design without code, One-Click Checkout, UPI and cash on delivery, GST invoices, automated customer emails and an app store — live in an afternoon.",
   openGraph: {
-    title: "Oyklane — Launch a store that sells",
-    description: "Themes, payments, COD, GST invoices, reviews and a no-code editor for Indian brands.",
+    title: "Oyklane — Build the store. Grow the brand.",
+    description: "Storefront, One-Click Checkout, payments, GST and growth apps for Indian brands.",
     images: ["/showcase/atelier.webp"],
     type: "website",
   },
 };
 
-export const viewport = { themeColor: "#ffffff" };
+export const viewport = { themeColor: "#07070c", colorScheme: "dark" };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Sections fade in on scroll; mark JS early so nothing flashes. */}
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
@@ -25,7 +34,12 @@ export default function RootLayout({ children }) {
           href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Inter:wght@400;500;600&display=swap"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <SiteNav />
+        <main id="main">{children}</main>
+        <SiteFooter />
+        <Reveal />
+      </body>
     </html>
   );
 }
