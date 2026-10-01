@@ -38,6 +38,8 @@ export const APP_LOGO = {
   whatsapp: { brand: "whatsapp" },
   "customer-reviews": { icon: "chat" },
   "custom-scripts": { icon: "code" },
+  "instagram-feed": { brand: "instagram" },
+  "google-reviews": { brand: "google" },
 };
 
 /** What's being built next — shown as "coming soon", never as available. */

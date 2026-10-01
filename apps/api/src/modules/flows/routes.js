@@ -4,6 +4,9 @@ const appsService = require("../apps/service");
 const { throttle } = require("../../lib/throttle");
 const catalog = require("./catalog");
 const engine = require("./engine");
+const templates = require("../../emails/templates");
+const { ICON_CHOICES, iconUrl } = require("../../emails/assets");
+const { mergeSettings } = require("../../lib/store-settings");
 
 /**
  * /api/flows — the Flow app's own panel (Apps ▸ Flow): the store's
@@ -69,6 +72,74 @@ async function flowsRoutes(fastify) {
     const flow = await prisma.flow.create({ data: { storeId: request.store.id, enabled: false, ...data } });
     reply.code(201);
     return { flow: shape(flow) };
+  });
+
+  // ── Email design: logo, colour and layout for every email the store
+  // sends (order emails and flows alike), in store.settings.emailDesign.
+
+  const designSchema = z.object({
+    accent: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Pick a colour"),
+    logoUrl: z.string().trim().max(1000).optional().nullable(),
+    logoWidth: z.coerce.number().int().min(60).max(240).default(120),
+    style: z.enum(templates.STYLES).default("classic"),
+  });
+
+  async function themeLogo(storeId) {
+    const theme = await prisma.theme.findFirst({ where: { storeId, isActive: true }, select: { settingsData: true } });
+    const logo = theme?.settingsData?.sections?.header?.settings?.logo;
+    return typeof logo === "string" && /^https:\/\//.test(logo) ? logo : null;
+  }
+
+  /** Two sample emails in a design: an order confirmation and a flow email. */
+  function samples(store, design) {
+    const s = { ...store, settings: { ...(store.settings || {}), emailDesign: design } };
+    const order = {
+      orderNumber: 1043, currency: store.currency || "INR", subtotal: 2299, discount: 0, shipping: 0, tax: 0, total: 2299,
+      paymentMethod: "cod", paymentStatus: "pending", shippingName: "Ananya Sharma",
+      shippingAddress1: "12, MG Road", shippingCity: "Pune", shippingProvince: "Maharashtra", shippingZip: "411001",
+      items: [{ title: "Pure linen shirt", quantity: 1, total: 1499 }, { title: "Cotton kurta", quantity: 1, total: 800 }],
+    };
+    return {
+      order: templates.orderConfirmation({ store: s, order, statusUrl: "#" }).html,
+      flow: templates.flowEmail({
+        store: s,
+        vars: { "customer.first_name": "Ananya", "store.name": store.name },
+        subject: "A thank-you from {{store.name}}",
+        heading: "Thanks for shopping with us, {{customer.first_name}}!",
+        text: "We loved packing your order. Here's 10% off your next one — just use {{discount_code}} at checkout.",
+        discountCode: "THANKYOU10",
+        buttonLabel: "Shop again",
+        buttonUrl: "#",
+        icon: "gift",
+      }).html,
+    };
+  }
+
+  fastify.get("/email-design", async (request) => {
+    const saved = request.store.settings?.emailDesign || null;
+    const design = templates.makeDesign(saved || { logoUrl: await themeLogo(request.store.id) });
+    return {
+      design: { accent: design.accent, logoUrl: design.logoUrl, logoWidth: design.logoWidth, style: design.style },
+      saved: Boolean(saved),
+      themeLogo: await themeLogo(request.store.id),
+      icons: ICON_CHOICES.map((key) => ({ key, url: iconUrl(key) })),
+      styles: templates.STYLES,
+      preview: samples(request.store, design),
+    };
+  });
+
+  fastify.post("/email-design/preview", async (request) => {
+    const design = designSchema.parse(request.body || {});
+    return { preview: samples(request.store, templates.makeDesign(design)) };
+  });
+
+  fastify.put("/email-design", async (request) => {
+    const input = designSchema.parse(request.body || {});
+    if (input.logoUrl && !/^https:\/\//i.test(input.logoUrl)) throw new HttpError(400, "The logo needs to be an https:// image — upload it from Files.");
+    const design = templates.makeDesign(input);
+    const emailDesign = { accent: design.accent, logoUrl: design.logoUrl, logoWidth: design.logoWidth, style: design.style };
+    await prisma.store.update({ where: { id: request.store.id }, data: { settings: mergeSettings(request.store, { emailDesign }) } });
+    return { design: emailDesign };
   });
 
   fastify.get("/:id", async (request) => {

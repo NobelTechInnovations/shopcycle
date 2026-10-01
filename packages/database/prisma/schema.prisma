@@ -82,7 +82,7 @@ model AuthToken {
 /// configured (local dev) nothing leaves the machine: the message is kept
 /// here with its HTML so it can be read in the platform console.
 model EmailLog {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   storeId           String?
   to                String
   subject           String
@@ -94,16 +94,16 @@ model EmailLog {
   status            String
   provider          String
   providerMessageId String?
-  error             String?  @db.Text
+  error             String?   @db.Text
   /// Only kept for "logged" emails (local dev) — sent mail isn't stored.
-  html              String?  @db.Text
+  html              String?   @db.Text
   /// The message to deliver (subject, html, sender, reply-to) while it's
   /// queued; emptied once it's sent or given up on (lib/mailer.js).
   payload           Json?
   attempts          Int       @default(0)
   nextAttemptAt     DateTime?
   sentAt            DateTime?
-  createdAt         DateTime @default(now())
+  createdAt         DateTime  @default(now())
 
   store Store? @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
@@ -623,6 +623,7 @@ model Store {
   pageViews            PageView[]
   campaigns            Campaign[]
   installedApps        StoreApp[]
+  appConnections       AppConnection[]
   cartSessions         CartSession[]
   metaConnection       MetaConnection?
   adCampaigns          AdCampaign[]
@@ -1164,6 +1165,9 @@ model Order {
   @@unique([storeId, orderNumber])
   @@unique([storeId, invoiceSeq])
   @@index([storeId])
+  // A shopper's history across stores (customers/insights.js).
+  @@index([phone])
+  @@index([email])
   @@map("orders")
 }
 
@@ -1392,6 +1396,9 @@ model MenuItem {
   label    String
   url      String
   position Int    @default(0)
+  /// 0 = top level; 1 = in the dropdown of the nearest link above at
+  /// depth 0; 2 = one level further. The list stays flat and ordered.
+  depth    Int    @default(0)
 
   menu Menu @relation(fields: [menuId], references: [id], onDelete: Cascade)
 
@@ -1602,6 +1609,34 @@ model App {
   installs StoreApp[]
 
   @@map("apps")
+}
+
+/// A store's link to an outside service for one app (Instagram feed,
+/// Google reviews): private credentials, the public profile, and the
+/// latest items fetched (posts, reviews) that the theme shows.
+model AppConnection {
+  id          String    @id @default(cuid())
+  storeId     String
+  /// App.key — "instagram-feed", "google-reviews".
+  appKey      String
+  /// Private (access tokens, place ids). Never sent to themes or the admin.
+  credentials Json      @default("{}")
+  /// Public: { username, name, picture, rating, total, url, ... }
+  profile     Json      @default("{}")
+  /// The latest posts / reviews, newest first.
+  items       Json      @default("[]")
+  fetchedAt   DateTime?
+  /// When the access token stops working (Instagram: 60 days, renewed).
+  expiresAt   DateTime?
+  /// The last fetch's error, shown to the seller; null when it worked.
+  error       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, appKey])
+  @@map("app_connections")
 }
 
 model StoreApp {

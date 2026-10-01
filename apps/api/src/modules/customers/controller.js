@@ -4,6 +4,7 @@ const {
   listCustomersQuerySchema,
 } = require("@shopcycle/validation");
 const service = require("./service");
+const insights = require("./insights");
 
 async function listHandler(request, reply) {
   const query = listCustomersQuerySchema.parse(request.query);
@@ -38,4 +39,9 @@ async function deleteHandler(request, reply) {
   reply.code(204).send();
 }
 
-module.exports = { listHandler, getHandler, createHandler, updateHandler, deleteHandler };
+/** GET /api/customers/:id/insights — buying behaviour here and across Oyklane. */
+async function insightsHandler(request, reply) {
+  reply.send({ insights: await insights.forCustomer(request.server.prisma, request.store.id, request.params.id) });
+}
+
+module.exports = { listHandler, getHandler, createHandler, updateHandler, deleteHandler, insightsHandler };

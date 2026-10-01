@@ -9,6 +9,7 @@ const {
 const service = require("./service");
 const storefrontService = require("../storefront/service");
 const platform = require("../storefront/platform");
+const appsService = require("../apps/service");
 
 async function listHandler(request, reply) {
   const themes = await service.listThemes(request.server.prisma, request.store.id);
@@ -19,7 +20,8 @@ async function getHandler(request, reply) {
   const theme = await service.getTheme(request.server.prisma, request.store.id, request.params.id);
   // The platform's arrangeable pages (product page): their sections and
   // default layouts, for the editor's page switcher.
-  reply.send({ theme, platform: await platform.editorPackage() });
+  const installed = await appsService.getInstalledAppsContext(request.server.prisma, request.store.id);
+  reply.send({ theme, platform: await platform.editorPackage({ installed }) });
 }
 
 async function installHandler(request, reply) {

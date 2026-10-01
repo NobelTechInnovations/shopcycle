@@ -27,6 +27,7 @@ import { CancelModal } from "./CancelModal";
 import { ReturnModal } from "./ReturnModal";
 import { Timeline } from "./Timeline";
 import { dateTime, dateOnly } from "./order-utils";
+import { CustomerInsightsCard } from "@/components/CustomerInsightsCard";
 
 /** Where the order came from: the timeline's "placed" entry says; orders
  * from before the timeline existed fall back to having a checkout email. */
@@ -517,6 +518,8 @@ export function OrderDetailView({ order, role, hasGstInvoices }) {
               {order.buyerGstin && <span className="text-ink-muted font-mono text-[13px]">GSTIN {order.buyerGstin}</span>}
             </div>
           </Card>
+
+          {(order.phone || order.email) && <CustomerInsightsCard path={`/api/orders/${order.id}/insights`} forOrder />}
 
           {order.customerNote && (
             <Card size="small" title="Note from customer">

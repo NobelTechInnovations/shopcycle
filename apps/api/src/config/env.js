@@ -247,6 +247,22 @@ const envSchema = z.object({
   // up yet rather than the API failing to boot.
   META_APP_ID: z.string().optional(),
   META_APP_SECRET: z.string().optional(),
+  // Instagram feed app: an app on developers.facebook.com with the
+  // "Instagram API with Instagram Login" product (instagram_business_basic).
+  // Register <ADMIN_ORIGIN>/admin/apps/instagram as its redirect URI.
+  // Without these a seller can still paste an access token.
+  INSTAGRAM_APP_ID: z.string().optional(),
+  INSTAGRAM_APP_SECRET: z.string().optional(),
+  INSTAGRAM_OAUTH_URL: z.string().default("https://www.instagram.com/oauth/authorize"),
+  INSTAGRAM_API_URL: z.string().default("https://api.instagram.com"),
+  INSTAGRAM_GRAPH_URL: z.string().default("https://graph.instagram.com"),
+  // Google reviews app: a Google Cloud API key with "Places API (New)" on.
+  GOOGLE_PLACES_API_KEY: z.string().optional(),
+  GOOGLE_PLACES_URL: z.string().default("https://places.googleapis.com/v1"),
+  // Add the newest catalog apps (Instagram feed, Google reviews) when
+  // running locally — off by default because local dev shares production's
+  // database, and production adds them itself once its code is deployed.
+  SEED_PREVIEW_APPS: z.string().optional(),
   // Where Meta redirects back after the merchant approves access —
   // must exactly match one of the "Valid OAuth Redirect URIs" configured
   // on the Meta app. Points at the admin app, not the API, since that's

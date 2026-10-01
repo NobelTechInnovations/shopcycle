@@ -6,6 +6,7 @@ async function analyticsRoutes(fastify) {
   fastify.addHook("preHandler", fastify.requireActiveSubscription);
 
   fastify.get("/live", controller.liveHandler);
+  fastify.get("/visitors", controller.visitorsHandler);
   fastify.get("/overview", controller.overviewHandler);
   fastify.get("/reports", controller.reportsHandler);
   fastify.get("/campaigns", controller.listCampaignsHandler);

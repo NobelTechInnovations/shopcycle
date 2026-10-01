@@ -1,3 +1,4 @@
+const { env } = require("../../config/env");
 const { FEATURES, PLANS, LEGACY_FLAGS } = require("./catalog");
 const { DEFAULTS, getSettings } = require("./settings");
 const { addDays } = require("./pricing");
@@ -70,6 +71,40 @@ const FLOW = {
   settingsSchema: [],
 };
 
+// Social apps (modules/social): free. Each has its own page in the admin
+// and a section sellers add in the theme editor.
+const INSTAGRAM_FEED = {
+  key: "instagram-feed",
+  name: "Instagram Feed",
+  description:
+    "Show your latest Instagram posts on your store — a scrolling row or a grid you add anywhere in Customize. Connect once; new posts appear by themselves.",
+  category: "marketing",
+  iconKey: "megaphone",
+  settingsSchema: [],
+};
+
+const GOOGLE_REVIEWS = {
+  key: "google-reviews",
+  name: "Google Reviews",
+  description:
+    "Show your Google rating and your best Google reviews on your store, with a link to write one. Find your business once; reviews refresh every day.",
+  category: "marketing",
+  iconKey: "star",
+  settingsSchema: [
+    {
+      id: "minRating",
+      label: "Show reviews with at least",
+      type: "select",
+      options: [
+        { value: "5", label: "5 stars" },
+        { value: "4", label: "4 stars" },
+        { value: "3", label: "3 stars" },
+        { value: "1", label: "Any rating" },
+      ],
+    },
+  ],
+};
+
 async function seedCatalog(prisma, { log } = {}) {
   const have = new Set((await prisma.feature.findMany({ select: { key: true } })).map((f) => f.key));
   const missing = FEATURES.filter((f) => !have.has(f.key));
@@ -118,6 +153,12 @@ async function seedCatalog(prisma, { log } = {}) {
   await prisma.app.upsert({ where: { key: ONE_CLICK.key }, update: {}, create: ONE_CLICK });
   await prisma.app.upsert({ where: { key: PHONE_LOGIN.key }, update: {}, create: PHONE_LOGIN });
   await prisma.app.upsert({ where: { key: FLOW.key }, update: {}, create: FLOW });
+  // Local dev shares production's database: a local start would list these
+  // in production's app store before production can run them.
+  if (env.NODE_ENV === "production" || env.SEED_PREVIEW_APPS === "1") {
+    await prisma.app.upsert({ where: { key: INSTAGRAM_FEED.key }, update: {}, create: INSTAGRAM_FEED });
+    await prisma.app.upsert({ where: { key: GOOGLE_REVIEWS.key }, update: {}, create: GOOGLE_REVIEWS });
+  }
   await require("../support/articles").seedArticles(prisma, { log });
 }
 

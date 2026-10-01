@@ -4,6 +4,8 @@ const menuItemSchema = z.object({
   id: z.string().optional(),
   label: z.string().min(1),
   url: z.string().min(1),
+  // Menu ▸ submenu ▸ sub-submenu.
+  depth: z.coerce.number().int().min(0).max(2).default(0),
 });
 
 const createMenuSchema = z.object({

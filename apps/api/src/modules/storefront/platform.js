@@ -109,12 +109,31 @@ function sanitizeArrangement(name, raw) {
   return JSON.stringify({ sections, order });
 }
 
-/** The platform's own section files and default layouts for arrangeable
- * pages — the theme editor builds its section list from these. */
-async function editorPackage() {
+/** App sections (sections/app-<app key>.liquid): a theme section each
+ * installed app adds — Instagram feed, Google reviews — that a seller can
+ * place on any page. Keyed by the app that brings it. */
+const APP_SECTIONS = {
+  "instagram-feed": "sections/app-instagram-feed.liquid",
+  "google-reviews": "sections/app-google-reviews.liquid",
+};
+
+/** The app section files, for renders of theme pages (platform pages get
+ * every platform file anyway). */
+async function appSectionFiles() {
   const { renderFiles } = await load();
+  return Object.fromEntries(Object.values(APP_SECTIONS).filter((p) => renderFiles[p]).map((p) => [p, renderFiles[p]]));
+}
+
+/** The platform's own section files and default layouts for arrangeable
+ * pages — the theme editor builds its section list from these — plus the
+ * sections of the store's installed apps. */
+async function editorPackage({ installed = {} } = {}) {
+  const { renderFiles } = await load();
+  const appPaths = Object.entries(APP_SECTIONS)
+    .filter(([key]) => installed[key])
+    .map(([, p]) => p);
   const sections = Object.entries(renderFiles)
-    .filter(([p]) => /^sections\/sys-/.test(p) && Object.values(ARRANGEABLE).some((r) => r.sections.includes(p.slice(9, -7))))
+    .filter(([p]) => (/^sections\/sys-/.test(p) && Object.values(ARRANGEABLE).some((r) => r.sections.includes(p.slice(9, -7)))) || appPaths.includes(p))
     .map(([path, content]) => ({ path, content }));
   const templates = {};
   for (const name of Object.keys(ARRANGEABLE)) templates[name] = JSON.parse(renderFiles[`templates/${name}.json`] || '{"sections":{},"order":[]}');
@@ -237,9 +256,33 @@ function cartDrawerOn(settings, templateName) {
   return (settings?.cart_type || "drawer") === "drawer" && templateName !== "cart" && templateName !== "checkout";
 }
 
+/** Menu dropdowns (snippets/menu-links: li.oy-has-sub > ul.oy-sub) for
+ * every theme: a panel under the link on hover or keyboard focus, a side
+ * panel for the third level, an indented list in the phone menu. The
+ * selectors outrank the themes' own ".header__nav ul". */
+const MENU_CSS = [
+  ".header__nav li.oy-has-sub{position:relative}",
+  ".header__nav li.oy-has-sub>a{display:inline-flex;align-items:center;gap:5px}",
+  ".oy-caret{width:10px;height:10px;flex:none;opacity:.65;transition:transform .2s}",
+  ".header__nav li.oy-has-sub:hover>a>.oy-caret,.header__nav li.oy-has-sub:focus-within>a>.oy-caret{transform:rotate(180deg)}",
+  ".header__nav li.oy-has-sub>ul.oy-sub{position:absolute;top:calc(100% + 10px);left:-14px;z-index:80;display:flex;flex-direction:column;flex-wrap:nowrap;gap:0;min-width:220px;margin:0;padding:8px;list-style:none;text-align:left;background:var(--oy-bg);color:var(--oy-text);border:1px solid var(--oy-line);border-radius:min(var(--oy-radius),14px);box-shadow:0 22px 44px -18px rgba(0,0,0,.3);opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease,visibility .18s}",
+  ".header__nav li.oy-has-sub>ul.oy-sub::before{content:\"\";position:absolute;left:0;right:0;top:-12px;height:12px}",
+  ".header__nav li.oy-has-sub:hover>ul.oy-sub,.header__nav li.oy-has-sub:focus-within>ul.oy-sub{opacity:1;visibility:visible;transform:none}",
+  ".header__nav ul.oy-sub li.oy-has-sub>ul.oy-sub{top:-9px;left:calc(100% + 8px)}",
+  ".header__nav ul.oy-sub li.oy-has-sub>ul.oy-sub::before{top:0;bottom:0;left:-10px;width:10px;height:auto}",
+  ".header__nav ul.oy-sub li{width:100%}",
+  ".header__nav ul.oy-sub a{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:9px 10px;border-radius:8px;white-space:nowrap;font-size:14px;color:var(--oy-text)}",
+  ".header__nav ul.oy-sub a::after{display:none}",
+  ".header__nav ul.oy-sub a:hover,.header__nav ul.oy-sub a:focus-visible{background:var(--oy-surface)}",
+  ".header__nav ul.oy-sub .oy-caret{transform:rotate(-90deg)!important}",
+  ".drawer__links ul.oy-sub{list-style:none;margin:0;padding:0 0 8px 16px;display:flex;flex-direction:column}",
+  ".drawer__links ul.oy-sub a{font-size:16px!important;padding:9px 0!important;border-bottom:0!important;font-family:inherit!important;font-weight:400!important;opacity:.85}",
+  ".drawer__links .oy-caret{display:none}",
+].join("");
+
 async function headTags(settings, { system, drawer, login, assetBase }) {
   const { version } = await load();
-  let tags = `<style id="oy-tokens">${tokensCss(settings)}</style>`;
+  let tags = `<style id="oy-tokens">${tokensCss(settings)}${MENU_CSS}</style>`;
   if (system) tags += `<link rel="stylesheet" href="${assetUrl("system.css", version, assetBase)}">`;
   if (drawer) tags += `<link rel="stylesheet" href="${assetUrl("cart-drawer.css", version, assetBase)}">`;
   if (login) tags += `<link rel="stylesheet" href="${assetUrl("login-popup.css", version, assetBase)}">`;
@@ -275,6 +318,8 @@ async function asset(name) {
 }
 
 module.exports = {
+  APP_SECTIONS,
+  appSectionFiles,
   ARRANGEABLE,
   isArrangeable,
   sanitizeArrangement,

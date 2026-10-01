@@ -85,6 +85,8 @@ async function renderEmail(prisma, store, step, ctx) {
     discountCode: step.discountCode,
     buttonLabel: step.buttonLabel,
     buttonUrl: url,
+    icon: step.icon || null,
+    banner: step.banner || null,
     ...summary,
   });
 }

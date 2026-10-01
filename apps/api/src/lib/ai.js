@@ -185,4 +185,30 @@ function streamText({ model, system, messages, maxTokens = 1200, signal }) {
   return streamNvidia(args);
 }
 
-module.exports = { aiConfigured, aiProvider, defaultModel, streamText, thinkFilter };
+/** The whole answer at once — for short jobs (rewrite a description,
+ * suggest tags) where nothing is shown until it's done. */
+async function completeText({ system, prompt, maxTokens = 700, timeoutMs = 45 * 1000 }) {
+  if (!aiConfigured()) {
+    const err = new Error("AI isn't set up on Oyklane yet.");
+    err.status = 503;
+    throw err;
+  }
+  let out = "";
+  for await (const piece of streamText({ system, messages: [{ role: "user", content: prompt }], maxTokens, signal: AbortSignal.timeout(timeoutMs) })) out += piece;
+  return out.trim();
+}
+
+/** The first JSON object in a model's answer (models sometimes wrap it in
+ * prose or a ``` fence). Null when there isn't one. */
+function parseJsonObject(text) {
+  const start = String(text || "").indexOf("{");
+  const end = String(text || "").lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+module.exports = { aiConfigured, aiProvider, defaultModel, streamText, completeText, parseJsonObject, thinkFilter };

@@ -58,6 +58,7 @@ function template(key, store) {
 <p>We share only what's needed with the partners who help us run the store — our e-commerce platform, payment gateways, couriers and messaging providers. We don't sell your personal information.</p>
 <h2>Faster checkout</h2>
 <p>Our store runs on Oyklane. When you confirm your mobile number with a one-time code at checkout, the delivery addresses you've used with that number on other stores on Oyklane may be offered to you, so you don't have to type them again. They're shown only to you, and we receive one only if you choose it for your order.</p>
+<p>To help stores on Oyklane prevent fake orders and return abuse, the number of orders placed, cancelled, returned or refused at delivery with your phone number or email may be shown to the stores you order from. Only these counts are shared — never which stores you bought from, what you bought or what you paid.</p>
 <h2>Cookies</h2>
 <p>We use cookies to keep your cart and sign-in working and, if enabled, to measure visits and ads.</p>
 <h2>Your choices</h2>

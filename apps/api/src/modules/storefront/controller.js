@@ -100,6 +100,8 @@ async function renderHandler(request, reply) {
         utm: { source: utmSource, medium: utmMedium, campaign: utmCampaign, term: utmTerm, content: utmContent },
         userAgent: request.headers["user-agent"],
         headers: request.headers,
+        fastify: request.server,
+        shopperToken: request.headers["x-shopper-token"],
       });
       reply.header("x-visitor-id", sessionId);
     } catch (err) {

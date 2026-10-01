@@ -8,6 +8,7 @@ import { ArrowDown, ArrowUp, Braces, ChevronDown, Flag, MoreHorizontal, Plus, Se
 import { PageHeader, SaveBar, EmptyState, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 import { StepIcon, TriggerIcon, stepSummary, stepTitle, stepShort, stepHeadline, newStep, relative } from "../flow-ui";
+import { ImageUploadField } from "@/components/ImageUploadField";
 
 const STATUS_TAG = {
   running: { color: "processing", label: "Running" },
@@ -317,12 +318,66 @@ function Preview({ trigger, step }) {
             <div className="px-3 py-2 bg-app-surface border-b border-app-border text-[12.5px] truncate">
               <span className="text-ink-subtle">Subject:</span> <span className="text-ink font-medium">{preview.subject}</span>
             </div>
-            <iframe title="Email preview" sandbox="" srcDoc={preview.html} className="w-full h-[460px] border-0 bg-white block" />
+            <iframe title="Email preview" sandbox="allow-same-origin" srcDoc={preview.html} className="w-full h-[460px] border-0 bg-white block" />
           </>
         ) : (
           <div className="h-[200px] flex items-center justify-center text-[12.5px] text-ink-subtle">Rendering…</div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** The email's look: a picture at the top and an optional banner. Logo,
+ * colour and layout are the store's (Email design). */
+function EmailDesignFields({ step, set, catalog }) {
+  const [open, setOpen] = useState(Boolean(step.icon || step.banner));
+  return (
+    <div className="rounded-[10px] border border-app-border mb-4">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between gap-3 px-3 py-2.5 bg-transparent border-0 cursor-pointer text-left">
+        <span>
+          <span className="block text-[13px] text-ink font-medium">Design</span>
+          <span className="block text-[12px] text-ink-muted">
+            {step.icon || step.banner ? [step.icon && "Icon", step.banner && "Banner image"].filter(Boolean).join(" + ") : "Add an icon or a banner image"}
+          </span>
+        </span>
+        <span className="text-[12px] text-accent">{open ? "Hide" : "Edit"}</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 border-t border-app-border pt-3">
+          <p className="text-[12.5px] text-ink m-0 mb-2">Icon at the top</p>
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            <button
+              type="button"
+              onClick={() => set({ icon: "" })}
+              className={`h-10 px-3 rounded-lg border text-[12px] cursor-pointer ${!step.icon ? "border-accent bg-accent-soft/50 text-ink" : "border-app-border bg-app-surface text-ink-muted"}`}
+            >
+              None
+            </button>
+            {(catalog.icons || []).map((i) => (
+              <button
+                key={i.key}
+                type="button"
+                title={i.key}
+                aria-label={`Icon: ${i.key}`}
+                onClick={() => set({ icon: i.key })}
+                className={`w-10 h-10 rounded-lg border flex items-center justify-center cursor-pointer ${step.icon === i.key ? "border-accent bg-accent-soft/50" : "border-app-border bg-app-surface hover:bg-app-bg"}`}
+              >
+                <img src={i.url} alt="" width={20} height={20} />
+              </button>
+            ))}
+          </div>
+          <p className="text-[12.5px] text-ink m-0 mb-2">Banner image (optional)</p>
+          <ImageUploadField value={step.banner || ""} onChange={(banner) => set({ banner })} aspect="2 / 1" label="Upload banner" />
+          <p className="text-[12px] text-ink-muted mt-2 mb-0">
+            Wide images (about 1200 × 600) look best. Your logo, colour and layout are set in{" "}
+            <Link href="/admin/apps/flow/design" className="text-accent">
+              Email design
+            </Link>
+            .
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -371,6 +426,7 @@ function EmailForm({ step, set, catalog, subject, trigger }) {
           )}
         </div>
       )}
+      <EmailDesignFields step={step} set={set} catalog={catalog} />
       {subject !== "customer" && (
         <label className="flex items-center justify-between gap-3 rounded-[10px] border border-app-border px-3 py-2.5 cursor-pointer">
           <span>

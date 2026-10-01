@@ -1,4 +1,5 @@
 import {
+  Instagram,
   Image as ImageIcon,
   GalleryHorizontal,
   Megaphone,
@@ -56,10 +57,13 @@ const META = {
   "rich-text": { icon: Type, group: "Text", text: "A heading or statement with an optional button." },
   header: { icon: PanelTop, group: "Layout", text: "Logo, menu, search, account and cart." },
   footer: { icon: PanelBottom, group: "Layout", text: "Links, contact details, newsletter and social icons." },
+  // Sections that installed apps add (themes/_platform/sections/app-*).
+  "app-instagram-feed": { icon: Instagram, group: "Apps", text: "Your latest Instagram posts — a scrolling row or a grid. From the Instagram Feed app." },
+  "app-google-reviews": { icon: Star, group: "Apps", text: "Your Google rating and best reviews. From the Google Reviews app." },
 };
 
 export function sectionMeta(type) {
   return META[type] || { icon: Layers, group: "Other", text: "A custom section." };
 }
 
-export const GROUP_ORDER = ["Banners", "Products", "Story", "Trust", "Text", "Other"];
+export const GROUP_ORDER = ["Apps", "Banners", "Products", "Story", "Trust", "Text", "Other"];

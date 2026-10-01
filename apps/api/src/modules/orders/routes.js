@@ -15,6 +15,7 @@ async function orderRoutes(fastify) {
   fastify.get("/:id", controller.getHandler);
   fastify.patch("/:id/status", controller.updateStatusHandler);
   fastify.get("/:id/status-link", controller.statusLinkHandler);
+  fastify.get("/:id/insights", controller.insightsHandler);
   fastify.post("/:id/fulfillments", controller.fulfillHandler);
   fastify.post("/:id/fulfillments/:fulfillmentId", controller.fulfillmentActionHandler);
   fastify.post("/:id/mark-paid", controller.markPaidHandler);

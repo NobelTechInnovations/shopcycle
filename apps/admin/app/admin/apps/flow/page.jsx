@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { App, Button, Dropdown, Form, Input, Modal, Select, Skeleton, Switch, Tag } from "antd";
-import { Plus, MoreHorizontal, Pencil, Trash2, ArrowRight, Workflow, Mail, Activity, Hourglass } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, ArrowRight, Workflow, Mail, Activity, Hourglass, Palette } from "lucide-react";
 import { PageHeader, EmptyState, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 import { useApps } from "@/lib/apps";
@@ -152,9 +152,14 @@ export default function FlowHomePage() {
         title="Flow"
         subtitle="Emails that send themselves — a trigger, then waits, conditions and messages."
         actions={
-          <Button type="primary" icon={<Plus size={15} aria-hidden="true" />} onClick={() => setCreating(true)}>
-            Create flow
-          </Button>
+          <div className="flex gap-2">
+            <Link href="/admin/apps/flow/design">
+              <Button icon={<Palette size={15} aria-hidden="true" />}>Email design</Button>
+            </Link>
+            <Button type="primary" icon={<Plus size={15} aria-hidden="true" />} onClick={() => setCreating(true)}>
+              Create flow
+            </Button>
+          </div>
         }
       />
 

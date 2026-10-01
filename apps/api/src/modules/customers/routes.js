@@ -8,6 +8,7 @@ async function customerRoutes(fastify) {
   fastify.get("/", controller.listHandler);
   fastify.post("/", controller.createHandler);
   fastify.get("/:id", controller.getHandler);
+  fastify.get("/:id/insights", controller.insightsHandler);
   fastify.patch("/:id", controller.updateHandler);
   fastify.delete("/:id", controller.deleteHandler);
 }

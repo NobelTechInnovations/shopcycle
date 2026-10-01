@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { HttpError } = require("@shopcycle/utils");
+const { ICON_CHOICES, iconUrl } = require("../../emails/assets");
 
 /**
  * What a Flow can be made of — the triggers that start one, the facts a
@@ -178,6 +179,10 @@ function cleanSteps(steps, trigger) {
           buttonUrl: buttonLink === "custom" ? buttonUrl : "",
           discountCode: str(s.discountCode, 40).toUpperCase(),
           includeSummary: subject !== "customer" && Boolean(s.includeSummary),
+          // Design: a picture at the top (an icon in the store's colour)
+          // and an optional banner image.
+          icon: ICON_CHOICES.includes(s.icon) ? s.icon : "",
+          banner: /^https:\/\/[^\s"'<>]+$/i.test(str(s.banner, 1000)) ? str(s.banner, 1000) : "",
         };
       }
       case "notify_owner": {
@@ -374,7 +379,18 @@ function recipe(key) {
 
 /** Everything the admin's builder needs, in one object. */
 function builderCatalog() {
-  return { triggers: TRIGGERS, fields: FIELDS, ops: OPS, stepTypes: STEP_TYPES, variables: VARIABLES, links: LINKS, recipes: RECIPES, maxSteps: MAX_STEPS };
+  return {
+    triggers: TRIGGERS,
+    fields: FIELDS,
+    ops: OPS,
+    stepTypes: STEP_TYPES,
+    variables: VARIABLES,
+    links: LINKS,
+    recipes: RECIPES,
+    maxSteps: MAX_STEPS,
+    // Pictures for the top of an email (white on the store's colour).
+    icons: ICON_CHOICES.map((key) => ({ key, url: iconUrl(key, { dark: true }) })),
+  };
 }
 
 module.exports = { TRIGGERS, FIELDS, OPS, STEP_TYPES, VARIABLES, LINKS, RECIPES, UNIT_MS, cleanSteps, cleanFlow, recipe, builderCatalog, newId };

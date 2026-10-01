@@ -1,6 +1,11 @@
 const { HttpError, detectDeviceType } = require("@shopcycle/utils");
 const storefrontService = require("../storefront/service");
 const repository = require("./repository");
+const { PLACED } = require("../orders/placed");
+
+// Required when first used: shopper/service pulls in modules that load
+// this one.
+const shopperService = () => require("../shopper/service");
 
 const SESSION_STALE_MS = 30 * 60 * 1000; // 30 minutes of inactivity ends a session
 const LIVE_TTL_SECONDS = 90; // a visitor with no page view in 90s drops off Live View
@@ -71,13 +76,30 @@ function liveKey(storeId, sessionId) {
   return `analytics:live:${storeId}:${sessionId}`;
 }
 
-async function markLive(redis, storeId, session, path) {
+async function markLive(redis, storeId, session, path, { customer, templateName } = {}) {
+  let views = 1;
+  let since = new Date().toISOString();
+  try {
+    const before = JSON.parse((await redis.get(liveKey(storeId, session.id))) || "null");
+    if (before) {
+      views = (before.views || 1) + 1;
+      since = before.since || since;
+    }
+  } catch {}
   const payload = {
     sessionId: session.id,
     path,
+    templateName: templateName || null,
     country: session.country,
     deviceType: session.deviceType,
-    customerName: session.customerName || null,
+    // Signed-in shoppers: who they are, so the seller can call or message.
+    customerId: customer?.id || null,
+    customerName: customer?.name || null,
+    phone: customer?.phone || null,
+    email: customer?.email || null,
+    referrer: session.utmSource || session.referrer || null,
+    views,
+    since,
     updatedAt: new Date().toISOString(),
   };
   await redis.set(liveKey(storeId, session.id), JSON.stringify(payload), "EX", LIVE_TTL_SECONDS);
@@ -107,8 +129,11 @@ async function getLiveVisitors(redis, storeId) {
  * and isn't invoked). Resolves or starts a session, records the page
  * view, and refreshes the Live View entry.
  */
-async function trackPageView(prisma, redis, handle, { sessionId, path, templateName, referrer, utm, userAgent, headers }) {
+async function trackPageView(prisma, redis, handle, { sessionId, path, templateName, referrer, utm, userAgent, headers, fastify, shopperToken }) {
   const store = await storefrontService.loadStoreOrThrow(prisma, handle);
+  // The signed-in shopper (if any) — so Live View and the visit history
+  // show who it is, not "Anonymous visitor".
+  const customer = fastify && shopperToken ? await shopperService().customerFromToken(fastify, store, shopperToken).catch(() => null) : null;
 
   let session = sessionId ? await repository.findSession(prisma, store.id, sessionId) : null;
   const isStale = session && Date.now() - new Date(session.lastSeenAt).getTime() > SESSION_STALE_MS;
@@ -125,19 +150,22 @@ async function trackPageView(prisma, redis, handle, { sessionId, path, templateN
       utmTerm: utm?.term || null,
       utmContent: utm?.content || null,
       entryPath: path,
+      ...(customer && { customerId: customer.id }),
     });
   } else {
-    session = await repository.touchSession(prisma, session.id, { lastSeenAt: new Date() });
+    session = await repository.touchSession(prisma, session.id, {
+      lastSeenAt: new Date(),
+      ...(customer && session.customerId !== customer.id && { customerId: customer.id }),
+    });
   }
 
   await repository.createPageView(prisma, store.id, session.id, path, templateName || null);
 
-  let customerName = null;
-  if (session.customerId) {
-    const customer = await prisma.customer.findUnique({ where: { id: session.customerId }, select: { name: true } });
-    customerName = customer?.name || null;
-  }
-  await markLive(redis, store.id, { ...session, customerName }, path);
+  // A session that was signed in earlier still shows who it was.
+  const who =
+    customer ||
+    (session.customerId ? await prisma.customer.findUnique({ where: { id: session.customerId }, select: { id: true, name: true, phone: true, email: true } }) : null);
+  await markLive(redis, store.id, session, path, { customer: who, templateName });
 
   return session.id;
 }
@@ -265,9 +293,121 @@ async function deleteCampaign(prisma, storeId, id) {
   await repository.deleteCampaign(prisma, id);
 }
 
+// ── Visitors: who's browsing, and who browsed ────────────────────
+
+const FIXED_PAGES = [
+  [/^\/?$/, "Home"],
+  [/^\/cart\b/, "Cart"],
+  [/^\/checkout\b/, "Checkout"],
+  [/^\/account\b/, "Account"],
+  [/^\/search\b/, "Search"],
+  [/^\/orders\b/, "Order status"],
+  [/^\/blogs?\b/, "Blog"],
+  [/^\/collections\/all\/?$/, "All products"],
+];
+
+/** "/store/h/products/x?y" → "/products/x" */
+function cleanPath(path) {
+  return String(path || "/")
+    .replace(/^\/store\/[^/]+/, "")
+    .replace(/[?#].*$/, "") || "/";
+}
+
+/** Turns storefront paths into names a seller recognises — the product's
+ * or collection's title — with one query for all of them. */
+async function pageLabeller(prisma, storeId, paths) {
+  const products = new Set();
+  const collections = new Set();
+  const pages = new Set();
+  for (const raw of paths) {
+    const path = cleanPath(raw);
+    const m = path.match(/^\/(products|collections|pages)\/([^/]+)/);
+    if (!m) continue;
+    const slug = decodeURIComponent(m[2]);
+    (m[1] === "products" ? products : m[1] === "collections" ? collections : pages).add(slug);
+  }
+  const [p, c, pg] = await Promise.all([
+    products.size ? prisma.product.findMany({ where: { storeId, slug: { in: [...products] } }, select: { slug: true, title: true } }) : [],
+    collections.size ? prisma.collection.findMany({ where: { storeId, slug: { in: [...collections] } }, select: { slug: true, title: true } }) : [],
+    pages.size ? prisma.page.findMany({ where: { storeId, slug: { in: [...pages] } }, select: { slug: true, title: true } }) : [],
+  ]);
+  const titles = { products: new Map(p.map((x) => [x.slug, x.title])), collections: new Map(c.map((x) => [x.slug, x.title])), pages: new Map(pg.map((x) => [x.slug, x.title])) };
+  return (raw) => {
+    const path = cleanPath(raw);
+    const m = path.match(/^\/(products|collections|pages)\/([^/]+)/);
+    if (m && m[2] !== "all") {
+      const slug = decodeURIComponent(m[2]);
+      const kind = { products: "product", collections: "collection", pages: "page" }[m[1]];
+      return { label: titles[m[1]].get(slug) || slug.replace(/-/g, " "), kind };
+    }
+    const fixed = FIXED_PAGES.find(([re]) => re.test(path));
+    return { label: fixed ? fixed[1] : path, kind: fixed ? fixed[1].toLowerCase() : "page" };
+  };
+}
+
+/** Live View, with readable page names. */
+async function liveVisitors(prisma, redis, storeId) {
+  const visitors = await getLiveVisitors(redis, storeId);
+  const label = await pageLabeller(prisma, storeId, visitors.map((v) => v.path));
+  return visitors.map((v) => ({ ...v, page: label(v.path) }));
+}
+
+/**
+ * Past visits, newest first: signed-in shoppers by default (the ones a
+ * seller can call back), or everyone; or one customer's visits.
+ */
+async function visitorHistory(prisma, storeId, { range = "7d", who = "signed_in", customerId, page = 1, pageSize = 20 } = {}) {
+  const store = await prisma.store.findUnique({ where: { id: storeId }, select: { timezone: true } });
+  const { from } = rangeToDates(range, store?.timezone || "Asia/Kolkata");
+  const where = {
+    storeId,
+    lastSeenAt: { gte: from },
+    ...(customerId ? { customerId } : who === "signed_in" ? { customerId: { not: null } } : {}),
+  };
+  const [total, sessions] = await Promise.all([
+    prisma.visitorSession.count({ where }),
+    prisma.visitorSession.findMany({
+      where,
+      orderBy: { lastSeenAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        customer: { select: { id: true, name: true, phone: true, email: true } },
+        pageViews: { orderBy: { createdAt: "asc" }, take: 80, select: { path: true, templateName: true, createdAt: true } },
+        orders: { where: PLACED, select: { id: true, orderNumber: true, total: true, createdAt: true } },
+      },
+    }),
+  ]);
+  const label = await pageLabeller(prisma, storeId, sessions.flatMap((s) => s.pageViews.map((v) => v.path)));
+  return {
+    total,
+    page,
+    pageSize,
+    sessions: sessions.map((s) => {
+      const views = s.pageViews.map((v) => ({ at: v.createdAt, path: cleanPath(v.path), ...label(v.path) }));
+      return {
+        id: s.id,
+        customer: s.customer,
+        firstSeenAt: s.firstSeenAt,
+        lastSeenAt: s.lastSeenAt,
+        deviceType: s.deviceType,
+        country: s.country,
+        source: s.utmSource || (s.referrer ? s.referrer.replace(/^https?:\/\/(www\.)?/, "").split("/")[0] : null),
+        views,
+        productsViewed: [...new Set(views.filter((v) => v.kind === "product").map((v) => v.label))],
+        reachedCart: views.some((v) => v.kind === "cart"),
+        reachedCheckout: views.some((v) => v.kind === "checkout"),
+        orders: s.orders.map((o) => ({ ...o, total: Number(o.total) })),
+      };
+    }),
+  };
+}
+
 module.exports = {
   trackPageView,
   getLiveVisitors,
+  liveVisitors,
+  visitorHistory,
   getOverview,
   getReports,
   listCampaigns,

@@ -19,6 +19,20 @@
         "dev"
       ],
       "port": 3004
+    },
+    {
+      "name": "admin",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@shopcycle/admin",
+        "exec",
+        "next",
+        "dev",
+        "--port",
+        "3010"
+      ],
+      "port": 3010
     }
   ]
 }

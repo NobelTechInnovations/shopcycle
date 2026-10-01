@@ -15,6 +15,7 @@ const { actorNameFrom } = require("./events");
 const { listAbandonedCheckouts } = require("../checkout/abandoned");
 
 const { HttpError } = require("@shopcycle/utils");
+const customerInsights = require("../customers/insights");
 
 const ctx = (request) => ({ actorName: actorNameFrom(request), log: request.log });
 
@@ -230,7 +231,13 @@ async function returnsListHandler(request, reply) {
   reply.send({ returns: rows });
 }
 
+/** GET /api/orders/:id/insights — the shopper's history, to decide whether to ship. */
+async function insightsHandler(request, reply) {
+  reply.send({ insights: await customerInsights.forOrder(request.server.prisma, request.store.id, request.params.id) });
+}
+
 module.exports = {
+  insightsHandler,
   listHandler,
   getHandler,
   createHandler,

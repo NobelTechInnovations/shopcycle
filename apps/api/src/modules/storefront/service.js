@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const { HttpError } = require("@shopcycle/utils");
 const {
   renderTemplate,
@@ -15,6 +16,7 @@ const repository = require("./repository");
 const cartService = require("../cart/service");
 const checkoutService = require("../checkout/service");
 const appsService = require("../apps/service");
+const socialConnections = require("../social/connections");
 const { computeAccess } = require("../billing/access");
 const shopperService = require("../shopper/service");
 const paymentsService = require("../payments/service");
@@ -78,6 +80,26 @@ async function masterFiles(handle) {
     );
   }
   return masterCache.get(handle);
+}
+
+/**
+ * Theme files the platform has improved since stores copied them. A store
+ * whose copy is still exactly one of these earlier versions (the seller
+ * never edited it) gets the master's current file; an edited copy is the
+ * seller's and stays as it is. Hash: sha256 of the content with runs of
+ * whitespace collapsed, first 16 hex characters.
+ */
+const PRISTINE_UPGRADES = {
+  // Sub-menus (dropdowns) — 1 Oct.
+  "snippets/menu-links.liquid": ["29def272dcaf31df"],
+};
+const contentHash = (text) => crypto.createHash("sha256").update(String(text).replace(/\s+/g, " ").trim()).digest("hex").slice(0, 16);
+
+function upgradePristine(files, master) {
+  for (const [file, old] of Object.entries(PRISTINE_UPGRADES)) {
+    if (files[file] != null && master[file] != null && files[file] !== master[file] && old.includes(contentHash(files[file]))) files[file] = master[file];
+  }
+  return files;
 }
 
 function serializeCustomer(customer) {
@@ -249,13 +271,22 @@ function buildLinklists(menus, routes) {
   const linkRoot = routes.root_url === "/" ? "" : routes.root_url;
   const linklists = {};
   for (const menu of menus) {
-    linklists[menu.handle] = {
-      title: menu.title,
-      links: menu.items.map((item) => ({
+    // Items are a flat, ordered list with a depth; a link's sub-links are
+    // the deeper ones right after it — `link.links`, as in Shopify themes.
+    const top = [];
+    const parents = [];
+    for (const item of menu.items) {
+      const link = {
         title: item.label,
         url: /^https?:\/\//.test(item.url) ? item.url : `${linkRoot}${item.url.startsWith("/") ? "" : "/"}${item.url}`,
-      })),
-    };
+        links: [],
+      };
+      const depth = Math.min(item.depth || 0, parents.length);
+      parents.length = depth;
+      (depth === 0 ? top : parents[depth - 1].links).push(link);
+      parents.push(link);
+    }
+    linklists[menu.handle] = { title: menu.title, links: top };
   }
   return linklists;
 }
@@ -387,6 +418,8 @@ async function buildGlobalContext(prisma, store, { slug, cartId, discountError, 
     payment_options: await paymentsService.checkoutOptions(prisma, store),
     platform: { fonts_url: platform.fontsUrl(themeSettings) },
     apps,
+    // Instagram feed / Google reviews apps: `instagram`, `google_reviews`.
+    ...(await socialConnections.storefrontData(prisma, store.id, apps)),
     // Stars under product cards (Product Reviews app, "show on cards").
     show_card_ratings: Boolean(reviewsApp && reviewsApp.showOnCards),
     reviews_app: reviewsApp,
@@ -672,7 +705,9 @@ async function renderPage(
   // live preview, unsaved edits over the top. Platform pages (everything
   // but the home page) always use Oyklane's own templates on top of that —
   // a theme can style them but not replace them.
-  let filesByPath = { ...(await masterFiles(theme.handle)), ...filesArrayToMap(theme.files), ...(filesOverride || {}) };
+  const master = await masterFiles(theme.handle);
+  // App sections (Instagram feed, Google reviews) can sit on any page.
+  let filesByPath = { ...master, ...upgradePristine(filesArrayToMap(theme.files), master), ...(await platform.appSectionFiles()), ...(filesOverride || {}) };
   if (system) {
     // The store's own arrangement of this page (theme editor), if it has one
     // and it's still valid — read before the platform's files replace it.
@@ -901,6 +936,9 @@ async function renderPage(
 
   const seo = buildSeo(store, templateName, globalContext);
   globalContext.page_title = seo.title;
+  // Rendering for the theme editor: sections may show setup hints that
+  // shoppers never see.
+  globalContext.design_mode = templateOverride != null || settingsOverride != null || filesOverride != null || assetBaseOverride != null;
 
   let html;
   try {

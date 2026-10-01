@@ -1,0 +1,148 @@
+{% comment %}
+  Google Reviews app: the store's Google rating and its best reviews
+  (`google_reviews`, see modules/social/google-reviews.js), with Google's
+  attribution and each reviewer's name, as Google requires. A scrolling
+  row of cards or a grid. Hidden from shoppers until a business is
+  connected; the theme editor shows a hint instead.
+{% endcomment %}
+{% assign gr = google_reviews %}
+{% if gr and gr.total > 0 %}
+  <section class="oy-gr oy-gr--{{ section.settings.layout | default: 'scroll' }}{% if section.settings.surface %} oy-gr--surface{% endif %}">
+    <div class="oy-gr__wrap">
+      <div class="oy-gr__head">
+        <div>
+          {% if section.settings.heading != blank %}<h2 class="oy-gr__title">{{ section.settings.heading }}</h2>{% endif %}
+          <div class="oy-gr__summary">
+            <svg class="oy-gr__g" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.5-.2-2.2H12v4.2h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2.1-1.9 3.3-4.8 3.3-8"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.7c-1 .7-2.2 1.1-3.7 1.1-2.9 0-5.3-1.9-6.2-4.5H2.1v2.8A11 11 0 0 0 12 23"/><path fill="#FBBC05" d="M5.8 14.2a6.6 6.6 0 0 1 0-4.3V7.1H2.1a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.2-3.2A11 11 0 0 0 2.1 7.1l3.7 2.8C6.7 7.3 9.1 5.4 12 5.4"/></svg>
+            {% if gr.rating_text %}<b class="oy-gr__score">{{ gr.rating_text }}</b>{% endif %}
+            <span class="oy-gr__stars" aria-label="{{ gr.rating_text }} out of 5 stars">
+              {% for i in (1..5) %}
+                {% assign fill = 0 %}
+                {% assign full_at = i | minus: 0.25 %}
+                {% assign half_at = i | minus: 0.75 %}
+                {% if gr.rating >= full_at %}{% assign fill = 100 %}{% elsif gr.rating >= half_at %}{% assign fill = 50 %}{% endif %}
+                <svg viewBox="0 0 24 24" aria-hidden="true" class="oy-gr__star{% if fill == 100 %} is-on{% elsif fill == 50 %} is-half{% endif %}"><path d="m12 2.5 2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></svg>
+              {% endfor %}
+            </span>
+            <span class="oy-gr__count">{{ gr.total }} Google review{% if gr.total != 1 %}s{% endif %}</span>
+          </div>
+        </div>
+        <div class="oy-gr__actions">
+          {% if section.settings.layout != 'grid' and gr.reviews.size > 1 %}
+            <button type="button" class="oy-gr__arrow" data-oy-gr-prev aria-label="Previous reviews"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <button type="button" class="oy-gr__arrow" data-oy-gr-next aria-label="More reviews"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+          {% endif %}
+          {% if section.settings.write_text != blank and gr.write_url %}
+            <a class="oy-gr__write" href="{{ gr.write_url }}" target="_blank" rel="noopener">{{ section.settings.write_text }}</a>
+          {% endif %}
+        </div>
+      </div>
+      {% if gr.reviews.size > 0 %}
+        <div class="oy-gr__track" data-oy-gr-track>
+          {% for r in gr.reviews %}
+            <article class="oy-gr__card">
+              <div class="oy-gr__who">
+                {% if r.photo %}<img src="{{ r.photo }}" alt="" width="40" height="40" loading="lazy" referrerpolicy="no-referrer">{% else %}<span class="oy-gr__initial" aria-hidden="true">{{ r.initial }}</span>{% endif %}
+                <div>
+                  {% if r.author_url %}<a href="{{ r.author_url }}" target="_blank" rel="noopener nofollow">{{ r.author }}</a>{% else %}<b>{{ r.author }}</b>{% endif %}
+                  <small>{{ r.when }}</small>
+                </div>
+                <svg class="oy-gr__g oy-gr__g--sm" viewBox="0 0 24 24" aria-label="Google review"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.5-.2-2.2H12v4.2h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2.1-1.9 3.3-4.8 3.3-8"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.7c-1 .7-2.2 1.1-3.7 1.1-2.9 0-5.3-1.9-6.2-4.5H2.1v2.8A11 11 0 0 0 12 23"/><path fill="#FBBC05" d="M5.8 14.2a6.6 6.6 0 0 1 0-4.3V7.1H2.1a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.2-3.2A11 11 0 0 0 2.1 7.1l3.7 2.8C6.7 7.3 9.1 5.4 12 5.4"/></svg>
+              </div>
+              <span class="oy-gr__stars oy-gr__stars--sm" aria-label="{{ r.rating }} out of 5 stars">
+                {% for i in (1..5) %}<svg viewBox="0 0 24 24" aria-hidden="true" class="oy-gr__star{% if r.rating >= i %} is-on{% endif %}"><path d="m12 2.5 2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></svg>{% endfor %}
+              </span>
+              <p class="oy-gr__text">{{ r.text | newline_to_br }}</p>
+              {% if r.url %}<a class="oy-gr__more" href="{{ r.url }}" target="_blank" rel="noopener">Read on Google</a>{% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% if gr.url %}<p class="oy-gr__credit">Reviews from <a href="{{ gr.url }}" target="_blank" rel="noopener">Google</a></p>{% endif %}
+    </div>
+  </section>
+  {% if section.settings.layout != 'grid' %}
+    <script>
+      (function () {
+        var s = document.currentScript && document.currentScript.previousElementSibling;
+        if (!s) return;
+        var t = s.querySelector("[data-oy-gr-track]");
+        if (!t) return;
+        function go(d) { t.scrollBy({ left: d * t.clientWidth * 0.8, behavior: "smooth" }); }
+        var p = s.querySelector("[data-oy-gr-prev]"), n = s.querySelector("[data-oy-gr-next]");
+        if (p) p.addEventListener("click", function () { go(-1); });
+        if (n) n.addEventListener("click", function () { go(1); });
+      })();
+    </script>
+  {% endif %}
+{% elsif design_mode %}
+  <section class="oy-app-hint">
+    <b>Google reviews</b>
+    <span>{% if apps['google-reviews'] %}Find your business in Apps ▸ Google Reviews — your rating and reviews will show here.{% else %}Install the Google Reviews app (Apps) to show your reviews here.{% endif %}</span>
+  </section>
+{% endif %}
+
+{% assign show_css = design_mode %}
+{% if gr and gr.total > 0 %}{% assign show_css = true %}{% endif %}
+{% if show_css %}
+<style>
+  .oy-gr{padding:clamp(40px,6vw,72px) 0;color:var(--oy-text);font-family:var(--oy-font-body)}
+  .oy-gr--surface{background:var(--oy-surface)}
+  .oy-gr__wrap{max-width:var(--oy-container,1280px);margin:0 auto;padding:0 20px}
+  .oy-gr__head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px}
+  .oy-gr__title{margin:0 0 8px;font-family:var(--oy-font-heading);font-size:clamp(22px,2.6vw,30px);line-height:1.15;letter-spacing:-.01em;color:var(--oy-text)}
+  .oy-gr__summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:15px}
+  .oy-gr__g{width:22px;height:22px;flex:none}
+  .oy-gr__g--sm{width:18px;height:18px;margin-left:auto}
+  .oy-gr__score{font-size:20px;font-weight:700}
+  .oy-gr__stars{display:inline-flex;gap:2px}
+  .oy-gr__star{width:18px;height:18px;fill:var(--oy-line-strong)}
+  .oy-gr__star.is-on{fill:#FBBC04}
+  .oy-gr__star.is-half{fill:#FBBC04;opacity:.5}
+  .oy-gr__stars--sm .oy-gr__star{width:15px;height:15px}
+  .oy-gr__count{color:var(--oy-muted)}
+  .oy-gr__actions{display:flex;align-items:center;gap:8px}
+  .oy-gr__arrow{width:40px;height:40px;border-radius:50%;border:1px solid var(--oy-line-strong);background:var(--oy-bg);color:var(--oy-text);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+  .oy-gr__arrow:hover{background:var(--oy-surface)}
+  .oy-gr__arrow svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .oy-gr__write{display:inline-flex;align-items:center;height:40px;padding:0 18px;border-radius:var(--oy-radius-button,999px);border:1px solid var(--oy-text);color:var(--oy-text);font-weight:600;font-size:14px;text-decoration:none;white-space:nowrap}
+  .oy-gr__write:hover{background:var(--oy-text);color:var(--oy-bg)}
+  .oy-gr__track{display:grid;gap:14px}
+  .oy-gr--grid .oy-gr__track{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+  .oy-gr--scroll .oy-gr__track{grid-auto-flow:column;grid-auto-columns:calc((100% - 28px) / 3);overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
+  .oy-gr--scroll .oy-gr__track::-webkit-scrollbar{display:none}
+  .oy-gr__card{display:flex;flex-direction:column;gap:10px;padding:20px;border:1px solid var(--oy-line);border-radius:min(var(--oy-radius,14px),18px);background:var(--oy-bg);scroll-snap-align:start;min-width:0}
+  .oy-gr--surface .oy-gr__card{border-color:transparent}
+  .oy-gr__who{display:flex;align-items:center;gap:10px;min-width:0}
+  .oy-gr__who img,.oy-gr__initial{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none}
+  .oy-gr__initial{display:flex;align-items:center;justify-content:center;background:var(--oy-primary);color:var(--oy-on-primary);font-weight:700}
+  .oy-gr__who a,.oy-gr__who b{display:block;color:var(--oy-text);font-weight:600;font-size:14px;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oy-gr__who small{color:var(--oy-muted);font-size:12.5px}
+  .oy-gr__text{margin:0;font-size:14.5px;line-height:1.6;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+  .oy-gr__more{margin-top:auto;font-size:13px;color:var(--oy-muted)}
+  .oy-gr__credit{margin:14px 0 0;font-size:12px;color:var(--oy-muted)}
+  .oy-gr__credit a{color:inherit}
+  @media (max-width:900px){.oy-gr--scroll .oy-gr__track{grid-auto-columns:calc((100% - 14px) / 2)}}
+  @media (max-width:600px){
+    .oy-gr--scroll .oy-gr__track{grid-auto-columns:84%;margin:0 -20px;padding:0 20px;scroll-padding:0 20px}
+    .oy-gr__arrow{display:none}
+  }
+  .oy-app-hint{display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center;margin:24px auto;max-width:var(--oy-container,1280px);padding:28px 20px;border:1.5px dashed var(--oy-line-strong);border-radius:14px;color:var(--oy-muted);font-family:var(--oy-font-body);font-size:14px}
+  .oy-app-hint b{color:var(--oy-text);font-size:15px}
+</style>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Google reviews",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Loved by our customers" },
+    { "type": "select", "id": "layout", "label": "Layout", "default": "scroll", "options": [
+      { "value": "scroll", "label": "Scrolling row" },
+      { "value": "grid", "label": "Grid" }
+    ] },
+    { "type": "text", "id": "write_text", "label": "Button text (empty hides it)", "default": "Write a review" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": true }
+  ]
+}
+{% endschema %}

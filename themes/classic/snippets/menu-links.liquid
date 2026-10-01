@@ -1,10 +1,30 @@
 {% comment %}
-  Menu items as <li>s. A store that hasn't built its menu yet (Content ▸
-  Navigation) still gets a useful one: all products, its first
-  collections and the blog.
+  Menu items as <li>s; a link with sub-links gets a dropdown (<ul
+  class="oy-sub">, styled by the platform's shared CSS), two levels deep.
+  A store that hasn't built its menu yet (Content ▸ Navigation) still gets
+  a useful one: all products, its first collections and the blog.
 {% endcomment %}
 {% if menu and menu.links.size > 0 %}
-  {% for link in menu.links %}<li><a href="{{ link.url }}">{{ link.title }}</a></li>{% endfor %}
+  {% capture caret %}<svg class="oy-caret" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>{% endcapture %}
+  {% for link in menu.links %}
+    {% if link.links.size > 0 %}
+      <li class="oy-has-sub"><a href="{{ link.url }}" aria-haspopup="true">{{ link.title }}{{ caret }}</a>
+        <ul class="oy-sub">
+          {% for child in link.links %}
+            {% if child.links.size > 0 %}
+              <li class="oy-has-sub"><a href="{{ child.url }}" aria-haspopup="true">{{ child.title }}{{ caret }}</a>
+                <ul class="oy-sub">{% for grand in child.links %}<li><a href="{{ grand.url }}">{{ grand.title }}</a></li>{% endfor %}</ul>
+              </li>
+            {% else %}
+              <li><a href="{{ child.url }}">{{ child.title }}</a></li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+      </li>
+    {% else %}
+      <li><a href="{{ link.url }}">{{ link.title }}</a></li>
+    {% endif %}
+  {% endfor %}
 {% else %}
   <li><a href="{{ routes.all_products_url }}">Shop all</a></li>
   {% assign shown = 0 %}

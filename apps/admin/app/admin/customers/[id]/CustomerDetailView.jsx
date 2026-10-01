@@ -9,6 +9,8 @@ import { PageHeader, StatusBadge, EmptyState, SaveBar } from "@shopcycle/ui";
 import { formatCurrency } from "@shopcycle/utils";
 import { apiFetch } from "@/lib/api";
 import { initials } from "@/lib/storefront";
+import { CustomerInsightsCard } from "@/components/CustomerInsightsCard";
+import { CustomerVisitsCard } from "@/components/CustomerVisitsCard";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
@@ -232,6 +234,9 @@ export function CustomerDetailView({ customer }) {
                 <Input autoComplete="off" inputMode="tel" prefix={<Phone size={14} className="text-ink-subtle" aria-hidden="true" />} />
               </Form.Item>
             </Card>
+
+            <CustomerInsightsCard path={`/api/customers/${customer.id}/insights`} />
+            <CustomerVisitsCard customerId={customer.id} phone={customer.phone} />
 
             <Card size="small" title="Marketing">
               <p className="text-[13px] text-ink-muted mt-0 mb-3">

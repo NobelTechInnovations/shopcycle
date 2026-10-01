@@ -1,10 +1,24 @@
+const { z } = require("zod");
 const { createCampaignSchema, overviewQuerySchema } = require("@shopcycle/validation");
 const { env } = require("../../config/env");
 const service = require("./service");
 
 async function liveHandler(request, reply) {
-  const visitors = await service.getLiveVisitors(request.server.redis, request.store.id);
+  const visitors = await service.liveVisitors(request.server.prisma, request.server.redis, request.store.id);
   reply.send({ visitors });
+}
+
+const visitorsQuerySchema = z.object({
+  range: z.enum(["today", "7d", "30d", "90d"]).default("7d"),
+  who: z.enum(["signed_in", "all"]).default("signed_in"),
+  customerId: z.string().max(40).optional(),
+  page: z.coerce.number().int().min(1).max(500).default(1),
+});
+
+/** GET /api/analytics/visitors — past visits, signed-in shoppers first. */
+async function visitorsHandler(request, reply) {
+  const query = visitorsQuerySchema.parse(request.query);
+  reply.send(await service.visitorHistory(request.server.prisma, request.store.id, query));
 }
 
 async function overviewHandler(request, reply) {
@@ -41,6 +55,7 @@ async function deleteCampaignHandler(request, reply) {
 
 module.exports = {
   liveHandler,
+  visitorsHandler,
   overviewHandler,
   reportsHandler,
   listCampaignsHandler,

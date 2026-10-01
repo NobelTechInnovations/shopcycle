@@ -64,6 +64,21 @@ async function sendToShopper(prisma, store, order, { template, subject, html, lo
   return result;
 }
 
+/** The order with each item's product photo (its first image), for the
+ * thumbnails in order emails. Never fails the email: no photos, no change. */
+async function withItemImages(prisma, order) {
+  const ids = [...new Set((order.items || []).map((i) => i.productId).filter(Boolean))];
+  if (!ids.length) return order;
+  try {
+    const images = await prisma.productImage.findMany({ where: { productId: { in: ids } }, orderBy: { position: "asc" }, select: { productId: true, url: true } });
+    const first = {};
+    for (const img of images) if (!first[img.productId] && /^https:\/\//.test(img.url)) first[img.productId] = img.url;
+    return { ...order, items: order.items.map((i) => ({ ...i, image: i.image || first[i.productId] || null })) };
+  } catch {
+    return order;
+  }
+}
+
 /** Order confirmation + the store's new-order alert — once per order, no
  * matter how many paths call it (COD checkout, payment verified, a retried
  * callback). The atomic claim on confirmationSentAt is what makes it once. */
@@ -74,6 +89,7 @@ async function sendOrderPlaced(prisma, store, order, log) {
   });
   if (count === 0) return;
 
+  order = await withItemImages(prisma, order);
   const statusUrl = await statusUrlFor(prisma, store, order);
   const confirmation = templates.orderConfirmation({ store, order, statusUrl });
   await sendToShopper(prisma, store, order, { template: "order_confirmation", ...confirmation, log });
@@ -92,12 +108,13 @@ async function sendOrderPlaced(prisma, store, order, log) {
 
 async function resendOrderConfirmation(prisma, store, order, log) {
   const statusUrl = await statusUrlFor(prisma, store, order);
-  const confirmation = templates.orderConfirmation({ store, order, statusUrl });
+  const confirmation = templates.orderConfirmation({ store, order: await withItemImages(prisma, order), statusUrl });
   return sendToShopper(prisma, store, order, { template: "order_confirmation", ...confirmation, log });
 }
 
 async function sendShippingUpdate(prisma, store, order, fulfillment, log) {
   const statusUrl = await statusUrlFor(prisma, store, order);
+  order = await withItemImages(prisma, order);
   const itemsById = Object.fromEntries(order.items.map((i) => [i.id, i]));
   const lineItems = (fulfillment.items || [])
     .map((f) => itemsById[f.orderItemId] && { ...itemsById[f.orderItemId], quantity: f.quantity, total: Number(itemsById[f.orderItemId].price) * f.quantity })

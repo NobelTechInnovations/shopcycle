@@ -136,12 +136,15 @@ function buildApp() {
   app.register(uploadsServe);
 
   app.get("/health", async () => ({ ok: true, service: "@shopcycle/api" }));
+  // Icons inside emails (public, cached) — see emails/assets.js.
+  app.register(require("./emails/assets").emailAssetRoutes, { prefix: "/api/email-assets" });
 
   app.register(authRoutes, { prefix: "/api/auth" });
   app.register(storeRoutes, { prefix: "/api/store" });
   app.register(billingRoutes, { prefix: "/api/billing" });
   app.register(dashboardRoutes, { prefix: "/api/dashboard" });
   app.register(productRoutes, { prefix: "/api/products" });
+  app.register(require("./modules/social/routes"), { prefix: "/api/social" });
   app.register(collectionRoutes, { prefix: "/api/collections" });
   app.register(brandRoutes, { prefix: "/api/brands" });
   app.register(categoryRoutes, { prefix: "/api/categories" });

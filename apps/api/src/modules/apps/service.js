@@ -61,6 +61,8 @@ async function uninstallApp(prisma, storeId, key) {
   const install = await repository.findInstall(prisma, storeId, app.id);
   if (!install) throw new HttpError(404, "This app isn't installed");
   await repository.removeInstall(prisma, storeId, app.id);
+  // Instagram / Google links go with the app (their tokens too).
+  await prisma.appConnection.deleteMany({ where: { storeId, appKey: key } });
 }
 
 /** Used by storefront/service.js to build the `apps` Liquid global — only
