@@ -42,12 +42,16 @@
       <span class="card-rating" aria-label="Rated {{ product.rating.average }} out of 5 from {{ product.rating.count }} reviews"><span class="stars" style="--stars: {{ product.rating.average | times: 20 }}%"></span>({{ product.rating.count }})</span>
     {% endif %}
     <p class="price">
+      {% if product.rental %}
+        <span class="price__now">{% if product.rental.has_tiers %}<span class="price__from">From</span> {{ product.rental.from_price | money }}{% else %}{{ product.rental.price_per_day | money }}{% endif %}</span><span class="price__from"> / day</span>
+      {% else %}
       {% if product.price_varies %}<span class="price__from">From</span>{% endif %}
       {% if pv.comparePrice and pv.comparePrice > pv.price %}
         <span class="price__now price__now--sale">{{ pv.price | money }}</span>
         <s class="price__was">{{ pv.comparePrice | money }}</s>
       {% else %}
         <span class="price__now">{{ pv.price | money }}</span>
+      {% endif %}
       {% endif %}
     </p>
   </div>

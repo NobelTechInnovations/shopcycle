@@ -19,6 +19,8 @@ import {
   LifeBuoy,
   Gift,
   ShieldCheck,
+  CalendarDays,
+  Store,
 } from "lucide-react";
 import { APP_ICON_KEYS } from "@shopcycle/utils";
 
@@ -47,6 +49,8 @@ const ICON_COMPONENTS = {
   "life-buoy": LifeBuoy,
   gift: Gift,
   shield: ShieldCheck,
+  calendar: CalendarDays,
+  store: Store,
 };
 
 export const APP_ICONS = ICON_COMPONENTS;

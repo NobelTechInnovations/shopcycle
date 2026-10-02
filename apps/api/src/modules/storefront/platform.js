@@ -74,10 +74,36 @@ function isSystemTemplate(name) {
  */
 const ARRANGEABLE = {
   product: { main: "sys-product", sections: ["sys-product", "sys-related", "sys-reviews"] },
+  // Content pages and collections: the page's own content (main) with any
+  // of the theme's sections around it — a custom "About us" or "Bridal
+  // collection" layout.
+  page: { main: "sys-page", sections: ["sys-page"] },
+  collection: { main: "sys-collection", sections: ["sys-collection"] },
 };
 
 function isArrangeable(name) {
   return Boolean(ARRANGEABLE[name]);
+}
+
+/** "product.rental" → { base: "product", suffix: "rental" }. */
+function templateParts(name) {
+  const [base, suffix = null] = String(name || "").split(".");
+  return { base, suffix };
+}
+
+/**
+ * Extra templates an installed app brings (templates/<kind>.<suffix>.json
+ * in themes/_platform), offered beside the store's own. A store's theme
+ * file of the same name wins — that's the seller's edited copy.
+ */
+const APP_TEMPLATES = {
+  rentals: [{ kind: "product", suffix: "rental", label: "Rental product" }],
+};
+
+function appTemplates(installed = {}) {
+  return Object.entries(APP_TEMPLATES)
+    .filter(([key]) => installed[key])
+    .flatMap(([, list]) => list);
 }
 
 /**
@@ -137,7 +163,12 @@ async function editorPackage({ installed = {} } = {}) {
     .map(([path, content]) => ({ path, content }));
   const templates = {};
   for (const name of Object.keys(ARRANGEABLE)) templates[name] = JSON.parse(renderFiles[`templates/${name}.json`] || '{"sections":{},"order":[]}');
-  return { sections, templates };
+  const extra = appTemplates(installed);
+  for (const t of extra) {
+    const file = renderFiles[`templates/${t.kind}.${t.suffix}.json`];
+    if (file) templates[`${t.kind}.${t.suffix}`] = JSON.parse(file);
+  }
+  return { sections, templates, appTemplates: extra };
 }
 
 // ── Tokens ─────────────────────────────────────────────────────────
@@ -322,6 +353,9 @@ module.exports = {
   appSectionFiles,
   ARRANGEABLE,
   isArrangeable,
+  templateParts,
+  APP_TEMPLATES,
+  appTemplates,
   sanitizeArrangement,
   editorPackage,
   SYSTEM_TEMPLATES,

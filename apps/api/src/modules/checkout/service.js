@@ -15,6 +15,7 @@ const { cancelOrder } = require("../orders/operations");
 const shopperService = require("../shopper/service");
 const shopperPhone = require("../shopper/phone");
 const abandoned = require("./abandoned");
+const rentals = require("../rentals/service");
 const { REPLACED_REASON } = ordersRepository;
 
 /** What checkout offers: cash on delivery (Settings ▸ Payments) and each
@@ -161,6 +162,9 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     quantity: item.quantity,
     price: item.price,
     total: Math.round((item.price * item.quantity + Number.EPSILON) * 100) / 100,
+    // Rentals: the dates, how it travels, and the line shoppers and the
+    // seller see under the item.
+    ...(item.rental && { properties: { rental: item.rental, detail: item.detail } }),
   }));
 
   const orderData = {
@@ -209,9 +213,12 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     // the merchant to handle rather than losing it at the last step. Each
     // move is recorded in the inventory history (lib/inventory.js).
     for (const item of created.items) {
-      if (!item.variantId) continue;
+      // A rented piece comes back — stock stays; the booking holds it instead.
+      if (!item.variantId || item.properties?.rental) continue;
       await adjustStock(tx, { storeId, variantId: item.variantId, delta: -item.quantity, reason: "sold", orderId: created.id });
     }
+    // Rentals: one booking per rented line, its dates checked once more.
+    await rentals.bookOrder(tx, storeId, created, created.items);
     // Spent in the same transaction as the order: if the card's balance
     // changed since the cart was loaded, nothing is created or charged.
     if (giftCard) await giftCards.redeem(tx, giftCard, created.id, giftCard.amount);

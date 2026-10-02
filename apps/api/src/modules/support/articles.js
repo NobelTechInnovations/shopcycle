@@ -207,6 +207,64 @@ Ask the assistant first (Help, top right) — it answers from these articles and
 `),
 ];
 
+// Articles for features added after the starter set went in. Each batch is
+// added once (a platform setting remembers it), so an article the team
+// deleted on purpose doesn't come back.
+const ADDED = {
+  "help-articles-2026-10-02": [
+    a("theme-templates", "design", "Different layouts for some products, pages or collections", ["template", "layout", "custom page", "product page", "alternate", "different", "landing"], `
+Make a second layout and choose it only where you want it — like Shopify's alternate templates.
+
+- Open **Online Store ▸ Themes ▸ Customize** and click **+ Template** at the top. Pick Products, Collections or Pages, give it a name (for example "Size guide" or "Bridal"), and start from the default layout or another template.
+- Arrange it like any page: for products, click **Product** to reorder or hide its parts (price, size picker, buy buttons, text blocks…); add your theme's sections above or below — a banner, images with text, a video. Pages can hide their title; collections keep their products and filters.
+- Use it: open the product, collection or page in the admin and choose it under **Layout ▸ Theme template**. Everything else keeps the default.
+- Delete a template from the **…** next to its name in Customize. Anything that used it goes back to the default.
+`),
+    a("rentals", "apps", "Rent products out by the day (Rentals app)", ["rent", "rental", "per day", "booking", "hire", "lend", "deposit", "lehenga", "dress on rent", "calendar"], `
+Install **Rentals** from **Apps**. Then:
+
+- Open a product and turn on **Rent this product**: rent per day, cheaper daily rates from a number of days (for example ₹800/day from 3 days), a refundable deposit, how many pieces of each size you own, the shortest and longest rental, days kept free after each rental (cleaning) and how much notice you need. The selling price isn't used — it can be 0.
+- Its page on your store now shows the daily rent and a **booking calendar**: booked days are greyed out per size, shoppers choose delivery or pickup and how it comes back, and see the total.
+- **Apps ▸ Rentals ▸ Settings**: let shoppers **pay at checkout** (the rent goes in the cart; dates are booked when the order is placed and freed if it's cancelled) or **send a request** you confirm by phone (no payment on the store). Also: who delivers and collects, your pickup address, when the deposit is collected, a late fee per day and your rental terms.
+- **Apps ▸ Rentals ▸ Today** shows requests to confirm, what goes out and comes back today and tomorrow, and late returns — with Call and WhatsApp buttons. Mark pieces **Handed over** (tick "deposit collected") and **Returned** (a late fee is suggested), then give the deposit back.
+- **Add booking** for phone or shop rentals, and **Block dates** for repairs or a photo shoot. The **Calendar** tab shows the whole month.
+`),
+    a("sell-on-google", "marketing", "Sell on Google (Google & YouTube app)", ["google", "merchant center", "google shopping", "free listings", "youtube", "feed", "google ads"], `
+Install **Google & YouTube** from **Apps** to list your products on Google Shopping, Search, Images, YouTube and Maps — free listings through Google Merchant Center.
+
+- **Sign in with Google** using the account that has your Merchant Center (create one free at merchants.google.com, country India). We add your product feed to it; Google reads your products every day and again when you press **Sync now**.
+- Or copy the **feed link** on the app's page and add it in Merchant Center yourself (Products ▸ Add products ▸ from a file ▸ link, daily).
+- In Merchant Center, fill in your business details, shipping and returns. To verify your website, choose "Add an HTML tag", paste it into **Verify your website** on the app's page, save, then press Verify there.
+- The app lists products that need attention (no photo, no price) — rented and hidden products aren't sent. On each product's page, **Sales channels** lets you keep it off Google and choose its Google category.
+`),
+    a("sell-on-facebook-instagram", "marketing", "Sell on Facebook & Instagram", ["facebook shop", "instagram shopping", "catalog", "catalogue", "meta", "product tags", "commerce manager", "marketplace"], `
+Install **Facebook & Instagram** from **Apps** to put your products in a Meta catalogue — for a shop on your Facebook Page and Instagram profile, product tags in posts and reels, and catalogue ads.
+
+- **Continue with Facebook**, then pick a catalogue or let us create one. We add your store's feed to it; Meta reads your products every hour, for good.
+- Or copy the **feed link** and add it in Commerce Manager yourself (Catalogue ▸ Data sources ▸ Data feed ▸ scheduled, hourly).
+- Verify your domain in Business settings ▸ Domains ("Meta-tag verification"): paste the tag into **Verify your domain** on the app's page and save.
+- Shoppers buy on your store. Facebook Marketplace listings for businesses aren't open to new shops.
+- Keep a product off Facebook & Instagram from **Sales channels** on its page.
+`),
+  ],
+};
+
+/** Adds each batch of newer articles once (production only — local
+ * development shares the database and may run ahead of what's deployed). */
+async function addNewArticles(prisma, { log, enabled = true } = {}) {
+  if (!enabled) return 0;
+  let added = 0;
+  for (const [key, list] of Object.entries(ADDED)) {
+    if (await prisma.platformSetting.findUnique({ where: { key } })) continue;
+    const base = await prisma.supportArticle.count();
+    const res = await prisma.supportArticle.createMany({ data: list.map((x, i) => ({ ...x, sortOrder: base + i, published: true })), skipDuplicates: true });
+    await prisma.platformSetting.create({ data: { key, value: { added: res.count, at: new Date().toISOString() } } });
+    added += res.count;
+  }
+  if (added) log?.info({ articles: added }, "support: new help articles added");
+  return added;
+}
+
 async function seedArticles(prisma, { log } = {}) {
   const count = await prisma.supportArticle.count();
   if (count > 0) return 0;
@@ -268,4 +326,4 @@ async function search(prisma, query, limit = 5) {
   return rank(articles, query, limit);
 }
 
-module.exports = { CATEGORIES, SEED, seedArticles, rank, search, tokens };
+module.exports = { CATEGORIES, SEED, ADDED, seedArticles, addNewArticles, rank, search, tokens };

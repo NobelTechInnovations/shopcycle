@@ -1254,3 +1254,11 @@ html.oy-1c-open {
 .oy-1c__opt-icon .oy-mark {
   font-size: 13px;
 }
+
+.oy-line__detail {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--oy-muted, #6b7280);
+}

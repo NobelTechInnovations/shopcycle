@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { templateSuffixField } = require("./theme");
 
 const variantSchema = z.object({
   id: z.string().optional(),
@@ -45,6 +46,11 @@ const createProductSchema = z.object({
   // Custom data values — checked against the store's field definitions
   // in modules/metafields.
   metafields: z.record(z.string().max(40), z.any()).optional(),
+
+  templateSuffix: templateSuffixField,
+  // Sales channels the product is kept off, and its Google category.
+  hiddenChannels: z.array(z.enum(["google", "facebook"])).max(5).optional(),
+  googleCategory: z.string().trim().max(250).optional().nullable(),
 });
 
 const updateProductSchema = createProductSchema.partial().extend({

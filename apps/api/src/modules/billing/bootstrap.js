@@ -105,6 +105,40 @@ const GOOGLE_REVIEWS = {
   ],
 };
 
+// Rentals (modules/rentals): rent products out by the day. Free unless the
+// super admin prices it.
+const RENTALS = {
+  key: "rentals",
+  name: "Rentals",
+  description:
+    "Rent products out by the day — outfits, jewellery, cameras, décor. Shoppers pick dates on a calendar that greys out booked days; you set the daily rent, cheaper rates for longer rentals, a refundable deposit, delivery or pickup. Track every booking: what goes out today, what comes back, late returns and deposits.",
+  category: "selling",
+  iconKey: "calendar",
+  settingsSchema: [],
+};
+
+// Sales channels (modules/channels): list the store's products on Google
+// (Shopping, Search, YouTube, Maps) and Facebook & Instagram.
+const GOOGLE_SHOPPING = {
+  key: "google-shopping",
+  name: "Google & YouTube",
+  description:
+    "List your products on Google for free — Shopping, Search, Images, YouTube and Maps — through Google Merchant Center. Connect your Google account once; prices, stock and new products stay in sync by themselves.",
+  category: "sales_channel",
+  iconKey: "store",
+  settingsSchema: [],
+};
+
+const FACEBOOK_SHOP = {
+  key: "facebook-shop",
+  name: "Facebook & Instagram",
+  description:
+    "Your product catalog on Facebook and Instagram — tag products in posts and reels, run catalog ads, and show a shop on your Page and profile. Connect with Facebook once; products stay in sync by themselves.",
+  category: "sales_channel",
+  iconKey: "store",
+  settingsSchema: [],
+};
+
 async function seedCatalog(prisma, { log } = {}) {
   const have = new Set((await prisma.feature.findMany({ select: { key: true } })).map((f) => f.key));
   const missing = FEATURES.filter((f) => !have.has(f.key));
@@ -158,8 +192,12 @@ async function seedCatalog(prisma, { log } = {}) {
   if (env.NODE_ENV === "production" || env.SEED_PREVIEW_APPS === "1") {
     await prisma.app.upsert({ where: { key: INSTAGRAM_FEED.key }, update: {}, create: INSTAGRAM_FEED });
     await prisma.app.upsert({ where: { key: GOOGLE_REVIEWS.key }, update: {}, create: GOOGLE_REVIEWS });
+    await prisma.app.upsert({ where: { key: RENTALS.key }, update: {}, create: RENTALS });
+    await prisma.app.upsert({ where: { key: GOOGLE_SHOPPING.key }, update: {}, create: GOOGLE_SHOPPING });
+    await prisma.app.upsert({ where: { key: FACEBOOK_SHOP.key }, update: {}, create: FACEBOOK_SHOP });
   }
   await require("../support/articles").seedArticles(prisma, { log });
+  await require("../support/articles").addNewArticles(prisma, { log, enabled: env.NODE_ENV === "production" || env.SEED_PREVIEW_APPS === "1" });
 }
 
 /** A trial for every store that has no subscription yet. A store already

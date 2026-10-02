@@ -7,6 +7,7 @@ import { Form, Input, Select, Card, App, Button } from "antd";
 import { Copy, ExternalLink } from "lucide-react";
 import { PageHeader, SaveBar } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+import { ThemeTemplateField } from "@/components/ThemeTemplateField";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { CustomDataFields, metafieldPayload } from "@/components/CustomDataFields";
 import { SavedPanel } from "@/components/SavedPanel";
@@ -36,8 +37,9 @@ export function CollectionForm({ collection, template, store, justCreated = fals
         image: source.image || null,
         metafields: source.metafields || {},
         productIds: source.products.map((p) => p.productId),
+        templateSuffix: source.templateSuffix || null,
       }
-    : { status: "draft", productIds: [] };
+    : { status: "draft", productIds: [], templateSuffix: null };
 
   async function handleSubmit(values) {
     setSaving(true);
@@ -135,6 +137,9 @@ export function CollectionForm({ collection, template, store, justCreated = fals
               <Form.Item name="image" className="mb-0" extra="Shown on collection tiles and at the top of the collection page.">
                 <ImageUploadField aspect="4 / 3" label="Upload image" />
               </Form.Item>
+            </Card>
+            <Card size="small" title="Layout">
+              <ThemeTemplateField kind="collection" hint="A template can add a banner, a story or other sections above or below the products." />
             </Card>
           </div>
         </div>

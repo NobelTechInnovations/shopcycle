@@ -38,6 +38,20 @@ export function publicCart(cart, request, handle) {
   };
 }
 
+/** The page the form was on, if it's on this same address. */
+function sameSiteReferer(request) {
+  try {
+    const ref = new URL(request.headers.get("referer") || "");
+    const here = new URL(request.url);
+    if (ref.host !== (request.headers.get("host") || here.host)) return null;
+    ref.searchParams.delete("formError");
+    ref.searchParams.delete("notice");
+    return ref;
+  } catch {
+    return null;
+  }
+}
+
 export function setCartCookie(response, cartId) {
   response.cookies.set(CART_COOKIE, cartId, { path: "/", httpOnly: true, sameSite: "lax", maxAge: CART_COOKIE_MAX_AGE });
 }
@@ -54,11 +68,17 @@ export async function mutateCart(handle, endpoint, request) {
   const form = await request.formData();
   const variantId = form.get("variantId");
   const quantity = Number(form.get("quantity") || 1);
+  // Which line (rentals share a variant), and a rental's dates and options.
+  const extra = {};
+  for (const name of ["lineKey", "rentalStart", "rentalEnd", "rentalHandover", "rentalReturn"]) {
+    const value = form.get(name);
+    if (typeof value === "string" && value) extra[name] = value.slice(0, 200);
+  }
 
   const res = await fetch(`${API_URL}/api/storefront/${handle}/cart/${endpoint}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ cartId, variantId, quantity }),
+    body: JSON.stringify({ cartId, variantId: variantId || undefined, quantity, ...extra }),
   });
 
   let cart = null;
@@ -79,6 +99,13 @@ export async function mutateCart(handle, endpoint, request) {
     return response;
   }
 
+  // Without JavaScript, a refused add (a rental without dates, dates that
+  // were just booked) goes back to the product page with the reason.
+  const back = !res.ok && endpoint === "add" ? sameSiteReferer(request) : null;
+  if (back) {
+    back.searchParams.set("formError", String(error || "That couldn't be added to your cart.").slice(0, 200));
+    return NextResponse.redirect(back, { status: 303 });
+  }
   const redirectPath = storefrontPath(request.headers.get("host"), handle, "/cart");
   const response = NextResponse.redirect(new URL(redirectPath, request.url), { status: 303 });
   if (cart?.cartId) {

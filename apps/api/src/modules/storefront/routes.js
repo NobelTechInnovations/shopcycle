@@ -1,3 +1,6 @@
+const rentals = require("../rentals/service");
+const rentalsNotify = require("../rentals/notify");
+const { throttle } = require("../../lib/throttle");
 const controller = require("./controller");
 const { redirectsToDomain } = require("../../lib/storefront-url");
 const service = require("./service");
@@ -36,6 +39,17 @@ async function storefrontRoutes(fastify) {
   fastify.post("/:handle/products/:slug/reviews", { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async (request) => {
     const store = await service.loadStoreOrThrow(fastify.prisma, request.params.handle);
     return reviews.submit(fastify.prisma, store, request.params.slug, request.body || {});
+  });
+  // Rentals app, request mode: a shopper asks to rent (the storefront
+  // app's /apps/rentals/request form). The seller confirms it later.
+  fastify.post("/:handle/apps/rentals/request", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request) => {
+    const store = await service.loadStoreOrThrow(fastify.prisma, request.params.handle);
+    const body = request.body || {};
+    const phone = String(body.phone || "").replace(/\D/g, "").slice(-10) || "none";
+    await throttle(fastify, `rental-request:${store.id}:${phone}`, { max: 6, windowSeconds: 60 * 60, message: "You've sent a few requests already — the store will call you soon." });
+    const booking = await rentals.requestBooking(fastify.prisma, store, body);
+    await rentalsNotify.requestMade(fastify.prisma, store, booking, request.log).catch((err) => request.log.warn({ err }, "rentals: request emails failed"));
+    return { ok: true, bookingId: booking.id, message: `Request sent! ${store.name} will call you to confirm your booking.` };
   });
   // Quick add on product cards (platform cart-drawer.js).
   fastify.get("/:handle/products/:slug/quick", async (request, reply) => {

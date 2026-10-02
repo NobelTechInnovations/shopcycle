@@ -1,5 +1,16 @@
 const { z } = require("zod");
 
+/** A theme template's name after the dot: product.<suffix>.json. */
+const TEMPLATE_SUFFIX = /^[a-z0-9][a-z0-9-]{0,29}$/;
+const templateSuffixField = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(TEMPLATE_SUFFIX, "Template names use letters, numbers and dashes")
+  .optional()
+  .nullable()
+  .or(z.literal("").transform(() => null));
+
 const installThemeSchema = z.object({
   // Keep in step with MASTER_THEMES (apps/api/src/modules/themes/service.js).
   handle: z.enum(["classic", "modern", "atelier", "lumiere"]),
@@ -19,7 +30,8 @@ const renameThemeFileSchema = z.object({
 });
 
 const renderDraftSchema = z.object({
-  template: z.enum(["index", "product", "collection", "cart", "page", "search", "404"]),
+  // A page, or one of its extra templates ("product.rental").
+  template: z.string().regex(/^(index|product|collection|cart|page|search|404)(\.[a-z0-9][a-z0-9-]{0,29})?$/, "Unknown template"),
   slug: z.string().optional(),
   templateOverride: z.record(z.any()).optional(),
   settingsOverride: z.record(z.any()).optional(),
@@ -28,7 +40,17 @@ const renderDraftSchema = z.object({
   filesOverride: z.record(z.string()).optional(),
 });
 
+const createTemplateSchema = z.object({
+  kind: z.enum(["product", "page", "collection"]),
+  name: z.string().trim().min(1, "Name the template").max(40),
+  // An existing template of the same kind to start from ("" = the default).
+  basedOn: z.string().trim().max(30).optional().nullable(),
+});
+
 module.exports = {
+  TEMPLATE_SUFFIX,
+  templateSuffixField,
+  createTemplateSchema,
   installThemeSchema,
   updateThemeSettingsSchema,
   upsertThemeFileSchema,

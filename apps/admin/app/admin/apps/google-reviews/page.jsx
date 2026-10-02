@@ -136,6 +136,30 @@ export default function GoogleReviewsPage() {
     }
   }
 
+  async function signIn() {
+    setBusy("google");
+    try {
+      const { url } = await apiFetch("/api/social/google-reviews/google-url", { method: "POST" });
+      window.location.href = url;
+    } catch (err) {
+      message.error(err.message);
+      setBusy(null);
+    }
+  }
+
+  async function choose(location) {
+    setBusy(`choose:${location}`);
+    try {
+      setData(await apiFetch("/api/social/google-reviews/choose", { method: "POST", body: { location } }));
+      setChanging(false);
+      message.success("Business connected");
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function disconnect() {
     const ok = await confirmDialog({ title: "Disconnect Google reviews?", content: "Your reviews disappear from your store until you connect again.", okText: "Disconnect", danger: true });
     if (!ok) return;
@@ -151,8 +175,30 @@ export default function GoogleReviewsPage() {
   return (
     <div>
       <PageHeader title="Google Reviews" backHref="/admin/apps" subtitle="Your Google rating and reviews on your store — refreshed every day." />
-      {!data.ready && (
-        <Alert className="mb-6" type="info" showIcon message="Google reviews is almost ready" description="Oyklane's Google connection is still being set up. You'll be able to find your business here soon." />
+      {!data.ready && !data.business && (
+        <Alert className="mb-6" type="info" showIcon message="Google reviews is almost ready" description="Oyklane's Google connection is still being set up. You'll be able to connect your business here soon." />
+      )}
+      {data.choose?.length > 0 && (
+        <Card className="mb-6" title="Which business?">
+          <p className="m-0 mb-3 text-[13px] text-ink-muted">Your Google account manages more than one business. Pick the one whose reviews show on your store.</p>
+          <div className="flex flex-col gap-2">
+            {data.choose.map((l) => (
+              <div key={l.location} className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-app-border px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="m-0 text-[14px] font-medium text-ink">{l.name}</p>
+                  {l.address && (
+                    <p className="m-0 text-[12.5px] text-ink-muted flex items-center gap-1">
+                      <MapPin size={12} aria-hidden="true" /> {l.address}
+                    </p>
+                  )}
+                </div>
+                <Button type="primary" loading={busy === `choose:${l.location}`} onClick={() => choose(l.location)}>
+                  Use this business
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
 
       {!data.connected || changing ? (
@@ -163,17 +209,29 @@ export default function GoogleReviewsPage() {
                 <BrandGlyph app={{ key: "google-reviews" }} size={22} />
               </span>
               <div>
-                <h2 className="m-0 text-[17px] font-semibold text-ink">Find your business on Google</h2>
-                <p className="m-0 mt-1 text-[13.5px] text-ink-muted">The listing customers review on Google Maps. No Google login needed.</p>
+                <h2 className="m-0 text-[17px] font-semibold text-ink">Connect your business on Google</h2>
+                <p className="m-0 mt-1 text-[13.5px] text-ink-muted">
+                  {data.business
+                    ? "Sign in with the Google account that manages your Business Profile — every review shows, and the connection stays on until you remove it."
+                    : "The listing customers review on Google Maps. No Google login needed."}
+                </p>
               </div>
             </div>
-            <FindBusiness
+            {data.business && (
+              <div className="mb-5 flex flex-col gap-2">
+                <Button type="primary" size="large" className="self-start" loading={busy === "google"} onClick={signIn} icon={<BrandGlyph app={{ key: "google-reviews" }} size={16} white />}>
+                  Sign in with Google
+                </Button>
+                {data.ready && <p className="m-0 text-[12.5px] text-ink-muted">Or find your business by name (shows five reviews):</p>}
+              </div>
+            )}
+            {data.ready && <FindBusiness
               onConnected={(d) => {
                 setData(d);
                 setChanging(false);
               }}
               onCancel={changing ? () => setChanging(false) : null}
-            />
+            />}
           </Card>
           <AddToStoreCard sectionName="Google reviews" />
         </div>
@@ -209,7 +267,13 @@ export default function GoogleReviewsPage() {
                   </Button>
                 </div>
               </div>
-              <p className="m-0 mt-3 text-[12px] text-ink-muted">Updated {when(data.fetchedAt)} · Google shares the five most relevant reviews; they refresh every day.</p>
+              <p className="m-0 mt-3 text-[12px] text-ink-muted">
+                Updated {when(data.fetchedAt)} ·{" "}
+                {data.via === "google"
+                  ? `connected with your Google account — ${reviews.length} recent reviews, refreshed every day.`
+                  : "Google shares the five most relevant reviews; they refresh every day."}
+                {data.via !== "google" && data.business ? " Sign in with Google (Change business) to show all your reviews." : ""}
+              </p>
             </Card>
 
             <Card

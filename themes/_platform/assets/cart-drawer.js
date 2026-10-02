@@ -115,14 +115,15 @@
         "</a>" +
         '<div class="oy-line__info">' +
         '<a class="oy-line__title" href="' + url + '">' + esc(item.title) + "</a>" +
+        (item.detail ? '<span class="oy-line__detail">' + esc(item.detail) + "</span>" : "") +
         '<span class="oy-line__price">' + money(item.price) + "</span>" +
         '<div class="oy-line__row">' +
         '<div class="oy-qty" role="group" aria-label="Quantity of ' + esc(item.title) + '">' +
-        '<button type="button" data-oy-qty="' + (item.quantity - 1) + '" data-variant="' + esc(item.variantId) + '" aria-label="Decrease quantity">' + ICON.minus + "</button>" +
+        '<button type="button" data-oy-qty="' + (item.quantity - 1) + '" data-variant="' + esc(item.variantId) + '" data-key="' + esc(item.key || "") + '" aria-label="Decrease quantity">' + ICON.minus + "</button>" +
         '<span aria-live="polite">' + item.quantity + "</span>" +
-        '<button type="button" data-oy-qty="' + (item.quantity + 1) + '" data-variant="' + esc(item.variantId) + '" aria-label="Increase quantity">' + ICON.plus + "</button>" +
+        '<button type="button" data-oy-qty="' + (item.quantity + 1) + '" data-variant="' + esc(item.variantId) + '" data-key="' + esc(item.key || "") + '" aria-label="Increase quantity">' + ICON.plus + "</button>" +
         "</div>" +
-        '<button type="button" class="oy-line__remove" data-oy-qty="0" data-variant="' + esc(item.variantId) + '">Remove</button>' +
+        '<button type="button" class="oy-line__remove" data-oy-qty="0" data-variant="' + esc(item.variantId) + '" data-key="' + esc(item.key || "") + '">Remove</button>' +
         "</div></div>" +
         '<strong class="oy-line__total">' + money(item.lineTotal) + "</strong>" +
         "</li>";
@@ -230,7 +231,8 @@
     function (e) {
       if (cfg.drawerOff) return;
       var form = e.target;
-      if (!(form instanceof HTMLFormElement) || pathOf(form.action) !== ADD_PATH) return;
+      var via = e.submitter && e.submitter.hasAttribute("formaction") ? e.submitter.formAction : form.action;
+      if (!(form instanceof HTMLFormElement) || pathOf(via) !== ADD_PATH) return;
       e.preventDefault();
       // Stop other submit handlers (e.g. "disable while submitting") — the
       // page isn't navigating, so this script manages the button itself.
@@ -484,6 +486,11 @@
       open();
       request(quickUrl(slug))
         .then(function (data) {
+          // Rented by the day: dates are picked on the product page.
+          if (data.product && data.product.rental) {
+            location.href = href;
+            return;
+          }
           renderQuick(data, href);
         })
         .catch(function () {
@@ -1237,6 +1244,7 @@
     body.setAttribute("aria-busy", "true");
     var data = new FormData();
     data.append("variantId", btn.getAttribute("data-variant"));
+    if (btn.getAttribute("data-key")) data.append("lineKey", btn.getAttribute("data-key"));
     data.append("quantity", btn.getAttribute("data-oy-qty"));
     request(cfg.update, data)
       .then(function (res) {

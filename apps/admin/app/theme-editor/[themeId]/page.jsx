@@ -23,9 +23,11 @@ export default async function ThemeEditorPage({ params }) {
   // is on one store at a time) or was deleted.
   let theme = null;
   let platform = null;
+  let templates = null;
+  let templateUsage = {};
   let problem = null;
   try {
-    ({ theme, platform } = await serverApiFetch(`/api/themes/${themeId}`));
+    ({ theme, platform, templates, templateUsage } = await serverApiFetch(`/api/themes/${themeId}`));
   } catch (err) {
     problem =
       err.status === 404
@@ -45,5 +47,5 @@ export default async function ThemeEditorPage({ params }) {
       </div>
     );
   }
-  return <EditorView theme={theme} platform={platform} />;
+  return <EditorView theme={theme} platform={platform} templates={templates} templateUsage={templateUsage} />;
 }

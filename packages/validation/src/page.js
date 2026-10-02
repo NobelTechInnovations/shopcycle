@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { templateSuffixField } = require("./theme");
 
 const createPageSchema = z.object({
   title: z.string().min(1, "Title is required").max(255),
@@ -6,6 +7,8 @@ const createPageSchema = z.object({
   status: z.enum(["active", "draft"]).default("draft"),
   seoTitle: z.string().optional().nullable(),
   seoDescription: z.string().optional().nullable(),
+
+  templateSuffix: templateSuffixField,
 });
 
 const updatePageSchema = createPageSchema.partial();

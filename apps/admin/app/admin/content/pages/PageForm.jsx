@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Form, Input, Select, Button, Card } from "antd";
 import { PageHeader, SaveBar } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+import { ThemeTemplateField } from "@/components/ThemeTemplateField";
 
 export function PageForm({ page }) {
   const router = useRouter();
@@ -13,8 +14,8 @@ export function PageForm({ page }) {
   const isEdit = Boolean(page);
 
   const initialValues = page
-    ? { title: page.title, body: page.body, status: page.status, seoTitle: page.seoTitle, seoDescription: page.seoDescription }
-    : { status: "draft" };
+    ? { title: page.title, body: page.body, status: page.status, seoTitle: page.seoTitle, seoDescription: page.seoDescription, templateSuffix: page.templateSuffix || null }
+    : { status: "draft", templateSuffix: null };
 
   async function handleSubmit(values) {
     setSaving(true);
@@ -60,16 +61,21 @@ export function PageForm({ page }) {
             </Card>
           </div>
 
-          <Card size="small" title="Status">
-            <Form.Item name="status" className="mb-0">
-              <Select
-                options={[
-                  { value: "draft", label: "Draft" },
-                  { value: "active", label: "Active" },
-                ]}
-              />
-            </Form.Item>
-          </Card>
+          <div className="flex flex-col gap-6">
+            <Card size="small" title="Status">
+              <Form.Item name="status" className="mb-0">
+                <Select
+                  options={[
+                    { value: "draft", label: "Draft" },
+                    { value: "active", label: "Active" },
+                  ]}
+                />
+              </Form.Item>
+            </Card>
+            <Card size="small" title="Layout">
+              <ThemeTemplateField kind="page" hint="A template can add banners, images or other sections around this page's text." />
+            </Card>
+          </div>
         </div>
 
         <SaveBar

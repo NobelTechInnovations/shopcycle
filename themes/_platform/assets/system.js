@@ -326,3 +326,226 @@
     });
   });
 })();
+
+/*
+ * Rentals app — the booking calendar on a rented product's page. Without
+ * JavaScript the block is two date fields (checked again by the server);
+ * with it, a month calendar that greys out booked days, keeps the range
+ * free of them, and shows the total as dates are picked.
+ */
+(function () {
+  "use strict";
+  var root = document.querySelector("[data-sys-rental]");
+  if (!root) return;
+  var cfg;
+  try {
+    cfg = JSON.parse(root.querySelector("[data-sys-rental-json]").textContent);
+  } catch (e) {
+    return;
+  }
+  var form = root.closest("form");
+  var startIn = root.querySelector("[data-sys-rent-start]");
+  var endIn = root.querySelector("[data-sys-rent-end]");
+  var cal = root.querySelector("[data-sys-rent-cal]");
+  var sum = root.querySelector("[data-sys-rent-sum]");
+  var inputs = root.querySelector("[data-sys-rent-inputs]");
+  var submit = root.querySelector("[data-sys-rent-submit]");
+  if (!form || !startIn || !endIn || !cal) return;
+
+  var DAY = 86400000;
+  var toDate = function (d) {
+    return new Date(d + "T00:00:00Z");
+  };
+  var fmt = function (date) {
+    return date.toISOString().slice(0, 10);
+  };
+  var add = function (d, n) {
+    return fmt(new Date(toDate(d).getTime() + n * DAY));
+  };
+  var span = function (a, b) {
+    return Math.round((toDate(b) - toDate(a)) / DAY) + 1;
+  };
+  var money = function (n) {
+    try {
+      return new Intl.NumberFormat("en-IN", { style: "currency", currency: cfg.currency || "INR", maximumFractionDigits: n % 1 ? 2 : 0 }).format(n);
+    } catch (e) {
+      return "₹" + n;
+    }
+  };
+  var short = function (d) {
+    return new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(toDate(d));
+  };
+
+  var state = { start: null, end: null, month: cfg.earliest.slice(0, 7), error: "" };
+  var booked = {};
+
+  function variantId() {
+    var radio = form.querySelector('input[type="radio"][name="variantId"]:checked');
+    if (radio) return radio.value;
+    var hidden = form.querySelector('input[name="variantId"]:not([type="radio"]):not([disabled])');
+    return hidden ? hidden.value : null;
+  }
+  function loadBooked() {
+    booked = {};
+    (cfg.booked[variantId()] || []).forEach(function (d) {
+      booked[d] = true;
+    });
+  }
+  function rateFor(days) {
+    var rate = cfg.pricePerDay;
+    (cfg.tiers || []).forEach(function (t) {
+      if (days >= t.days) rate = t.price;
+    });
+    return rate;
+  }
+  // The range, and the days kept free after it, must all be open.
+  function rangeFree(a, b) {
+    for (var d = a; d <= add(b, cfg.bufferDays); d = add(d, 1)) if (booked[d]) return false;
+    return true;
+  }
+  function latestEnd() {
+    return add(cfg.latest, cfg.maxDays);
+  }
+  function selectable(d) {
+    if (d < cfg.earliest || booked[d]) return false;
+    if (state.start && !state.end && d >= state.start) {
+      if (span(state.start, d) > cfg.maxDays) return false;
+      return rangeFree(state.start, d);
+    }
+    return d <= cfg.latest;
+  }
+
+  function pick(d) {
+    state.error = "";
+    if (!state.start || state.end || d < state.start) {
+      state.start = d;
+      state.end = null;
+      if (!rangeFree(d, add(d, Math.max(0, cfg.minDays - 1)))) {
+        state.start = null;
+        state.error = "That day is too close to another booking — try another day.";
+      }
+    } else {
+      var n = span(state.start, d);
+      if (n < cfg.minDays) {
+        state.error = "Rent it for at least " + cfg.minDays + " days.";
+      } else if (!rangeFree(state.start, d)) {
+        state.error = "Some of those days are booked — pick a shorter stretch.";
+      } else {
+        state.end = d;
+      }
+    }
+    sync();
+  }
+
+  function sync() {
+    startIn.value = state.start || "";
+    endIn.value = state.end || "";
+    renderCal();
+    renderSum();
+  }
+
+  function renderSum() {
+    var html = "";
+    var ready = state.start && state.end;
+    if (state.error) html += '<p class="sys-rent__error">' + state.error + "</p>";
+    if (ready) {
+      var days = span(state.start, state.end);
+      var rate = rateFor(days);
+      var rent = Math.round(rate * days * 100) / 100;
+      var payNow = rent + (cfg.depositAtCheckout ? cfg.deposit : 0);
+      html += "<div><span>" + short(state.start) + " → " + short(state.end) + "</span><span>" + days + " day" + (days === 1 ? "" : "s") + "</span></div>";
+      html += "<div><span>" + money(rate) + " × " + days + " day" + (days === 1 ? "" : "s") + "</span><span>" + money(rent) + "</span></div>";
+      if (cfg.deposit > 0) html += "<div><span>Refundable deposit" + (cfg.depositAtCheckout ? "" : " (on delivery)") + "</span><span>" + money(cfg.deposit) + "</span></div>";
+      html += '<div class="sys-rent__total"><span>' + (cfg.mode === "request" ? "Total" : "To pay now") + "</span><span>" + money(cfg.mode === "request" ? rent + cfg.deposit : payNow) + "</span></div>";
+    } else if (state.start) {
+      html += '<p class="sys-rent__hint">' + short(state.start) + " → now pick the last day" + (cfg.minDays > 1 ? " (at least " + cfg.minDays + " days)" : "") + ".</p>";
+    } else if (!state.error) {
+      html += '<p class="sys-rent__hint">Tap the first day you need it.</p>';
+    }
+    sum.innerHTML = html;
+    if (submit) submit.disabled = !ready;
+  }
+
+  function renderCal() {
+    var first = toDate(state.month + "-01");
+    var y = first.getUTCFullYear();
+    var m = first.getUTCMonth();
+    var daysIn = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    var lead = (first.getUTCDay() + 6) % 7; // Monday first
+    var prevMonth = fmt(new Date(Date.UTC(y, m - 1, 1))).slice(0, 7);
+    var nextMonth = fmt(new Date(Date.UTC(y, m + 1, 1))).slice(0, 7);
+    var title = new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(first);
+    var html =
+      '<div class="sys-cal"><div class="sys-cal__head">' +
+      '<button type="button" class="sys-cal__nav" data-month="' + prevMonth + '" aria-label="Previous month"' + (prevMonth < cfg.earliest.slice(0, 7) ? " disabled" : "") + ">‹</button>" +
+      '<span class="sys-cal__month" aria-live="polite">' + title + "</span>" +
+      '<button type="button" class="sys-cal__nav" data-month="' + nextMonth + '" aria-label="Next month"' + (nextMonth > latestEnd().slice(0, 7) ? " disabled" : "") + ">›</button>" +
+      '</div><div class="sys-cal__grid" role="grid">';
+    ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].forEach(function (d) {
+      html += '<span class="sys-cal__dow" aria-hidden="true">' + d + "</span>";
+    });
+    for (var i = 0; i < lead; i++) html += "<span></span>";
+    for (var n = 1; n <= daysIn; n++) {
+      var d = state.month + "-" + (n < 10 ? "0" : "") + n;
+      var cls = "sys-cal__day";
+      if (booked[d]) cls += " sys-cal__day--booked";
+      if (d === state.start) cls += " sys-cal__day--start";
+      if (d === state.end) cls += " sys-cal__day--end";
+      if (state.start && state.end && d > state.start && d < state.end) cls += " sys-cal__day--in";
+      var ok = selectable(d) || d === state.start;
+      html += '<button type="button" class="' + cls + '" data-day="' + d + '"' + (ok ? "" : " disabled") + ' aria-label="' + short(d) + (booked[d] ? ", booked" : "") + '"' + (d === state.start || d === state.end ? ' aria-pressed="true"' : "") + ">" + n + "</button>";
+    }
+    html += '</div><div class="sys-cal__legend"><span>Greyed out: booked or unavailable</span></div></div>';
+    cal.innerHTML = html;
+  }
+
+  cal.addEventListener("click", function (e) {
+    var nav = e.target.closest("[data-month]");
+    if (nav && !nav.disabled) {
+      state.month = nav.getAttribute("data-month");
+      renderCal();
+      return;
+    }
+    var day = e.target.closest("[data-day]");
+    if (day && !day.disabled) pick(day.getAttribute("data-day"));
+  });
+
+  // Another size or colour has its own bookings.
+  form.addEventListener("change", function (e) {
+    var name = e.target && e.target.name;
+    if (name !== "variantId" && !/^option\d+$/.test(name || "")) return;
+    setTimeout(function () {
+      loadBooked();
+      if (state.start && !rangeFree(state.start, state.end || state.start)) {
+        state.start = state.end = null;
+        state.error = "Those dates are booked in this size — pick new dates.";
+      }
+      sync();
+    }, 0);
+  });
+
+  // Dates first: stop the form (and the cart drawer, which listens on the
+  // document) before an incomplete booking goes anywhere.
+  window.addEventListener(
+    "submit",
+    function (e) {
+      if (e.target !== form) return;
+      var via = e.submitter;
+      if (via && !via.hasAttribute("data-sys-rent-submit") && !root.contains(via)) return;
+      if (state.start && state.end) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      state.error = state.start ? "Pick the last day of your rental." : "Pick the dates you need it for.";
+      renderSum();
+      cal.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+    true
+  );
+
+  startIn.required = false;
+  endIn.required = false;
+  if (inputs) inputs.hidden = true;
+  cal.hidden = false;
+  loadBooked();
+  sync();
+})();

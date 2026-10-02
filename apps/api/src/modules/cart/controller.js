@@ -1,12 +1,22 @@
 const { z } = require("zod");
+const { HttpError } = require("@shopcycle/utils");
 const storefrontService = require("../storefront/service");
 const cartService = require("./service");
 const { throttle } = require("../../lib/throttle");
 
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable().or(z.literal("").transform(() => null));
+
 const mutateSchema = z.object({
   cartId: z.string().optional(),
-  variantId: z.string().min(1),
+  variantId: z.string().min(1).optional(),
   quantity: z.coerce.number().int(),
+  // Which line (rental lines share a variant); see cart/service.js lineKey.
+  lineKey: z.string().max(200).optional().nullable(),
+  // Rentals app: the dates and how the piece travels.
+  rentalStart: day,
+  rentalEnd: day,
+  rentalHandover: z.enum(["delivery", "store_pickup"]).optional().nullable().or(z.literal("").transform(() => null)),
+  rentalReturn: z.enum(["collect", "drop_off"]).optional().nullable().or(z.literal("").transform(() => null)),
 });
 
 const discountSchema = z.object({
@@ -27,28 +37,33 @@ async function getHandler(request, reply) {
 
 async function addHandler(request, reply) {
   const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
-  const { cartId, variantId, quantity } = mutateSchema.parse(request.body);
+  const { cartId, variantId, quantity, rentalStart, rentalEnd, rentalHandover, rentalReturn } = mutateSchema.parse(request.body);
+  if (!variantId) throw new HttpError(400, "Choose an option first.");
+  const rental = rentalStart ? { start: rentalStart, end: rentalEnd || rentalStart, handover: rentalHandover || undefined, returnMethod: rentalReturn || undefined } : null;
   const cart = await cartService.addItem(
     request.server.prisma,
     store.id,
     cartId,
     variantId,
-    Math.max(1, quantity),
-    store.handle
+    Math.min(99, Math.max(1, quantity)),
+    store.handle,
+    { rental }
   );
   reply.send({ cart });
 }
 
 async function updateHandler(request, reply) {
   const store = await storefrontService.loadStoreOrThrow(request.server.prisma, request.params.handle);
-  const { cartId, variantId, quantity } = mutateSchema.parse(request.body);
+  const { cartId, variantId, quantity, lineKey } = mutateSchema.parse(request.body);
+  if (!variantId && !lineKey) throw new HttpError(400, "Which item?");
   const cart = await cartService.updateItem(
     request.server.prisma,
     store.id,
     cartId,
     variantId,
-    quantity,
-    store.handle
+    Math.min(99, quantity),
+    store.handle,
+    { key: lineKey || null }
   );
   reply.send({ cart });
 }

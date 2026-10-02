@@ -5,7 +5,7 @@ function metaConfigured() {
   return Boolean(env.META_APP_ID && env.META_APP_SECRET);
 }
 
-const GRAPH_BASE = () => `https://graph.facebook.com/${env.META_GRAPH_API_VERSION}`;
+const GRAPH_BASE = () => `${env.META_GRAPH_API_URL.replace(/\/$/, "")}/${env.META_GRAPH_API_VERSION}`;
 
 async function graphRequest(path, { method = "GET", token, params, body } = {}) {
   const url = new URL(`${GRAPH_BASE()}${path}`);

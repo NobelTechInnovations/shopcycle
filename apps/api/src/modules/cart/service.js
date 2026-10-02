@@ -4,6 +4,7 @@ const discountService = require("../discounts/service");
 const shippingService = require("../shipping/service");
 const taxService = require("../taxes/service");
 const giftCards = require("../gift-cards/service");
+const rentals = require("../rentals/service");
 
 const CART_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days, refreshed on every write
 
@@ -55,6 +56,14 @@ function round2(n) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+/** A cart line's identity: the variant — or, for a rental, the variant
+ * and its dates (the same dress for two different weekends is two lines). */
+function lineKey(item) {
+  if (!item.rental) return item.variantId;
+  const r = item.rental;
+  return [item.variantId, r.start, r.end, r.handover || "", r.returnMethod || ""].join("|");
+}
+
 /** Re-fetches variant/product data on every read rather than caching it in
  * the cart itself, so a price change (or the product going out of stock)
  * is always reflected — matches how a real cart should behave. Items
@@ -82,12 +91,16 @@ async function hydrateCart(prisma, storeId, cartId, raw) {
   const variants = variantIds.length
     ? await prisma.productVariant.findMany({
         where: { id: { in: variantIds }, product: { storeId } },
-        include: { product: { include: { images: { orderBy: { position: "asc" }, take: 12 } } } },
+        include: { product: { include: { images: { orderBy: { position: "asc" }, take: 12 }, rental: true } } },
       })
     : [];
   const variantsById = Object.fromEntries(variants.map((v) => [v.id, v]));
+  // Rentals app: rental lines are priced by their dates; a product being
+  // rented can't also sit in the cart as a plain purchase.
+  const rentalSettings = variants.some((v) => v.product.rental?.enabled || v.product.rental) ? await rentals.installedSettings(prisma, storeId) : null;
 
   const items = [];
+  const kept = [];
   let changed = false;
   for (const item of raw.items) {
     const variant = variantsById[item.variantId];
@@ -95,8 +108,20 @@ async function hydrateCart(prisma, storeId, cartId, raw) {
       changed = true; // drop stale/removed references
       continue;
     }
-    const price = Number(variant.price);
+    let price = Number(variant.price);
+    let extra = {};
+    if (item.rental || variant.product.rental?.enabled) {
+      const details = item.rental ? rentals.cartLineDetails(variant.product, item.rental, rentalSettings, item.quantity) : null;
+      if (!details) {
+        changed = true; // no longer rentable, or a plain line for a rental product
+        continue;
+      }
+      price = details.price;
+      extra = { rental: details.rental, detail: details.detail };
+    }
+    kept.push(item);
     items.push({
+      key: lineKey(item),
       variantId: variant.id,
       productId: variant.productId,
       title: `${variant.product.title}${variant.title !== "Default" ? ` — ${variant.title}` : ""}`,
@@ -104,13 +129,14 @@ async function hydrateCart(prisma, storeId, cartId, raw) {
       image: variantImage(variant),
       price,
       quantity: item.quantity,
-      lineTotal: price * item.quantity,
+      lineTotal: round2(price * item.quantity),
+      ...extra,
     });
   }
 
   if (changed) {
     await writeRaw(prisma, storeId, cartId, {
-      items: raw.items.filter((i) => variantsById[i.variantId]),
+      items: kept,
       discountCode: raw.discountCode,
       giftCardId: raw.giftCardId,
       pendingOrderId: raw.pendingOrderId,
@@ -190,26 +216,66 @@ async function assertVariantBelongsToStore(prisma, storeId, variantId) {
   return variant;
 }
 
-async function addItem(prisma, storeId, cartId, variantId, quantity, handle) {
-  await assertVariantBelongsToStore(prisma, storeId, variantId);
+/** A variant with what rental checks need. */
+function loadVariant(prisma, storeId, variantId) {
+  return prisma.productVariant.findFirst({ where: { id: variantId, product: { storeId } }, include: { product: { include: { rental: true } } } });
+}
+
+/** `rental`: { start, end, handover, returnMethod } — required for a
+ * product the Rentals app rents out; checked against its rules and
+ * bookings before it goes in. */
+async function addItem(prisma, storeId, cartId, variantId, quantity, handle, { rental } = {}) {
+  const variant = await loadVariant(prisma, storeId, variantId);
+  if (!variant) throw new HttpError(404, "Product variant not found");
   const id = cartId || generateCartId();
   const raw = await readRaw(prisma, storeId, id);
-  const existing = raw.items.find((i) => i.variantId === variantId);
-  if (existing) existing.quantity += quantity;
-  else raw.items.push({ variantId, quantity });
+  const settings = variant.product.rental?.enabled ? await rentals.installedSettings(prisma, storeId) : null;
+  // Set up for renting, but the Rentals app is gone: not for sale either.
+  if (variant.product.rental?.enabled && !settings) throw new HttpError(400, "This product isn't available right now.");
+  if (settings) {
+    if (!rental?.start) throw new HttpError(400, "Pick your rental dates first.");
+    const probe = { variantId, rental: { start: rental.start, end: rental.end || rental.start, handover: rental.handover, returnMethod: rental.returnMethod } };
+    const existing = raw.items.find((i) => i.rental && lineKey(i) === lineKey(probe));
+    const others = raw.items.filter((i) => i !== existing);
+    const checked = await rentals.cartRental(prisma, storeId, { variant, input: rental, quantity: quantity + (existing?.quantity || 0), otherLines: others, settings });
+    if (existing) existing.quantity += quantity;
+    else raw.items.push({ variantId, productId: variant.productId, quantity, rental: checked });
+  } else {
+    const existing = raw.items.find((i) => i.variantId === variantId && !i.rental);
+    if (existing) existing.quantity += quantity;
+    else raw.items.push({ variantId, quantity });
+  }
   await writeRaw(prisma, storeId, id, raw);
   return getCart(prisma, storeId, id, handle);
 }
 
-async function updateItem(prisma, storeId, cartId, variantId, quantity, handle) {
+/** Changes a line's quantity (0 removes it). `key` picks the line; older
+ * forms send only the variant. */
+async function updateItem(prisma, storeId, cartId, variantId, quantity, handle, { key } = {}) {
   if (!cartId) throw new HttpError(400, "Missing cart");
   const raw = await readRaw(prisma, storeId, cartId);
-  const idx = raw.items.findIndex((i) => i.variantId === variantId);
+  let idx = key ? raw.items.findIndex((i) => lineKey(i) === key) : -1;
+  if (idx < 0 && variantId) {
+    idx = raw.items.findIndex((i) => i.variantId === variantId && !i.rental);
+    if (idx < 0) idx = raw.items.findIndex((i) => i.variantId === variantId);
+  }
   if (quantity <= 0) {
     if (idx >= 0) raw.items.splice(idx, 1);
   } else if (idx >= 0) {
-    raw.items[idx].quantity = quantity;
-  } else {
+    const line = raw.items[idx];
+    if (line.rental && quantity > line.quantity) {
+      // More pieces for the same dates: they have to be free too.
+      const variant = await loadVariant(prisma, storeId, line.variantId);
+      const settings = variant && (await rentals.installedSettings(prisma, storeId));
+      if (variant && settings) {
+        await rentals.cartRental(prisma, storeId, { variant, input: line.rental, quantity, otherLines: raw.items.filter((_, i) => i !== idx), settings });
+      }
+    }
+    line.quantity = quantity;
+  } else if (variantId) {
+    const variant = await loadVariant(prisma, storeId, variantId);
+    if (!variant) throw new HttpError(404, "Product variant not found");
+    if (variant.product.rental?.enabled && (await rentals.installedSettings(prisma, storeId))) throw new HttpError(400, "Pick your rental dates on the product page.");
     raw.items.push({ variantId, quantity });
   }
   await writeRaw(prisma, storeId, cartId, raw);
@@ -286,4 +352,5 @@ module.exports = {
   hydrateCart,
   readRaw,
   round2,
+  lineKey,
 };

@@ -6,6 +6,7 @@ async function themeRoutes(fastify) {
   fastify.addHook("preHandler", fastify.requireActiveSubscription);
 
   fastify.get("/", controller.listHandler);
+  fastify.get("/templates", controller.templatesHandler);
   fastify.post("/install", controller.installHandler);
   fastify.get("/:id", controller.getHandler);
   fastify.post("/:id/activate", controller.activateHandler);
@@ -29,6 +30,9 @@ async function themeRoutes(fastify) {
   fastify.get("/:id/files/:fileId/revisions", controller.listRevisionsHandler);
   fastify.post("/:id/files/:fileId/revisions/:revisionId/restore", codeOnly, controller.restoreRevisionHandler);
   fastify.post("/:id/render-draft", controller.renderDraftHandler);
+  // Extra templates (product.rental) are JSON layouts — every plan.
+  fastify.post("/:id/templates", controller.createTemplateHandler);
+  fastify.delete("/:id/templates/:name", controller.deleteTemplateHandler);
 }
 
 module.exports = themeRoutes;

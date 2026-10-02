@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { useEffect, useRef } from "react";
 import { useEditorStore } from "./store";
+import { useDraftRender, PreviewErrorBar } from "./draft-render";
 
 const LOADING_HTML =
   "<p style=\"font-family:system-ui,sans-serif;padding:24px;color:#888\">Loading preview…</p>";
@@ -45,10 +45,23 @@ export function PreviewFrame({ themeId, templateName, previewSlug, device, selec
   const settingsData = useEditorStore((s) => s.settingsData);
   const selectedSectionKey = useEditorStore((s) => s.selectedSectionKey);
   const selectSection = useEditorStore((s) => s.selectSection);
-  const [srcDoc, setSrcDoc] = useState(LOADING_HTML);
-  const timeoutRef = useRef(null);
   const frameRef = useRef(null);
   const lastScrolled = useRef(null);
+
+  // Product/collection previews need something to show.
+  const kind = String(templateName || "").split(".")[0];
+  const needsItem = ["product", "collection", "page"].includes(kind) && !previewSlug;
+  const { html, error, retry } = useDraftRender(
+    themeId,
+    () => ({
+      template: templateName,
+      slug: previewSlug || undefined,
+      templateOverride: template,
+      settingsOverride: settingsData,
+    }),
+    [template, settingsData, templateName, previewSlug],
+    { enabled: Boolean(template) && !needsItem }
+  );
 
   // Clicks in the preview select sections.
   useEffect(() => {
@@ -78,42 +91,22 @@ export function PreviewFrame({ themeId, templateName, previewSlug, device, selec
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSectionKey, selectable]);
 
-  useEffect(() => {
-    if (!template) return;
-    clearTimeout(timeoutRef.current);
-    // Product/collection previews need something to show.
-    if ((templateName === "product" || templateName === "collection") && !previewSlug) {
-      setSrcDoc(
-        `<div style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:90vh;text-align:center;color:#6b7280"><div><p style="font-size:15px;color:#111;margin:0 0 6px">Nothing to preview yet</p><p style="font-size:13px;margin:0">Add an active ${templateName} first — its page shows here.</p></div></div>`
-      );
-      return undefined;
-    }
-    timeoutRef.current = setTimeout(async () => {
-      try {
-        const { html } = await apiFetch(`/api/themes/${themeId}/render-draft`, {
-          method: "POST",
-          body: {
-            template: templateName,
-            slug: previewSlug || undefined,
-            templateOverride: template,
-            settingsOverride: settingsData,
-          },
-        });
-        setSrcDoc(selectable ? withPicker(html, labels) : html);
-      } catch (err) {
-        setSrcDoc(
-          `<p style="font-family:system-ui,sans-serif;padding:24px;color:#b91c1c">Preview error: ${err.message}</p>`
-        );
-      }
-    }, 400);
-    return () => clearTimeout(timeoutRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [template, settingsData, themeId, templateName, previewSlug, selectable]);
+  let srcDoc;
+  if (needsItem) {
+    srcDoc = `<div style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:90vh;text-align:center;color:#6b7280"><div><p style="font-size:15px;color:#111;margin:0 0 6px">Nothing to preview yet</p><p style="font-size:13px;margin:0">Add an active ${kind} first — its page shows here.</p></div></div>`;
+  } else if (html) {
+    srcDoc = selectable ? withPicker(html, labels) : html;
+  } else if (error) {
+    srcDoc = `<p style="font-family:system-ui,sans-serif;padding:24px;color:#6b7280">The preview will show here once it loads.</p>`;
+  } else {
+    srcDoc = LOADING_HTML;
+  }
 
   const width = device === "mobile" ? 390 : "100%";
 
   return (
-    <div className="h-full flex justify-center bg-app-bg overflow-auto py-4">
+    <div className="relative h-full flex justify-center bg-app-bg overflow-auto py-4">
+      <PreviewErrorBar error={needsItem ? null : error} onRetry={retry} hasPreview={Boolean(html)} />
       <iframe
         ref={frameRef}
         title="Theme preview"

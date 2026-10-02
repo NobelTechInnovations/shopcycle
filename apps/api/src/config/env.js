@@ -257,6 +257,9 @@ const envSchema = z.object({
   INSTAGRAM_API_URL: z.string().default("https://api.instagram.com"),
   INSTAGRAM_GRAPH_URL: z.string().default("https://graph.instagram.com"),
   // Google reviews app: a Google Cloud API key with "Places API (New)" on.
+  // Tests point Google's API hosts at a mock: https://<host>/… becomes
+  // <GOOGLE_API_BASE>/<host>/…. Unset in real use.
+  GOOGLE_API_BASE: z.string().optional(),
   GOOGLE_PLACES_API_KEY: z.string().optional(),
   GOOGLE_PLACES_URL: z.string().default("https://places.googleapis.com/v1"),
   // Add the newest catalog apps (Instagram feed, Google reviews) when

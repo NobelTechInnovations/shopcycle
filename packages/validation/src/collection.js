@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { templateSuffixField } = require("./theme");
 
 const createCollectionSchema = z.object({
   title: z.string().min(1, "Title is required").max(255),
@@ -7,6 +8,8 @@ const createCollectionSchema = z.object({
   status: z.enum(["active", "draft"]).default("draft"),
   productIds: z.array(z.string()).default([]),
   metafields: z.record(z.string().max(40), z.any()).optional(),
+
+  templateSuffix: templateSuffixField,
 });
 
 const updateCollectionSchema = createCollectionSchema.partial();

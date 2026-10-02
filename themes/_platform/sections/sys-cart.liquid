@@ -32,9 +32,11 @@
                   </a>
                   <div class="sys-line__info">
                     <a class="sys-line__title" href="{{ item.url }}">{{ item.title }}</a>
+                    {% if item.detail %}<span class="sys-line__detail">{{ item.detail }}</span>{% endif %}
                     <span class="sys-muted sys-small sys-num">{{ item.price | money }} each</span>
                     <form method="post" action="{{ routes.cart_update_url }}" class="sys-line__controls">
                       <input type="hidden" name="variantId" value="{{ item.variantId }}">
+                      <input type="hidden" name="lineKey" value="{{ item.key | escape }}">
                       <div class="sys-qty sys-qty--sm">
                         <button type="submit" name="quantity" value="{{ item.quantity | minus: 1 }}" aria-label="Decrease quantity of {{ item.title }}">{% render 'snippets/sys-icon', icon: 'minus' %}</button>
                         <input type="number" value="{{ item.quantity }}" readonly tabindex="-1" aria-label="Quantity">

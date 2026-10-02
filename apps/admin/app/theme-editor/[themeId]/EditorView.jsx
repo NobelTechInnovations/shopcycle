@@ -13,18 +13,21 @@ import { SettingsPanel } from "./SettingsPanel";
 import { AddSectionModal } from "./AddSectionModal";
 import { ThemeSettingsDrawer } from "./ThemeSettingsDrawer";
 import { GlobalSectionsDrawer } from "./GlobalSectionsDrawer";
+import { templateOptions, templateLabel, CreateTemplateModal, TemplateActions, NewTemplateButton } from "./TemplatePicker";
 
-// The home page is designed in the theme. The product page is Oyklane's
-// own, but its blocks and sections can be arranged here. Collection and
-// cart are fixed — listed as previews so a colour or font change can be
-// checked on them.
-const TEMPLATE_OPTIONS = [
-  { value: "index", label: "Home page" },
-  { value: "product", label: "Product page" },
-  { value: "collection", label: "Collection page · preview" },
-  { value: "cart", label: "Cart · preview" },
-];
-const EDITABLE = new Set(["index", "product"]);
+// The home page is designed in the theme. Product, collection and content
+// pages are Oyklane's own, but their sections can be arranged here — the
+// default layout and any extra templates (product.rental). The cart is
+// fixed — listed as a preview so a colour or font change can be checked.
+const EDITABLE_BASES = new Set(["index", "product", "collection", "page"]);
+const MAIN_SECTION = { product: "sys-product", collection: "sys-collection", page: "sys-page" };
+const baseOf = (name) => String(name).split(".")[0];
+
+const PAGE_HINTS = {
+  product: "Oyklane's product page on every store. Click “Product” to reorder, hide or resize its parts; add your theme's sections around it.",
+  collection: "The collection's products and filters stay; add your theme's sections above or below them.",
+  page: "The page's own text stays; add your theme's sections around it — a banner, images, a video.",
+};
 
 function FixedPageNote({ onOpenSettings }) {
   return (
@@ -44,17 +47,29 @@ function FixedPageNote({ onOpenSettings }) {
 }
 
 function getTemplateJson(files, name, platform) {
-  const file = files.find((f) => f.path === `templates/${name}.json`);
-  if (file) {
+  const base = baseOf(name);
+  const main = MAIN_SECTION[base];
+  // A saved layout counts only while its main section is there.
+  const usable = (json) => !main || Object.values(json?.sections || {}).some((sec) => sec.type === main);
+  const fromFile = (path) => {
+    const file = files.find((f) => f.path === path);
+    if (!file) return null;
     try {
       const json = JSON.parse(file.content);
-      // A saved product layout counts only while its main section is there.
-      if (name !== "product" || Object.values(json.sections || {}).some((sec) => sec.type === "sys-product")) return json;
+      return usable(json) ? json : null;
     } catch {
-      // fall through to the default
+      return null;
     }
+  };
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  // An extra template: the store's copy, else the one an app brings, else
+  // (just created and not saved yet) the default layout.
+  if (name !== base) {
+    const own = fromFile(`templates/${name}.json`);
+    if (own) return own;
+    if (platform?.templates?.[name]) return clone(platform.templates[name]);
   }
-  return platform?.templates?.[name] ? JSON.parse(JSON.stringify(platform.templates[name])) : { sections: {}, order: [] };
+  return fromFile(`templates/${base}.json`) || (platform?.templates?.[base] ? clone(platform.templates[base]) : { sections: {}, order: [] });
 }
 
 function getSettingsSchemaGroups(files) {
@@ -67,9 +82,17 @@ function getSettingsSchemaGroups(files) {
   }
 }
 
-export function EditorView({ theme, platform }) {
+export function EditorView({ theme, platform, templates: initialTemplates, templateUsage = {} }) {
   const { message } = App.useApp();
-  const [templateName, setTemplateName] = useState("index");
+  const [templateName, setTemplateName] = useState(() => {
+    // ?template=product.rental opens that template (links from the admin).
+    if (typeof window === "undefined") return "index";
+    const asked = new URLSearchParams(window.location.search).get("template");
+    return asked && /^(index|product|collection|page|cart)(\.[a-z0-9-]+)?$/.test(asked) ? asked : "index";
+  });
+  const [templates, setTemplates] = useState(initialTemplates || { product: [], page: [], collection: [] });
+  const [createOpen, setCreateOpen] = useState(false);
+  const [pages, setPages] = useState([]);
   const [device, setDevice] = useState("desktop");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
@@ -99,7 +122,9 @@ export function EditorView({ theme, platform }) {
   const addSection = useEditorStore((s) => s.addSection);
   const markSaved = useEditorStore((s) => s.markSaved);
 
-  const editable = EDITABLE.has(templateName);
+  const base = baseOf(templateName);
+  const editable = EDITABLE_BASES.has(base);
+  const altLabel = templateLabel(templates, templateName);
 
   const save = useCallback(async () => {
     if (!template) return;
@@ -132,6 +157,7 @@ export function EditorView({ theme, platform }) {
       .then((d) => setCollections(d.collections.filter((c) => c.status === "active")))
       .catch(() => {});
     apiFetch("/api/menus").then((d) => setMenus(d.menus)).catch(() => {});
+    apiFetch("/api/pages?pageSize=100").then((d) => setPages((d.pages || []).filter((p) => p.status === "active"))).catch(() => {});
   }, []);
 
   // Initial load and every template switch.
@@ -166,10 +192,31 @@ export function EditorView({ theme, platform }) {
     addSection(newSectionKey(type), type, defaultSettingsFor(catalog, type), blocks, block_order, at);
   }
 
+  function handleCreated(template) {
+    setTemplates((cur) => ({ ...cur, [template.kind]: [...(cur[template.kind] || []).filter((t) => t.name !== template.name), { suffix: template.suffix, name: template.name, label: template.label, source: "theme" }] }));
+    filesRef.current = [...filesRef.current.filter((f) => f.path !== `templates/${template.name}.json`), { path: `templates/${template.name}.json`, content: JSON.stringify(template.content) }];
+    setCreateOpen(false);
+    handleTemplateChange(template.name);
+  }
+
+  function handleDeleted(name) {
+    const kind = baseOf(name);
+    const fromApp = (platform?.appTemplates || []).some((t) => `${t.kind}.${t.suffix}` === name);
+    // An app's template stays (back to the app's own layout); the store's own goes.
+    setTemplates((cur) => ({ ...cur, [kind]: (cur[kind] || []).flatMap((t) => (t.name !== name ? [t] : fromApp ? [{ ...t, source: "app" }] : [])) }));
+    filesRef.current = filesRef.current.filter((f) => f.path !== `templates/${name}.json`);
+    useEditorStore.getState().markSaved();
+    setTemplateName(kind);
+  }
+
   const [previewPick, setPreviewPick] = useState({});
-  const previewOptions = templateName === "product" ? products : templateName === "collection" ? collections : [];
+  const previewOptions = base === "product" ? products : base === "collection" ? collections : base === "page" ? pages : [];
+  // An extra template previews with something that uses it, when there is one.
+  const suffix = templateName.split(".")[1] || null;
+  const usingIt = suffix ? previewOptions.filter((x) => x.templateSuffix === suffix || (suffix === "rental" && x.rental?.enabled)) : [];
   const previewSlug =
-    previewOptions.length && (previewOptions.find((x) => x.slug === previewPick[templateName])?.slug || previewOptions[0].slug);
+    previewOptions.length &&
+    (previewOptions.find((x) => x.slug === previewPick[templateName])?.slug || usingIt[0]?.slug || previewOptions[0].slug);
 
   if (!ready || !template) {
     return (
@@ -190,12 +237,17 @@ export function EditorView({ theme, platform }) {
           <span className="text-xs text-ink-muted hidden md:inline">Page</span>
           <Select
             size="small"
-            className="w-56"
+            className="w-60"
             value={templateName}
             onChange={handleTemplateChange}
-            options={TEMPLATE_OPTIONS}
+            options={templateOptions(templates)}
             aria-label="Template being edited"
+            popupMatchSelectWidth={false}
           />
+          {altLabel && templates[base]?.find((t) => t.name === templateName)?.source !== "app" && (
+            <TemplateActions themeId={theme.id} name={templateName} label={altLabel} usage={templateUsage} onDeleted={handleDeleted} />
+          )}
+          <NewTemplateButton onClick={() => setCreateOpen(true)} />
           {previewOptions.length > 1 && (
             <Select
               size="small"
@@ -259,10 +311,14 @@ export function EditorView({ theme, platform }) {
               catalog={catalog}
               onAddSection={() => setAddModalOpen(true)}
               onOpenGlobal={() => setGlobalSectionsOpen(true)}
-              pageLabel={templateName === "product" ? "Product page" : "Home page"}
+              pageLabel={
+                base === "index"
+                  ? "Home page"
+                  : `${base === "product" ? "Product" : base === "collection" ? "Collection" : "Page"} · ${altLabel || "Default"}`
+              }
               hint={
-                templateName === "product"
-                  ? "Oyklane's product page on every store. Click “Product” to reorder, hide or resize its parts; add your theme's sections around it."
+                PAGE_HINTS[base]
+                  ? `${PAGE_HINTS[base]}${altLabel ? ` Used by the ${base === "collection" ? "collections" : base + "s"} you set to “${altLabel}”.` : ""}`
                   : undefined
               }
             />
@@ -291,7 +347,7 @@ export function EditorView({ theme, platform }) {
               onOpenGlobal={() => setGlobalSectionsOpen(true)}
             />
           ) : (
-            <p className="text-[13px] text-ink-muted p-4 m-0">Pick “Home page” or “Product page” above to edit sections.</p>
+            <p className="text-[13px] text-ink-muted p-4 m-0">Pick the home page, or a product, collection or page template above to edit sections.</p>
           )}
         </div>
       </div>
@@ -301,8 +357,16 @@ export function EditorView({ theme, platform }) {
         onClose={() => setAddModalOpen(false)}
         catalog={catalog}
         onAdd={handleAddSection}
-        templateName={templateName}
+        templateName={base}
         presentTypes={template.order.map((k) => template.sections[k]?.type)}
+      />
+      <CreateTemplateModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        themeId={theme.id}
+        templates={templates}
+        defaultKind={MAIN_SECTION[base] ? base : "product"}
+        onCreated={handleCreated}
       />
       <ThemeSettingsDrawer
         open={settingsDrawerOpen}

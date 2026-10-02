@@ -76,6 +76,8 @@ const APP_ICON_KEYS = [
   "life-buoy",
   "gift",
   "shield",
+  "calendar",
+  "store",
 ];
 
 module.exports = { slugify, formatCurrency, asyncHandler, HttpError, detectDeviceType, APP_ICON_KEYS };

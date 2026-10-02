@@ -16,10 +16,11 @@ class ApiError extends Error {
 
 /** Client Components: browser sends the session cookie automatically via
  * credentials: "include". */
-export async function apiFetch(path, { method = "GET", body, headers } = {}) {
+export async function apiFetch(path, { method = "GET", body, headers, signal } = {}) {
   const res = await fetch(`${API_URL}${path}`, {
     method,
     credentials: "include",
+    signal,
     // Only set Content-Type when there's a body — Fastify's JSON parser
     // rejects application/json on a bodiless request (e.g. POST .../activate).
     headers: { ...(body !== undefined && { "Content-Type": "application/json" }), ...headers },

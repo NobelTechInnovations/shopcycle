@@ -111,6 +111,8 @@ function publicOrder(store, order, { statusUrl, invoiceUrl } = {}) {
       price: Number(i.price),
       total: Number(i.total),
       returnable: quantities[i.id]?.returnable || 0,
+      // e.g. a rental's dates — written by the platform, never by shoppers.
+      detail: i.properties?.detail ? safe(i.properties.detail) : null,
     })),
     shipments: live.map((f) => ({
       status: f.status,

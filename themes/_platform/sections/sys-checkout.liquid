@@ -17,7 +17,7 @@
           {% if item.image %}<img src="{{ item.image }}" alt="" width="128" height="128">{% endif %}
           <span class="sys-item__qty">{{ item.quantity }}</span>
         </span>
-        <span>{{ item.title }}</span>
+        <span>{{ item.title }}{% if item.detail %}<span class="sys-line__detail">{{ item.detail }}</span>{% endif %}</span>
         <span class="sys-num">{{ item.lineTotal | money }}</span>
       </li>
     {% endfor %}

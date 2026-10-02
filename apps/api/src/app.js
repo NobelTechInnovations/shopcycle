@@ -145,6 +145,9 @@ function buildApp() {
   app.register(dashboardRoutes, { prefix: "/api/dashboard" });
   app.register(productRoutes, { prefix: "/api/products" });
   app.register(require("./modules/social/routes"), { prefix: "/api/social" });
+  app.register(require("./modules/rentals/routes"), { prefix: "/api/rentals" });
+  app.register(require("./modules/channels/routes"), { prefix: "/api/channels" });
+  app.register(require("./modules/channels/public-routes"), { prefix: "/api/public/feeds" });
   app.register(collectionRoutes, { prefix: "/api/collections" });
   app.register(brandRoutes, { prefix: "/api/brands" });
   app.register(categoryRoutes, { prefix: "/api/categories" });

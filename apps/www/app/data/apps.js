@@ -23,7 +23,7 @@ export async function getApps() {
   }
 }
 
-export const APP_CATEGORY = { automation: "Automation", checkout: "Checkout", customers: "Customers", marketing: "Marketing", analytics: "Analytics", utility: "Utilities", other: "Other" };
+export const APP_CATEGORY = { sales_channel: "Sales channels", selling: "Selling", automation: "Automation", checkout: "Checkout", customers: "Customers", marketing: "Marketing", analytics: "Analytics", utility: "Utilities", other: "Other" };
 
 // Each app's logo (components/Logo.jsx): the brand's own mark for apps that
 // connect a brand, an icon for Oyklane's own apps.
@@ -40,6 +40,9 @@ export const APP_LOGO = {
   "custom-scripts": { icon: "code" },
   "instagram-feed": { brand: "instagram" },
   "google-reviews": { brand: "google" },
+  "google-shopping": { brand: "google" },
+  "facebook-shop": { brand: "facebook" },
+  rentals: { icon: "calendar" },
 };
 
 /** What's being built next — shown as "coming soon", never as available. */

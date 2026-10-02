@@ -624,6 +624,8 @@ model Store {
   campaigns            Campaign[]
   installedApps        StoreApp[]
   appConnections       AppConnection[]
+  rentalProducts       RentalProduct[]
+  rentalBookings       RentalBooking[]
   cartSessions         CartSession[]
   metaConnection       MetaConnection?
   adCampaigns          AdCampaign[]
@@ -850,6 +852,13 @@ model Product {
   /// Custom data (Settings ▸ Custom data): { key: value } for this store's
   /// product field definitions. Themes read it as product.metafields.custom.key.
   metafields     Json          @default("{}")
+  /// Which theme template shows it: templates/product.<suffix>.json
+  /// (theme editor ▸ Create template). Null = the default product page.
+  templateSuffix String?
+  /// Sales channels this product is kept off ("google", "facebook").
+  hiddenChannels String[]      @default([])
+  /// Google product category for shopping feeds ("Apparel & Accessories > Clothing").
+  googleCategory String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -861,6 +870,8 @@ model Product {
   collectionProducts CollectionProduct[]
   orderItems         OrderItem[]
   reviews            ProductReview[]
+  rental             RentalProduct?
+  rentalBookings     RentalBooking[]
 
   @@unique([storeId, slug])
   @@index([storeId])
@@ -953,17 +964,19 @@ enum CollectionStatus {
 }
 
 model Collection {
-  id          String           @id @default(cuid())
-  storeId     String
-  title       String
-  slug        String
-  description String?          @db.Text
-  image       String?
-  status      CollectionStatus @default(draft)
+  id             String           @id @default(cuid())
+  storeId        String
+  title          String
+  slug           String
+  description    String?          @db.Text
+  image          String?
+  status         CollectionStatus @default(draft)
   /// Custom data — see Product.metafields.
-  metafields  Json             @default("{}")
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  metafields     Json             @default("{}")
+  /// templates/collection.<suffix>.json — see Product.templateSuffix.
+  templateSuffix String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   store    Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
   products CollectionProduct[]
@@ -1293,15 +1306,18 @@ model InventoryAdjustment {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  productId String?
-  variantId String?
-  title     String
-  sku       String?
-  quantity  Int
-  price     Decimal @db.Decimal(10, 2)
-  total     Decimal @db.Decimal(10, 2)
+  id         String  @id @default(cuid())
+  orderId    String
+  productId  String?
+  variantId  String?
+  title      String
+  sku        String?
+  quantity   Int
+  price      Decimal @db.Decimal(10, 2)
+  total      Decimal @db.Decimal(10, 2)
+  /// Extra details of the line, e.g. a rental's dates:
+  /// { rental: { start, end, days, pricePerDay, deposit, handover, returnMethod } }
+  properties Json?
 
   order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
@@ -1360,6 +1376,8 @@ model Page {
   status         PageStatus @default(draft)
   seoTitle       String?
   seoDescription String?    @db.Text
+  /// templates/page.<suffix>.json — see Product.templateSuffix.
+  templateSuffix String?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
@@ -2518,4 +2536,84 @@ model LimitRequest {
 
   @@index([status, createdAt])
   @@map("limit_requests")
+}
+
+/// Rentals app: how one product is rented out — a daily rate (lower for
+/// longer rentals), a deposit, and how many pieces of each size exist.
+model RentalProduct {
+  id          String   @id @default(cuid())
+  storeId     String
+  productId   String   @unique
+  enabled     Boolean  @default(true)
+  pricePerDay Decimal  @db.Decimal(10, 2)
+  /// Lower daily rates for longer rentals: [{ "days": 3, "price": 800 }]
+  /// — from 3 days on, every day costs 800.
+  tiers       Json     @default("[]")
+  minDays     Int      @default(1)
+  maxDays     Int      @default(30)
+  /// Refundable security deposit per piece.
+  deposit     Decimal  @default(0) @db.Decimal(10, 2)
+  /// Pieces the seller owns of each size/colour (variant).
+  units       Int      @default(1)
+  /// Days kept free after each rental, for cleaning and delivery.
+  bufferDays  Int      @default(1)
+  /// Notice needed: the earliest first day is today + leadDays.
+  leadDays    Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("rental_products")
+}
+
+/// One rental: a piece out from startDate to endDate (both days included).
+/// Made by an order (status confirmed), a booking request from the store
+/// (requested), the seller by hand, or a block for repairs (blocked).
+model RentalBooking {
+  id            String    @id @default(cuid())
+  storeId       String
+  productId     String?
+  variantId     String?
+  orderId       String?
+  /// "Silk lehenga — M"
+  title         String
+  customerName  String?
+  email         String?
+  phone         String?
+  startDate     DateTime  @db.Date
+  endDate       DateTime  @db.Date
+  days          Int
+  quantity      Int       @default(1)
+  pricePerDay   Decimal   @default(0) @db.Decimal(10, 2)
+  rentalTotal   Decimal   @default(0) @db.Decimal(10, 2)
+  deposit       Decimal   @default(0) @db.Decimal(10, 2)
+  /// none | due (collect on handover) | held | refunded | kept
+  depositStatus String    @default("none")
+  /// delivery (seller delivers) | store_pickup (customer collects)
+  handover      String    @default("delivery")
+  /// collect (seller picks it up) | drop_off (customer brings it back)
+  returnMethod  String    @default("collect")
+  address       String?   @db.Text
+  /// requested | confirmed | out | returned | cancelled | blocked
+  status        String    @default("confirmed")
+  outAt         DateTime?
+  returnedAt    DateTime?
+  lateFee       Decimal   @default(0) @db.Decimal(10, 2)
+  note          String?   @db.Text
+  /// online | request | manual | block
+  source        String    @default("online")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  store   Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, status])
+  @@index([storeId, startDate])
+  @@index([productId, startDate])
+  @@index([orderId])
+  @@map("rental_bookings")
 }

@@ -10,6 +10,10 @@ import { MediaLibraryModal } from "@/components/MediaLibraryModal";
 import { CustomDataFields, metafieldPayload } from "@/components/CustomDataFields";
 import { PageHeader, StatusBadge, SaveBar } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+import { useApps } from "@/lib/apps";
+import { RentalProductCard } from "@/components/RentalProductCard";
+import { ThemeTemplateField } from "@/components/ThemeTemplateField";
+import { SalesChannelsCard } from "@/components/channels/SalesChannelsCard";
 import { IMAGE_ACCEPT, uploadImage } from "@/lib/uploads";
 import { storefrontUrlFor, storefrontLabelFor } from "@/lib/storefront";
 
@@ -239,6 +243,10 @@ export function ProductForm({ product, store, template, justCreated = false }) {
   const [suggesting, setSuggesting] = useState(false);
   const lastSuggested = useRef(null);
   const [form] = Form.useForm();
+  const { apps } = useApps();
+  const hasApp = (key) => Boolean(apps?.some((a) => a.key === key && a.installed));
+  const rentalRef = useRef(null);
+  const [rentalOn, setRentalOn] = useState(false);
   const seoTitle = Form.useWatch("seoTitle", form);
   const seoDescription = Form.useWatch("seoDescription", form);
   const title = Form.useWatch("title", form);
@@ -277,6 +285,9 @@ export function ProductForm({ product, store, template, justCreated = false }) {
         seoDescription: source.seoDescription,
         hsnCode: source.hsnCode,
         metafields: source.metafields || {},
+        templateSuffix: source.templateSuffix || null,
+        hiddenChannels: source.hiddenChannels || [],
+        googleCategory: source.googleCategory || null,
         // A copy gets new variants (no ids) and no SKUs — those must stay unique.
         variants: source.variants.map((v) => ({
           id: template ? undefined : v.id,
@@ -290,6 +301,8 @@ export function ProductForm({ product, store, template, justCreated = false }) {
     : {
         status: "draft",
         tags: [],
+        templateSuffix: null,
+        hiddenChannels: [],
         variants: [{ title: "Default", price: undefined, inventoryQuantity: 0 }],
       };
 
@@ -359,6 +372,12 @@ export function ProductForm({ product, store, template, justCreated = false }) {
   }
 
   async function handleSubmit(values) {
+    const rentalProblem = rentalRef.current?.problem();
+    if (rentalProblem) {
+      message.error(rentalProblem);
+      document.getElementById("rental")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     setSaving(true);
     try {
       // Stock is only sent when it was changed here — otherwise the save
@@ -379,12 +398,18 @@ export function ProductForm({ product, store, template, justCreated = false }) {
       };
       if (isEdit) {
         await apiFetch(`/api/products/${product.id}`, { method: "PATCH", body: payload });
+        await rentalRef.current?.save(product.id);
         // Stay on the product: the panel offers what's next.
         setDirty(false);
         setSaved("saved");
         router.refresh();
       } else {
         const { product: created } = await apiFetch("/api/products", { method: "POST", body: payload });
+        try {
+          await rentalRef.current?.save(created.id);
+        } catch (err) {
+          message.error(`Product saved, but the rental settings weren't: ${err.message}`);
+        }
         setDirty(false);
         router.replace(`/admin/products/${created.id}?saved=new`);
       }
@@ -414,7 +439,7 @@ export function ProductForm({ product, store, template, justCreated = false }) {
   const suggestedCategory = suggestions?.category && suggestions.category.id !== categoryId ? suggestions.category : null;
   const suggestedTags = (suggestions?.tags || []).filter((t) => !tags.includes(t)).slice(0, 8);
   const popularTags = (suggestions?.popularTags || storeTags).filter((t) => !tags.includes(t) && !suggestedTags.includes(t)).slice(0, 6);
-  const hasPrice = variants.some((v) => Number(v?.price) > 0);
+  const hasPrice = rentalOn || variants.some((v) => Number(v?.price) > 0);
 
   const checks = [
     { label: "A clear title", ok: String(title || "").trim().length >= 3 },
@@ -513,7 +538,7 @@ export function ProductForm({ product, store, template, justCreated = false }) {
                   <Input />
                 </Form.Item>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-                  <Form.Item name={["variants", 0, "price"]} label="Selling price" rules={[{ required: true, message: "Enter the price" }]} extra="What the shopper pays, including GST.">
+                  <Form.Item name={["variants", 0, "price"]} label="Selling price" rules={[{ required: !rentalOn, message: "Enter the price" }]} extra={rentalOn ? "Not used while it's rented out — the rent per day below is." : "What the shopper pays, including GST."}>
                     <InputNumber min={0} className="w-full" prefix="₹" placeholder="999" />
                   </Form.Item>
                   <Form.Item
@@ -563,7 +588,7 @@ export function ProductForm({ product, store, template, justCreated = false }) {
                             <Form.Item {...restField} name={[name, "title"]} label="Option" className="mb-0">
                               <Input placeholder="M / Black" />
                             </Form.Item>
-                            <Form.Item {...restField} name={[name, "price"]} label="Price" className="mb-0" rules={[{ required: true, message: "Required" }]}>
+                            <Form.Item {...restField} name={[name, "price"]} label="Price" className="mb-0" rules={[{ required: !rentalOn, message: "Required" }]}>
                               <InputNumber min={0} className="w-full" prefix="₹" />
                             </Form.Item>
                             <Form.Item {...restField} name={[name, "comparePrice"]} label="MRP" className="mb-0">
@@ -597,6 +622,8 @@ export function ProductForm({ product, store, template, justCreated = false }) {
               </Card>
             )}
             <VariantOptionsModal open={optionsOpen} onClose={() => setOptionsOpen(false)} onApply={applyVariantTitles} />
+
+            {hasApp("rentals") && <RentalProductCard ref={rentalRef} productId={isEdit ? product.id : null} onEnabled={setRentalOn} onChange={() => setDirty(true)} />}
 
             <CustomDataFields ownerType="product" />
 
@@ -725,6 +752,15 @@ export function ProductForm({ product, store, template, justCreated = false }) {
             </Card>
 
             <ReadyChecklist checks={checks} />
+
+            <SalesChannelsCard installed={hasApp} onChange={() => setDirty(true)} />
+
+            <Card size="small" title="Layout">
+              <ThemeTemplateField
+                kind="product"
+                hint={rentalOn ? "Rented products use the Rental product layout unless you pick another." : "A different product page layout made in the theme editor."}
+              />
+            </Card>
 
             <Card size="small" title="GST">
               <Form.Item

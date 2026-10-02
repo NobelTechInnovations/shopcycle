@@ -93,7 +93,7 @@ async function createRefund(prisma, store, orderId, input, { actorName, log } = 
     if (input.restock) {
       for (const row of items) {
         const item = order.items.find((i) => i.id === row.orderItemId);
-        if (!item?.variantId) continue;
+        if (!item?.variantId || item.properties?.rental) continue; // rentals never left stock
         // Shipped items come back as returns; unshipped ones never left.
         const reason = quantities[row.orderItemId].fulfilled > 0 ? "returned" : "order_cancelled";
         await adjustStock(tx, { storeId: store.id, variantId: item.variantId, delta: row.quantity, reason, orderId, actorName });

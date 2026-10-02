@@ -10,7 +10,8 @@
 {% assign many = product.variants.size > 1 %}
 {% assign s = section.settings %}
 {% assign has_picker = false %}
-{% for block in section.blocks %}{% if block.type == 'variant_picker' %}{% assign has_picker = true %}{% endif %}{% endfor %}
+{% assign has_booking = false %}
+{% for block in section.blocks %}{% if block.type == 'variant_picker' %}{% assign has_picker = true %}{% endif %}{% if block.type == 'rental_booking' %}{% assign has_booking = true %}{% endif %}{% endfor %}
 <div class="sys">
   <section class="sys-section sys-section--product">
     <div class="sys-container">
@@ -82,6 +83,11 @@
                 {% endif %}
 
               {% when 'price' %}
+                {% if product.rental %}
+                  <div class="sys-pblock sys-rentprice">
+                    <p class="sys-rentprice__now"><span class="sys-num">{{ product.rental.price_per_day | money }}</span><span class="sys-rentprice__unit"> / day</span></p>
+                  </div>
+                {% else %}
                 <div class="sys-pblock sys-pinfo__pricebox sys-pinfo__pricebox--{{ b.size }}">
                   <div class="sys-price" data-sys-price>
                     {% render 'snippets/sys-price', variant: current, show_save: b.show_save %}
@@ -90,6 +96,74 @@
                     <p class="sys-pinfo__taxnote">{% if shop.taxes_included %}Inclusive of all taxes{% else %}Taxes calculated at checkout{% endif %}{% if shop.free_shipping_above %} · Free delivery over {{ shop.free_shipping_above | money }}{% endif %}</p>
                   {% endif %}
                 </div>
+                {% endif %}
+
+              {% when 'rental_price' %}
+                {% if product.rental %}
+                  <div class="sys-pblock sys-rentprice">
+                    <p class="sys-rentprice__now"><span class="sys-num">{{ product.rental.price_per_day | money }}</span><span class="sys-rentprice__unit"> / day</span></p>
+                    {% if b.show_tiers != false and product.rental.tiers.size > 0 %}
+                      <ul class="sys-rentprice__tiers">
+                        {% for t in product.rental.tiers %}<li>{{ t.days }}+ days <strong class="sys-num">{{ t.price | money }}</strong> / day</li>{% endfor %}
+                      </ul>
+                    {% endif %}
+                    {% if b.show_deposit != false and product.rental.deposit > 0 %}
+                      <p class="sys-rentprice__note">{% render 'snippets/sys-icon', icon: 'shield' %} Refundable deposit {{ product.rental.deposit | money }}{% if product.rental.deposit_at_checkout %}, paid with the rent{% else %}, paid on delivery{% endif %}</p>
+                    {% endif %}
+                  </div>
+                {% endif %}
+
+              {% when 'rental_booking' %}
+                {% if product.rental %}
+                  {% assign r = product.rental %}
+                  <div class="sys-pblock sys-rent" id="rental" data-sys-rental>
+                    {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
+                    {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+                    <p class="sys-rent__title">{{ b.heading | default: 'Pick your dates' }}</p>
+                    <div class="sys-rent__dates" data-sys-rent-inputs>
+                      <label class="sys-field"><span class="sys-label">First day</span><input class="sys-input" type="date" name="rentalStart" min="{{ r.earliest }}" max="{{ r.latest }}" required data-sys-rent-start></label>
+                      <label class="sys-field"><span class="sys-label">Last day</span><input class="sys-input" type="date" name="rentalEnd" min="{{ r.earliest }}" required data-sys-rent-end></label>
+                    </div>
+                    <div class="sys-rent__cal" data-sys-rent-cal hidden></div>
+                    <p class="sys-rent__rules">{% if r.min_days > 1 %}At least {{ r.min_days }} days · {% endif %}Up to {{ r.max_days }} days · Greyed-out days are booked</p>
+                    {% if r.handover_options.size > 1 %}
+                      <fieldset class="sys-rent__opts">
+                        <legend>Getting it</legend>
+                        {% for o in r.handover_options %}<label class="sys-rent__opt"><input type="radio" name="rentalHandover" value="{{ o.value }}"{% if forloop.first %} checked{% endif %}><span>{{ o.label }}</span></label>{% endfor %}
+                      </fieldset>
+                    {% else %}
+                      <input type="hidden" name="rentalHandover" value="{{ r.handover_options.first.value }}">
+                    {% endif %}
+                    {% if r.return_options.size > 1 %}
+                      <fieldset class="sys-rent__opts">
+                        <legend>Giving it back</legend>
+                        {% for o in r.return_options %}<label class="sys-rent__opt"><input type="radio" name="rentalReturn" value="{{ o.value }}"{% if forloop.first %} checked{% endif %}><span>{{ o.label }}</span></label>{% endfor %}
+                      </fieldset>
+                    {% else %}
+                      <input type="hidden" name="rentalReturn" value="{{ r.return_options.first.value }}">
+                    {% endif %}
+                    {% if r.handover_options.size == 1 and r.return_options.size == 1 %}<p class="sys-rent__rules">{{ r.handover_options.first.label }} · {{ r.return_options.first.label }}</p>{% endif %}
+                    {% if r.pickup_address %}<p class="sys-rent__rules">{% render 'snippets/sys-icon', icon: 'truck' %} Store: {{ r.pickup_address | escape }}</p>{% endif %}
+                    <div class="sys-rent__sum" data-sys-rent-sum aria-live="polite"></div>
+                    {% if r.mode == 'request' %}
+                      <div class="sys-rent__contact">
+                        <label class="sys-field"><span class="sys-label">Your name</span><input class="sys-input" name="rentalName" autocomplete="name" required maxlength="120"></label>
+                        <label class="sys-field"><span class="sys-label">Mobile number</span><input class="sys-input" name="rentalPhone" type="tel" autocomplete="tel" inputmode="tel" required maxlength="20"></label>
+                        <label class="sys-field"><span class="sys-label">Email (optional)</span><input class="sys-input" name="rentalEmail" type="email" autocomplete="email" maxlength="200"></label>
+                        <label class="sys-field sys-rent__wide"><span class="sys-label">Address for delivery &amp; pickup</span><textarea class="sys-input" name="rentalAddress" rows="2" autocomplete="street-address" maxlength="500"></textarea></label>
+                        <label class="sys-field sys-rent__wide"><span class="sys-label">Anything we should know? (optional)</span><input class="sys-input" name="rentalNote" maxlength="1000"></label>
+                      </div>
+                      <input type="hidden" name="return_to" value="{{ product.url }}">
+                      <button type="submit" class="sys-btn sys-btn--lg sys-btn--block" formaction="{{ r.request_url }}" data-sys-rent-submit>{{ b.request_label | default: 'Request to book' }}</button>
+                      <p class="sys-rent__rules" style="text-align:center">No payment now — the store calls you to confirm.</p>
+                    {% else %}
+                      <button type="submit" class="sys-btn sys-btn--lg sys-btn--block" data-sys-rent-submit>{{ b.button_label | default: 'Book now' }}</button>
+                    {% endif %}
+                    {% if r.late_fee %}<p class="sys-rent__rules">Late returns: {{ r.late_fee | money }} a day.</p>{% endif %}
+                    {% if r.terms %}<details class="sys-accordion"><summary>Rental terms {% render 'snippets/sys-icon', icon: 'plus' %}</summary><div class="sys-accordion__body"><p>{{ r.terms | escape | newline_to_br }}</p></div></details>{% endif %}
+                    <script type="application/json" data-sys-rental-json>{{ r.client_json }}</script>
+                  </div>
+                {% endif %}
 
               {% when 'variant_picker' %}
                 <div class="sys-pblock sys-stack" style="gap:18px">
@@ -148,6 +222,7 @@
                 </div>
 
               {% when 'stock' %}
+                {% unless product.rental %}
                 <div class="sys-pblock">
                   {% if current.inventoryQuantity <= 0 %}
                     <p class="sys-stock sys-stock--out" data-sys-stock>Out of stock</p>
@@ -157,8 +232,12 @@
                     <p class="sys-stock" data-sys-stock>In stock, ready to ship</p>
                   {% endif %}
                 </div>
+                {% endunless %}
 
               {% when 'buy_buttons' %}
+                {% if product.rental %}
+                  {% unless has_booking %}<p class="sys-pblock sys-rent__rules">This is rented by the day — choose the Rental product template for it in the admin to show the booking calendar.</p>{% endunless %}
+                {% else %}
                 <div class="sys-buy sys-pblock{% unless b.show_quantity %} sys-buy--noqty{% endunless %}">
                   {% if b.show_quantity %}
                     <div class="sys-qty" data-sys-qty>
@@ -173,6 +252,7 @@
                     {% if current.available %}{{ b.button_label | default: 'Add to cart' }}{% else %}Sold out{% endif %}
                   </button>
                 </div>
+                {% endif %}
 
               {% when 'trust' %}
                 <ul class="sys-trust sys-pblock">
@@ -310,6 +390,17 @@
       ] },
       { "type": "checkbox", "id": "show_save", "label": "Show “Save x%” on sale items", "default": true },
       { "type": "checkbox", "id": "show_tax_note", "label": "Show “Inclusive of all taxes”", "default": true }
+    ] },
+    { "type": "rental_price", "name": "Rent per day (Rentals app)", "limit": 1, "settings": [
+      { "type": "paragraph", "content": "The daily rent, cheaper rates for longer rentals, and the deposit — for products you rent out." },
+      { "type": "checkbox", "id": "show_tiers", "label": "Show longer-rental rates", "default": true },
+      { "type": "checkbox", "id": "show_deposit", "label": "Show the deposit", "default": true }
+    ] },
+    { "type": "rental_booking", "name": "Booking calendar (Rentals app)", "limit": 1, "settings": [
+      { "type": "paragraph", "content": "Dates, delivery and return choices, the total, and the Book button. Shows on products you rent out." },
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Pick your dates" },
+      { "type": "text", "id": "button_label", "label": "Button text", "default": "Book now" },
+      { "type": "text", "id": "request_label", "label": "Button text (booking requests)", "default": "Request to book" }
     ] },
     { "type": "variant_picker", "name": "Size & colour picker", "limit": 1, "settings": [
       { "type": "select", "id": "style", "label": "Style", "default": "buttons", "options": [

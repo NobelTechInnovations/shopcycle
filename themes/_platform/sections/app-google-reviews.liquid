@@ -39,7 +39,8 @@
       </div>
       {% if gr.reviews.size > 0 %}
         <div class="oy-gr__track" data-oy-gr-track>
-          {% for r in gr.reviews %}
+          {% assign show_count = section.settings.count | default: 12 %}
+          {% for r in gr.reviews limit: show_count %}
             <article class="oy-gr__card">
               <div class="oy-gr__who">
                 {% if r.photo %}<img src="{{ r.photo }}" alt="" width="40" height="40" loading="lazy" referrerpolicy="no-referrer">{% else %}<span class="oy-gr__initial" aria-hidden="true">{{ r.initial }}</span>{% endif %}
@@ -141,6 +142,7 @@
       { "value": "scroll", "label": "Scrolling row" },
       { "value": "grid", "label": "Grid" }
     ] },
+    { "type": "range", "id": "count", "label": "Reviews to show", "min": 3, "max": 24, "step": 1, "default": 12 },
     { "type": "text", "id": "write_text", "label": "Button text (empty hides it)", "default": "Write a review" },
     { "type": "checkbox", "id": "surface", "label": "Use light background", "default": true }
   ]

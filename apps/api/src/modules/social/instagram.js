@@ -1,13 +1,20 @@
 const { HttpError } = require("@shopcycle/utils");
 const { env } = require("../../config/env");
+const { encryptSecret, decryptSecret } = require("../../lib/crypto");
+const meta = require("../meta/service");
 const connections = require("./connections");
 
 /**
  * Instagram feed app: the store's latest Instagram posts in a scrolling
- * section of their theme. Uses the "Instagram API with Instagram Login"
- * (Business or Creator accounts): the seller connects with one click when
- * Oyklane's Instagram app is set up (INSTAGRAM_APP_ID/SECRET), or pastes an
- * access token. Tokens last 60 days and are renewed as the feed refreshes.
+ * section of their theme. Three ways to connect (Business or Creator
+ * accounts):
+ * - Continue with Facebook (META_APP_ID/SECRET): the Instagram account
+ *   linked to the seller's Facebook Page. The Page's token never expires,
+ *   so the feed keeps working until the seller removes the connection.
+ * - Instagram login (INSTAGRAM_APP_ID/SECRET): 60-day tokens, renewed as
+ *   the feed refreshes.
+ * - A pasted access token (renewed the same way).
+ * Tokens are stored encrypted.
  */
 
 const APP_KEY = "instagram-feed";
@@ -17,6 +24,9 @@ const PROFILE_FIELDS = "user_id,username,name,profile_picture_url,followers_coun
 const DAY = 24 * 60 * 60 * 1000;
 
 const oauthReady = () => Boolean(env.INSTAGRAM_APP_ID && env.INSTAGRAM_APP_SECRET);
+const facebookReady = () => meta.metaConfigured();
+const FB_SCOPES = ["instagram_basic", "pages_show_list", "pages_read_engagement", "business_management"];
+const fbGraph = (path, params) => `${env.META_GRAPH_API_URL.replace(/\/$/, "")}/${env.META_GRAPH_API_VERSION}${path}?${new URLSearchParams(params)}`;
 const redirectUri = () => `${env.ADMIN_ORIGIN.replace(/\/$/, "")}/admin/apps/instagram`;
 const graph = (path, params) => `${env.INSTAGRAM_GRAPH_URL.replace(/\/$/, "")}${path}?${new URLSearchParams(params)}`;
 
@@ -99,7 +109,7 @@ async function store(prisma, storeId, token, expiresAt) {
   const { profile, items } = await fetchAll(token);
   if (!profile.username) throw new HttpError(400, "Instagram didn't return an account for that token.");
   return connections.save(prisma, storeId, APP_KEY, {
-    credentials: { accessToken: token, connectedAt: new Date().toISOString() },
+    credentials: { via: "instagram", accessToken: encryptSecret(token), connectedAt: new Date().toISOString() },
     profile,
     items,
     fetchedAt: new Date(),
@@ -137,10 +147,98 @@ async function connectWithToken(prisma, storeId, token) {
   return store(prisma, storeId, renewed?.token || clean, renewed?.expiresAt || null);
 }
 
+// ── Continue with Facebook ─────────────────────────────────────
+
+/** Facebook's sign-in, asking to read the Pages' linked Instagram accounts. */
+function facebookAuthorizeUrl() {
+  if (!facebookReady()) throw new HttpError(400, "Facebook sign-in isn't set up on Oyklane yet — use another way below.");
+  return meta.buildAuthorizeUrl(FB_SCOPES);
+}
+
+/** Posts and profile through the Facebook Page's Instagram account. */
+async function fetchViaFacebook(pageToken, igUserId) {
+  const [profile, media] = await Promise.all([
+    call(fbGraph(`/${igUserId}`, { fields: "id,username,name,profile_picture_url,followers_count,media_count", access_token: pageToken })),
+    call(fbGraph(`/${igUserId}/media`, { fields: MEDIA_FIELDS, limit: "24", access_token: pageToken })),
+  ]);
+  return {
+    profile: {
+      id: String(profile.id || igUserId),
+      username: String(profile.username || ""),
+      name: String(profile.name || ""),
+      picture: connections.safeUrl(profile.profile_picture_url),
+      followers: Number.isFinite(profile.followers_count) ? profile.followers_count : null,
+      posts: Number.isFinite(profile.media_count) ? profile.media_count : null,
+    },
+    items: (media.data || []).map(mapPost).filter(Boolean),
+  };
+}
+
+async function saveFacebookAccount(prisma, storeId, account) {
+  const pageToken = decryptSecret(account.pageToken);
+  const { profile, items } = await fetchViaFacebook(pageToken, account.igUserId);
+  if (!profile.username) throw new HttpError(400, "Facebook didn't return that Instagram account.");
+  return connections.save(prisma, storeId, APP_KEY, {
+    credentials: { via: "facebook", pageToken: encryptSecret(pageToken), igUserId: account.igUserId, pageId: account.pageId, pageName: account.pageName, connectedAt: new Date().toISOString() },
+    profile,
+    items,
+    fetchedAt: new Date(),
+    expiresAt: null, // a Page token from a long-lived login doesn't expire
+    error: null,
+  });
+}
+
+/** The code Facebook sent back: find the Instagram accounts linked to the
+ * seller's Pages. One → connected; several → the seller picks. */
+async function connectWithFacebook(prisma, storeId, code) {
+  const { accessToken } = await meta.exchangeCodeForLongLivedToken(code);
+  const pages = await call(
+    fbGraph("/me/accounts", { fields: "id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}", limit: "50", access_token: accessToken })
+  );
+  const accounts = (pages.data || [])
+    .filter((p) => p.instagram_business_account?.id && p.access_token)
+    .map((p) => ({
+      pageId: String(p.id),
+      pageName: String(p.name || ""),
+      pageToken: encryptSecret(p.access_token),
+      igUserId: String(p.instagram_business_account.id),
+      username: String(p.instagram_business_account.username || ""),
+      picture: connections.safeUrl(p.instagram_business_account.profile_picture_url),
+    }));
+  if (!accounts.length) {
+    throw new HttpError(
+      400,
+      "None of your Facebook Pages has an Instagram account linked. In Instagram, switch to a Business or Creator account and link it to your Facebook Page (Settings ▸ Account centre), then connect again."
+    );
+  }
+  if (accounts.length === 1) return saveFacebookAccount(prisma, storeId, accounts[0]);
+  // Several: keep the choices (tokens encrypted) until the seller picks one.
+  const row = await connections.get(prisma, storeId, APP_KEY);
+  return connections.save(prisma, storeId, APP_KEY, {
+    credentials: { ...(row?.credentials || {}), pendingFacebook: { accounts, at: new Date().toISOString() } },
+    ...(row ? {} : { profile: {}, items: [] }),
+  });
+}
+
+async function chooseFacebookAccount(prisma, storeId, igUserId) {
+  const row = await connections.get(prisma, storeId, APP_KEY);
+  const account = row?.credentials?.pendingFacebook?.accounts?.find((a) => a.igUserId === String(igUserId));
+  if (!account) throw new HttpError(400, "That choice expired — connect with Facebook again.");
+  return saveFacebookAccount(prisma, storeId, account);
+}
+
 /** Fresh posts (and a renewed token when it's within 20 days of expiring). */
 async function refresh(prisma, storeId) {
   const row = await connections.get(prisma, storeId, APP_KEY);
-  const token = row?.credentials?.accessToken;
+  if (row?.credentials?.via === "facebook") {
+    try {
+      const { profile, items } = await fetchViaFacebook(decryptSecret(row.credentials.pageToken), row.credentials.igUserId);
+      return connections.save(prisma, storeId, APP_KEY, { profile, items, fetchedAt: new Date(), error: null });
+    } catch (err) {
+      return connections.save(prisma, storeId, APP_KEY, { fetchedAt: new Date(), error: err.message || "Couldn't refresh the feed" });
+    }
+  }
+  const token = decryptSecret(row?.credentials?.accessToken);
   if (!token) return row;
   let current = token;
   let expiresAt = row.expiresAt;
@@ -153,7 +251,7 @@ async function refresh(prisma, storeId) {
   }
   try {
     const { profile, items } = await fetchAll(current);
-    return connections.save(prisma, storeId, APP_KEY, { credentials: { ...row.credentials, accessToken: current }, profile, items, fetchedAt: new Date(), expiresAt, error: null });
+    return connections.save(prisma, storeId, APP_KEY, { credentials: { ...row.credentials, accessToken: encryptSecret(current) }, profile, items, fetchedAt: new Date(), expiresAt, error: null });
   } catch (err) {
     // Keep showing the last posts; tell the seller what went wrong.
     return connections.save(prisma, storeId, APP_KEY, { fetchedAt: new Date(), error: err.message || "Couldn't refresh the feed" });
@@ -182,12 +280,18 @@ function forTheme(row) {
   };
 }
 
-/** For the admin's Instagram page — never the token. */
+/** For the admin's Instagram page — never a token. */
 function forAdmin(row) {
-  if (!row?.profile?.username) return { connected: false, oauth: oauthReady() };
+  const pending = row?.credentials?.pendingFacebook;
+  const choose = pending ? pending.accounts.map((a) => ({ igUserId: a.igUserId, username: a.username, pageName: a.pageName, picture: a.picture })) : null;
+  if (!row?.profile?.username) return { connected: false, oauth: oauthReady(), facebook: facebookReady(), choose };
   return {
     connected: true,
     oauth: oauthReady(),
+    facebook: facebookReady(),
+    via: row.credentials?.via || "instagram",
+    pageName: row.credentials?.pageName || null,
+    choose,
     profile: row.profile,
     posts: (row.items || []).slice(0, 12),
     fetchedAt: row.fetchedAt,
@@ -196,4 +300,17 @@ function forAdmin(row) {
   };
 }
 
-module.exports = { APP_KEY, oauthReady, authorizeUrl, connectWithCode, connectWithToken, refresh, forTheme, forAdmin };
+module.exports = {
+  APP_KEY,
+  oauthReady,
+  facebookReady,
+  authorizeUrl,
+  facebookAuthorizeUrl,
+  connectWithCode,
+  connectWithToken,
+  connectWithFacebook,
+  chooseFacebookAccount,
+  refresh,
+  forTheme,
+  forAdmin,
+};

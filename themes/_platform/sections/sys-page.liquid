@@ -1,12 +1,19 @@
-{% comment %} Content pages (About, FAQ, policies…). Merchant-written HTML. {% endcomment %}
+{% comment %}
+  Content pages (About, FAQ, policies…): the merchant-written text. In the
+  theme editor a page template can put the theme's sections around it, and
+  hide the title for pages that open with a banner.
+{% endcomment %}
+{% assign s = section.settings %}
 <div class="sys">
   <section class="sys-section">
-    <div class="sys-container sys-container--narrow">
-      <ol class="sys-crumbs" aria-label="Breadcrumb">
-        <li><a href="{{ routes.root_url }}">Home</a></li>
-        <li aria-current="page">{{ page.title }}</li>
-      </ol>
-      <h1 class="sys-h1" style="margin-bottom:24px">{{ page.title }}</h1>
+    <div class="sys-container{% if s.width != 'wide' %} sys-container--narrow{% endif %}">
+      {% unless s.hide_breadcrumbs %}
+        <ol class="sys-crumbs" aria-label="Breadcrumb">
+          <li><a href="{{ routes.root_url }}">Home</a></li>
+          <li aria-current="page">{{ page.title }}</li>
+        </ol>
+      {% endunless %}
+      {% unless s.hide_title %}<h1 class="sys-h1" style="margin-bottom:24px">{{ page.title }}</h1>{% endunless %}
       <div class="sys-prose">
         {% if page.body contains '<' %}{{ page.body }}{% else %}{{ page.body | newline_to_br }}{% endif %}
       </div>
@@ -15,5 +22,18 @@
 </div>
 
 {% schema %}
-{ "name": "Page", "settings": [] }
+{
+  "name": "Page content",
+  "locked": true,
+  "templates": ["page"],
+  "settings": [
+    { "type": "paragraph", "content": "The page's own text, written under Content ▸ Pages. Add your theme's sections above or below it." },
+    { "type": "select", "id": "width", "label": "Text width", "default": "narrow", "options": [
+      { "value": "narrow", "label": "Narrow (easy to read)" },
+      { "value": "wide", "label": "Full page width" }
+    ] },
+    { "type": "checkbox", "id": "hide_title", "label": "Hide the page title", "default": false },
+    { "type": "checkbox", "id": "hide_breadcrumbs", "label": "Hide breadcrumbs", "default": false }
+  ]
+}
 {% endschema %}

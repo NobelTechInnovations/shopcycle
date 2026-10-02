@@ -46,7 +46,7 @@
           <div class="sys-card">
             <h2 class="sys-card__title">Items</h2>
             {% for item in order.items %}
-              <div class="sys-row-line"><span>{{ item.title }} <span class="sys-muted">× {{ item.quantity }}</span></span><span class="sys-num">{{ item.total | money }}</span></div>
+              <div class="sys-row-line"><span>{{ item.title }} <span class="sys-muted">× {{ item.quantity }}</span>{% if item.detail %}<span class="sys-line__detail">{{ item.detail }}</span>{% endif %}</span><span class="sys-num">{{ item.total | money }}</span></div>
             {% endfor %}
             <div style="margin-top:8px">
               <div class="sys-row-line"><span class="sys-muted">Subtotal</span><span class="sys-num">{{ order.subtotal | money }}</span></div>

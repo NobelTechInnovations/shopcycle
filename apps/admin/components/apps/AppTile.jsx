@@ -15,11 +15,11 @@ const TINT = {
 };
 
 /** The brand's own mark, for apps that connect Google, Meta or WhatsApp. */
-export function BrandGlyph({ app, size }) {
+export function BrandGlyph({ app, size, white = false }) {
   const b = APP_BRANDS[app.key];
   if (!b) return null;
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill={b.hex} role="img" aria-label={b.title}>
+    <svg viewBox="0 0 24 24" width={size} height={size} fill={white ? "#fff" : b.hex} role="img" aria-label={b.title}>
       <path d={b.path} />
     </svg>
   );

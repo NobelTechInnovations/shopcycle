@@ -18,7 +18,8 @@ function list(prisma, storeId, { q, status, page, pageSize }) {
   return Promise.all([
     prisma.product.findMany({
       where,
-      include: { variants: true, images: { orderBy: { position: "asc" }, take: 1 } },
+      // rental: the theme editor previews the Rental template with a rented product.
+      include: { variants: true, images: { orderBy: { position: "asc" }, take: 1 }, rental: { select: { enabled: true } } },
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,

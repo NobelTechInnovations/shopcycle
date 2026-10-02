@@ -61,6 +61,19 @@ function ItemRow({ item, quantity, currency, note }) {
     <div className="flex items-start justify-between gap-4 py-3 border-b border-app-border last:border-0">
       <div className="min-w-0">
         <p className="m-0 text-sm font-medium text-ink">{item.title}</p>
+        {item.properties?.detail && (
+          <p className="m-0 text-xs text-accent">
+            {item.properties.detail}
+            {item.properties.rental && (
+              <>
+                {" · "}
+                <a href="/admin/apps/rentals?tab=bookings" className="underline">
+                  Booking
+                </a>
+              </>
+            )}
+          </p>
+        )}
         <p className="m-0 text-xs text-ink-muted">
           {item.sku ? `SKU ${item.sku} · ` : ""}
           {formatCurrency(item.price, currency)} × {quantity}

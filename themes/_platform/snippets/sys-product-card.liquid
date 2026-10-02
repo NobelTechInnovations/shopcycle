@@ -30,8 +30,13 @@
       <span class="sys-pcard__rating">{% render 'snippets/sys-stars', rating: product.rating.average %}({{ product.rating.count }})</span>
     {% endif %}
     <span class="sys-price">
-      {% if product.price_varies %}<span class="sys-muted sys-small">From</span>{% endif %}
-      {% render 'snippets/sys-price', variant: card_variant %}
+      {% if product.rental %}
+        {% if product.rental.has_tiers %}<span class="sys-muted sys-small">From</span>{% endif %}
+        <span class="sys-price__now">{% if product.rental.has_tiers %}{{ product.rental.from_price | money }}{% else %}{{ product.rental.price_per_day | money }}{% endif %}</span><span class="sys-muted sys-small">/ day</span>
+      {% else %}
+        {% if product.price_varies %}<span class="sys-muted sys-small">From</span>{% endif %}
+        {% render 'snippets/sys-price', variant: card_variant %}
+      {% endif %}
     </span>
   </div>
 </a>

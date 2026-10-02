@@ -104,7 +104,7 @@ async function updateReturn(prisma, store, orderId, returnId, { action, merchant
     if (action === "receive" && restock) {
       for (const row of ret.items || []) {
         const item = order.items.find((i) => i.id === row.orderItemId);
-        if (item?.variantId) {
+        if (item?.variantId && !item.properties?.rental) {
           await adjustStock(tx, { storeId: store.id, variantId: item.variantId, delta: row.quantity, reason: "returned", orderId, actorName });
         }
       }

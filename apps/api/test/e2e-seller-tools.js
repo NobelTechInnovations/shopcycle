@@ -422,7 +422,12 @@ async function main() {
     check("connect with a token: profile and posts (bad links dropped, video uses its thumbnail)", r.status === 200 && r.data.connected && r.data.profile.username === "loomwear.test" && r.data.posts.length === 2 && r.data.posts[1].image === "https://cdn.example.com/2.jpg", r.data);
     check("the token never reaches the admin", !JSON.stringify(r.data).includes("IGAA_GOOD"));
     const igRow = await prisma.appConnection.findUnique({ where: { storeId_appKey: { storeId: store.id, appKey: "instagram-feed" } } });
-    check("the renewed 60-day token is stored privately", igRow.credentials.accessToken === "IGAA_GOOD_TOKEN_0000000000-RENEWED" && igRow.expiresAt && new Date(igRow.expiresAt) > new Date(Date.now() + 50 * 86400000), igRow.credentials);
+    const { decryptSecret } = require(path.join(ROOT, "apps/api/src/lib/crypto"));
+    check(
+      "the renewed 60-day token is stored encrypted",
+      String(igRow.credentials.accessToken).startsWith("enc:v1:") && decryptSecret(igRow.credentials.accessToken) === "IGAA_GOOD_TOKEN_0000000000-RENEWED" && igRow.expiresAt && new Date(igRow.expiresAt) > new Date(Date.now() + 50 * 86400000),
+      igRow.credentials
+    );
 
     const theme = await prisma.theme.findFirst({ where: { storeId: store.id, isActive: true } });
     r = await owner("GET", `/api/themes/${theme.id}`);

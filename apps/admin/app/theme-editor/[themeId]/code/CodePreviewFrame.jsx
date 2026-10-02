@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { useDraftRender, PreviewErrorBar } from "../draft-render";
 
 const LOADING_HTML = "<p style=\"font-family:system-ui,sans-serif;padding:24px;color:#888\">Loading preview…</p>";
 
@@ -10,36 +9,23 @@ const LOADING_HTML = "<p style=\"font-family:system-ui,sans-serif;padding:24px;c
  * JSON — `filesOverride` merges the currently-edited file's unsaved content
  * over the theme's persisted files for one render call, nothing is written. */
 export function CodePreviewFrame({ themeId, templateName, previewSlug, filePath, fileContent }) {
-  const [srcDoc, setSrcDoc] = useState(LOADING_HTML);
-  const timeoutRef = useRef(null);
-
-  useEffect(() => {
-    clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(async () => {
-      try {
-        const { html } = await apiFetch(`/api/themes/${themeId}/render-draft`, {
-          method: "POST",
-          body: {
-            template: templateName,
-            slug: previewSlug || undefined,
-            filesOverride: { [filePath]: fileContent },
-          },
-        });
-        setSrcDoc(html);
-      } catch (err) {
-        setSrcDoc(
-          `<p style="font-family:system-ui,sans-serif;padding:24px;color:#b91c1c">Preview error: ${err.message}</p>`
-        );
-      }
-    }, 500);
-    return () => clearTimeout(timeoutRef.current);
-  }, [themeId, templateName, previewSlug, filePath, fileContent]);
+  const { html, error, retry } = useDraftRender(
+    themeId,
+    () => ({
+      template: templateName,
+      slug: previewSlug || undefined,
+      filesOverride: { [filePath]: fileContent },
+    }),
+    [templateName, previewSlug, filePath, fileContent],
+    { delay: 500 }
+  );
 
   return (
-    <div className="h-full bg-app-bg overflow-auto py-4 flex justify-center">
+    <div className="relative h-full bg-app-bg overflow-auto py-4 flex justify-center">
+      <PreviewErrorBar error={error} onRetry={retry} hasPreview={Boolean(html)} />
       <iframe
         title="Code preview"
-        srcDoc={srcDoc}
+        srcDoc={html || LOADING_HTML}
         style={{ width: "100%", maxWidth: 900, height: "100%", border: "none", background: "#fff" }}
       />
     </div>

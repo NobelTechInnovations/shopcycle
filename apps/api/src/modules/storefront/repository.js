@@ -31,6 +31,8 @@ const activeProductInclude = {
   images: { orderBy: { position: "asc" } },
   brand: { select: { title: true, slug: true } },
   category: { select: { title: true, slug: true } },
+  // Rentals app: the product's daily rate, deposit and rules.
+  rental: true,
 };
 
 function getAllActiveProducts(prisma, storeId) {

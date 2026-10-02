@@ -15,12 +15,17 @@ export const APP_PANELS = {
   "meta-ads": "/admin/apps/meta-ads",
   whatsapp: "/admin/apps/whatsapp",
   "product-reviews": "/admin/apps/reviews",
+  rentals: "/admin/apps/rentals",
+  "google-shopping": "/admin/apps/google-shopping",
+  "facebook-shop": "/admin/apps/facebook-shop",
 };
 
 export const detailsHref = (app) => `/admin/apps/details/${app.key}`;
 export const appHref = (app) => APP_PANELS[app.key] || detailsHref(app);
 
 export const APP_CATEGORIES = {
+  sales_channel: "Sales channels",
+  selling: "Selling",
   automation: "Automation",
   checkout: "Checkout",
   customers: "Customers",

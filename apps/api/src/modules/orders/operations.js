@@ -177,11 +177,13 @@ async function cancelOrder(prisma, store, orderId, { reason, restock = true, ref
     if (restock) {
       for (const item of order.items) {
         const qty = quantities[item.id].toFulfill;
-        if (item.variantId && qty > 0) {
+        if (item.variantId && qty > 0 && !item.properties?.rental) {
           await adjustStock(tx, { storeId: store.id, variantId: item.variantId, delta: qty, reason: "order_cancelled", orderId, actorName });
         }
       }
     }
+    // Rentals: the order's booked dates are free again.
+    await tx.rentalBooking.updateMany({ where: { orderId, status: { in: ["requested", "confirmed"] } }, data: { status: "cancelled" } });
     await tx.order.update({
       where: { id: orderId },
       data: { fulfillmentStatus: "cancelled", cancelledAt: new Date(), cancelReason: reason || null },

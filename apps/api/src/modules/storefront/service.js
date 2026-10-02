@@ -32,6 +32,7 @@ const pagePolicies = require("../pages/policies");
 const { PLACED } = require("../orders/placed");
 const { INDIAN_STATES } = require("../../lib/indian-states");
 const blogService = require("../blog/service");
+const rentalsService = require("../rentals/service");
 const platform = require("./platform");
 const { trackingTags } = require("./tracking");
 const { buildSeo, seoTags } = require("./seo");
@@ -92,6 +93,8 @@ async function masterFiles(handle) {
 const PRISTINE_UPGRADES = {
   // Sub-menus (dropdowns) — 1 Oct.
   "snippets/menu-links.liquid": ["29def272dcaf31df"],
+  // Daily rent on cards (Rentals app) — 2 Oct.
+  "snippets/product-card.liquid": ["3449020d8c0c6c67", "c1b47d0e8933b270"],
 };
 const contentHash = (text) => crypto.createHash("sha256").update(String(text).replace(/\s+/g, " ").trim()).digest("hex").slice(0, 16);
 
@@ -374,6 +377,27 @@ async function buildGlobalContext(prisma, store, { slug, cartId, discountError, 
     products: Object.values(all_products),
   };
 
+  // Rentals app: rented products show their daily rent on cards and are
+  // never "sold out" — a piece comes back; the calendar shows what's free.
+  // With the app removed, a product still set up for renting isn't for
+  // sale either (its selling price is usually 0) — it shows as sold out.
+  const rentalOn = Boolean(apps[rentalsService.APP_KEY]);
+  const rentalById = {};
+  for (const p of products) {
+    const info = p.rental && rentalsService.cardInfo(p.rental);
+    if (info) rentalById[p.id] = info;
+  }
+  if (Object.keys(rentalById).length) {
+    const tagRental = (p) => {
+      if (!rentalById[p.id]) return;
+      if (rentalOn) p.rental = rentalById[p.id];
+      p.available = rentalOn;
+      p.variants.forEach((v) => (v.available = rentalOn));
+    };
+    Object.values(all_products).forEach(tagRental);
+    Object.values(collectionsMap).forEach((c) => (c.products || []).forEach(tagRental));
+  }
+
   // Product Reviews app: stars on every product (cards and pages).
   const reviewsApp = apps[reviewsService.APP_KEY] ? { ...reviewsService.DEFAULTS, ...apps[reviewsService.APP_KEY] } : null;
   if (reviewsApp) {
@@ -649,6 +673,14 @@ function primaryCollection(ctx, product) {
   return Object.values(ctx.collections).find((c) => c.slug !== "all" && c.products.some((p) => p.id === product.id)) || null;
 }
 
+/** Domain verification tags the sales channels ask for (Google Merchant
+ * Center, Meta) — set on the channel apps' pages. Codes are checked on save. */
+function verificationTags(store) {
+  const v = (store.settings && typeof store.settings === "object" && store.settings.verification) || {};
+  const ok = (code) => typeof code === "string" && /^[A-Za-z0-9_\-:.]{4,120}$/.test(code);
+  return `${ok(v.google) ? `<meta name="google-site-verification" content="${v.google}">` : ""}${ok(v.facebook) ? `<meta name="facebook-domain-verification" content="${v.facebook}">` : ""}`;
+}
+
 async function renderPage(
   prisma,
   {
@@ -691,6 +723,10 @@ async function renderPage(
     returnTo,
   }
 ) {
+  // "product.rental": the theme editor previewing one of a page's extra
+  // templates. Live pages ask for "product" and the item names its own.
+  const parts = platform.templateParts(templateName);
+  templateName = parts.base;
   const store = await loadStoreOrThrow(prisma, handle);
   const theme = await resolveTheme(prisma, store, themeId);
   // Storefront pages load their CSS, JS and images from the store's own
@@ -708,15 +744,12 @@ async function renderPage(
   const master = await masterFiles(theme.handle);
   // App sections (Instagram feed, Google reviews) can sit on any page.
   let filesByPath = { ...master, ...upgradePristine(filesArrayToMap(theme.files), master), ...(await platform.appSectionFiles()), ...(filesOverride || {}) };
+  // The store's own files, before the platform's replace them: its
+  // arrangements of arrangeable pages are read from here (see below).
+  const storeFiles = filesByPath;
   if (system) {
-    // The store's own arrangement of this page (theme editor), if it has one
-    // and it's still valid — read before the platform's files replace it.
-    const arranged = platform.isArrangeable(templateName)
-      ? platform.sanitizeArrangement(templateName, templateOverride ?? filesByPath[`templates/${templateName}.json`])
-      : null;
     const { renderFiles } = await platform.load();
     filesByPath = { ...filesByPath, ...renderFiles };
-    if (arranged) filesByPath[`templates/${templateName}.json`] = arranged;
     if (platform.OWN_LAYOUT[templateName]) filesByPath["layout/theme.liquid"] = renderFiles[platform.OWN_LAYOUT[templateName]];
   }
 
@@ -756,8 +789,13 @@ async function renderPage(
     const selected = found.variants.find((v) => v.id === variant) || found.variants.find((v) => v.available) || found.variants[0] || null;
     const fieldDefs = await metafieldService.list(prisma, store.id, "product");
     const reviewData = globalContext.reviews_app ? await reviewsService.forProduct(prisma, store.id, found.id) : null;
+    // Rentals app: the booking calendar's rules and booked days.
+    const rental = found.rental
+      ? await rentalsService.productContext(prisma, store, found, await prisma.rentalProduct.findUnique({ where: { productId: found.id } }), globalContext.apps?.[rentalsService.APP_KEY], routes)
+      : null;
     globalContext.product = {
       ...found,
+      rental,
       // Product Reviews app: the summary, published reviews and the form.
       reviews: reviewData && {
         ...reviewData,
@@ -934,6 +972,24 @@ async function renderPage(
     globalContext.article = await blogService.articleBySlug(prisma, store, routes, slug);
   }
 
+  // The store's own arrangement of this page (theme editor), if it has one
+  // and it's still valid: the item's own template (product.rental), else
+  // the page's default one. A rental product without a template of its
+  // own uses the Rentals app's.
+  if (system && platform.isArrangeable(templateName)) {
+    const item = templateName === "product" ? globalContext.product : templateName === "collection" ? globalContext.collection : globalContext.page;
+    const suffix = parts.suffix || item?.template_suffix || item?.templateSuffix || (item?.rental ? "rental" : null);
+    const { renderFiles } = await platform.load();
+    const appMade = new Set(platform.appTemplates(globalContext.apps).map((t) => `templates/${t.kind}.${t.suffix}.json`));
+    const altPath = suffix ? `templates/${templateName}.${suffix}.json` : null;
+    const source =
+      templateOverride ??
+      (altPath && (storeFiles[altPath] ?? (appMade.has(altPath) ? renderFiles[altPath] : undefined))) ??
+      storeFiles[`templates/${templateName}.json`];
+    const arranged = platform.sanitizeArrangement(templateName, source);
+    if (arranged) filesByPath[`templates/${templateName}.json`] = arranged;
+  }
+
   const seo = buildSeo(store, templateName, globalContext);
   globalContext.page_title = seo.title;
   // Rendering for the theme editor: sections may show setup hints that
@@ -980,7 +1036,7 @@ async function renderPage(
       }
     : null;
   const login = loginPopupConfig(globalContext, customer, store, routes, templateName);
-  const head = `${await platform.headTags(themeSettings, { system, drawer, login, assetBase })}${seoTags(seo)}`;
+  const head = `${await platform.headTags(themeSettings, { system, drawer, login, assetBase })}${seoTags(seo)}${verificationTags(store)}`;
   html = html.includes("</head>") ? html.replace("</head>", `${head}</head>`) : head + html;
 
   // Facebook Pixel / Google Analytics and their shopping events — on every
@@ -1057,6 +1113,8 @@ async function quickProduct(prisma, handle, slug) {
       compare_at_price: p.compare_at_price,
       price_varies: p.price_varies,
       available: p.available,
+      // Rentals app: dates are picked on the product page, not in quick add.
+      rental: Boolean(product.rental?.enabled),
       selected_variant_id: selected?.id || null,
       options: variantOptions(p, selected),
       variants: p.variants.map((v) => ({ id: v.id, title: v.title, price: v.price, comparePrice: v.comparePrice, available: v.available, inventoryQuantity: v.inventoryQuantity })),

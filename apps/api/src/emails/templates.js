@@ -167,7 +167,9 @@ function itemRows(items, currency) {
         }</td>`
       : ""
   }
-  <td style="padding:10px 0;border-bottom:1px solid ${LINE};font:400 14px/1.45 ${FONT};color:${INK};text-align:left">${esc(item.title)}<span style="color:${MUTED}"> × ${Number(item.quantity)}</span></td>
+  <td style="padding:10px 0;border-bottom:1px solid ${LINE};font:400 14px/1.45 ${FONT};color:${INK};text-align:left">${esc(item.title)}<span style="color:${MUTED}"> × ${Number(item.quantity)}</span>${
+    item.detail || item.properties?.detail ? `<br><span style="font:400 12.5px/1.5 ${FONT};color:${MUTED}">${esc(item.detail || item.properties.detail)}</span>` : ""
+  }</td>
   <td align="right" style="padding:10px 0;border-bottom:1px solid ${LINE};font:500 14px ${FONT};color:${INK};white-space:nowrap">${money(item.total ?? item.price * item.quantity, currency)}</td>
 </tr>`
     )
@@ -294,6 +296,71 @@ function newOrderAlert({ store, order, adminUrl }) {
         button(adminUrl, "View order", d),
       ].join(""),
       footer: "You get these because new-order alerts are on in Settings ▸ Notifications.",
+    }),
+  };
+}
+
+// ── Rentals app ───────────────────────────────────────────────────
+
+const HANDOVER_TEXT = { delivery: "Delivered to the customer", store_pickup: "Customer picks it up from the store" };
+const RETURN_TEXT = { collect: "Collected from the customer", drop_off: "Customer drops it back at the store" };
+
+function rentalDetails(b, currency = "INR") {
+  const rows = [
+    summaryRow("Item", `${esc(b.title)}${b.quantity > 1 ? ` × ${b.quantity}` : ""}`),
+    summaryRow("Dates", esc(b.range)),
+    summaryRow("Handover", HANDOVER_TEXT[b.handover] || esc(b.handover)),
+    summaryRow("Return", RETURN_TEXT[b.returnMethod] || esc(b.returnMethod)),
+    summaryRow("Rent", money(b.rentalTotal, currency)),
+    Number(b.deposit) > 0 ? summaryRow("Refundable deposit", money(b.deposit, currency)) : "",
+  ].join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;border-top:1px solid ${LINE};padding-top:8px">${rows}</table>`;
+}
+
+/** To the seller: a shopper asked to rent something (request mode). */
+function rentalRequestAlert({ store, booking, adminUrl }) {
+  const d = PLATFORM_DESIGN;
+  return {
+    subject: `Rental request · ${booking.title} · ${booking.range}`,
+    html: layout({
+      design: d,
+      icon: "bell",
+      brand: store.name,
+      preheader: `${booking.customerName} wants to rent ${booking.title} (${booking.range}).`,
+      body: [
+        heading("New rental request"),
+        p(`<strong>${esc(booking.customerName)}</strong> (${esc(booking.phone || "")}${booking.email ? ` · ${esc(booking.email)}` : ""}) wants to rent:`),
+        rentalDetails(booking, store.currency),
+        booking.address ? p(`<span style="color:${MUTED}">Address:</span> ${esc(booking.address)}`) : "",
+        booking.note ? p(`<span style="color:${MUTED}">Note:</span> ${esc(booking.note)}`) : "",
+        p("Call them to confirm, then mark it confirmed — the dates are held for them from then on."),
+        button(adminUrl, "Open the request", d),
+      ].join(""),
+      footer: "Sent by the Rentals app in your Oyklane store.",
+    }),
+  };
+}
+
+/** To the shopper: their request reached the store / the store confirmed it. */
+function rentalRequestUpdate({ store, booking, confirmed = false }) {
+  const d = designFor(store);
+  return {
+    subject: confirmed ? `Your rental is confirmed · ${booking.title}` : `We got your rental request · ${booking.title}`,
+    html: layout({
+      design: d,
+      icon: confirmed ? "check" : "clock",
+      brand: store.name,
+      preheader: confirmed ? `${booking.range} is booked for you.` : `${store.name} will call you to confirm ${booking.range}.`,
+      body: [
+        heading(confirmed ? "Your rental is confirmed" : "Request received"),
+        p(
+          confirmed
+            ? `Hi ${esc(booking.customerName || "there")}, ${esc(store.name)} has booked these dates for you.`
+            : `Hi ${esc(booking.customerName || "there")}, thanks — ${esc(store.name)} will call you shortly to confirm your booking.`
+        ),
+        rentalDetails(booking, store.currency),
+      ].join(""),
+      footer: storeFooter(store),
     }),
   };
 }
@@ -663,6 +730,8 @@ function supportTicketEmail({ title, intro, message, author, cta, ctaUrl, footer
 }
 
 module.exports = {
+  rentalRequestAlert,
+  rentalRequestUpdate,
   designFor,
   makeDesign,
   STYLES,

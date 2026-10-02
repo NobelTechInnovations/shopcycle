@@ -120,6 +120,32 @@ function InstagramPanel() {
     }
   }
 
+  /** Continue with Facebook: back through the admin's Facebook callback page. */
+  async function connectFacebook() {
+    setBusy("facebook");
+    try {
+      const { url } = await apiFetch("/api/social/instagram/facebook-url", { method: "POST" });
+      sessionStorage.setItem("meta-connect-endpoint", "/api/social/instagram/facebook");
+      sessionStorage.setItem("meta-connect-return-to", "/admin/apps/instagram");
+      window.location.href = url;
+    } catch (err) {
+      message.error(err.message);
+      setBusy(null);
+    }
+  }
+
+  async function choose(igUserId) {
+    setBusy(`choose:${igUserId}`);
+    try {
+      setData(await apiFetch("/api/social/instagram/choose", { method: "POST", body: { igUserId } }));
+      message.success("Instagram connected");
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function refresh() {
     setBusy("refresh");
     try {
@@ -142,9 +168,31 @@ function InstagramPanel() {
   if (!data) return <Skeleton active paragraph={{ rows: 8 }} />;
 
   const p = data.profile;
+  const choosing = data.choose?.length ? (
+    <Card className="mb-6" title="Which Instagram account?">
+      <p className="m-0 mb-3 text-[13px] text-ink-muted">Your Facebook Pages have more than one Instagram account linked. Pick the one to show on your store.</p>
+      <div className="flex flex-col gap-2">
+        {data.choose.map((a) => (
+          <div key={a.igUserId} className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-app-border px-3 py-2.5">
+            <div className="flex items-center gap-3 min-w-0">
+              {a.picture ? <img src={a.picture} alt="" width={36} height={36} className="rounded-full" referrerPolicy="no-referrer" /> : <span className="w-9 h-9 rounded-full bg-app-bg" />}
+              <div className="min-w-0">
+                <p className="m-0 text-[14px] font-medium text-ink">@{a.username}</p>
+                <p className="m-0 text-[12.5px] text-ink-muted">Facebook Page: {a.pageName}</p>
+              </div>
+            </div>
+            <Button type="primary" loading={busy === `choose:${a.igUserId}`} onClick={() => choose(a.igUserId)}>
+              Use this account
+            </Button>
+          </div>
+        ))}
+      </div>
+    </Card>
+  ) : null;
   return (
     <div>
       <PageHeader title="Instagram Feed" backHref="/admin/apps" subtitle="Your latest Instagram posts on your store, kept up to date by themselves." />
+      {choosing}
 
       {!data.connected ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -161,20 +209,34 @@ function InstagramPanel() {
               </div>
             </div>
             <div className="mt-5 flex flex-col gap-4">
-              {data.oauth && (
-                <Button type="primary" size="large" loading={busy === "connect"} onClick={connect} className="self-start">
-                  Connect Instagram
-                </Button>
+              {(data.facebook || data.oauth) && (
+                <div className="flex flex-wrap gap-2">
+                  {data.facebook && (
+                    <Button type="primary" size="large" loading={busy === "facebook"} onClick={connectFacebook} icon={<BrandGlyph app={{ key: "meta-ads" }} size={16} white />}>
+                      Continue with Facebook
+                    </Button>
+                  )}
+                  {data.oauth && (
+                    <Button type={data.facebook ? "default" : "primary"} size="large" loading={busy === "connect"} onClick={connect}>
+                      {data.facebook ? "Sign in with Instagram instead" : "Connect Instagram"}
+                    </Button>
+                  )}
+                </div>
+              )}
+              {data.facebook && (
+                <p className="m-0 -mt-2 text-[12.5px] text-ink-muted">
+                  With Facebook, we use the Instagram account linked to your Facebook Page — the connection stays on until you remove it.
+                </p>
               )}
               <Collapse
-                ghost={data.oauth}
-                defaultActiveKey={data.oauth ? [] : ["token"]}
+                ghost={data.oauth || data.facebook}
+                defaultActiveKey={data.oauth || data.facebook ? [] : ["token"]}
                 items={[
                   {
                     key: "token",
                     label: (
                       <span className="inline-flex items-center gap-1.5 text-[13px]">
-                        <KeyRound size={13} aria-hidden="true" /> {data.oauth ? "Or connect with an access token" : "Connect with an access token"}
+                        <KeyRound size={13} aria-hidden="true" /> {data.oauth || data.facebook ? "Or connect with an access token" : "Connect with an access token"}
                       </span>
                     ),
                     children: <TokenForm onConnected={setData} />,
@@ -219,7 +281,11 @@ function InstagramPanel() {
               </div>
               <p className="m-0 mt-3 text-[12px] text-ink-muted">
                 Updated {when(data.fetchedAt)} · refreshes every few hours by itself
-                {data.expiresAt ? ` · connection renews automatically (current one until ${new Date(data.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })})` : ""}
+                {data.via === "facebook"
+                  ? ` · connected through your Facebook Page${data.pageName ? ` “${data.pageName}”` : ""} — stays on until you remove it`
+                  : data.expiresAt
+                    ? ` · connection renews automatically (current one until ${new Date(data.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })})`
+                    : ""}
               </p>
             </Card>
             <Card size="small" title={`Latest posts (${data.posts.length})`}>
