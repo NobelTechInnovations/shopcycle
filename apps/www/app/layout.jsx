@@ -11,6 +11,9 @@ export const metadata = {
   },
   description:
     "Oyklane is the commerce platform for Indian brands: a store you design without code, One-Click Checkout, UPI and cash on delivery, GST invoices, automated customer emails and an app store — live in an afternoon.",
+  // Google Search Console's "HTML tag" ownership check (Google Cloud's
+  // OAuth branding needs oyklane.com verified). Set the code on Vercel.
+  ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && { verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION } }),
   openGraph: {
     title: "Oyklane — Build the store. Grow the brand.",
     description: "Storefront, One-Click Checkout, payments, GST and growth apps for Indian brands.",

@@ -58,6 +58,10 @@ export function SiteFooter() {
             </ul>
           </div>
         </div>
+        <p className="muted" style={{ fontSize: 13, margin: "0 0 18px", maxWidth: "90ch" }}>
+          Sellers can sign in with Google to show their Google reviews on their store, list their products in Google Merchant Center and set up Google
+          Analytics — Oyklane uses that data only for those features. See how in our <Link href="/privacy#google">Privacy Policy</Link>.
+        </p>
         <div className="footer__bottom">
           <span>© {new Date().getFullYear()} Oyklane. Made in India.</span>
           <span>
