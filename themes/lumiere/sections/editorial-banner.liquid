@@ -1,0 +1,107 @@
+{% comment %}
+  Editorial split: a large photo beside a story — heading, text, a button
+  and up to three figures ("12k+ happy customers").
+{% endcomment %}
+{% case section.settings.image_ratio %}
+  {% when 'natural' %}{% assign media_ratio = 'auto' %}
+  {% when 'portrait' %}{% assign media_ratio = '4 / 5' %}
+  {% when 'tall' %}{% assign media_ratio = '2 / 3' %}
+  {% when 'square' %}{% assign media_ratio = '1 / 1' %}
+  {% when 'landscape' %}{% assign media_ratio = '4 / 3' %}
+  {% when 'wide' %}{% assign media_ratio = '16 / 9' %}
+  {% else %}{% assign media_ratio = '' %}
+{% endcase %}
+<style>
+  .editorial--custom { grid-template-columns: minmax(0, var(--media-w)) minmax(0, 1fr); align-items: var(--text-pos); }
+  .editorial--custom.editorial--reverse { grid-template-columns: minmax(0, 1fr) minmax(0, var(--media-w)); }
+  .editorial--custom .editorial__media img { object-fit: var(--media-fit); object-position: var(--media-focus); }
+  .editorial--custom[data-ratio] .editorial__media { aspect-ratio: var(--media-ratio); }
+  .editorial--custom[data-ratio="auto"] .editorial__media img { height: auto; }
+  @media (max-width: 989px) {
+    .editorial--custom, .editorial--custom.editorial--reverse { grid-template-columns: 1fr; }
+  }
+</style>
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    <div class="editorial editorial--custom{% if section.settings.reverse %} editorial--reverse{% endif %}"{% if media_ratio != '' %} data-ratio="{{ media_ratio }}"{% endif %} style="--media-w: {{ section.settings.media_width | default: 50 }}%; --media-fit: {{ section.settings.image_fit | default: 'cover' }}; --media-focus: {{ section.settings.image_focus | default: 'center' }}; --text-pos: {{ section.settings.text_position | default: 'center' }}{% if media_ratio != '' %}; --media-ratio: {{ media_ratio }}{% endif %}">
+      <div class="editorial__media">
+        {% if section.settings.image != blank %}
+          <img src="{{ section.settings.image | image_url }}" alt="{{ section.settings.image_alt | escape }}" loading="lazy" width="1200" height="1440">
+        {% else %}
+          {{ 'lifestyle-2' | placeholder_svg }}
+        {% endif %}
+      </div>
+      <div class="editorial__body">
+        {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+        <h2 class="h1">{{ section.settings.heading }}</h2>
+        {% if section.settings.text != blank %}<div class="editorial__text">{{ section.settings.text | newline_to_br }}</div>{% endif %}
+        {% if section.blocks.size > 0 %}
+          <dl class="stats">
+            {% for block in section.blocks limit: 3 %}
+              <div class="stats__item"><dt>{{ block.settings.label }}</dt><dd>{{ block.settings.value }}</dd></div>
+            {% endfor %}
+          </dl>
+        {% endif %}
+        {% if section.settings.button_label != blank %}
+          <a class="btn" href="{{ section.settings.button_link | default: routes.all_products_url }}">{{ section.settings.button_label }}</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Image with story",
+  "settings": [
+    { "type": "image_picker", "id": "image", "label": "Image" },
+    { "type": "text", "id": "image_alt", "label": "Image description", "default": "" },
+    { "type": "checkbox", "id": "reverse", "label": "Image on the right", "default": false },
+    { "type": "header", "content": "Image" },
+    { "type": "select", "id": "image_ratio", "label": "Image shape", "default": "theme", "options": [
+      { "value": "theme", "label": "Theme default" },
+      { "value": "natural", "label": "As uploaded (no cropping)" },
+      { "value": "portrait", "label": "Portrait (4:5)" },
+      { "value": "tall", "label": "Tall (2:3)" },
+      { "value": "square", "label": "Square" },
+      { "value": "landscape", "label": "Landscape (4:3)" },
+      { "value": "wide", "label": "Wide (16:9)" }
+    ] },
+    { "type": "select", "id": "image_fit", "label": "Image fit", "default": "cover", "options": [
+      { "value": "cover", "label": "Fill the shape (trims the edges)" },
+      { "value": "contain", "label": "Show the whole image" }
+    ] },
+    { "type": "select", "id": "image_focus", "label": "Keep in view when trimming", "default": "center", "options": [
+      { "value": "center", "label": "Centre" },
+      { "value": "top", "label": "Top" },
+      { "value": "bottom", "label": "Bottom" },
+      { "value": "left", "label": "Left" },
+      { "value": "right", "label": "Right" }
+    ] },
+    { "type": "range", "id": "media_width", "label": "Image width (%)", "min": 30, "max": 70, "step": 5, "default": 50 },
+    { "type": "select", "id": "text_position", "label": "Text position", "default": "center", "options": [
+      { "value": "start", "label": "Top" },
+      { "value": "center", "label": "Middle" },
+      { "value": "end", "label": "Bottom" }
+    ] },
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Our story" },
+    { "type": "textarea", "id": "heading", "label": "Heading", "default": "Fewer, better things" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "We started with a simple idea: make everyday essentials that are honest about what goes into them, and built to be used for years. Every piece is made in small batches with partners we know by name." },
+    { "type": "text", "id": "button_label", "label": "Button", "default": "Read more" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "stat", "name": "Figure", "settings": [
+      { "type": "text", "id": "value", "label": "Figure", "default": "12k+" },
+      { "type": "text", "id": "label", "label": "Label", "default": "Happy customers" }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "stat", "settings": { "value": "12k+", "label": "Happy customers" } },
+    { "type": "stat", "settings": { "value": "4.8/5", "label": "Average rating" } },
+    { "type": "stat", "settings": { "value": "100%", "label": "Made in India" } }
+  ],
+  "max_blocks": 3
+}
+{% endschema %}

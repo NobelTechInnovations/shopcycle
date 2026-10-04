@@ -1,0 +1,6 @@
+{
+  "sections": {
+    "main": { "type": "sys-page", "settings": {} }
+  },
+  "order": ["main"]
+}

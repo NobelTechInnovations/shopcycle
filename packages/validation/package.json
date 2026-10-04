@@ -1,0 +1,10 @@
+{
+  "name": "@shopcycle/validation",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.js",
+  "dependencies": {
+    "@shopcycle/utils": "workspace:*",
+    "zod": "^3.23.8"
+  }
+}

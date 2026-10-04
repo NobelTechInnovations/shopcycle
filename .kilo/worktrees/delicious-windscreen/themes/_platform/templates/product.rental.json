@@ -1,0 +1,22 @@
+{
+  "sections": {
+    "main": {
+      "type": "sys-product",
+      "settings": {},
+      "blocks": {
+        "brand": { "type": "brand", "settings": {} },
+        "title": { "type": "title", "settings": { "size": "medium" } },
+        "rating": { "type": "rating", "settings": {} },
+        "rent": { "type": "rental_price", "settings": { "show_tiers": true, "show_deposit": true } },
+        "picker": { "type": "variant_picker", "settings": { "style": "buttons", "size_chart_label": "Size guide" } },
+        "booking": { "type": "rental_booking", "settings": { "heading": "Pick your dates", "button_label": "Book now", "request_label": "Request to book" } },
+        "description": { "type": "description", "settings": { "display": "open", "heading": "Description" } },
+        "details": { "type": "details", "settings": { "heading": "Details", "open": false, "show_basics": true } }
+      },
+      "block_order": ["brand", "title", "rating", "rent", "picker", "booking", "description", "details"]
+    },
+    "reviews": { "type": "sys-reviews", "settings": {} },
+    "related": { "type": "sys-related", "settings": {} }
+  },
+  "order": ["main", "reviews", "related"]
+}

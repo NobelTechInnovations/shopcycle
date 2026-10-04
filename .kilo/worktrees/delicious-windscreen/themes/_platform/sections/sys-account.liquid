@@ -1,0 +1,181 @@
+{% comment %}
+  Shopper account: a summary up top, then Orders / Address & details /
+  Password. Without JS the three parts simply stack; system.js turns them
+  into tabs and reopens the tab a form was sent from.
+{% endcomment %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container sys-acct">
+      {% if customer %}
+        <header class="sys-acct__head">
+          <span class="sys-acct__avatar" aria-hidden="true">{{ customer.initials }}</span>
+          <div class="sys-stack sys-acct__who">
+            <h1 class="sys-h1">Hi, {{ customer.first_name }}</h1>
+            <span class="sys-muted sys-small">{{ customer.email }}{% unless customer.email_verified %} · <span title="Sign in with an emailed code once to verify it">not verified yet</span>{% endunless %}</span>
+          </div>
+          <form method="post" action="{{ routes.account_logout_url }}">
+            <button type="submit" class="sys-btn sys-btn--secondary sys-btn--sm">Sign out</button>
+          </form>
+        </header>
+
+        {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
+        {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+
+        {% assign latest = customer.orders.first %}
+        <ul class="sys-acct__tiles">
+          <li class="sys-acct__tile">
+            <span class="sys-acct__tile-icon">{% render 'snippets/sys-icon', icon: 'bag' %}</span>
+            <span class="sys-stack" style="gap:2px">
+              <strong class="sys-acct__tile-value sys-num">{{ customer.orders_count }}</strong>
+              <span class="sys-muted sys-small">order{% if customer.orders_count != 1 %}s{% endif %}{% if customer.open_orders > 0 %} · {{ customer.open_orders }} on the way{% endif %}</span>
+            </span>
+          </li>
+          <li class="sys-acct__tile">
+            <span class="sys-acct__tile-icon">{% render 'snippets/sys-icon', icon: 'truck' %}</span>
+            {% if latest %}
+              <span class="sys-stack" style="gap:2px;min-width:0">
+                <strong class="sys-acct__tile-value">{{ latest.status.label }}</strong>
+                <a class="sys-link sys-small" href="{{ latest.statusUrl }}">Track order {{ latest.name }}</a>
+              </span>
+            {% else %}
+              <span class="sys-stack" style="gap:2px">
+                <strong class="sys-acct__tile-value">No orders yet</strong>
+                <a class="sys-link sys-small" href="{{ routes.order_lookup_url }}">Track a guest order</a>
+              </span>
+            {% endif %}
+          </li>
+          <li class="sys-acct__tile">
+            <span class="sys-acct__tile-icon">{% render 'snippets/sys-icon', icon: 'pin' %}</span>
+            <span class="sys-stack" style="gap:2px;min-width:0">
+              {% if customer.address1 != blank %}
+                <strong class="sys-acct__tile-value sys-acct__clip">{{ customer.city | default: customer.address1 }}{% if customer.zip != blank %} {{ customer.zip }}{% endif %}</strong>
+                <a class="sys-link sys-small" href="#details" data-sys-tab-link="details">Edit delivery address</a>
+              {% else %}
+                <strong class="sys-acct__tile-value">No address saved</strong>
+                <a class="sys-link sys-small" href="#details" data-sys-tab-link="details">Add one for faster checkout</a>
+              {% endif %}
+            </span>
+          </li>
+        </ul>
+
+        <div class="sys-tabs" role="tablist" aria-label="Account" data-sys-tabs hidden>
+          <button type="button" class="sys-tab" role="tab" id="tab-orders" aria-controls="orders" data-sys-tab="orders">Orders{% if customer.orders_count > 0 %} <span class="sys-tab__count">{{ customer.orders_count }}</span>{% endif %}</button>
+          <button type="button" class="sys-tab" role="tab" id="tab-details" aria-controls="details" data-sys-tab="details">Address &amp; details</button>
+          {% unless shop.phone_login %}<button type="button" class="sys-tab" role="tab" id="tab-security" aria-controls="security" data-sys-tab="security">{% if customer.has_password %}Password{% else %}Set a password{% endif %}</button>{% endunless %}
+        </div>
+
+        <section class="sys-acct__panel" id="orders" role="tabpanel" aria-labelledby="tab-orders" data-sys-panel="orders">
+          <h2 class="sys-acct__panel-title">Orders</h2>
+          {% unless customer.email_verified %}
+            <p class="sys-note sys-small">Showing orders placed while signed in. Ordered as a guest before? <a class="sys-link" href="{{ routes.order_lookup_url }}">Find that order</a>.</p>
+          {% endunless %}
+          {% if customer.orders.size > 0 %}
+            <ul class="sys-ocards">
+              {% for order in customer.orders %}
+                <li class="sys-ocard">
+                  <div class="sys-ocard__top">
+                    <div class="sys-stack" style="gap:2px">
+                      <strong>Order {{ order.name }}</strong>
+                      <span class="sys-muted sys-small">{{ order.date }} · {{ order.items.size }} item{% if order.items.size != 1 %}s{% endif %} · <span class="sys-num">{{ order.total | money }}</span></span>
+                    </div>
+                    {% case order.status.key %}
+                      {% when 'delivered' %}<span class="sys-badge sys-badge--success">{{ order.status.label }}</span>
+                      {% when 'shipped', 'partially_shipped' %}<span class="sys-badge sys-badge--info">{{ order.status.label }}</span>
+                      {% when 'cancelled' %}<span class="sys-badge sys-badge--danger">{{ order.status.label }}</span>
+                      {% else %}<span class="sys-badge sys-badge--warning">{{ order.status.label }}</span>
+                    {% endcase %}
+                  </div>
+                  <div class="sys-ocard__items">
+                    {% for item in order.items limit: 4 %}
+                      <span class="sys-ocard__thumb" title="{{ item.title | escape }}">
+                        {% if item.image %}<img src="{{ item.image }}" alt="{{ item.title | escape }}" loading="lazy" width="120" height="150">{% else %}{% render 'snippets/sys-icon', icon: 'photo' %}{% endif %}
+                        {% if item.quantity > 1 %}<span class="sys-ocard__qty">×{{ item.quantity }}</span>{% endif %}
+                      </span>
+                    {% endfor %}
+                    {% if order.items.size > 4 %}<span class="sys-ocard__more">+{{ order.items.size | minus: 4 }}</span>{% endif %}
+                    <span class="sys-ocard__names sys-small sys-muted">{% for item in order.items limit: 2 %}{{ item.title }}{% unless forloop.last %}, {% endunless %}{% endfor %}{% if order.items.size > 2 %} and more{% endif %}</span>
+                  </div>
+                  <div class="sys-ocard__actions">
+                    <a class="sys-btn sys-btn--sm" href="{{ order.statusUrl }}">{% if order.status.key == 'delivered' or order.status.key == 'cancelled' %}View order{% else %}Track order{% endif %}</a>
+                    {% if order.canReturn %}<a class="sys-btn sys-btn--secondary sys-btn--sm" href="{{ order.statusUrl }}/return">Return or exchange</a>{% endif %}
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="sys-empty" style="padding:28px 0">
+              <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'package' %}</span>
+              <p>You haven't placed any orders {% if customer.email_verified %}yet{% else %}while signed in yet{% endif %}.</p>
+              <a class="sys-btn" href="{{ routes.all_products_url }}">Start shopping</a>
+            </div>
+          {% endif %}
+        </section>
+
+        <section class="sys-acct__panel" id="details" role="tabpanel" aria-labelledby="tab-details" data-sys-panel="details">
+          <h2 class="sys-acct__panel-title">Address &amp; details</h2>
+          <p class="sys-muted sys-small" style="margin:-6px 0 18px">Checkout fills these in for you.</p>
+          <form method="post" action="{{ routes.account_update_url }}" class="sys-stack sys-acct__form" style="gap:14px" data-sys-once>
+            <div class="sys-fields sys-fields--2">
+              <label class="sys-field"><span class="sys-label">Name</span><input class="sys-input" name="name" required autocomplete="name" value="{{ customer.name }}"></label>
+              <label class="sys-field"><span class="sys-label">Mobile number</span><input class="sys-input" name="phone" type="tel" inputmode="tel" autocomplete="tel" value="{{ customer.phone }}" placeholder="10-digit mobile"></label>
+            </div>
+            <label class="sys-field"><span class="sys-label">Address</span><input class="sys-input" name="address1" autocomplete="address-line1" value="{{ customer.address1 }}" placeholder="House no., street"></label>
+            <label class="sys-field"><span class="sys-label">Apartment, landmark <span class="sys-muted">(optional)</span></span><input class="sys-input" name="address2" autocomplete="address-line2" value="{{ customer.address2 }}"></label>
+            <div class="sys-fields sys-fields--3">
+              <label class="sys-field"><span class="sys-label">PIN code</span><input class="sys-input" name="zip" inputmode="numeric" maxlength="6" autocomplete="postal-code" value="{{ customer.zip }}"></label>
+              <label class="sys-field"><span class="sys-label">City</span><input class="sys-input" name="city" autocomplete="address-level2" value="{{ customer.city }}"></label>
+              <label class="sys-field"><span class="sys-label">State</span><input class="sys-input" name="province" autocomplete="address-level1" value="{{ customer.province }}" list="sys-states"></label>
+            </div>
+            <datalist id="sys-states">{% for state in indian_states %}<option value="{{ state }}"></option>{% endfor %}</datalist>
+            <input type="hidden" name="country" value="{{ customer.country | default: 'IN' }}">
+            <label class="sys-check"><input type="checkbox" name="acceptsEmailMarketing" value="true" {% if customer.accepts_marketing %}checked{% endif %}> <span>Email me about new arrivals and offers</span></label>
+            <button type="submit" class="sys-btn" data-busy-label="Saving…">Save details</button>
+          </form>
+        </section>
+
+        {% unless shop.phone_login %}
+        <section class="sys-acct__panel" id="security" role="tabpanel" aria-labelledby="tab-security" data-sys-panel="security">
+          <h2 class="sys-acct__panel-title">{% if customer.has_password %}Change password{% else %}Set a password{% endif %}</h2>
+          <p class="sys-muted sys-small" style="margin:-6px 0 18px">
+            {% if customer.has_password %}Other devices are signed out when you change it.{% else %}Sign in with your email and a password next time, instead of a code.{% endif %}
+          </p>
+          <form method="post" action="{{ routes.account_password_url }}" class="sys-stack sys-acct__form" style="gap:14px" data-sys-once>
+            {% if customer.has_password and customer.can_reset_password == false %}
+              <label class="sys-field"><span class="sys-label">Current password</span><input class="sys-input" type="password" name="currentPassword" autocomplete="current-password" required maxlength="200"></label>
+            {% endif %}
+            <label class="sys-field">
+              <span class="sys-label">New password</span>
+              <span class="sys-password">
+                <input class="sys-input" type="password" name="password" autocomplete="new-password" required minlength="8" maxlength="200" data-sys-password>
+                <button type="button" class="sys-password__toggle" data-sys-reveal aria-label="Show password">Show</button>
+              </span>
+              <span class="sys-hint">At least 8 characters.</span>
+            </label>
+            <label class="sys-field"><span class="sys-label">Confirm new password</span><input class="sys-input" type="password" name="confirmPassword" autocomplete="new-password" required minlength="8" maxlength="200"></label>
+            <button type="submit" class="sys-btn sys-btn--secondary" data-busy-label="Saving…">Save password</button>
+          </form>
+        </section>
+        {% endunless %}
+
+        <aside class="sys-acct__help">
+          {% render 'snippets/sys-icon', icon: 'mail' %}
+          <p class="sys-small">Need help with an order?
+            {% if shop.support_email %}Write to <a class="sys-link" href="mailto:{{ shop.support_email }}">{{ shop.support_email }}</a>{% endif %}{% if shop.support_email and shop.support_phone %} or call {% elsif shop.support_phone %}Call {% endif %}{% if shop.support_phone %}<a class="sys-link" href="tel:{{ shop.support_phone | remove: ' ' }}">{{ shop.support_phone }}</a>{% endif %}{% unless shop.support_email or shop.support_phone %}Open the order and reply to its confirmation email{% endunless %}.
+          </p>
+        </aside>
+      {% else %}
+        <div class="sys-auth sys-empty">
+          <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'user' %}</span>
+          <h1 class="sys-h2">Your account</h1>
+          <p>Sign in to track orders, return items and check out faster.</p>
+          <a class="sys-btn" href="{{ routes.account_login_url }}">Sign in</a>
+          <a class="sys-link sys-small" href="{{ routes.order_lookup_url }}">Track an order without signing in</a>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{ "name": "Customer account", "settings": [] }
+{% endschema %}

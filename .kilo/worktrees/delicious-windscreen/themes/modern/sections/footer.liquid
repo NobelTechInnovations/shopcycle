@@ -1,0 +1,102 @@
+{% comment %}
+  Dark footer: brand column, link columns / text / newsletter as blocks,
+  social icons from Theme settings, payment methods, and the store's name
+  set large across the bottom.
+{% endcomment %}
+<footer class="footer">
+  <div class="container footer__grid">
+    <div class="footer__brand">
+      <a class="footer__logo" href="{{ routes.root_url }}">{{ shop.name }}</a>
+      {% if section.settings.about != blank %}<p class="footer__about">{{ section.settings.about }}</p>{% endif %}
+      {% if shop.support_email or shop.support_phone %}
+        <p class="footer__contact">
+          {% if shop.support_email %}<a href="mailto:{{ shop.support_email }}">{{ shop.support_email }}</a>{% endif %}
+          {% if shop.support_phone %}<a href="tel:{{ shop.support_phone | remove: ' ' }}">{{ shop.support_phone }}</a>{% endif %}
+        </p>
+      {% endif %}
+      {% render 'snippets/social-links' %}
+    </div>
+
+    {% for block in section.blocks %}
+      {% case block.type %}
+        {% when 'links' %}
+          {% assign col = linklists[block.settings.menu] %}
+          <div class="footer__col">
+            <h3 class="footer__heading">{{ block.settings.heading | default: col.title | default: 'Links' }}</h3>
+            <ul>
+              {% if col and col.links.size > 0 %}
+                {% for link in col.links %}<li><a href="{{ link.url }}">{{ link.title }}</a></li>{% endfor %}
+              {% elsif forloop.first %}
+                {% render 'snippets/menu-links' %}
+              {% else %}
+                <li><a href="{{ routes.order_lookup_url }}">Track your order</a></li>
+                <li><a href="{{ routes.account_url }}">Your account</a></li>
+                <li><a href="{{ routes.search_url }}">Search</a></li>
+                {% if blog.articles.size > 0 %}<li><a href="{{ routes.blog_url }}">Journal</a></li>{% endif %}
+              {% endif %}
+            </ul>
+          </div>
+        {% when 'text' %}
+          <div class="footer__col">
+            <h3 class="footer__heading">{{ block.settings.heading }}</h3>
+            <p class="footer__text">{{ block.settings.text | newline_to_br }}</p>
+          </div>
+        {% when 'newsletter' %}
+          <div class="footer__col footer__col--wide">
+            <h3 class="footer__heading">{{ block.settings.heading }}</h3>
+            <p class="footer__text">{{ block.settings.text }}</p>
+            <form class="line-form line-form--light" method="post" action="{{ routes.newsletter_url }}">
+              <input type="hidden" name="return_to" value="{{ routes.root_url }}">
+              <label class="visually-hidden" for="footer-email-{{ forloop.index }}">Email</label>
+              <input id="footer-email-{{ forloop.index }}" type="email" name="email" required placeholder="Your email" autocomplete="email">
+              <button type="submit" class="icon-btn icon-btn--accent" aria-label="Subscribe">{% render 'snippets/icon', icon: 'arrow-right' %}</button>
+            </form>
+          </div>
+      {% endcase %}
+    {% endfor %}
+  </div>
+
+  <div class="container footer__bottom">
+    <p>© {{ 'now' | date: '%Y' }} {{ shop.name }}. {{ section.settings.copyright }} {{ powered_by }}</p>
+    {% if section.settings.show_payments %}
+      <ul class="pay-badges" aria-label="Payment methods">
+        <li>UPI</li><li>Visa</li><li>Mastercard</li><li>RuPay</li>{% if shop.cod_enabled %}<li>Cash on delivery</li>{% endif %}
+      </ul>
+    {% endif %}
+  </div>
+  {% if section.settings.show_wordmark %}
+    <div class="footer__wordmark" aria-hidden="true"><span>{{ shop.name }}</span></div>
+  {% endif %}
+</footer>
+
+{% schema %}
+{
+  "name": "Footer",
+  "settings": [
+    { "type": "textarea", "id": "about", "label": "About your store", "default": "Modern essentials, made with care and shipped across India." },
+    { "type": "text", "id": "copyright", "label": "Copyright line", "default": "All rights reserved." },
+    { "type": "checkbox", "id": "show_payments", "label": "Show payment methods", "default": true },
+    { "type": "checkbox", "id": "show_wordmark", "label": "Show store name large at the bottom", "default": true }
+  ],
+  "blocks": [
+    { "type": "links", "name": "Link list", "settings": [
+      { "type": "text", "id": "heading", "label": "Heading" },
+      { "type": "menu", "id": "menu", "label": "Menu", "default": "footer-menu" }
+    ] },
+    { "type": "text", "name": "Text", "settings": [
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Visit us" },
+      { "type": "textarea", "id": "text", "label": "Text", "default": "Mon–Sat, 10am–7pm" }
+    ] },
+    { "type": "newsletter", "name": "Newsletter", "settings": [
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Stay in the loop" },
+      { "type": "textarea", "id": "text", "label": "Text", "default": "Early access to drops and members-only offers." }
+    ] }
+  ],
+  "max_blocks": 4,
+  "default_blocks": [
+    { "type": "links", "settings": { "heading": "Shop", "menu": "main-menu" } },
+    { "type": "links", "settings": { "heading": "Help", "menu": "footer-menu" } },
+    { "type": "newsletter", "settings": { "heading": "Stay in the loop", "text": "Early access to drops and members-only offers." } }
+  ]
+}
+{% endschema %}

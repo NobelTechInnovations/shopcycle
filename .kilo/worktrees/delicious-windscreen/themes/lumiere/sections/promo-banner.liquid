@@ -1,0 +1,53 @@
+{% comment %}
+  Promo tiles: one to three image tiles side by side with text over the
+  photo — a sale, a new drop, a gift guide.
+{% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    <div class="promos promos--n{{ section.blocks.size | at_most: 3 }}">
+      {% for block in section.blocks limit: 3 %}
+        <a class="promo promo--{{ block.settings.text_color }}" href="{{ block.settings.link | default: routes.all_products_url }}">
+          <span class="promo__media">
+            {% if block.settings.image != blank %}
+              <img src="{{ block.settings.image | image_url }}" alt="" loading="lazy" width="1200" height="1200">
+            {% else %}
+              {% assign art = 'lifestyle-' | append: forloop.index %}{{ art | placeholder_svg }}
+            {% endif %}
+          </span>
+          <span class="promo__body">
+            {% if block.settings.eyebrow != blank %}<span class="eyebrow">{{ block.settings.eyebrow }}</span>{% endif %}
+            <span class="h2 promo__title">{{ block.settings.heading }}</span>
+            {% if block.settings.button_label != blank %}<span class="arrow-link">{{ block.settings.button_label }}{% render 'snippets/icon', icon: 'arrow-up-right', class: 'icon icon--sm' %}</span>{% endif %}
+          </span>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Promo tiles",
+  "settings": [
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "tile", "name": "Tile", "settings": [
+      { "type": "image_picker", "id": "image", "label": "Image" },
+      { "type": "text", "id": "eyebrow", "label": "Small text", "default": "Limited time" },
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Up to 30% off" },
+      { "type": "text", "id": "button_label", "label": "Link text", "default": "Shop the sale" },
+      { "type": "url", "id": "link", "label": "Link" },
+      { "type": "select", "id": "text_color", "label": "Text colour", "default": "light", "options": [
+        { "value": "light", "label": "Light" },
+        { "value": "dark", "label": "Dark" }
+      ] }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "tile", "settings": { "eyebrow": "Limited time", "heading": "Up to 30% off bestsellers", "button_label": "Shop the sale", "text_color": "dark" } },
+    { "type": "tile", "settings": { "eyebrow": "Just landed", "heading": "The new collection", "button_label": "Discover", "text_color": "dark" } }
+  ],
+  "max_blocks": 3
+}
+{% endschema %}

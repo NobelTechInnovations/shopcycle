@@ -1,0 +1,51 @@
+{% comment %} A single blog post. {% endcomment %}
+<div class="sys">
+  <article class="sys-section">
+    <div class="sys-container sys-container--narrow">
+      <ol class="sys-crumbs" aria-label="Breadcrumb">
+        <li><a href="{{ routes.root_url }}">Home</a></li>
+        <li><a href="{{ routes.blog_url }}">{{ blog.title }}</a></li>
+        <li aria-current="page">{{ article.title }}</li>
+      </ol>
+      <header class="sys-stack" style="gap:12px">
+        <span class="sys-muted sys-small">{{ article.date }}{% if article.author %} · {{ article.author }}{% endif %} · {{ article.reading_minutes }} min read</span>
+        <h1 class="sys-h1" style="font-size:clamp(28px,4vw,44px)">{{ article.title }}</h1>
+        {% if article.excerpt %}<p class="sys-muted" style="font-size:18px">{{ article.excerpt }}</p>{% endif %}
+      </header>
+      {% if article.image %}
+        <div class="sys-article__cover"><img src="{{ article.image }}" alt="{{ article.image_alt | default: article.title }}" width="1600" height="900"></div>
+      {% else %}
+        <div style="height:28px"></div>
+      {% endif %}
+      <div class="sys-prose">
+        {% if article.content contains '<' %}{{ article.content }}{% else %}{{ article.content | newline_to_br }}{% endif %}
+      </div>
+      {% if article.tags.size > 0 %}
+        <ul class="sys-tags" style="margin-top:32px" aria-label="Tags">
+          {% for tag in article.tags %}<li><a class="sys-badge" href="{{ routes.blog_url }}?tag={{ tag | url_encode }}" style="text-decoration:none">#{{ tag }}</a></li>{% endfor %}
+        </ul>
+      {% endif %}
+      <div style="margin-top:40px;padding-top:24px;border-top:1px solid var(--oy-line)">
+        <a class="sys-link" href="{{ routes.blog_url }}">← All posts</a>
+      </div>
+    </div>
+    {% if article.related.size > 0 %}
+      <div class="sys-container" style="margin-top:64px">
+        <h2 class="sys-h2" style="margin-bottom:24px">Keep reading</h2>
+        <div class="sys-posts">
+          {% for post in article.related %}
+            <a class="sys-post" href="{{ post.url }}">
+              <div class="sys-post__media">{% if post.image %}<img src="{{ post.image }}" alt="" loading="lazy" width="1200" height="750">{% else %}<span class="sys-placeholder">{% render 'snippets/sys-icon', icon: 'photo' %}</span>{% endif %}</div>
+              <span class="sys-muted sys-small">{{ post.date }}</span>
+              <h3 class="sys-post__title">{{ post.title }}</h3>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </article>
+</div>
+
+{% schema %}
+{ "name": "Article", "settings": [] }
+{% endschema %}

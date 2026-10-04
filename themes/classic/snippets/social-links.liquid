@@ -1,0 +1,13 @@
+{% comment %} Social icons from Theme settings ▸ Social media. {% endcomment %}
+{% assign has_social = false %}
+{% if settings.social_instagram != blank or settings.social_facebook != blank or settings.social_youtube != blank or settings.social_x != blank or settings.social_pinterest != blank or settings.social_whatsapp != blank %}{% assign has_social = true %}{% endif %}
+{% if has_social %}
+<ul class="social" aria-label="Follow us">
+  {% if settings.social_instagram != blank %}<li><a href="{{ settings.social_instagram }}" target="_blank" rel="noopener" aria-label="Instagram">{% render 'snippets/icon', icon: 'instagram' %}</a></li>{% endif %}
+  {% if settings.social_facebook != blank %}<li><a href="{{ settings.social_facebook }}" target="_blank" rel="noopener" aria-label="Facebook">{% render 'snippets/icon', icon: 'facebook' %}</a></li>{% endif %}
+  {% if settings.social_youtube != blank %}<li><a href="{{ settings.social_youtube }}" target="_blank" rel="noopener" aria-label="YouTube">{% render 'snippets/icon', icon: 'youtube' %}</a></li>{% endif %}
+  {% if settings.social_x != blank %}<li><a href="{{ settings.social_x }}" target="_blank" rel="noopener" aria-label="X">{% render 'snippets/icon', icon: 'x' %}</a></li>{% endif %}
+  {% if settings.social_pinterest != blank %}<li><a href="{{ settings.social_pinterest }}" target="_blank" rel="noopener" aria-label="Pinterest">{% render 'snippets/icon', icon: 'pinterest' %}</a></li>{% endif %}
+  {% if settings.social_whatsapp != blank %}<li><a href="{{ settings.social_whatsapp }}" target="_blank" rel="noopener" aria-label="WhatsApp">{% render 'snippets/icon', icon: 'whatsapp' %}</a></li>{% endif %}
+</ul>
+{% endif %}

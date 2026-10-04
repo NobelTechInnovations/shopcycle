@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="{{ shop.locale | default: 'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="{{ settings.color_background | default: '#FFFFFF' }}">
+  <title>{{ page_title | default: shop.name }}</title>
+  {% if platform.fonts_url %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="{{ platform.fonts_url }}">
+  {% endif %}
+  <link rel="stylesheet" href="{{ 'theme.css' | asset_url }}">
+  {% comment %}
+    Theme settings → CSS variables. theme.css only ever reads these, so the
+    Theme settings drawer restyles the whole store live. The platform
+    pages (product, cart, checkout…) get their own copy of the colours and
+    fonts from the platform — see storefront/platform.js.
+  {% endcomment %}
+  {% case settings.section_spacing %}
+    {% when 'compact' %}{% assign spacing = 48 %}
+    {% when 'spacious' %}{% assign spacing = 112 %}
+    {% else %}{% assign spacing = 80 %}
+  {% endcase %}
+  {% case settings.card_image_ratio %}
+    {% when 'square' %}{% assign card_ratio = '1 / 1' %}
+    {% when 'landscape' %}{% assign card_ratio = '4 / 3' %}
+    {% else %}{% assign card_ratio = '4 / 5' %}
+  {% endcase %}
+  <style>
+    :root {
+      --c-bg: {{ settings.color_background | default: '#FFFFFF' }};
+      --c-text: {{ settings.color_text | default: '#141414' }};
+      --c-primary: {{ settings.color_primary | default: '#141414' }};
+      --c-accent: {{ settings.color_accent | default: '#D2452F' }};
+      --c-surface: {{ settings.color_surface | default: '#F6F3EE' }};
+      --f-heading: '{{ settings.heading_font | default: "Jost" }}', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --f-body: '{{ settings.body_font | default: "Inter" }}', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --f-heading-weight: {{ settings.heading_weight | default: 500 }};
+      --f-heading-case: {{ settings.heading_case | default: 'none' }};
+      --f-base: {{ settings.base_size | default: 15 }}px;
+      --w-container: {{ settings.container_width | default: 1320 }}px;
+      --s-section: {{ spacing }}px;
+      --r-button: {{ settings.button_radius | default: 40 }}px;
+      --r-card: {{ settings.card_radius | default: 12 }}px;
+      --card-ratio: {{ card_ratio }};
+    }
+  </style>
+  {% render 'snippets/installed-apps' %}
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  {% section 'announcement-bar' %}
+  {% section 'header' %}
+  <main id="main" tabindex="-1">
+    {{ content_for_layout }}
+  </main>
+  {% section 'footer' %}
+  <script src="{{ 'theme.js' | asset_url }}" defer></script>
+</body>
+</html>

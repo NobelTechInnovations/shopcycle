@@ -1,0 +1,31 @@
+{% comment %} Latest blog posts. Hidden until the store publishes its first post. {% endcomment %}
+{% if blog.articles.size > 0 %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, align: 'left', link_url: routes.blog_url, link_text: 'All posts' %}
+    <div class="posts" style="--cols: {{ section.settings.count }}">
+      {% for article in blog.articles limit: section.settings.count %}
+        <a class="post" href="{{ article.url }}">
+          <span class="post__media">{% if article.image %}<img src="{{ article.image }}" alt="" loading="lazy" width="1200" height="750">{% else %}{% render 'snippets/placeholder', kind: 'lifestyle' %}{% endif %}</span>
+          <span class="post__meta">{{ article.date }} · {{ article.reading_minutes }} min read</span>
+          <h3 class="post__title">{{ article.title }}</h3>
+          {% if section.settings.show_excerpt and article.excerpt %}<p class="post__excerpt">{{ article.excerpt }}</p>{% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Blog posts",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Journal" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Stories and guides" },
+    { "type": "range", "id": "count", "label": "Posts to show", "min": 2, "max": 4, "step": 1, "default": 3 },
+    { "type": "checkbox", "id": "show_excerpt", "label": "Show summary", "default": true },
+    { "type": "checkbox", "id": "surface", "label": "Use alternate background", "default": false }
+  ]
+}
+{% endschema %}

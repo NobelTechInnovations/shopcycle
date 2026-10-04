@@ -1,0 +1,51 @@
+{
+  "sections": {
+    "hero": {
+      "type": "split-hero",
+      "settings": { "height": "large", "overlay": 18 },
+      "blocks": {
+        "p1": { "type": "panel", "settings": { "eyebrow": "The new season edit", "heading": "Women", "button_label": "Shop women", "text_color": "light" } },
+        "p2": { "type": "panel", "settings": { "eyebrow": "Tailored, relaxed, everyday", "heading": "Men", "button_label": "Shop men", "text_color": "light" } }
+      },
+      "block_order": ["p1", "p2"]
+    },
+    "ticker": {
+      "type": "marquee",
+      "settings": { "style": "dark", "speed": 35 },
+      "blocks": {
+        "t1": { "type": "text", "settings": { "text": "Free shipping over ₹1,499" } },
+        "t2": { "type": "text", "settings": { "text": "Easy 15-day exchanges" } },
+        "t3": { "type": "text", "settings": { "text": "Cash on delivery" } },
+        "t4": { "type": "text", "settings": { "text": "Designed in India" } }
+      },
+      "block_order": ["t1", "t2", "t3", "t4"]
+    },
+    "categories": { "type": "category-circles", "settings": { "heading": "Shop by category", "shape": "circle" } },
+    "new_in": { "type": "product-grid", "settings": { "eyebrow": "Just dropped", "heading": "New in", "source": "newest", "limit": 8, "columns": 4, "link_text": "Shop all new" } },
+    "promos": {
+      "type": "promo-banner",
+      "settings": {},
+      "blocks": {
+        "b1": { "type": "tile", "settings": { "eyebrow": "End of season", "heading": "Up to 40% off", "button_label": "Shop the sale", "text_color": "dark" } },
+        "b2": { "type": "tile", "settings": { "eyebrow": "Wardrobe staples", "heading": "The essentials edit", "button_label": "Discover", "text_color": "dark" } }
+      },
+      "block_order": ["b1", "b2"]
+    },
+    "look": { "type": "shop-the-look", "settings": { "surface": true } },
+    "bestsellers": { "type": "product-grid", "settings": { "eyebrow": "Most loved", "heading": "Best sellers", "source": "best_sellers", "limit": 8, "columns": 4 } },
+    "features": {
+      "type": "usp",
+      "settings": { "surface": true },
+      "blocks": {
+        "u1": { "type": "item", "settings": { "icon": "ruler", "title": "Find your fit", "text": "Size charts on every product." } },
+        "u2": { "type": "item", "settings": { "icon": "exchange", "title": "Easy exchanges", "text": "Wrong size? Swap it within 15 days." } },
+        "u3": { "type": "item", "settings": { "icon": "truck", "title": "Free shipping", "text": "On orders over ₹1,499." } },
+        "u4": { "type": "item", "settings": { "icon": "cash", "title": "Cash on delivery", "text": "Pay when it arrives." } }
+      },
+      "block_order": ["u1", "u2", "u3", "u4"]
+    },
+    "gallery": { "type": "instagram-gallery", "settings": { "eyebrow": "#WornWell", "heading": "Styled by you", "link_text": "Follow us" } },
+    "newsletter": { "type": "newsletter", "settings": { "eyebrow": "The list", "heading": "10% off your first order", "text": "New drops, restocks and private sales — first, in your inbox.", "style": "dark" } }
+  },
+  "order": ["hero", "ticker", "categories", "new_in", "promos", "look", "bestsellers", "features", "gallery", "newsletter"]
+}

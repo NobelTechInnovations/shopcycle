@@ -1,0 +1,65 @@
+{% comment %}
+  The maker's story: a photo, a heading and a paragraph, with up to three
+  facts underneath — "925 sterling silver", "BIS hallmarked", "Made in
+  Jaipur". Photo left or right.
+{% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    <div class="craft{% if section.settings.image_right %} craft--flip{% endif %}">
+      <div class="craft__media">
+        {% if section.settings.image != blank %}
+          <img src="{{ section.settings.image | image_url }}" alt="{{ section.settings.image_alt | escape }}" loading="lazy" width="1200" height="1500">
+        {% else %}
+          {{ 'jewel-2' | placeholder_svg: 'craft__art' }}
+        {% endif %}
+      </div>
+      <div class="craft__text">
+        {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+        {% if section.settings.heading != blank %}<h2 class="h1">{{ section.settings.heading }}</h2>{% endif %}
+        {% if section.settings.text != blank %}<div class="craft__body">{{ section.settings.text | newline_to_br }}</div>{% endif %}
+        {% if section.blocks.size > 0 %}
+          <dl class="craft__facts">
+            {% for block in section.blocks limit: 3 %}
+              <div class="craft__fact">
+                <dt>{{ block.settings.value }}</dt>
+                <dd>{{ block.settings.label }}</dd>
+              </div>
+            {% endfor %}
+          </dl>
+        {% endif %}
+        {% if section.settings.button_label != blank %}
+          <a class="btn btn--ghost" href="{{ section.settings.button_link | default: routes.all_products_url }}">{{ section.settings.button_label }}</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Craft story",
+  "settings": [
+    { "type": "image_picker", "id": "image", "label": "Photo", "info": "Portrait, 1200 × 1500 px or larger." },
+    { "type": "text", "id": "image_alt", "label": "Photo description", "default": "" },
+    { "type": "checkbox", "id": "image_right", "label": "Photo on the right", "default": false },
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Our craft" },
+    { "type": "textarea", "id": "heading", "label": "Heading", "default": "Made by hand, made to last" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "Every piece is cast, set and polished by hand in our own workshop — in small batches, from certified metals and ethically sourced stones." },
+    { "type": "text", "id": "button_label", "label": "Button", "default": "Discover the collection" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": true }
+  ],
+  "blocks": [
+    { "type": "fact", "name": "Fact", "settings": [
+      { "type": "text", "id": "value", "label": "Big text", "default": "925" },
+      { "type": "text", "id": "label", "label": "Small text", "default": "Sterling silver" }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "fact", "settings": { "value": "925", "label": "Sterling silver" } },
+    { "type": "fact", "settings": { "value": "BIS", "label": "Hallmarked gold" } },
+    { "type": "fact", "settings": { "value": "30+", "label": "Years of craft" } }
+  ],
+  "max_blocks": 3
+}
+{% endschema %}

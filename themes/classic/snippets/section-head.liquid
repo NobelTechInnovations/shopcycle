@@ -1,0 +1,17 @@
+{% comment %}
+  Section heading row: optional eyebrow, title, subtitle and a "view all"
+  link. Pass `eyebrow`, `title`, `subtitle`, `link_url`, `link_text`,
+  `align` ('left' | 'center').
+{% endcomment %}
+{% if title != blank or eyebrow != blank %}
+<div class="section-head section-head--{{ align | default: 'left' }}">
+  <div class="section-head__text">
+    {% if eyebrow != blank %}<p class="eyebrow">{{ eyebrow }}</p>{% endif %}
+    {% if title != blank %}<h2 class="h2">{{ title }}</h2>{% endif %}
+    {% if subtitle != blank %}<p class="section-head__sub">{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if link_url != blank and link_text != blank %}
+    <a class="link-arrow" href="{{ link_url }}">{{ link_text }} {% render 'snippets/icon', icon: 'arrow-right', class: 'icon icon--sm' %}</a>
+  {% endif %}
+</div>
+{% endif %}

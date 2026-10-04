@@ -1,0 +1,42 @@
+{% comment %} A grid of photos — your Instagram, customer photos, a lookbook. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, align: 'left', link_url: section.settings.link, link_text: section.settings.link_text %}
+    <div class="gallery">
+      {% for block in section.blocks limit: 6 %}
+        {% if block.settings.link != blank %}<a class="gallery__item" href="{{ block.settings.link }}">{% else %}<div class="gallery__item">{% endif %}
+          {% if block.settings.image != blank %}
+            <img src="{{ block.settings.image | image_url }}" alt="{{ block.settings.alt | escape }}" loading="lazy" width="800" height="800">
+          {% else %}
+            {% assign art = 'jewel-' | append: forloop.index %}{{ art | placeholder_svg }}
+          {% endif %}
+        {% if block.settings.link != blank %}</a>{% else %}</div>{% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Photo gallery",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "@yourbrand" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Seen on Instagram" },
+    { "type": "text", "id": "link_text", "label": "Link text", "default": "Follow us" },
+    { "type": "url", "id": "link", "label": "Link" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "image", "name": "Photo", "settings": [
+      { "type": "image_picker", "id": "image", "label": "Photo" },
+      { "type": "text", "id": "alt", "label": "Description", "default": "" },
+      { "type": "url", "id": "link", "label": "Link (optional)" }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "image", "settings": {} }, { "type": "image", "settings": {} }, { "type": "image", "settings": {} },
+    { "type": "image", "settings": {} }, { "type": "image", "settings": {} }, { "type": "image", "settings": {} }
+  ],
+  "max_blocks": 6
+}
+{% endschema %}

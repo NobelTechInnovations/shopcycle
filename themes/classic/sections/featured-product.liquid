@@ -1,0 +1,108 @@
+{% comment %}
+  One product in the spotlight, with add-to-cart right on the home page.
+  Variants are a plain <select> so it works without JavaScript. The seller
+  picks the photo shape and fit, one or two photos, which side they sit on
+  and how big the title is.
+{% endcomment %}
+{% assign fp = all_products[section.settings.product] | default: best_sellers.first %}
+{% case section.settings.image_ratio %}
+  {% when 'square' %}{% assign fp_ratio = '1 / 1' %}
+  {% when 'tall' %}{% assign fp_ratio = '2 / 3' %}
+  {% when 'landscape' %}{% assign fp_ratio = '4 / 3' %}
+  {% when 'natural' %}{% assign fp_ratio = 'auto' %}
+  {% else %}{% assign fp_ratio = '4 / 5' %}
+{% endcase %}
+{% case section.settings.heading_size %}
+  {% when 'small' %}{% assign fp_title = 'clamp(22px, 2.2vw, 28px)' %}
+  {% when 'large' %}{% assign fp_title = 'clamp(30px, 4.2vw, 56px)' %}
+  {% else %}{% assign fp_title = 'clamp(25px, 3vw, 40px)' %}
+{% endcase %}
+<style>
+  .spotlight--fp { grid-template-columns: minmax(0, var(--fp-media)) minmax(0, 1fr); }
+  .spotlight--fp.spotlight--flip .spotlight__media { order: 2; }
+  .spotlight--fp .spotlight__media img, .spotlight--fp .spotlight__media .placeholder { aspect-ratio: var(--fp-ratio); object-fit: var(--fp-fit); height: auto; max-height: 82vh; }
+  .spotlight--fp .spotlight__title { font-size: var(--fp-title); line-height: 1.1; }
+  @media (max-width: 900px) {
+    .spotlight--fp { grid-template-columns: 1fr; }
+    .spotlight--fp.spotlight--flip .spotlight__media { order: 0; }
+  }
+</style>
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    <div class="spotlight spotlight--fp{% if section.settings.flip %} spotlight--flip{% endif %}" style="--fp-media: {{ section.settings.media_width | default: 52 }}%; --fp-ratio: {{ fp_ratio }}; --fp-fit: {{ section.settings.image_fit | default: 'cover' }}; --fp-title: {{ fp_title }}">
+      <div class="spotlight__media">
+        {% if fp and fp.images.size > 0 %}
+          <img src="{{ fp.images[0].url }}" alt="{{ fp.images[0].altText | default: fp.title }}" loading="lazy" width="1200" height="1500">
+          {% if fp.images.size > 1 and section.settings.second_photo %}<img src="{{ fp.images[1].url }}" alt="" loading="lazy" width="1200" height="1500">{% endif %}
+        {% elsif fp %}
+          {% render 'snippets/placeholder', kind: 'image' %}
+        {% else %}
+          {% render 'snippets/placeholder', kind: 'product', n: 4 %}
+        {% endif %}
+      </div>
+      <div class="spotlight__info">
+        {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+        {% if fp %}
+          <h2 class="h2 spotlight__title">{{ fp.title }}</h2>
+          {% assign pv = fp.price_variant | default: fp.variants.first %}
+          <p class="price price--lg">
+            {% if pv.comparePrice and pv.comparePrice > pv.price %}<span class="price__now price__now--sale">{{ pv.price | money }}</span> <s class="price__was">{{ pv.comparePrice | money }}</s>{% else %}<span class="price__now">{{ pv.price | money }}</span>{% endif %}
+          </p>
+          {% if section.settings.show_description and fp.description != blank %}<p class="spotlight__desc">{{ fp.description | strip_html | truncatewords: 40 }}</p>{% endif %}
+          <form method="post" action="{{ routes.cart_add_url }}" class="spotlight__form" data-product-title="{{ fp.title | escape }}">
+            {% if fp.variants.size > 1 %}
+              <label class="field"><span>Option</span>
+                <select name="variantId">
+                  {% for v in fp.variants %}<option value="{{ v.id }}" {% unless v.available %}disabled{% endunless %}>{{ v.title }} — {{ v.price | money }}{% unless v.available %} (sold out){% endunless %}</option>{% endfor %}
+                </select>
+              </label>
+            {% else %}
+              <input type="hidden" name="variantId" value="{{ pv.id }}">
+            {% endif %}
+            <input type="hidden" name="quantity" value="1">
+            <div class="btn-row">
+              <button type="submit" class="btn" {% unless fp.available %}disabled{% endunless %}>{% if fp.available %}Add to cart{% else %}Sold out{% endif %}</button>
+              <a class="btn btn--ghost" href="{{ fp.url }}">View details</a>
+            </div>
+          </form>
+        {% else %}
+          <h2 class="h2 spotlight__title">Example product title</h2>
+          <p class="price price--lg"><span class="price__now">{{ 1999 | money }}</span></p>
+          <p class="spotlight__desc">Pick a product for this section in the theme editor — its photos, price and an add-to-cart button show here.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Featured product",
+  "settings": [
+    { "type": "product", "id": "product", "label": "Product" },
+    { "type": "text", "id": "eyebrow", "label": "Small text above title", "default": "Bestseller" },
+    { "type": "select", "id": "heading_size", "label": "Title size", "default": "medium", "options": [
+      { "value": "small", "label": "Small" },
+      { "value": "medium", "label": "Medium" },
+      { "value": "large", "label": "Large" }
+    ] },
+    { "type": "checkbox", "id": "show_description", "label": "Show the description", "default": true },
+    { "type": "checkbox", "id": "surface", "label": "Use alternate background", "default": false },
+    { "type": "header", "content": "Photos" },
+    { "type": "checkbox", "id": "second_photo", "label": "Show the second photo beside the first", "default": true },
+    { "type": "select", "id": "image_ratio", "label": "Photo shape", "default": "portrait", "options": [
+      { "value": "portrait", "label": "Portrait (4:5)" },
+      { "value": "tall", "label": "Tall (2:3)" },
+      { "value": "square", "label": "Square" },
+      { "value": "landscape", "label": "Landscape (4:3)" },
+      { "value": "natural", "label": "As uploaded" }
+    ] },
+    { "type": "select", "id": "image_fit", "label": "Photo fit", "default": "cover", "options": [
+      { "value": "cover", "label": "Fill the shape (trims the edges)" },
+      { "value": "contain", "label": "Show the whole photo" }
+    ] },
+    { "type": "range", "id": "media_width", "label": "Photo area width (%)", "min": 35, "max": 70, "step": 5, "default": 50 },
+    { "type": "checkbox", "id": "flip", "label": "Photos on the right", "default": false }
+  ]
+}
+{% endschema %}

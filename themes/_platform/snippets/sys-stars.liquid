@@ -1,0 +1,3 @@
+{% comment %} Five stars filled to `rating` (0–5, halves shown as part-filled). {% endcomment %}
+{% assign pct = rating | default: 0 | times: 20 | at_most: 100 %}
+<span class="sys-stars" style="--sys-stars: {{ pct }}%" aria-hidden="true"><span class="sys-stars__fill"></span></span>

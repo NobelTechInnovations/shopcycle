@@ -1,0 +1,62 @@
+{% comment %}
+  Shop by category as small round (or arched) pictures in a row that
+  swipes on phones — up to 10. Each block picks a collection; its own
+  picture overrides the collection's.
+{% endcomment %}
+<section class="section section--tight{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, align: 'center' %}
+    <ul class="circles circles--{{ section.settings.shape }}">
+      {% for block in section.blocks limit: 10 %}
+        {% assign coll = collections[block.settings.collection] %}
+        {% assign img = block.settings.image | default: coll.image %}
+        {% if img == blank and coll.products.size > 0 %}{% assign img = coll.products[0].featured_image.url %}{% endif %}
+        {% assign name = block.settings.title | default: coll.title | default: 'Category' %}
+        <li>
+          <a class="circle" href="{% if coll %}{{ coll.url }}{% else %}{{ routes.all_products_url }}{% endif %}">
+            <span class="circle__media">
+              {% if img != blank %}
+                <img src="{{ img | image_url }}" alt="" loading="lazy" width="400" height="400">
+              {% else %}
+                {% assign n = forloop.index0 | modulo: 4 | plus: 1 %}{% assign art = 'collection-' | append: n %}{{ art | placeholder_svg }}
+              {% endif %}
+            </span>
+            <span class="circle__name">{{ name }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Category circles",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Shop by category" },
+    { "type": "select", "id": "shape", "label": "Picture shape", "default": "circle", "options": [
+      { "value": "circle", "label": "Circle" },
+      { "value": "arch", "label": "Arch" },
+      { "value": "square", "label": "Square" }
+    ] },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "collection", "name": "Category", "settings": [
+      { "type": "collection", "id": "collection", "label": "Collection" },
+      { "type": "text", "id": "title", "label": "Name (optional)", "default": "" },
+      { "type": "image_picker", "id": "image", "label": "Picture (optional)" }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "collection", "settings": {} },
+    { "type": "collection", "settings": {} },
+    { "type": "collection", "settings": {} },
+    { "type": "collection", "settings": {} },
+    { "type": "collection", "settings": {} },
+    { "type": "collection", "settings": {} }
+  ],
+  "max_blocks": 10
+}
+{% endschema %}

@@ -1,0 +1,263 @@
+[
+  {
+    "name": "Colors",
+    "settings": [
+      {
+        "type": "color",
+        "id": "color_background",
+        "label": "Background",
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "id": "color_text",
+        "label": "Text",
+        "default": "#141414"
+      },
+      {
+        "type": "color",
+        "id": "color_primary",
+        "label": "Buttons",
+        "default": "#141414"
+      },
+      {
+        "type": "color",
+        "id": "color_accent",
+        "label": "Sale and highlights",
+        "default": "#D2452F"
+      },
+      {
+        "type": "color",
+        "id": "color_surface",
+        "label": "Alternate section background",
+        "default": "#F6F3EE"
+      },
+      {
+        "type": "paragraph",
+        "content": "These colors also style your product, cart, checkout and account pages."
+      }
+    ]
+  },
+  {
+    "name": "Typography",
+    "settings": [
+      {
+        "type": "font",
+        "id": "heading_font",
+        "label": "Headings",
+        "default": "Jost"
+      },
+      {
+        "type": "font",
+        "id": "body_font",
+        "label": "Body text",
+        "default": "Inter"
+      },
+      {
+        "type": "select",
+        "id": "heading_weight",
+        "label": "Heading weight",
+        "default": "500",
+        "options": [
+          {
+            "value": "400",
+            "label": "Regular"
+          },
+          {
+            "value": "500",
+            "label": "Medium"
+          },
+          {
+            "value": "600",
+            "label": "Semibold"
+          },
+          {
+            "value": "700",
+            "label": "Bold"
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "id": "heading_case",
+        "label": "Heading style",
+        "default": "none",
+        "options": [
+          {
+            "value": "none",
+            "label": "As typed"
+          },
+          {
+            "value": "uppercase",
+            "label": "UPPERCASE"
+          }
+        ]
+      },
+      {
+        "type": "range",
+        "id": "base_size",
+        "label": "Body text size (px)",
+        "min": 14,
+        "max": 18,
+        "step": 1,
+        "default": 15
+      }
+    ]
+  },
+  {
+    "name": "Layout",
+    "settings": [
+      {
+        "type": "range",
+        "id": "container_width",
+        "label": "Page width (px)",
+        "min": 1080,
+        "max": 1600,
+        "step": 20,
+        "default": 1320
+      },
+      {
+        "type": "select",
+        "id": "section_spacing",
+        "label": "Space between sections",
+        "default": "comfortable",
+        "options": [
+          {
+            "value": "compact",
+            "label": "Compact"
+          },
+          {
+            "value": "comfortable",
+            "label": "Comfortable"
+          },
+          {
+            "value": "spacious",
+            "label": "Spacious"
+          }
+        ]
+      },
+      {
+        "type": "range",
+        "id": "button_radius",
+        "label": "Button corners (px)",
+        "min": 0,
+        "max": 40,
+        "step": 2,
+        "default": 40
+      },
+      {
+        "type": "range",
+        "id": "card_radius",
+        "label": "Card and image corners (px)",
+        "min": 0,
+        "max": 24,
+        "step": 2,
+        "default": 12
+      }
+    ]
+  },
+  {
+    "name": "Product cards",
+    "settings": [
+      {
+        "type": "select",
+        "id": "card_image_ratio",
+        "label": "Image shape",
+        "default": "portrait",
+        "options": [
+          {
+            "value": "portrait",
+            "label": "Portrait (4:5)"
+          },
+          {
+            "value": "square",
+            "label": "Square"
+          },
+          {
+            "value": "landscape",
+            "label": "Landscape (4:3)"
+          }
+        ]
+      },
+      {
+        "type": "checkbox",
+        "id": "card_hover_image",
+        "label": "Show second image on hover",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "card_show_brand",
+        "label": "Show brand",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "card_quick_add",
+        "label": "Show quick add button",
+        "default": true
+      }
+    ]
+  },
+  {
+    "name": "Cart",
+    "settings": [
+      {
+        "type": "select",
+        "id": "cart_type",
+        "label": "Cart type",
+        "default": "drawer",
+        "options": [
+          {
+            "value": "drawer",
+            "label": "Drawer \u2014 slides in, shoppers stay on the page"
+          },
+          {
+            "value": "page",
+            "label": "Page \u2014 go to the full cart page"
+          }
+        ],
+        "info": "The cart page and checkout keep their own layout either way."
+      }
+    ]
+  },
+  {
+    "name": "Social media",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Links appear in the footer."
+      },
+      {
+        "type": "url",
+        "id": "social_instagram",
+        "label": "Instagram"
+      },
+      {
+        "type": "url",
+        "id": "social_facebook",
+        "label": "Facebook"
+      },
+      {
+        "type": "url",
+        "id": "social_youtube",
+        "label": "YouTube"
+      },
+      {
+        "type": "url",
+        "id": "social_x",
+        "label": "X (Twitter)"
+      },
+      {
+        "type": "url",
+        "id": "social_pinterest",
+        "label": "Pinterest"
+      },
+      {
+        "type": "url",
+        "id": "social_whatsapp",
+        "label": "WhatsApp (wa.me link)"
+      }
+    ]
+  }
+]

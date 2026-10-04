@@ -1,0 +1,35 @@
+{% comment %} "You may also like" under the product: same collection first, then same category or brand, then best sellers. {% endcomment %}
+{% if product.related.size > 0 %}
+<div class="sys">
+  <section class="sys-section sys-section--flush">
+    <div class="sys-container">
+      <div class="sys-related">
+        <div class="sys-related__head">
+          <h2 class="sys-h2">{{ section.settings.heading | default: 'You may also like' }}</h2>
+          {% if product.collection %}<a class="sys-link sys-small" href="{{ product.collection.url }}">View all</a>{% endif %}
+        </div>
+        <div class="sys-grid{% if section.settings.columns == '3' %} sys-grid--3{% endif %}">
+          {% for related_product in product.related limit: section.settings.limit %}
+            {% render 'snippets/sys-product-card', product: related_product %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Related products",
+  "limit": 1,
+  "templates": ["product"],
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "You may also like" },
+    { "type": "range", "id": "limit", "label": "Products to show", "min": 2, "max": 8, "step": 1, "default": 4 },
+    { "type": "select", "id": "columns", "label": "Per row", "default": "4", "options": [
+      { "value": "3", "label": "3" }, { "value": "4", "label": "4" }
+    ] }
+  ]
+}
+{% endschema %}

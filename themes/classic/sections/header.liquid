@@ -1,0 +1,93 @@
+{% comment %}
+  Site header: logo, main menu, search, account and cart. On phones the
+  menu opens in a drawer built on <details>, so it works even before
+  theme.js loads.
+{% endcomment %}
+<style>
+  .header__logo { min-width: 0; max-width: 100%; }
+  .header__logo img { width: var(--logo-w); max-width: 100%; height: auto; }
+  .header__logo > span { display: block; font-size: var(--name-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .header--center .header__inner { grid-template-columns: 1fr minmax(0, auto) 1fr; }
+  @media (max-width: 900px) {
+    .header .header__inner { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .header.header--center .header__inner { grid-template-columns: 1fr minmax(0, auto) 1fr; }
+    .header__logo img { width: var(--logo-w-m); }
+    .header__logo > span { font-size: var(--name-size-m); }
+  }
+</style>
+{% assign menu = linklists[section.settings.menu] %}
+<header class="header header--{{ section.settings.layout }}{% if section.settings.sticky %} header--sticky{% endif %}" data-header>
+  <div class="container header__inner">
+    <details class="drawer" data-drawer>
+      <summary class="icon-btn drawer__toggle" aria-label="Menu">{% render 'snippets/icon', icon: 'menu' %}</summary>
+      <div class="drawer__panel">
+        <div class="drawer__top">
+          <span class="drawer__title">{{ shop.name }}</span>
+          <button type="button" class="icon-btn" data-drawer-close aria-label="Close menu">{% render 'snippets/icon', icon: 'close' %}</button>
+        </div>
+        <form class="drawer__search" action="{{ routes.search_url }}" method="get" role="search">
+          <input type="search" name="q" placeholder="Search products" aria-label="Search products">
+        </form>
+        <nav aria-label="Mobile">
+          <ul class="drawer__links">
+            {% render 'snippets/menu-links', menu: menu %}
+          </ul>
+        </nav>
+        <div class="drawer__foot">
+          <a href="{{ routes.account_url }}">{% render 'snippets/icon', icon: 'user' %} {% if customer %}My account{% else %}Sign in{% endif %}</a>
+        </div>
+      </div>
+    </details>
+
+    <a class="header__logo" href="{{ routes.root_url }}" style="--logo-w: {{ section.settings.logo_width }}px; --logo-w-m: {{ section.settings.logo_width_mobile }}px; --name-size: {{ section.settings.name_size }}px; --name-size-m: {{ section.settings.name_size_mobile }}px">
+      {% if section.settings.logo != blank %}
+        <img src="{{ section.settings.logo | image_url }}" alt="{{ shop.name }}">
+      {% else %}
+        <span data-oy-fit="11">{{ shop.name }}</span>
+      {% endif %}
+    </a>
+
+    <nav class="header__nav" aria-label="Main">
+      <ul>
+        {% render 'snippets/menu-links', menu: menu %}
+      </ul>
+    </nav>
+
+    <div class="header__actions">
+      <details class="search-pop" data-search>
+        <summary class="icon-btn" aria-label="Search">{% render 'snippets/icon', icon: 'search' %}</summary>
+        <form class="search-pop__form" action="{{ routes.search_url }}" method="get" role="search">
+          <div class="container search-pop__row">
+            {% render 'snippets/icon', icon: 'search' %}
+            <input type="search" name="q" placeholder="What are you looking for?" aria-label="Search products" autocomplete="off">
+            <button type="submit" class="btn btn--sm">Search</button>
+          </div>
+        </form>
+      </details>
+      <a class="icon-btn header__account" href="{{ routes.account_url }}" aria-label="{% if customer %}My account{% else %}Sign in{% endif %}">{% render 'snippets/icon', icon: 'user' %}</a>
+      <a class="icon-btn header__cart" href="{{ routes.cart_url }}" aria-label="Cart, {{ cart.item_count }} item{% if cart.item_count != 1 %}s{% endif %}">
+        {% render 'snippets/icon', icon: 'bag' %}
+        <span class="header__count" data-cart-count{% if cart.item_count == 0 %} hidden{% endif %}>{{ cart.item_count }}</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+{% schema %}
+{
+  "name": "Header",
+  "settings": [
+    { "type": "image_picker", "id": "logo", "label": "Logo" },
+    { "type": "range", "id": "logo_width", "label": "Logo width on computers (px)", "min": 60, "max": 240, "step": 10, "default": 120 },
+    { "type": "range", "id": "logo_width_mobile", "label": "Logo width on phones (px)", "min": 40, "max": 200, "step": 5, "default": 90 },
+    { "type": "range", "id": "name_size", "label": "Store name size on computers (px)", "min": 14, "max": 48, "step": 1, "default": 24, "info": "Shown when there's no logo image. A long name shrinks to fit on small screens." },
+    { "type": "range", "id": "name_size_mobile", "label": "Store name size on phones (px)", "min": 12, "max": 32, "step": 1, "default": 20 },
+    { "type": "menu", "id": "menu", "label": "Menu", "default": "main-menu" },
+    { "type": "select", "id": "layout", "label": "Layout", "default": "left", "options": [
+      { "value": "left", "label": "Logo left, menu beside it" },
+      { "value": "center", "label": "Logo centred" }
+    ] },
+    { "type": "checkbox", "id": "sticky", "label": "Stay at the top while scrolling", "default": true }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,62 @@
+{% comment %}
+  Shop by category — collection tiles in a bento grid (the first tile is
+  large) or an even grid. Each block picks a collection; its own image
+  overrides the collection's. Unpicked tiles show an illustration.
+{% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, align: 'left', link_url: routes.all_products_url, link_text: section.settings.link_text %}
+    <div class="cats cats--{{ section.settings.layout }} cats--n{{ section.blocks.size | at_most: 5 }}">
+      {% for block in section.blocks limit: 5 %}
+        {% assign coll = collections[block.settings.collection] %}
+        {% assign coll_img = block.settings.image | default: coll.image %}
+        {% if coll_img == blank and coll.products.size > 0 %}{% assign coll_img = coll.products[0].featured_image.url %}{% endif %}
+        {% assign name = block.settings.title | default: coll.title | default: 'Collection name' %}
+        <a class="cat" href="{% if coll %}{{ coll.url }}{% else %}{{ routes.all_products_url }}{% endif %}">
+          <span class="cat__media">
+            {% if coll_img != blank %}
+              <img src="{{ coll_img | image_url }}" alt="" loading="lazy" width="900" height="1100">
+            {% else %}
+              {% assign art = 'jewel-' | append: forloop.index %}{{ art | placeholder_svg }}
+            {% endif %}
+          </span>
+          <span class="cat__label">
+            <span class="cat__name">{{ name }}</span>
+            {% if coll %}<span class="cat__count">{{ coll.products.size }} product{% if coll.products.size != 1 %}s{% endif %}</span>{% endif %}
+          </span>
+          <span class="cat__go" aria-hidden="true">{% render 'snippets/icon', icon: 'arrow-up-right', class: 'icon icon--sm' %}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Shop by category",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Categories" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Shop by category" },
+    { "type": "select", "id": "layout", "label": "Layout", "default": "bento", "options": [
+      { "value": "bento", "label": "Bento — first tile large" },
+      { "value": "even", "label": "Even grid" }
+    ] },
+    { "type": "text", "id": "link_text", "label": "\"View all\" link text", "default": "Shop all" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "collection", "name": "Collection", "settings": [
+      { "type": "collection", "id": "collection", "label": "Collection" },
+      { "type": "text", "id": "title", "label": "Name (optional)", "default": "" },
+      { "type": "image_picker", "id": "image", "label": "Image (optional)" }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "collection", "settings": {} },
+    { "type": "collection", "settings": {} },
+    { "type": "collection", "settings": {} },
+    { "type": "collection", "settings": {} }
+  ],
+  "max_blocks": 5
+}
+{% endschema %}

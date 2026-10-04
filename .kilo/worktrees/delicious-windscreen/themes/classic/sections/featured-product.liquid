@@ -1,0 +1,63 @@
+{% comment %}
+  One product in the spotlight, with add-to-cart right on the home page.
+  Variants are a plain <select> so it works without JavaScript.
+{% endcomment %}
+{% assign fp = all_products[section.settings.product] | default: best_sellers.first %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    <div class="spotlight">
+      <div class="spotlight__media">
+        {% if fp and fp.images.size > 0 %}
+          <img src="{{ fp.images[0].url }}" alt="{{ fp.images[0].altText | default: fp.title }}" loading="lazy" width="1200" height="1500">
+          {% if fp.images.size > 1 %}<img src="{{ fp.images[1].url }}" alt="" loading="lazy" width="1200" height="1500">{% endif %}
+        {% elsif fp %}
+          {% render 'snippets/placeholder', kind: 'image' %}
+        {% else %}
+          {% render 'snippets/placeholder', kind: 'product', n: 4 %}
+        {% endif %}
+      </div>
+      <div class="spotlight__info">
+        {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+        {% if fp %}
+          <h2 class="h2">{{ fp.title }}</h2>
+          {% assign pv = fp.price_variant | default: fp.variants.first %}
+          <p class="price price--lg">
+            {% if pv.comparePrice and pv.comparePrice > pv.price %}<span class="price__now price__now--sale">{{ pv.price | money }}</span> <s class="price__was">{{ pv.comparePrice | money }}</s>{% else %}<span class="price__now">{{ pv.price | money }}</span>{% endif %}
+          </p>
+          {% if fp.description != blank %}<p class="spotlight__desc">{{ fp.description | strip_html | truncatewords: 40 }}</p>{% endif %}
+          <form method="post" action="{{ routes.cart_add_url }}" class="spotlight__form" data-product-title="{{ fp.title | escape }}">
+            {% if fp.variants.size > 1 %}
+              <label class="field"><span>Option</span>
+                <select name="variantId">
+                  {% for v in fp.variants %}<option value="{{ v.id }}" {% unless v.available %}disabled{% endunless %}>{{ v.title }} — {{ v.price | money }}{% unless v.available %} (sold out){% endunless %}</option>{% endfor %}
+                </select>
+              </label>
+            {% else %}
+              <input type="hidden" name="variantId" value="{{ pv.id }}">
+            {% endif %}
+            <input type="hidden" name="quantity" value="1">
+            <div class="btn-row">
+              <button type="submit" class="btn" {% unless fp.available %}disabled{% endunless %}>{% if fp.available %}Add to cart{% else %}Sold out{% endif %}</button>
+              <a class="btn btn--ghost" href="{{ fp.url }}">View details</a>
+            </div>
+          </form>
+        {% else %}
+          <h2 class="h2">Example product title</h2>
+          <p class="price price--lg"><span class="price__now">{{ 1999 | money }}</span></p>
+          <p class="spotlight__desc">Pick a product for this section in the theme editor — its photos, price and an add-to-cart button show here.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Featured product",
+  "settings": [
+    { "type": "product", "id": "product", "label": "Product" },
+    { "type": "text", "id": "eyebrow", "label": "Small text above title", "default": "Bestseller" },
+    { "type": "checkbox", "id": "surface", "label": "Use alternate background", "default": false }
+  ]
+}
+{% endschema %}

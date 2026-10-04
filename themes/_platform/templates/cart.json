@@ -1,0 +1,6 @@
+{
+  "sections": {
+    "main": { "type": "sys-cart", "settings": {} }
+  },
+  "order": ["main"]
+}

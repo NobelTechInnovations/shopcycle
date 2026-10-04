@@ -1,0 +1,6 @@
+{
+  "sections": {
+    "main": { "type": "sys-account-login", "settings": {} }
+  },
+  "order": ["main"]
+}

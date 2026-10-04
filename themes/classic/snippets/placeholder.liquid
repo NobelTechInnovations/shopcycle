@@ -1,0 +1,15 @@
+{% comment %}
+  Shown where the merchant hasn't added a photo yet — the platform's
+  illustrations (the placeholder_svg filter), so a new store still looks
+  finished. kind: 'lifestyle' (wide banners) | 'product' | 'collection' |
+  'image' (a real item without a photo); `n` picks a variation.
+{% endcomment %}
+{% assign k = kind | default: 'product' %}
+{% if k == 'image' %}
+  {% assign art = 'image' %}
+{% elsif n == blank %}
+  {% assign art = k | append: '-1' %}
+{% else %}
+  {% assign art = k | append: '-' | append: n %}
+{% endif %}
+{{ art | placeholder_svg: 'placeholder' }}

@@ -1,0 +1,466 @@
+{% comment %}
+  Product page — Oyklane's own design on every store; the theme supplies
+  fonts and colours. The seller arranges it in the theme editor: the
+  blocks on the right (title, price, options, buy buttons, trust badges,
+  description…) can be reordered, hidden and adjusted, but not restyled.
+  Adding to cart is a plain form POST (works without JS); system.js keeps
+  price, stock and the button in sync with the chosen variant.
+{% endcomment %}
+{% assign current = product.selected_variant | default: product.variants.first %}
+{% assign many = product.variants.size > 1 %}
+{% assign s = section.settings %}
+{% assign has_picker = false %}
+{% assign has_booking = false %}
+{% for block in section.blocks %}{% if block.type == 'variant_picker' %}{% assign has_picker = true %}{% endif %}{% if block.type == 'rental_booking' %}{% assign has_booking = true %}{% endif %}{% endfor %}
+<div class="sys">
+  <section class="sys-section sys-section--product">
+    <div class="sys-container">
+      {% if s.show_breadcrumbs %}
+        <ol class="sys-crumbs" aria-label="Breadcrumb">
+          <li><a href="{{ routes.root_url }}">Home</a></li>
+          {% if product.collection %}<li><a href="{{ product.collection.url }}">{{ product.collection.title }}</a></li>{% endif %}
+          <li aria-current="page">{{ product.title }}</li>
+        </ol>
+      {% endif %}
+
+      <div class="sys-product sys-product--media-{{ s.media_size }}{% if s.sticky_info %} sys-product--sticky{% endif %}">
+        {% if s.gallery_layout == 'stacked' and product.images.size > 1 %}
+          <div class="sys-gallery sys-gallery--stacked" data-sys-gallery>
+            {% for image in product.images %}
+              <div class="sys-gallery__main sys-gallery__main--{{ s.image_fit }}" data-sys-stack-image data-alt="{{ image.altText | default: product.title }}">
+                <img src="{{ image.url }}" alt="{{ image.altText | default: product.title }}" width="1200" height="1500"{% unless forloop.first %} loading="lazy"{% endunless %}>
+                {% if forloop.first and product.on_sale and product.available %}
+                  <span class="sys-pcard__badges"><span class="sys-badge sys-badge--sale">−{{ product.discount_percent }}%</span></span>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="sys-gallery{% if product.images.size < 2 %} sys-gallery--single{% endif %}{% if s.gallery_layout == 'thumbs_below' %} sys-gallery--below{% endif %}" data-sys-gallery>
+            <div class="sys-gallery__main sys-gallery__main--{{ s.image_fit }}">
+              {% if product.images.size > 0 %}
+                <img data-sys-gallery-main src="{{ product.images[0].url }}" alt="{{ product.images[0].altText | default: product.title }}" width="1200" height="1500">
+              {% else %}
+                <span class="sys-placeholder">{% render 'snippets/sys-icon', icon: 'photo' %}</span>
+              {% endif %}
+              {% if product.on_sale and product.available %}
+                <span class="sys-pcard__badges"><span class="sys-badge sys-badge--sale">−{{ product.discount_percent }}%</span></span>
+              {% endif %}
+            </div>
+            {% if product.images.size > 1 %}
+              <div class="sys-gallery__thumbs" role="list">
+                {% for image in product.images %}
+                  <button type="button" class="sys-gallery__thumb" data-sys-thumb data-src="{{ image.url }}" data-alt="{{ image.altText | default: product.title }}" aria-label="Show image {{ forloop.index }}" aria-current="{% if forloop.first %}true{% else %}false{% endif %}" role="listitem">
+                    <img src="{{ image.url }}" alt="" loading="lazy" width="160" height="200">
+                  </button>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        {% comment %}
+          The whole column is the add-to-cart form, so blocks can go in any
+          order. Without a picker block, the chosen variant still goes along.
+        {% endcomment %}
+        <form method="post" action="{{ routes.cart_add_url }}" class="sys-pinfo" data-sys-product data-product-title="{{ product.title | escape }}">
+          {% unless has_picker %}<input type="hidden" name="variantId" value="{{ current.id }}">{% endunless %}
+          {% for block in section.blocks %}
+            {% assign b = block.settings %}
+            {% case block.type %}
+              {% when 'brand' %}
+                {% if product.brand %}<span class="sys-eyebrow sys-pblock">{{ product.brand }}</span>{% endif %}
+
+              {% when 'title' %}
+                <h1 class="sys-pinfo__title sys-pinfo__title--{{ b.size }} sys-pblock">{{ product.title }}</h1>
+
+              {% when 'rating' %}
+                {% if product.reviews %}
+                  <a class="sys-rating sys-pblock" href="#reviews" aria-label="{% if product.reviews.count > 0 %}Rated {{ product.reviews.average }} out of 5, {{ product.reviews.count }} reviews{% else %}No reviews yet{% endif %}">
+                    {% render 'snippets/sys-stars', rating: product.reviews.average %}
+                    <span class="sys-rating__text">{% if product.reviews.count > 0 %}{{ product.reviews.average }} · {{ product.reviews.count }} review{% if product.reviews.count != 1 %}s{% endif %}{% else %}Be the first to review{% endif %}</span>
+                  </a>
+                {% endif %}
+
+              {% when 'price' %}
+                {% if product.rental %}
+                  <div class="sys-pblock sys-rentprice">
+                    <p class="sys-rentprice__now"><span class="sys-num">{{ product.rental.price_per_day | money }}</span><span class="sys-rentprice__unit"> / day</span></p>
+                  </div>
+                {% else %}
+                <div class="sys-pblock sys-pinfo__pricebox sys-pinfo__pricebox--{{ b.size }}">
+                  <div class="sys-price" data-sys-price>
+                    {% render 'snippets/sys-price', variant: current, show_save: b.show_save %}
+                  </div>
+                  {% if b.show_tax_note %}
+                    <p class="sys-pinfo__taxnote">{% if shop.taxes_included %}Inclusive of all taxes{% else %}Taxes calculated at checkout{% endif %}{% if shop.free_shipping_above %} · Free delivery over {{ shop.free_shipping_above | money }}{% endif %}</p>
+                  {% endif %}
+                </div>
+                {% endif %}
+
+              {% when 'rental_price' %}
+                {% if product.rental %}
+                  <div class="sys-pblock sys-rentprice">
+                    <p class="sys-rentprice__now"><span class="sys-num">{{ product.rental.price_per_day | money }}</span><span class="sys-rentprice__unit"> / day</span></p>
+                    {% if b.show_tiers != false and product.rental.tiers.size > 0 %}
+                      <ul class="sys-rentprice__tiers">
+                        {% for t in product.rental.tiers %}<li>{{ t.days }}+ days <strong class="sys-num">{{ t.price | money }}</strong> / day</li>{% endfor %}
+                      </ul>
+                    {% endif %}
+                    {% if b.show_deposit != false and product.rental.deposit > 0 %}
+                      <p class="sys-rentprice__note">{% render 'snippets/sys-icon', icon: 'shield' %} Refundable deposit {{ product.rental.deposit | money }}{% if product.rental.deposit_at_checkout %}, paid with the rent{% else %}, paid on delivery{% endif %}</p>
+                    {% endif %}
+                  </div>
+                {% endif %}
+
+              {% when 'rental_booking' %}
+                {% if product.rental %}
+                  {% assign r = product.rental %}
+                  <div class="sys-pblock sys-rent" id="rental" data-sys-rental>
+                    {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
+                    {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+                    <p class="sys-rent__title">{{ b.heading | default: 'Pick your dates' }}</p>
+                    <div class="sys-rent__dates" data-sys-rent-inputs>
+                      <label class="sys-field"><span class="sys-label">First day</span><input class="sys-input" type="date" name="rentalStart" min="{{ r.earliest }}" max="{{ r.latest }}" required data-sys-rent-start></label>
+                      <label class="sys-field"><span class="sys-label">Last day</span><input class="sys-input" type="date" name="rentalEnd" min="{{ r.earliest }}" required data-sys-rent-end></label>
+                    </div>
+                    <div class="sys-rent__cal" data-sys-rent-cal hidden></div>
+                    <p class="sys-rent__rules">{% if r.min_days > 1 %}At least {{ r.min_days }} days · {% endif %}Up to {{ r.max_days }} days · Greyed-out days are booked</p>
+                    {% if r.handover_options.size > 1 %}
+                      <fieldset class="sys-rent__opts">
+                        <legend>Getting it</legend>
+                        {% for o in r.handover_options %}<label class="sys-rent__opt"><input type="radio" name="rentalHandover" value="{{ o.value }}"{% if forloop.first %} checked{% endif %}><span>{{ o.label }}</span></label>{% endfor %}
+                      </fieldset>
+                    {% else %}
+                      <input type="hidden" name="rentalHandover" value="{{ r.handover_options.first.value }}">
+                    {% endif %}
+                    {% if r.return_options.size > 1 %}
+                      <fieldset class="sys-rent__opts">
+                        <legend>Giving it back</legend>
+                        {% for o in r.return_options %}<label class="sys-rent__opt"><input type="radio" name="rentalReturn" value="{{ o.value }}"{% if forloop.first %} checked{% endif %}><span>{{ o.label }}</span></label>{% endfor %}
+                      </fieldset>
+                    {% else %}
+                      <input type="hidden" name="rentalReturn" value="{{ r.return_options.first.value }}">
+                    {% endif %}
+                    {% if r.handover_options.size == 1 and r.return_options.size == 1 %}<p class="sys-rent__rules">{{ r.handover_options.first.label }} · {{ r.return_options.first.label }}</p>{% endif %}
+                    {% if r.pickup_address %}<p class="sys-rent__rules">{% render 'snippets/sys-icon', icon: 'truck' %} Store: {{ r.pickup_address | escape }}</p>{% endif %}
+                    <div class="sys-rent__sum" data-sys-rent-sum aria-live="polite"></div>
+                    {% if r.mode == 'request' %}
+                      <div class="sys-rent__contact">
+                        <label class="sys-field"><span class="sys-label">Your name</span><input class="sys-input" name="rentalName" autocomplete="name" required maxlength="120"></label>
+                        <label class="sys-field"><span class="sys-label">Mobile number</span><input class="sys-input" name="rentalPhone" type="tel" autocomplete="tel" inputmode="tel" required maxlength="20"></label>
+                        <label class="sys-field"><span class="sys-label">Email (optional)</span><input class="sys-input" name="rentalEmail" type="email" autocomplete="email" maxlength="200"></label>
+                        <label class="sys-field sys-rent__wide"><span class="sys-label">Address for delivery &amp; pickup</span><textarea class="sys-input" name="rentalAddress" rows="2" autocomplete="street-address" maxlength="500"></textarea></label>
+                        <label class="sys-field sys-rent__wide"><span class="sys-label">Anything we should know? (optional)</span><input class="sys-input" name="rentalNote" maxlength="1000"></label>
+                      </div>
+                      <input type="hidden" name="return_to" value="{{ product.url }}">
+                      <button type="submit" class="sys-btn sys-btn--lg sys-btn--block" formaction="{{ r.request_url }}" data-sys-rent-submit>{{ b.request_label | default: 'Request to book' }}</button>
+                      <p class="sys-rent__rules" style="text-align:center">No payment now — the store calls you to confirm.</p>
+                    {% else %}
+                      <button type="submit" class="sys-btn sys-btn--lg sys-btn--block" data-sys-rent-submit>{{ b.button_label | default: 'Book now' }}</button>
+                    {% endif %}
+                    {% if r.late_fee %}<p class="sys-rent__rules">Late returns: {{ r.late_fee | money }} a day.</p>{% endif %}
+                    {% if r.terms %}<details class="sys-accordion"><summary>Rental terms {% render 'snippets/sys-icon', icon: 'plus' %}</summary><div class="sys-accordion__body"><p>{{ r.terms | escape | newline_to_br }}</p></div></details>{% endif %}
+                    <script type="application/json" data-sys-rental-json>{{ r.client_json }}</script>
+                  </div>
+                {% endif %}
+
+              {% when 'variant_picker' %}
+                <div class="sys-pblock sys-stack" style="gap:18px">
+                  {% if many and product.options.size > 0 %}
+                    {% comment %}
+                      One picker per option (Size, Colour…) from titles like "M / Black".
+                      system.js turns the choices into the matching variant; the hidden
+                      input is enabled only once it runs — without JS the plain list in
+                      <noscript> is what's submitted.
+                    {% endcomment %}
+                    <input type="hidden" name="variantId" value="{{ current.id }}" data-sys-variant-input disabled>
+                    {% for option in product.options %}
+                      <fieldset class="sys-options" data-sys-option="{{ option.position }}">
+                        <legend>{{ option.name }}: <span data-sys-option-selected>{{ option.selected }}</span></legend>
+                        <div class="sys-swatches sys-swatches--{{ b.style }}">
+                          {% for item in option.values %}
+                            <label class="sys-swatch{% if option.is_colour and item.swatch %} sys-swatch--colour{% endif %}{% unless item.available %} sys-swatch--unavailable{% endunless %}">
+                              <input type="radio" name="option{{ option.position }}" value="{{ item.value | escape }}" {% if item.value == option.selected %}checked{% endif %}>
+                              <span>{% if option.is_colour and item.swatch %}<i class="sys-swatch__dot" style="background: {{ item.swatch }}" aria-hidden="true"></i>{% endif %}{{ item.value }}</span>
+                            </label>
+                          {% endfor %}
+                        </div>
+                      </fieldset>
+                    {% endfor %}
+                    {% if b.size_chart != blank %}
+                      <a class="sys-link sys-small sys-sizechart" href="{{ b.size_chart }}" target="_blank" rel="noopener">{% render 'snippets/sys-icon', icon: 'file' %} {{ b.size_chart_label | default: 'Size guide' }}</a>
+                    {% endif %}
+                    <noscript>
+                      <fieldset class="sys-options">
+                        <legend>Option</legend>
+                        <div class="sys-swatches">
+                          {% for variant in product.variants %}
+                            <label class="sys-swatch{% unless variant.available %} sys-swatch--unavailable{% endunless %}">
+                              <input type="radio" name="variantId" value="{{ variant.id }}" {% if variant.id == current.id %}checked{% endif %}>
+                              <span>{{ variant.title }}</span>
+                            </label>
+                          {% endfor %}
+                        </div>
+                      </fieldset>
+                    </noscript>
+                  {% elsif many %}
+                    <fieldset class="sys-options">
+                      <legend>Option: <span data-sys-selected>{{ current.title }}</span></legend>
+                      <div class="sys-swatches">
+                        {% for variant in product.variants %}
+                          <label class="sys-swatch{% unless variant.available %} sys-swatch--unavailable{% endunless %}">
+                            <input type="radio" name="variantId" value="{{ variant.id }}" {% if variant.id == current.id %}checked{% endif %}>
+                            <span>{{ variant.title }}</span>
+                          </label>
+                        {% endfor %}
+                      </div>
+                    </fieldset>
+                  {% else %}
+                    <input type="hidden" name="variantId" value="{{ current.id }}">
+                  {% endif %}
+                </div>
+
+              {% when 'stock' %}
+                {% unless product.rental %}
+                <div class="sys-pblock">
+                  {% if current.inventoryQuantity <= 0 %}
+                    <p class="sys-stock sys-stock--out" data-sys-stock>Out of stock</p>
+                  {% elsif current.inventoryQuantity <= shop.low_stock %}
+                    <p class="sys-stock sys-stock--low" data-sys-stock>Only {{ current.inventoryQuantity }} left — order soon</p>
+                  {% else %}
+                    <p class="sys-stock" data-sys-stock>In stock, ready to ship</p>
+                  {% endif %}
+                </div>
+                {% endunless %}
+
+              {% when 'buy_buttons' %}
+                {% if product.rental %}
+                  {% unless has_booking %}<p class="sys-pblock sys-rent__rules">This is rented by the day — choose the Rental product template for it in the admin to show the booking calendar.</p>{% endunless %}
+                {% else %}
+                <div class="sys-buy sys-pblock{% unless b.show_quantity %} sys-buy--noqty{% endunless %}">
+                  {% if b.show_quantity %}
+                    <div class="sys-qty" data-sys-qty>
+                      <button type="button" data-step="-1" aria-label="Decrease quantity">{% render 'snippets/sys-icon', icon: 'minus' %}</button>
+                      <input type="number" name="quantity" value="1" min="1" max="99" inputmode="numeric" aria-label="Quantity">
+                      <button type="button" data-step="1" aria-label="Increase quantity">{% render 'snippets/sys-icon', icon: 'plus' %}</button>
+                    </div>
+                  {% else %}
+                    <input type="hidden" name="quantity" value="1">
+                  {% endif %}
+                  <button type="submit" class="sys-btn sys-btn--lg sys-btn--block" data-sys-add data-label="{{ b.button_label | default: 'Add to cart' | escape }}" {% unless current.available %}disabled{% endunless %}>
+                    {% if current.available %}{{ b.button_label | default: 'Add to cart' }}{% else %}Sold out{% endif %}
+                  </button>
+                </div>
+                {% endif %}
+
+              {% when 'trust' %}
+                <ul class="sys-trust sys-pblock">
+                  {% if shop.free_shipping_above %}
+                    <li>{% render 'snippets/sys-icon', icon: 'truck' %}<span>Free delivery on orders over {{ shop.free_shipping_above | money }}</span></li>
+                  {% else %}
+                    <li>{% render 'snippets/sys-icon', icon: 'truck' %}<span>Delivery across India, tracked to your door</span></li>
+                  {% endif %}
+                  {% if shop.cod_enabled %}<li>{% render 'snippets/sys-icon', icon: 'cash' %}<span>Cash on delivery available</span></li>{% endif %}
+                  {% if shop.return_days > 0 %}<li>{% render 'snippets/sys-icon', icon: 'return' %}<span>Easy returns within {{ shop.return_days }} days of delivery</span></li>{% endif %}
+                  <li>{% render 'snippets/sys-icon', icon: 'shield' %}<span>Secure checkout</span></li>
+                </ul>
+
+              {% when 'description' %}
+                {% if product.description != blank %}
+                  {% if b.display == 'plain' %}
+                    <div class="sys-prose sys-pblock sys-pinfo__desc">
+                      {% if product.description contains '<' %}{{ product.description }}{% else %}{{ product.description | newline_to_br }}{% endif %}
+                    </div>
+                  {% else %}
+                    <details class="sys-accordion sys-pblock"{% if b.display == 'open' %} open{% endif %}>
+                      <summary>{{ b.heading | default: 'Description' }} {% render 'snippets/sys-icon', icon: 'plus' %}</summary>
+                      <div class="sys-accordion__body sys-prose">
+                        {% if product.description contains '<' %}{{ product.description }}{% else %}{{ product.description | newline_to_br }}{% endif %}
+                      </div>
+                    </details>
+                  {% endif %}
+                {% endif %}
+
+              {% when 'details' %}
+                <details class="sys-accordion sys-pblock"{% if b.open %} open{% endif %}>
+                  <summary>{{ b.heading | default: 'Details' }} {% render 'snippets/sys-icon', icon: 'plus' %}</summary>
+                  <div class="sys-accordion__body">
+                    <dl>
+                      {% comment %} The seller's own fields — Settings ▸ Custom data. {% endcomment %}
+                      {% for spec in product.specs %}
+                        <dt>{{ spec.name | escape }}</dt>
+                        <dd>
+                          {% case spec.type %}
+                            {% when 'color' %}<span class="sys-spec-swatch" style="background:{{ spec.value }}"></span>{{ spec.value }}
+                            {% when 'url' %}<a class="sys-link" href="{{ spec.value | escape }}" target="_blank" rel="noopener nofollow">Open link</a>
+                            {% when 'image' %}<a href="{{ spec.value | escape }}" target="_blank" rel="noopener"><img class="sys-spec-image" src="{{ spec.value | escape }}" alt="{{ spec.name | escape }}" loading="lazy"></a>
+                            {% when 'multiline' %}{{ spec.display | escape | newline_to_br }}
+                            {% else %}{{ spec.display | escape }}
+                          {% endcase %}
+                        </dd>
+                      {% endfor %}
+                      {% if b.show_basics %}
+                        {% if product.brand %}<dt>Brand</dt><dd>{{ product.brand }}</dd>{% endif %}
+                        {% if product.category %}<dt>Category</dt><dd>{{ product.category }}</dd>{% endif %}
+                        {% if product.product_type %}<dt>Type</dt><dd>{{ product.product_type }}</dd>{% endif %}
+                        {% if current.sku %}<dt>SKU</dt><dd>{{ current.sku }}</dd>{% endif %}
+                        <dt>Sold by</dt><dd>{{ shop.name }}</dd>
+                      {% endif %}
+                    </dl>
+                  </div>
+                </details>
+
+              {% when 'delivery' %}
+                <details class="sys-accordion sys-pblock">
+                  <summary>{{ b.heading | default: 'Delivery & returns' }} {% render 'snippets/sys-icon', icon: 'plus' %}</summary>
+                  <div class="sys-accordion__body sys-stack" style="gap:8px">
+                    {% if b.text != blank %}
+                      <p>{{ b.text | escape | newline_to_br }}</p>
+                    {% else %}
+                      <p>Orders are packed within 1–2 business days and delivered in 3–7 days depending on your PIN code. You'll get tracking by email as soon as it ships.</p>
+                      {% if shop.return_days > 0 %}
+                        <p>Changed your mind? Request a return from your order page within {{ shop.return_days }} days of delivery.</p>
+                      {% else %}
+                        <p>For returns, contact us{% if shop.support_email %} at <a class="sys-link" href="mailto:{{ shop.support_email }}">{{ shop.support_email }}</a>{% endif %}.</p>
+                      {% endif %}
+                    {% endif %}
+                  </div>
+                </details>
+
+              {% when 'text' %}
+                {% if b.text != blank %}
+                  <div class="sys-pblock sys-ptext sys-ptext--{{ b.style }}">{% if b.style == 'highlight' %}{% render 'snippets/sys-icon', icon: b.icon %}{% endif %}<p>{{ b.text | escape | newline_to_br }}</p></div>
+                {% endif %}
+
+              {% when 'collapsible' %}
+                {% if b.heading != blank %}
+                  <details class="sys-accordion sys-pblock"{% if b.open %} open{% endif %}>
+                    <summary>{{ b.heading | escape }} {% render 'snippets/sys-icon', icon: 'plus' %}</summary>
+                    <div class="sys-accordion__body"><p>{{ b.text | escape | newline_to_br }}</p></div>
+                  </details>
+                {% endif %}
+            {% endcase %}
+          {% endfor %}
+        </form>
+      </div>
+    </div>
+  </section>
+</div>
+<script type="application/json" data-sys-product-json>{{ product.client_json }}</script>
+
+{% schema %}
+{
+  "name": "Product",
+  "locked": true,
+  "templates": ["product"],
+  "settings": [
+    { "type": "select", "id": "gallery_layout", "label": "Photos", "default": "thumbs_left", "options": [
+      { "value": "thumbs_left", "label": "Large photo, thumbnails beside" },
+      { "value": "thumbs_below", "label": "Large photo, thumbnails below" },
+      { "value": "stacked", "label": "All photos, one under another" }
+    ] },
+    { "type": "select", "id": "image_fit", "label": "Photo fit", "default": "cover", "options": [
+      { "value": "cover", "label": "Fill the frame (crop)" },
+      { "value": "contain", "label": "Show the whole photo" }
+    ] },
+    { "type": "select", "id": "media_size", "label": "Photo width", "default": "wide", "options": [
+      { "value": "wide", "label": "Wide" },
+      { "value": "half", "label": "Half and half" },
+      { "value": "narrow", "label": "Narrow" }
+    ] },
+    { "type": "checkbox", "id": "sticky_info", "label": "Keep product info in view while scrolling photos", "default": true },
+    { "type": "checkbox", "id": "show_breadcrumbs", "label": "Show breadcrumbs", "default": true }
+  ],
+  "blocks": [
+    { "type": "brand", "name": "Brand", "limit": 1, "settings": [
+      { "type": "paragraph", "content": "The product's brand, above the title." }
+    ] },
+    { "type": "title", "name": "Title", "limit": 1, "settings": [
+      { "type": "select", "id": "size", "label": "Size", "default": "medium", "options": [
+        { "value": "small", "label": "Small" }, { "value": "medium", "label": "Medium" }, { "value": "large", "label": "Large" }
+      ] }
+    ] },
+    { "type": "rating", "name": "Star rating", "limit": 1, "settings": [
+      { "type": "paragraph", "content": "Stars and the number of reviews. Shows once the Product reviews app is installed." }
+    ] },
+    { "type": "price", "name": "Price", "limit": 1, "settings": [
+      { "type": "select", "id": "size", "label": "Size", "default": "medium", "options": [
+        { "value": "small", "label": "Small" }, { "value": "medium", "label": "Medium" }, { "value": "large", "label": "Large" }
+      ] },
+      { "type": "checkbox", "id": "show_save", "label": "Show “Save x%” on sale items", "default": true },
+      { "type": "checkbox", "id": "show_tax_note", "label": "Show “Inclusive of all taxes”", "default": true }
+    ] },
+    { "type": "rental_price", "name": "Rent per day (Rentals app)", "limit": 1, "settings": [
+      { "type": "paragraph", "content": "The daily rent, cheaper rates for longer rentals, and the deposit — for products you rent out." },
+      { "type": "checkbox", "id": "show_tiers", "label": "Show longer-rental rates", "default": true },
+      { "type": "checkbox", "id": "show_deposit", "label": "Show the deposit", "default": true }
+    ] },
+    { "type": "rental_booking", "name": "Booking calendar (Rentals app)", "limit": 1, "settings": [
+      { "type": "paragraph", "content": "Dates, delivery and return choices, the total, and the Book button. Shows on products you rent out." },
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Pick your dates" },
+      { "type": "text", "id": "button_label", "label": "Button text", "default": "Book now" },
+      { "type": "text", "id": "request_label", "label": "Button text (booking requests)", "default": "Request to book" }
+    ] },
+    { "type": "variant_picker", "name": "Size & colour picker", "limit": 1, "settings": [
+      { "type": "select", "id": "style", "label": "Style", "default": "buttons", "options": [
+        { "value": "buttons", "label": "Buttons" }, { "value": "pills", "label": "Rounded pills" }
+      ] },
+      { "type": "url", "id": "size_chart", "label": "Size guide link (optional)" },
+      { "type": "text", "id": "size_chart_label", "label": "Size guide link text", "default": "Size guide" }
+    ] },
+    { "type": "stock", "name": "Stock message", "limit": 1, "settings": [
+      { "type": "paragraph", "content": "“In stock”, “Only 3 left”, or “Out of stock” for the chosen option." }
+    ] },
+    { "type": "buy_buttons", "name": "Quantity & add to cart", "limit": 1, "settings": [
+      { "type": "checkbox", "id": "show_quantity", "label": "Show quantity selector", "default": true },
+      { "type": "text", "id": "button_label", "label": "Button text", "default": "Add to cart" }
+    ] },
+    { "type": "trust", "name": "Delivery & payment badges", "limit": 1, "settings": [
+      { "type": "paragraph", "content": "Free delivery, cash on delivery, returns and secure checkout — from your store's settings." }
+    ] },
+    { "type": "description", "name": "Description", "limit": 1, "settings": [
+      { "type": "select", "id": "display", "label": "Show as", "default": "open", "options": [
+        { "value": "open", "label": "Section, open" }, { "value": "closed", "label": "Section, closed" }, { "value": "plain", "label": "Plain text" }
+      ] },
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Description" }
+    ] },
+    { "type": "details", "name": "Details (custom data)", "limit": 1, "settings": [
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Details" },
+      { "type": "checkbox", "id": "open", "label": "Open by default", "default": true },
+      { "type": "checkbox", "id": "show_basics", "label": "Also list brand, category, SKU and seller", "default": true }
+    ] },
+    { "type": "delivery", "name": "Delivery & returns", "limit": 1, "settings": [
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Delivery & returns" },
+      { "type": "textarea", "id": "text", "label": "Text (leave empty for the standard text)", "default": "" }
+    ] },
+    { "type": "collapsible", "name": "Extra tab", "settings": [
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Care instructions" },
+      { "type": "textarea", "id": "text", "label": "Text", "default": "Machine wash cold. Line dry in shade." },
+      { "type": "checkbox", "id": "open", "label": "Open by default", "default": false }
+    ] },
+    { "type": "text", "name": "Text", "settings": [
+      { "type": "textarea", "id": "text", "label": "Text", "default": "Free gift wrapping on every order." },
+      { "type": "select", "id": "style", "label": "Style", "default": "highlight", "options": [
+        { "value": "highlight", "label": "Highlighted, with an icon" }, { "value": "body", "label": "Plain" }, { "value": "small", "label": "Small print" }
+      ] },
+      { "type": "select", "id": "icon", "label": "Icon (highlighted style)", "default": "gift", "options": [
+        { "value": "gift", "label": "Gift" }, { "value": "truck", "label": "Delivery" }, { "value": "tag", "label": "Offer" }, { "value": "shield", "label": "Guarantee" }, { "value": "return", "label": "Returns" }, { "value": "cash", "label": "Cash" }
+      ] }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "brand" },
+    { "type": "title" },
+    { "type": "rating" },
+    { "type": "price" },
+    { "type": "variant_picker" },
+    { "type": "stock" },
+    { "type": "buy_buttons" },
+    { "type": "trust" },
+    { "type": "description" },
+    { "type": "details" },
+    { "type": "delivery" }
+  ]
+}
+{% endschema %}

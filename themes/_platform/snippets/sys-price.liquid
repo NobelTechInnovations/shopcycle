@@ -1,0 +1,9 @@
+{% comment %} Price with sale state. Expects `variant` (price, comparePrice). {% endcomment %}
+{% if variant.comparePrice and variant.comparePrice > variant.price %}
+  {% assign sys_pct = variant.comparePrice | minus: variant.price | times: 100.0 | divided_by: variant.comparePrice | round %}
+  <span class="sys-price__now sys-price__now--sale">{{ variant.price | money }}</span>
+  <span class="sys-price__was">{{ variant.comparePrice | money }}</span>
+  {% if show_save %}<span class="sys-price__save">SAVE {{ sys_pct }}%</span>{% endif %}
+{% else %}
+  <span class="sys-price__now">{{ variant.price | money }}</span>
+{% endif %}

@@ -1,0 +1,6 @@
+{
+  "sections": {
+    "main": { "type": "sys-order-confirmation", "settings": {} }
+  },
+  "order": ["main"]
+}

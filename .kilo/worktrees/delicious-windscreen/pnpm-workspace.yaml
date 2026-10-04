@@ -1,0 +1,13 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
+# pnpm 10 (pinned in package.json for hosts whose corepack can't run
+# pnpm 11+) reads this list; pnpm 11+ reads allowBuilds above.
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - prisma

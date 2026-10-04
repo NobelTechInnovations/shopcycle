@@ -1,0 +1,72 @@
+{% comment %}
+  Shop the look: one styled photo with numbered dots, and the products in
+  it listed alongside with prices. Each block is a product and where its
+  dot sits on the photo (percent from the left and top).
+{% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, subtitle: section.settings.subheading, align: 'left' %}
+    <div class="look{% if section.settings.image_right %} look--flip{% endif %}">
+      <div class="look__media">
+        {% if section.settings.image != blank %}
+          <img src="{{ section.settings.image | image_url }}" alt="{{ section.settings.image_alt | escape }}" loading="lazy" width="1200" height="1500">
+        {% else %}
+          {{ 'lifestyle-2' | placeholder_svg: 'look__art' }}
+        {% endif %}
+        {% for block in section.blocks limit: 5 %}
+          <span class="look__dot" style="left: {{ block.settings.x }}%; top: {{ block.settings.y }}%" aria-hidden="true">{{ forloop.index }}</span>
+        {% endfor %}
+      </div>
+      <ol class="look__list">
+        {% for block in section.blocks limit: 5 %}
+          {% assign p = all_products[block.settings.product] %}
+          {% if p == blank %}{% assign p = best_sellers[forloop.index0] %}{% endif %}
+          <li class="look__item">
+            <span class="look__num">{{ forloop.index }}</span>
+            {% if p %}
+              <a class="look__thumb" href="{{ p.url }}" tabindex="-1" aria-hidden="true">
+                {% if p.featured_image %}<img src="{{ p.featured_image.url | image_url }}" alt="" loading="lazy" width="160" height="200">{% else %}{{ 'product-6' | placeholder_svg }}{% endif %}
+              </a>
+              <div class="look__info">
+                <a class="look__title" href="{{ p.url }}">{{ p.title }}</a>
+                <span class="look__price">{% if p.price_varies %}From {% endif %}{{ p.price | money }}{% if p.on_sale %} <s>{{ p.compare_at_price | money }}</s>{% endif %}</span>
+              </div>
+              <a class="icon-btn look__go" href="{{ p.url }}" aria-label="View {{ p.title | escape }}">{% render 'snippets/icon', icon: 'arrow-right', class: 'icon icon--sm' %}</a>
+            {% else %}
+              <span class="look__thumb">{{ 'product-6' | placeholder_svg }}</span>
+              <div class="look__info"><span class="look__title">Pick a product</span><span class="look__price">In the theme editor</span></div>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Shop the look",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Lookbook" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Shop the look" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "Everything in this outfit, in one place." },
+    { "type": "image_picker", "id": "image", "label": "Photo", "info": "Portrait, 1200 × 1500 px or larger." },
+    { "type": "text", "id": "image_alt", "label": "Photo description", "default": "" },
+    { "type": "checkbox", "id": "image_right", "label": "Photo on the right", "default": false },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "item", "name": "Product", "settings": [
+      { "type": "product", "id": "product", "label": "Product" },
+      { "type": "range", "id": "x", "label": "Dot position — from left (%)", "min": 5, "max": 95, "step": 1, "default": 40 },
+      { "type": "range", "id": "y", "label": "Dot position — from top (%)", "min": 5, "max": 95, "step": 1, "default": 30 }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "item", "settings": { "x": 46, "y": 24 } },
+    { "type": "item", "settings": { "x": 38, "y": 56 } },
+    { "type": "item", "settings": { "x": 58, "y": 84 } }
+  ],
+  "max_blocks": 5
+}
+{% endschema %}

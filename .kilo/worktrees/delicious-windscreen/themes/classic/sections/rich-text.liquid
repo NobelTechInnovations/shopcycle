@@ -1,0 +1,26 @@
+{% comment %} A centred statement: heading, paragraph, button. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    <div class="statement statement--{{ section.settings.align }}">
+      {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+      {% if section.settings.heading != blank %}<h2 class="display display--md">{{ section.settings.heading }}</h2>{% endif %}
+      {% if section.settings.text != blank %}<div class="rte">{{ section.settings.text | newline_to_br }}</div>{% endif %}
+      {% if section.settings.button_text != blank %}<a class="btn" href="{{ section.settings.button_link | default: routes.all_products_url }}">{{ section.settings.button_text }}</a>{% endif %}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Rich text",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Honest products, fairly made" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "Tell customers what makes your brand different — in a sentence or two." },
+    { "type": "text", "id": "button_text", "label": "Button", "default": "" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "select", "id": "align", "label": "Alignment", "default": "center", "options": [{ "value": "left", "label": "Left" }, { "value": "center", "label": "Centre" }] },
+    { "type": "checkbox", "id": "surface", "label": "Use alternate background", "default": false }
+  ]
+}
+{% endschema %}

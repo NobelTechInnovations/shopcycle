@@ -1,0 +1,81 @@
+{% comment %} Brand story / feature: a photo beside a heading, text and a button. {% endcomment %}
+{% case section.settings.image_ratio %}
+  {% when 'natural' %}{% assign media_ratio = 'auto' %}
+  {% when 'portrait' %}{% assign media_ratio = '4 / 5' %}
+  {% when 'tall' %}{% assign media_ratio = '2 / 3' %}
+  {% when 'square' %}{% assign media_ratio = '1 / 1' %}
+  {% when 'landscape' %}{% assign media_ratio = '4 / 3' %}
+  {% when 'wide' %}{% assign media_ratio = '16 / 9' %}
+  {% else %}{% assign media_ratio = '' %}
+{% endcase %}
+<style>
+  .split--custom { grid-template-columns: minmax(0, var(--media-w)) minmax(0, 1fr); align-items: var(--text-pos); }
+  .split--custom.split--right { grid-template-columns: minmax(0, 1fr) minmax(0, var(--media-w)); }
+  .split--custom .split__media img { object-fit: var(--media-fit); object-position: var(--media-focus); }
+  .split--custom[data-ratio] .split__media { aspect-ratio: var(--media-ratio); }
+  .split--custom[data-ratio="auto"] .split__media img { height: auto; }
+  @media (max-width: 900px) {
+    .split--custom, .split--custom.split--right { grid-template-columns: 1fr; }
+  }
+</style>
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    <div class="split split--custom split--{{ section.settings.image_position }}"{% if media_ratio != '' %} data-ratio="{{ media_ratio }}"{% endif %} style="--media-w: {{ section.settings.media_width | default: 50 }}%; --media-fit: {{ section.settings.image_fit | default: 'cover' }}; --media-focus: {{ section.settings.image_focus | default: 'center' }}; --text-pos: {{ section.settings.text_position | default: 'center' }}{% if media_ratio != '' %}; --media-ratio: {{ media_ratio }}{% endif %}">
+      <div class="split__media">
+        {% if section.settings.image != blank %}<img src="{{ section.settings.image | image_url }}" alt="{{ section.settings.alt }}" loading="lazy" width="1200" height="1400">{% else %}{% render 'snippets/placeholder', kind: 'product' %}{% endif %}
+      </div>
+      <div class="split__text">
+        {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+        <h2 class="h2">{{ section.settings.heading }}</h2>
+        <div class="rte">{{ section.settings.text | newline_to_br }}</div>
+        {% if section.settings.button_text != blank %}
+          <a class="btn btn--ghost" href="{{ section.settings.button_link | default: routes.all_products_url }}">{{ section.settings.button_text }}</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Image with text",
+  "settings": [
+    { "type": "image_picker", "id": "image", "label": "Image" },
+    { "type": "text", "id": "alt", "label": "Image description", "default": "" },
+    { "type": "select", "id": "image_position", "label": "Image position", "default": "left", "options": [{ "value": "left", "label": "Left" }, { "value": "right", "label": "Right" }] },
+    { "type": "header", "content": "Image" },
+    { "type": "select", "id": "image_ratio", "label": "Image shape", "default": "theme", "options": [
+      { "value": "theme", "label": "Theme default" },
+      { "value": "natural", "label": "As uploaded (no cropping)" },
+      { "value": "portrait", "label": "Portrait (4:5)" },
+      { "value": "tall", "label": "Tall (2:3)" },
+      { "value": "square", "label": "Square" },
+      { "value": "landscape", "label": "Landscape (4:3)" },
+      { "value": "wide", "label": "Wide (16:9)" }
+    ] },
+    { "type": "select", "id": "image_fit", "label": "Image fit", "default": "cover", "options": [
+      { "value": "cover", "label": "Fill the shape (trims the edges)" },
+      { "value": "contain", "label": "Show the whole image" }
+    ] },
+    { "type": "select", "id": "image_focus", "label": "Keep in view when trimming", "default": "center", "options": [
+      { "value": "center", "label": "Centre" },
+      { "value": "top", "label": "Top" },
+      { "value": "bottom", "label": "Bottom" },
+      { "value": "left", "label": "Left" },
+      { "value": "right", "label": "Right" }
+    ] },
+    { "type": "range", "id": "media_width", "label": "Image width (%)", "min": 30, "max": 70, "step": 5, "default": 50 },
+    { "type": "select", "id": "text_position", "label": "Text position", "default": "center", "options": [
+      { "value": "start", "label": "Top" },
+      { "value": "center", "label": "Middle" },
+      { "value": "end", "label": "Bottom" }
+    ] },
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Our story" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Small batches, made with care" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "We work with makers across India to create pieces that last — natural materials, fair wages and packaging you can recycle." },
+    { "type": "text", "id": "button_text", "label": "Button", "default": "Read more" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "checkbox", "id": "surface", "label": "Use alternate background", "default": true }
+  ]
+}
+{% endschema %}

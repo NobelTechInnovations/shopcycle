@@ -1,0 +1,54 @@
+{% comment %}
+  Gift guide: tiles by budget or by occasion — "Under ₹2,000",
+  "Anniversary", "For her". Each tile links wherever you like (a
+  collection, a search, a page).
+{% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, subtitle: section.settings.subheading, align: 'center' %}
+    <ul class="gifts" style="--cols: {{ section.blocks.size | at_most: 4 }}">
+      {% for block in section.blocks limit: 4 %}
+        <li>
+          <a class="gift" href="{{ block.settings.link | default: routes.all_products_url }}">
+            <span class="gift__media">
+              {% if block.settings.image != blank %}
+                <img src="{{ block.settings.image | image_url }}" alt="" loading="lazy" width="700" height="700">
+              {% else %}
+                {% assign n = forloop.index0 | modulo: 4 | plus: 1 %}{% assign art = 'jewel-' | append: n %}{{ art | placeholder_svg }}
+              {% endif %}
+            </span>
+            <span class="gift__label">{{ block.settings.label }}</span>
+            <span class="gift__title">{{ block.settings.title }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Gift guide",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Gift guide" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Something for every moment" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "Gift-wrapped and delivered with a handwritten note." },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "tile", "name": "Tile", "settings": [
+      { "type": "image_picker", "id": "image", "label": "Picture" },
+      { "type": "text", "id": "label", "label": "Small text", "default": "Gifts" },
+      { "type": "text", "id": "title", "label": "Title", "default": "Under ₹2,000" },
+      { "type": "url", "id": "link", "label": "Link" }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "tile", "settings": { "label": "Gifts", "title": "Under ₹2,000" } },
+    { "type": "tile", "settings": { "label": "Gifts", "title": "Under ₹5,000" } },
+    { "type": "tile", "settings": { "label": "Occasion", "title": "Anniversary" } },
+    { "type": "tile", "settings": { "label": "Occasion", "title": "Wedding season" } }
+  ],
+  "max_blocks": 4
+}
+{% endschema %}

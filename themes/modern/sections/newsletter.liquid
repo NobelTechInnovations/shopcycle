@@ -1,0 +1,43 @@
+{% comment %}
+  Email signup on a dark band. A signup becomes a customer with email
+  consent (Customers in the admin); the result comes back as a message.
+{% endcomment %}
+<section class="section">
+  <div class="container">
+    <div class="signup signup--{{ section.settings.style }}">
+      <div class="signup__text">
+        {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+        <h2 class="h1">{{ section.settings.heading }}</h2>
+        {% if section.settings.text != blank %}<p>{{ section.settings.text }}</p>{% endif %}
+      </div>
+      <div class="signup__form">
+        {% if notice %}<p class="note note--ok" role="status">{{ notice }}</p>{% endif %}
+        {% if form_error %}<p class="note note--error" role="alert">{{ form_error }}</p>{% endif %}
+        <form class="line-form" method="post" action="{{ routes.newsletter_url }}">
+          <input type="hidden" name="return_to" value="{{ routes.root_url }}">
+          <label class="visually-hidden" for="nl-{{ section.id }}">Email</label>
+          <input id="nl-{{ section.id }}" type="email" name="email" required placeholder="Your email address" autocomplete="email">
+          <button type="submit" class="btn {% if section.settings.style == 'dark' %}btn--accent{% endif %}">{{ section.settings.button_text }}</button>
+        </form>
+        <p class="signup__fine">We'll only email you about {{ shop.name }}. Unsubscribe any time.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Newsletter",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Newsletter" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "10% off your first order" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "Join the list for new drops, restocks and members-only offers." },
+    { "type": "text", "id": "button_text", "label": "Button", "default": "Subscribe" },
+    { "type": "select", "id": "style", "label": "Colours", "default": "dark", "options": [
+      { "value": "dark", "label": "Dark" },
+      { "value": "light", "label": "Light" },
+      { "value": "accent", "label": "Highlight colour" }
+    ] }
+  ]
+}
+{% endschema %}

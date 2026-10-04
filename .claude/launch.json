@@ -1,0 +1,61 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "www",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@shopcycle/www",
+        "dev"
+      ],
+      "port": 3004
+    },
+    {
+      "name": "admin",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@shopcycle/admin",
+        "exec",
+        "next",
+        "dev",
+        "--port",
+        "3010"
+      ],
+      "port": 3010
+    },
+    {
+      "name": "api-local",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/api && ADMIN_ORIGIN=http://localhost:3010 EMAIL_PROVIDER=log SMS_PROVIDER=log WHATSAPP_PROVIDER=log JOBS_DISABLED=true BILLING_JOBS=false FLOW_JOBS=false MEDIA_STORAGE=database node src/server.js"
+      ],
+      "port": 4100
+    },
+    {
+      "name": "storefront",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@shopcycle/storefront",
+        "exec",
+        "next",
+        "dev",
+        "--port",
+        "3002"
+      ],
+      "port": 3002
+    }
+  ]
+}

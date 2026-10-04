@@ -1,0 +1,25 @@
+{% comment %} Guest order lookup: order number + email. {% endcomment %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container">
+      <div class="sys-auth">
+        <p class="sys-eyebrow" style="margin-bottom:10px">{{ shop.name }}</p>
+        <h1 class="sys-h1">Find your order</h1>
+        <p class="sys-muted" style="margin:10px 0 24px">Enter your order number and the email you used at checkout.</p>
+        <div class="sys-card">
+          {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+          <form method="post" action="{{ routes.order_lookup_url }}" class="sys-stack" data-sys-once>
+            <label class="sys-field"><span class="sys-label">Order number</span><input class="sys-input" name="orderNumber" inputmode="numeric" required placeholder="1001"></label>
+            <label class="sys-field"><span class="sys-label">Email</span><input class="sys-input" type="email" name="email" autocomplete="email" required placeholder="you@example.com"></label>
+            <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Looking…">Find order</button>
+          </form>
+        </div>
+        <p class="sys-small sys-muted" style="margin-top:20px;text-align:center">Have an account? <a class="sys-link" href="{{ routes.account_login_url }}">Sign in</a> to see all your orders.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{ "name": "Order lookup", "settings": [] }
+{% endschema %}

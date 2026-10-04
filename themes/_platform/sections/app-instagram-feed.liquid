@@ -1,0 +1,137 @@
+{% comment %}
+  Instagram Feed app: the store's latest posts (`instagram`, see
+  modules/social/instagram.js). A scrolling row (swipe on phones, arrows on
+  computers) or a grid. Styled with the platform's --oy-* tokens so it fits
+  any theme. Nothing shows to shoppers until an account is connected; the
+  theme editor shows a hint instead.
+{% endcomment %}
+{% assign ig = instagram %}
+{% if ig and ig.posts.size > 0 %}
+  {% assign count = section.settings.count | default: 12 %}
+  <section class="oy-ig oy-ig--{{ section.settings.layout | default: 'scroll' }}{% if section.settings.surface %} oy-ig--surface{% endif %}" style="--oy-ig-cols: {{ section.settings.columns | default: 4 }}; --oy-ig-radius: {{ section.settings.radius | default: 12 }}px">
+    <div class="oy-ig__wrap">
+      <div class="oy-ig__head">
+        <div class="oy-ig__intro">
+          {% if section.settings.show_profile %}
+            <a class="oy-ig__avatar" href="{{ ig.profile_url }}" target="_blank" rel="noopener" aria-hidden="true" tabindex="-1">
+              {% if ig.picture %}<img src="{{ ig.picture }}" alt="" width="56" height="56" loading="lazy">{% else %}<span>{{ ig.username | slice: 0 | upcase }}</span>{% endif %}
+            </a>
+          {% endif %}
+          <div>
+            {% if section.settings.heading != blank %}<h2 class="oy-ig__title">{{ section.settings.heading }}</h2>{% endif %}
+            <a class="oy-ig__handle" href="{{ ig.profile_url }}" target="_blank" rel="noopener">@{{ ig.username }}</a>
+          </div>
+        </div>
+        <div class="oy-ig__actions">
+          {% if section.settings.layout != 'grid' %}
+            <button type="button" class="oy-ig__arrow" data-oy-ig-prev aria-label="Previous posts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <button type="button" class="oy-ig__arrow" data-oy-ig-next aria-label="More posts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+          {% endif %}
+          {% if section.settings.follow_text != blank %}
+            <a class="oy-ig__follow" href="{{ ig.profile_url }}" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.6" cy="6.4" r="1" fill="currentColor" stroke="none"/></svg>
+              {{ section.settings.follow_text }}
+            </a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="oy-ig__track" data-oy-ig-track>
+        {% for post in ig.posts limit: count %}
+          <a class="oy-ig__post" href="{{ post.url }}" target="_blank" rel="noopener">
+            <img src="{{ post.image }}" alt="{{ post.alt }}" loading="lazy" width="640" height="640">
+            {% if post.video %}<span class="oy-ig__badge" aria-label="Video"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none"/></svg></span>{% endif %}
+            {% if section.settings.captions %}
+              <span class="oy-ig__cap">
+                {% if post.caption != blank %}<span>{{ post.caption | truncatewords: 16 }}</span>{% endif %}
+                {% if post.likes %}<b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" fill="currentColor" stroke="none"/></svg>{{ post.likes }}</b>{% endif %}
+              </span>
+            {% endif %}
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% if section.settings.layout != 'grid' %}
+    <script>
+      (function () {
+        var s = document.currentScript && document.currentScript.previousElementSibling;
+        if (!s) return;
+        var t = s.querySelector("[data-oy-ig-track]");
+        function go(d) { t.scrollBy({ left: d * t.clientWidth * 0.8, behavior: "smooth" }); }
+        var p = s.querySelector("[data-oy-ig-prev]"), n = s.querySelector("[data-oy-ig-next]");
+        if (p) p.addEventListener("click", function () { go(-1); });
+        if (n) n.addEventListener("click", function () { go(1); });
+      })();
+    </script>
+  {% endif %}
+{% elsif design_mode %}
+  <section class="oy-app-hint">
+    <b>Instagram feed</b>
+    <span>{% if apps['instagram-feed'] %}Connect your Instagram account in Apps ▸ Instagram Feed — your latest posts will show here.{% else %}Install the Instagram Feed app (Apps) to show your posts here.{% endif %}</span>
+  </section>
+{% endif %}
+
+{% assign show_css = design_mode %}
+{% if ig and ig.posts.size > 0 %}{% assign show_css = true %}{% endif %}
+{% if show_css %}
+<style>
+  .oy-ig{padding:clamp(40px,6vw,72px) 0;color:var(--oy-text);font-family:var(--oy-font-body)}
+  .oy-ig--surface{background:var(--oy-surface)}
+  .oy-ig__wrap{max-width:var(--oy-container,1280px);margin:0 auto;padding:0 20px}
+  .oy-ig__head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px}
+  .oy-ig__intro{display:flex;align-items:center;gap:14px;min-width:0}
+  .oy-ig__avatar{width:56px;height:56px;border-radius:50%;padding:2px;background:linear-gradient(45deg,#f9ce34,#ee2a7b,#6228d7);flex:none;text-decoration:none}
+  .oy-ig__avatar img,.oy-ig__avatar span{display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:50%;border:2px solid var(--oy-bg);object-fit:cover;background:var(--oy-surface);color:var(--oy-text);font-weight:700}
+  .oy-ig__title{margin:0 0 2px;font-family:var(--oy-font-heading);font-size:clamp(22px,2.6vw,30px);line-height:1.15;letter-spacing:-.01em;color:var(--oy-text)}
+  .oy-ig__handle{color:var(--oy-muted);text-decoration:none;font-size:15px}
+  .oy-ig__handle:hover{color:var(--oy-text);text-decoration:underline}
+  .oy-ig__actions{display:flex;align-items:center;gap:8px}
+  .oy-ig__arrow{width:40px;height:40px;border-radius:50%;border:1px solid var(--oy-line-strong);background:var(--oy-bg);color:var(--oy-text);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s}
+  .oy-ig__arrow:hover{background:var(--oy-surface)}
+  .oy-ig__arrow svg,.oy-ig__follow svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .oy-ig__follow{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 18px;border-radius:var(--oy-radius-button,999px);background:var(--oy-primary);color:var(--oy-on-primary);font-weight:600;font-size:14px;text-decoration:none;white-space:nowrap}
+  .oy-ig__follow:hover{opacity:.9}
+  .oy-ig__track{display:grid;gap:12px}
+  .oy-ig--grid .oy-ig__track{grid-template-columns:repeat(var(--oy-ig-cols),minmax(0,1fr))}
+  .oy-ig--scroll .oy-ig__track{grid-auto-flow:column;grid-auto-columns:calc((100% - 12px * (var(--oy-ig-cols) - 1)) / var(--oy-ig-cols));overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+  .oy-ig--scroll .oy-ig__track::-webkit-scrollbar{display:none}
+  .oy-ig__post{position:relative;display:block;aspect-ratio:1;overflow:hidden;border-radius:var(--oy-ig-radius);background:var(--oy-surface);scroll-snap-align:start;color:#fff;text-decoration:none}
+  .oy-ig__post img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s ease}
+  .oy-ig__post:hover img{transform:scale(1.05)}
+  .oy-ig__badge{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
+  .oy-ig__badge svg{width:13px;height:13px;margin-left:2px}
+  .oy-ig__cap{position:absolute;inset:auto 0 0 0;display:flex;flex-direction:column;gap:6px;padding:40px 14px 12px;background:linear-gradient(to top,rgba(0,0,0,.72),transparent);font-size:13px;line-height:1.4;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s}
+  .oy-ig__cap b{display:inline-flex;align-items:center;gap:5px;font-weight:600}
+  .oy-ig__cap svg{width:14px;height:14px}
+  .oy-ig__post:hover .oy-ig__cap,.oy-ig__post:focus-visible .oy-ig__cap{opacity:1;transform:none}
+  @media (max-width:900px){.oy-ig{--oy-ig-cols:3!important}}
+  @media (max-width:600px){
+    .oy-ig--scroll .oy-ig__track{grid-auto-columns:42%;margin:0 -20px;padding:0 20px;scroll-padding:0 20px}
+    .oy-ig--grid .oy-ig__track{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .oy-ig__arrow{display:none}
+    .oy-ig__head{align-items:center}
+  }
+  .oy-app-hint{display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center;margin:24px auto;max-width:var(--oy-container,1280px);padding:28px 20px;border:1.5px dashed var(--oy-line-strong);border-radius:14px;color:var(--oy-muted);font-family:var(--oy-font-body);font-size:14px}
+  .oy-app-hint b{color:var(--oy-text);font-size:15px}
+</style>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Instagram feed",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Follow us on Instagram" },
+    { "type": "select", "id": "layout", "label": "Layout", "default": "scroll", "options": [
+      { "value": "scroll", "label": "Scrolling row" },
+      { "value": "grid", "label": "Grid" }
+    ] },
+    { "type": "range", "id": "count", "label": "Posts to show", "min": 3, "max": 24, "step": 1, "default": 12 },
+    { "type": "range", "id": "columns", "label": "Posts across (computer)", "min": 2, "max": 6, "step": 1, "default": 4 },
+    { "type": "range", "id": "radius", "label": "Corner rounding", "min": 0, "max": 28, "step": 2, "default": 12 },
+    { "type": "checkbox", "id": "show_profile", "label": "Show profile picture", "default": true },
+    { "type": "checkbox", "id": "captions", "label": "Show caption and likes on hover", "default": true },
+    { "type": "text", "id": "follow_text", "label": "Follow button text (empty hides it)", "default": "Follow" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ]
+}
+{% endschema %}

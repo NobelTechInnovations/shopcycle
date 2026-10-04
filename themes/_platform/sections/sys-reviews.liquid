@@ -1,0 +1,99 @@
+{% comment %}
+  Product reviews (the Product Reviews app — nothing shows until it's
+  installed): the average and a breakdown by stars, the published reviews
+  with the store's replies, and a form to write one.
+{% endcomment %}
+{% if product.reviews %}
+{% assign r = product.reviews %}
+<div class="sys" id="reviews">
+  <section class="sys-section sys-section--flush">
+    <div class="sys-container">
+      <div class="sys-reviews">
+        <div class="sys-reviews__summary">
+          <h2 class="sys-h2">{{ section.settings.heading | default: 'Customer reviews' }}</h2>
+          {% if r.count > 0 %}
+            <div class="sys-reviews__score">
+              <span class="sys-reviews__avg sys-num">{{ r.average }}</span>
+              <span class="sys-stack" style="gap:4px">
+                {% render 'snippets/sys-stars', rating: r.average %}
+                <span class="sys-muted sys-small">Based on {{ r.count }} review{% if r.count != 1 %}s{% endif %}</span>
+              </span>
+            </div>
+            <ul class="sys-reviews__bars">
+              {% for bar in r.histogram %}
+                <li>
+                  <span class="sys-small">{{ bar.star }}★</span>
+                  <span class="sys-reviews__bar" aria-hidden="true"><span style="width: {{ bar.percent }}%"></span></span>
+                  <span class="sys-small sys-muted sys-num">{{ bar.count }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="sys-muted">No reviews yet. Bought this? Tell others what you think.</p>
+          {% endif %}
+
+          {% if section.settings.show_form %}
+            <details class="sys-review-form"{% if form_error %} open{% endif %}>
+              <summary class="sys-btn sys-btn--secondary sys-btn--block">Write a review</summary>
+              <form method="post" action="{{ r.form_url }}" class="sys-stack" style="gap:14px" data-sys-once>
+                <fieldset class="sys-starpick">
+                  <legend class="sys-label">Your rating</legend>
+                  <div class="sys-starpick__row">
+                    {% for n in (1..5) reversed %}
+                      <input type="radio" id="star-{{ n }}" name="rating" value="{{ n }}" required>
+                      <label for="star-{{ n }}" title="{{ n }} star{% if n > 1 %}s{% endif %}"><span class="sys-visually-hidden">{{ n }} star{% if n > 1 %}s{% endif %}</span></label>
+                    {% endfor %}
+                  </div>
+                </fieldset>
+                <div class="sys-fields sys-fields--2">
+                  <label class="sys-field"><span class="sys-label">Name</span><input class="sys-input" name="name" required maxlength="80" autocomplete="name" value="{{ customer.name }}"></label>
+                  <label class="sys-field"><span class="sys-label">Email <span class="sys-muted" style="font-weight:400">(not shown)</span></span><input class="sys-input" type="email" name="email" required maxlength="200" autocomplete="email" value="{{ customer.email }}"></label>
+                </div>
+                <label class="sys-field"><span class="sys-label">Title <span class="sys-muted" style="font-weight:400">(optional)</span></span><input class="sys-input" name="title" maxlength="120" placeholder="Sum it up"></label>
+                <label class="sys-field"><span class="sys-label">Review</span><textarea class="sys-input sys-textarea" name="body" rows="4" required minlength="10" maxlength="3000" placeholder="Fit, quality, how it feels…"></textarea></label>
+                {% if r.buyers_only %}<p class="sys-hint" style="margin:0">Only customers who bought this can review it — use the email you ordered with.</p>{% endif %}
+                <button type="submit" class="sys-btn" data-busy-label="Sending…">Submit review</button>
+              </form>
+            </details>
+          {% endif %}
+        </div>
+
+        <div class="sys-reviews__list">
+          {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
+          {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+          {% for review in r.items %}
+            <article class="sys-review">
+              <div class="sys-review__head">
+                {% render 'snippets/sys-stars', rating: review.rating %}
+                <span class="sys-muted sys-small">{{ review.date | date: '%d %b %Y' }}</span>
+              </div>
+              {% if review.title != blank %}<h3 class="sys-review__title">{{ review.title | escape }}</h3>{% endif %}
+              <p class="sys-review__body">{{ review.body | escape | newline_to_br }}</p>
+              <p class="sys-review__author">
+                {{ review.author | escape }}
+                {% if review.verified %}<span class="sys-review__verified">{% render 'snippets/sys-icon', icon: 'check' %} Verified buyer</span>{% endif %}
+              </p>
+              {% if review.reply %}
+                <div class="sys-review__reply"><strong>{{ shop.name }}</strong><p>{{ review.reply | escape | newline_to_br }}</p></div>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Reviews",
+  "limit": 1,
+  "templates": ["product"],
+  "settings": [
+    { "type": "paragraph", "content": "Shows once the Product Reviews app is installed (Apps)." },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Customer reviews" },
+    { "type": "checkbox", "id": "show_form", "label": "Let shoppers write a review here", "default": true }
+  ]
+}
+{% endschema %}

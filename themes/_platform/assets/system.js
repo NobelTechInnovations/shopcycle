@@ -1,0 +1,551 @@
+/*
+ * Oyklane platform pages — progressive enhancement only. Every form here
+ * works without JavaScript (plain POST/redirect/GET); this script just
+ * makes it nicer: gallery thumbnails, variant switching that keeps price,
+ * stock and the add-to-cart button in sync, quantity steppers, sorting
+ * without a submit button, and one-click-only checkout.
+ */
+(function () {
+  "use strict";
+
+  function money(amount, currency) {
+    try {
+      return new Intl.NumberFormat("en-IN", { style: "currency", currency: currency || "INR" }).format(amount);
+    } catch (e) {
+      return String(amount);
+    }
+  }
+
+  // ── Gallery ────────────────────────────────────────────
+  document.querySelectorAll("[data-sys-gallery]").forEach(function (gallery) {
+    var main = gallery.querySelector("[data-sys-gallery-main]");
+    if (!main) return;
+    gallery.querySelectorAll("[data-sys-thumb]").forEach(function (thumb) {
+      thumb.addEventListener("click", function () {
+        main.src = thumb.getAttribute("data-src");
+        main.alt = thumb.getAttribute("data-alt") || main.alt;
+        gallery.querySelectorAll("[data-sys-thumb]").forEach(function (t) {
+          t.setAttribute("aria-current", t === thumb ? "true" : "false");
+        });
+      });
+    });
+  });
+
+  // ── Quantity steppers ──────────────────────────────────
+  document.querySelectorAll("[data-sys-qty]").forEach(function (wrap) {
+    var input = wrap.querySelector("input");
+    if (!input) return;
+    wrap.querySelectorAll("[data-step]").forEach(function (btn) {
+      btn.addEventListener("click", function (event) {
+        // Cart steppers are real submit buttons; only product-page ones
+        // (type="button") are handled here.
+        if (btn.type !== "button") return;
+        event.preventDefault();
+        var min = Number(input.min || 1);
+        var max = Number(input.max || 999);
+        var next = Math.min(max, Math.max(min, Number(input.value || 1) + Number(btn.getAttribute("data-step"))));
+        input.value = String(next);
+      });
+    });
+  });
+
+  // ── Variant picker ─────────────────────────────────────
+  document.querySelectorAll("[data-sys-product]").forEach(function (form) {
+    var dataEl = document.querySelector("[data-sys-product-json]");
+    if (!dataEl) return;
+    var data;
+    try {
+      data = JSON.parse(dataEl.textContent);
+    } catch (e) {
+      return;
+    }
+    var priceEl = document.querySelector("[data-sys-price]");
+    var stockEl = document.querySelector("[data-sys-stock]");
+    var button = form.querySelector("[data-sys-add]");
+    var selectedLabel = document.querySelector("[data-sys-selected]");
+
+    function render(variantId) {
+      var v = data.variants.filter(function (x) {
+        return x.id === variantId;
+      })[0];
+      if (!v) return;
+      if (priceEl) {
+        var onSale = v.comparePrice && v.comparePrice > v.price;
+        var html = '<span class="sys-price__now' + (onSale ? " sys-price__now--sale" : "") + '">' + money(v.price, data.currency) + "</span>";
+        if (onSale) {
+          var pct = Math.round(((v.comparePrice - v.price) / v.comparePrice) * 100);
+          html += '<span class="sys-price__was">' + money(v.comparePrice, data.currency) + "</span>";
+          html += '<span class="sys-price__save">SAVE ' + pct + "%</span>";
+        }
+        priceEl.innerHTML = html;
+      }
+      if (stockEl) {
+        var q = v.inventoryQuantity;
+        stockEl.className = "sys-stock" + (q <= 0 ? " sys-stock--out" : q <= data.lowStock ? " sys-stock--low" : "");
+        stockEl.textContent = q <= 0 ? "Out of stock" : q <= data.lowStock ? "Only " + q + " left — order soon" : "In stock, ready to ship";
+      }
+      if (button) {
+        button.disabled = !v.available;
+        button.textContent = v.available ? button.getAttribute("data-label") || data.labels.add : data.labels.soldOut;
+      }
+      if (selectedLabel) selectedLabel.textContent = v.title;
+    }
+
+    form.querySelectorAll('input[type="radio"][name="variantId"]').forEach(function (radio) {
+      radio.addEventListener("change", function () {
+        render(radio.value);
+      });
+    });
+
+    // Separate pickers (Size, Colour…): the chosen values make a title
+    // like "M / Black", which picks the variant.
+    var hidden = form.querySelector("[data-sys-variant-input]");
+    var groups = Array.prototype.slice.call(form.querySelectorAll("[data-sys-option]"));
+    if (!hidden || !groups.length) return;
+    hidden.disabled = false;
+    var parts = function (v) {
+      return v.title.split(" / ").map(function (s) {
+        return s.trim();
+      });
+    };
+    function chosen() {
+      return groups.map(function (g) {
+        var r = g.querySelector("input:checked");
+        return r ? r.value : null;
+      });
+    }
+    function sync() {
+      var picks = chosen();
+      var match = data.variants.filter(function (v) {
+        var p = parts(v);
+        return picks.every(function (val, i) {
+          return p[i] === val;
+        });
+      })[0];
+      groups.forEach(function (g, i) {
+        var label = g.querySelector("[data-sys-option-selected]");
+        if (label) label.textContent = picks[i] || "";
+        // Strike through values with nothing in stock alongside the other picks.
+        g.querySelectorAll("input").forEach(function (input) {
+          var trial = picks.slice();
+          trial[i] = input.value;
+          var ok = data.variants.some(function (v) {
+            var p = parts(v);
+            return v.available && trial.every(function (val, k) {
+              return p[k] === val;
+            });
+          });
+          input.closest(".sys-swatch").classList.toggle("sys-swatch--unavailable", !ok);
+        });
+      });
+      if (match) {
+        hidden.value = match.id;
+        render(match.id);
+        if (selectedLabel) selectedLabel.textContent = match.title;
+        showPhotoFor(picks);
+      } else if (button) {
+        button.disabled = true;
+        button.textContent = "Unavailable";
+        if (stockEl) {
+          stockEl.className = "sys-stock sys-stock--out";
+          stockEl.textContent = "This combination isn't available";
+        }
+      }
+    }
+    // Choosing a colour (or any value named in a photo's description, e.g.
+    // "Pure Linen Shirt in Olive") brings that photo up in the gallery.
+    var thumbs = Array.prototype.slice.call(document.querySelectorAll("[data-sys-thumb]"));
+    var lastShown = null;
+    function showPhotoFor(picks) {
+      var key = picks.join("|");
+      if (!thumbs.length || key === lastShown) return;
+      lastShown = key;
+      for (var i = picks.length - 1; i >= 0; i -= 1) {
+        var want = String(picks[i] || "").toLowerCase();
+        if (!want) continue;
+        var hit = thumbs.filter(function (t) {
+          return new RegExp("\\b" + want.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(String(t.getAttribute("data-alt") || "").toLowerCase());
+        })[0];
+        if (hit) {
+          if (hit.getAttribute("aria-current") !== "true") hit.click();
+          return;
+        }
+      }
+    }
+    groups.forEach(function (g) {
+      g.addEventListener("change", sync);
+    });
+    sync();
+  });
+
+  // ── Account tabs ───────────────────────────────────────
+  // The account page's Orders / Details / Password parts become tabs. The
+  // tab a form was sent from reopens after the page comes back (with its
+  // "saved" or error message); a #details link opens that tab.
+  document.querySelectorAll("[data-sys-tabs]").forEach(function (list) {
+    var tabs = Array.prototype.slice.call(list.querySelectorAll("[data-sys-tab]"));
+    var panels = {};
+    tabs.forEach(function (t) {
+      panels[t.getAttribute("data-sys-tab")] = document.querySelector('[data-sys-panel="' + t.getAttribute("data-sys-tab") + '"]');
+    });
+    var KEY = "oy-account-tab";
+    function show(name, focus) {
+      if (!panels[name]) name = tabs[0].getAttribute("data-sys-tab");
+      tabs.forEach(function (t) {
+        var on = t.getAttribute("data-sys-tab") === name;
+        t.setAttribute("aria-selected", on ? "true" : "false");
+        t.tabIndex = on ? 0 : -1;
+        if (on && focus) t.focus();
+        panels[t.getAttribute("data-sys-tab")].hidden = !on;
+      });
+    }
+    list.hidden = false;
+    tabs.forEach(function (t, i) {
+      t.addEventListener("click", function () {
+        show(t.getAttribute("data-sys-tab"));
+        if (history.replaceState) history.replaceState(null, "", "#" + t.getAttribute("data-sys-tab"));
+      });
+      t.addEventListener("keydown", function (e) {
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        var next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+        show(next.getAttribute("data-sys-tab"), true);
+      });
+    });
+    Object.keys(panels).forEach(function (name) {
+      var form = panels[name] && panels[name].querySelector("form");
+      if (form) form.addEventListener("submit", function () {
+        try {
+          sessionStorage.setItem(KEY, name);
+        } catch (e) {}
+      });
+    });
+    document.querySelectorAll("[data-sys-tab-link]").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        show(a.getAttribute("data-sys-tab-link"));
+        list.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+    var start = (location.hash || "").slice(1);
+    if (document.querySelector(".sys-acct .sys-alert")) {
+      try {
+        start = sessionStorage.getItem(KEY) || start;
+      } catch (e) {}
+    }
+    try {
+      sessionStorage.removeItem(KEY);
+    } catch (e) {}
+    show(start);
+  });
+
+  // ── Auto-submitting selects (collection sort) ──────────
+  document.querySelectorAll("[data-sys-autosubmit]").forEach(function (el) {
+    el.addEventListener("change", function () {
+      if (el.form) el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit();
+    });
+  });
+
+  // ── Listing filters: a sidebar on desktop (always open), folded behind a
+  // "Filters" button on phones. Rendered open so it works without JS.
+  document.querySelectorAll("[data-sys-filters]").forEach(function (panel) {
+    if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) panel.open = false;
+  });
+  // Keep the address tidy: empty price boxes and the default sort stay out of it.
+  var filterForm = document.getElementById("sys-filter-form");
+  if (filterForm) {
+    filterForm.addEventListener("submit", function () {
+      Array.prototype.forEach.call(filterForm.elements, function (field) {
+        if ((field.name === "price_min" || field.name === "price_max") && !field.value) field.disabled = true;
+        if (field.name === "sort" && field.value === "featured") field.disabled = true;
+      });
+    });
+  }
+
+  // ── Checkout: the state from the PIN code, and the pay button naming the
+  // chosen way to pay ("Pay ₹1,299 with UPI").
+  var PIN_STATES = [
+    [110, 110, "Delhi"], [120, 136, "Haryana"], [140, 159, "Punjab"], [160, 160, "Chandigarh"], [161, 169, "Punjab"],
+    [170, 177, "Himachal Pradesh"], [180, 193, "Jammu and Kashmir"], [194, 194, "Ladakh"],
+    [246, 246, "Uttarakhand"], [248, 249, "Uttarakhand"], [262, 263, "Uttarakhand"], [200, 285, "Uttar Pradesh"],
+    [301, 345, "Rajasthan"], [396, 396, "Dadra and Nagar Haveli and Daman and Diu"], [360, 395, "Gujarat"],
+    [403, 403, "Goa"], [400, 445, "Maharashtra"], [450, 488, "Madhya Pradesh"], [490, 497, "Chhattisgarh"],
+    [500, 509, "Telangana"], [510, 535, "Andhra Pradesh"], [560, 591, "Karnataka"], [605, 605, "Puducherry"],
+    [600, 643, "Tamil Nadu"], [682, 682, "Lakshadweep"], [670, 695, "Kerala"], [737, 737, "Sikkim"],
+    [744, 744, "Andaman and Nicobar Islands"], [700, 743, "West Bengal"], [751, 770, "Odisha"], [781, 788, "Assam"],
+    [790, 792, "Arunachal Pradesh"], [793, 794, "Meghalaya"], [795, 795, "Manipur"], [796, 796, "Mizoram"],
+    [797, 798, "Nagaland"], [799, 799, "Tripura"], [814, 835, "Jharkhand"], [800, 855, "Bihar"],
+  ];
+  document.querySelectorAll("[data-sys-checkout]").forEach(function (form) {
+    var pin = form.querySelector("[data-sys-pin]");
+    var state = form.querySelector("[data-sys-state]");
+    if (pin && state) {
+      pin.addEventListener("input", function () {
+        var d = pin.value.replace(/\D/g, "");
+        if (d.length !== 6 || state.value) return;
+        var n = Number(d.slice(0, 3));
+        for (var i = 0; i < PIN_STATES.length; i += 1) {
+          if (n >= PIN_STATES[i][0] && n <= PIN_STATES[i][1]) {
+            state.value = PIN_STATES[i][2];
+            break;
+          }
+        }
+      });
+    }
+    var text = form.querySelector("[data-sys-pay-text]");
+    if (text) {
+      form.addEventListener("change", function (e) {
+        var label = e.target.getAttribute && e.target.getAttribute("data-pay-label");
+        if (label) text.textContent = label;
+      });
+    }
+  });
+
+  // ── Show / hide password ───────────────────────────────
+  document.querySelectorAll("[data-sys-reveal]").forEach(function (btn) {
+    var input = btn.parentNode.querySelector("[data-sys-password]");
+    if (!input) return;
+    btn.addEventListener("click", function () {
+      var show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "Hide" : "Show";
+      btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    });
+  });
+
+  // ── One submit only (checkout, account forms) ──────────
+  document.querySelectorAll("[data-sys-once]").forEach(function (form) {
+    form.addEventListener("submit", function () {
+      var btn = form.querySelector('button[type="submit"]');
+      if (!btn || btn.disabled) return;
+      // Deferred so the browser still sends the form first.
+      setTimeout(function () {
+        btn.disabled = true;
+        btn.setAttribute("aria-busy", "true");
+        if (btn.getAttribute("data-busy-label")) btn.textContent = btn.getAttribute("data-busy-label");
+      }, 0);
+    });
+  });
+})();
+
+/*
+ * Rentals app — the booking calendar on a rented product's page. Without
+ * JavaScript the block is two date fields (checked again by the server);
+ * with it, a month calendar that greys out booked days, keeps the range
+ * free of them, and shows the total as dates are picked.
+ */
+(function () {
+  "use strict";
+  var root = document.querySelector("[data-sys-rental]");
+  if (!root) return;
+  var cfg;
+  try {
+    cfg = JSON.parse(root.querySelector("[data-sys-rental-json]").textContent);
+  } catch (e) {
+    return;
+  }
+  var form = root.closest("form");
+  var startIn = root.querySelector("[data-sys-rent-start]");
+  var endIn = root.querySelector("[data-sys-rent-end]");
+  var cal = root.querySelector("[data-sys-rent-cal]");
+  var sum = root.querySelector("[data-sys-rent-sum]");
+  var inputs = root.querySelector("[data-sys-rent-inputs]");
+  var submit = root.querySelector("[data-sys-rent-submit]");
+  if (!form || !startIn || !endIn || !cal) return;
+
+  var DAY = 86400000;
+  var toDate = function (d) {
+    return new Date(d + "T00:00:00Z");
+  };
+  var fmt = function (date) {
+    return date.toISOString().slice(0, 10);
+  };
+  var add = function (d, n) {
+    return fmt(new Date(toDate(d).getTime() + n * DAY));
+  };
+  var span = function (a, b) {
+    return Math.round((toDate(b) - toDate(a)) / DAY) + 1;
+  };
+  var money = function (n) {
+    try {
+      return new Intl.NumberFormat("en-IN", { style: "currency", currency: cfg.currency || "INR", maximumFractionDigits: n % 1 ? 2 : 0 }).format(n);
+    } catch (e) {
+      return "₹" + n;
+    }
+  };
+  var short = function (d) {
+    return new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(toDate(d));
+  };
+
+  var state = { start: null, end: null, month: cfg.earliest.slice(0, 7), error: "" };
+  var booked = {};
+
+  function variantId() {
+    var radio = form.querySelector('input[type="radio"][name="variantId"]:checked');
+    if (radio) return radio.value;
+    var hidden = form.querySelector('input[name="variantId"]:not([type="radio"]):not([disabled])');
+    return hidden ? hidden.value : null;
+  }
+  function loadBooked() {
+    booked = {};
+    (cfg.booked[variantId()] || []).forEach(function (d) {
+      booked[d] = true;
+    });
+  }
+  function rateFor(days) {
+    var rate = cfg.pricePerDay;
+    (cfg.tiers || []).forEach(function (t) {
+      if (days >= t.days) rate = t.price;
+    });
+    return rate;
+  }
+  // The range, and the days kept free after it, must all be open.
+  function rangeFree(a, b) {
+    for (var d = a; d <= add(b, cfg.bufferDays); d = add(d, 1)) if (booked[d]) return false;
+    return true;
+  }
+  function latestEnd() {
+    return add(cfg.latest, cfg.maxDays);
+  }
+  function selectable(d) {
+    if (d < cfg.earliest || booked[d]) return false;
+    if (state.start && !state.end && d >= state.start) {
+      if (span(state.start, d) > cfg.maxDays) return false;
+      return rangeFree(state.start, d);
+    }
+    return d <= cfg.latest;
+  }
+
+  function pick(d) {
+    state.error = "";
+    if (!state.start || state.end || d < state.start) {
+      state.start = d;
+      state.end = null;
+      if (!rangeFree(d, add(d, Math.max(0, cfg.minDays - 1)))) {
+        state.start = null;
+        state.error = "That day is too close to another booking — try another day.";
+      }
+    } else {
+      var n = span(state.start, d);
+      if (n < cfg.minDays) {
+        state.error = "Rent it for at least " + cfg.minDays + " days.";
+      } else if (!rangeFree(state.start, d)) {
+        state.error = "Some of those days are booked — pick a shorter stretch.";
+      } else {
+        state.end = d;
+      }
+    }
+    sync();
+  }
+
+  function sync() {
+    startIn.value = state.start || "";
+    endIn.value = state.end || "";
+    renderCal();
+    renderSum();
+  }
+
+  function renderSum() {
+    var html = "";
+    var ready = state.start && state.end;
+    if (state.error) html += '<p class="sys-rent__error">' + state.error + "</p>";
+    if (ready) {
+      var days = span(state.start, state.end);
+      var rate = rateFor(days);
+      var rent = Math.round(rate * days * 100) / 100;
+      var payNow = rent + (cfg.depositAtCheckout ? cfg.deposit : 0);
+      html += "<div><span>" + short(state.start) + " → " + short(state.end) + "</span><span>" + days + " day" + (days === 1 ? "" : "s") + "</span></div>";
+      html += "<div><span>" + money(rate) + " × " + days + " day" + (days === 1 ? "" : "s") + "</span><span>" + money(rent) + "</span></div>";
+      if (cfg.deposit > 0) html += "<div><span>Refundable deposit" + (cfg.depositAtCheckout ? "" : " (on delivery)") + "</span><span>" + money(cfg.deposit) + "</span></div>";
+      html += '<div class="sys-rent__total"><span>' + (cfg.mode === "request" ? "Total" : "To pay now") + "</span><span>" + money(cfg.mode === "request" ? rent + cfg.deposit : payNow) + "</span></div>";
+    } else if (state.start) {
+      html += '<p class="sys-rent__hint">' + short(state.start) + " → now pick the last day" + (cfg.minDays > 1 ? " (at least " + cfg.minDays + " days)" : "") + ".</p>";
+    } else if (!state.error) {
+      html += '<p class="sys-rent__hint">Tap the first day you need it.</p>';
+    }
+    sum.innerHTML = html;
+    if (submit) submit.disabled = !ready;
+  }
+
+  function renderCal() {
+    var first = toDate(state.month + "-01");
+    var y = first.getUTCFullYear();
+    var m = first.getUTCMonth();
+    var daysIn = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    var lead = (first.getUTCDay() + 6) % 7; // Monday first
+    var prevMonth = fmt(new Date(Date.UTC(y, m - 1, 1))).slice(0, 7);
+    var nextMonth = fmt(new Date(Date.UTC(y, m + 1, 1))).slice(0, 7);
+    var title = new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(first);
+    var html =
+      '<div class="sys-cal"><div class="sys-cal__head">' +
+      '<button type="button" class="sys-cal__nav" data-month="' + prevMonth + '" aria-label="Previous month"' + (prevMonth < cfg.earliest.slice(0, 7) ? " disabled" : "") + ">‹</button>" +
+      '<span class="sys-cal__month" aria-live="polite">' + title + "</span>" +
+      '<button type="button" class="sys-cal__nav" data-month="' + nextMonth + '" aria-label="Next month"' + (nextMonth > latestEnd().slice(0, 7) ? " disabled" : "") + ">›</button>" +
+      '</div><div class="sys-cal__grid" role="grid">';
+    ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].forEach(function (d) {
+      html += '<span class="sys-cal__dow" aria-hidden="true">' + d + "</span>";
+    });
+    for (var i = 0; i < lead; i++) html += "<span></span>";
+    for (var n = 1; n <= daysIn; n++) {
+      var d = state.month + "-" + (n < 10 ? "0" : "") + n;
+      var cls = "sys-cal__day";
+      if (booked[d]) cls += " sys-cal__day--booked";
+      if (d === state.start) cls += " sys-cal__day--start";
+      if (d === state.end) cls += " sys-cal__day--end";
+      if (state.start && state.end && d > state.start && d < state.end) cls += " sys-cal__day--in";
+      var ok = selectable(d) || d === state.start;
+      html += '<button type="button" class="' + cls + '" data-day="' + d + '"' + (ok ? "" : " disabled") + ' aria-label="' + short(d) + (booked[d] ? ", booked" : "") + '"' + (d === state.start || d === state.end ? ' aria-pressed="true"' : "") + ">" + n + "</button>";
+    }
+    html += '</div><div class="sys-cal__legend"><span>Greyed out: booked or unavailable</span></div></div>';
+    cal.innerHTML = html;
+  }
+
+  cal.addEventListener("click", function (e) {
+    var nav = e.target.closest("[data-month]");
+    if (nav && !nav.disabled) {
+      state.month = nav.getAttribute("data-month");
+      renderCal();
+      return;
+    }
+    var day = e.target.closest("[data-day]");
+    if (day && !day.disabled) pick(day.getAttribute("data-day"));
+  });
+
+  // Another size or colour has its own bookings.
+  form.addEventListener("change", function (e) {
+    var name = e.target && e.target.name;
+    if (name !== "variantId" && !/^option\d+$/.test(name || "")) return;
+    setTimeout(function () {
+      loadBooked();
+      if (state.start && !rangeFree(state.start, state.end || state.start)) {
+        state.start = state.end = null;
+        state.error = "Those dates are booked in this size — pick new dates.";
+      }
+      sync();
+    }, 0);
+  });
+
+  // Dates first: stop the form (and the cart drawer, which listens on the
+  // document) before an incomplete booking goes anywhere.
+  window.addEventListener(
+    "submit",
+    function (e) {
+      if (e.target !== form) return;
+      var via = e.submitter;
+      if (via && !via.hasAttribute("data-sys-rent-submit") && !root.contains(via)) return;
+      if (state.start && state.end) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      state.error = state.start ? "Pick the last day of your rental." : "Pick the dates you need it for.";
+      renderSum();
+      cal.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+    true
+  );
+
+  startIn.required = false;
+  endIn.required = false;
+  if (inputs) inputs.hidden = true;
+  cal.hidden = false;
+  loadBooked();
+  sync();
+})();

@@ -1,0 +1,9 @@
+{% comment %} The filters in use, each removable, and "Clear all". {% endcomment %}
+{% if listing.active_count > 0 %}
+  <ul class="sys-chips" aria-label="Filters in use">
+    {% for chip in listing.active %}
+      <li><a class="sys-chip" href="{{ chip.remove_url }}" aria-label="Remove filter {{ chip.label }}">{{ chip.label }} {% render 'snippets/sys-icon', icon: 'x' %}</a></li>
+    {% endfor %}
+    <li><a class="sys-link sys-small" href="{{ listing.clear_url }}">Clear all</a></li>
+  </ul>
+{% endif %}

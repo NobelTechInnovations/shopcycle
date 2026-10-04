@@ -1,0 +1,45 @@
+{% comment %} Blog index: newest post large, the rest in a grid. {% endcomment %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container">
+      <div class="sys-collection-head">
+        <span class="sys-eyebrow">{{ shop.name }}</span>
+        <h1 class="sys-h1">{{ blog.title }}</h1>
+        {% if blog.tag %}<p>Posts tagged “{{ blog.tag }}” · <a class="sys-link" href="{{ routes.blog_url }}">See all</a></p>{% endif %}
+      </div>
+      {% if blog.articles.size > 0 %}
+        <div class="sys-posts">
+          {% for article in blog.articles %}
+            <a class="sys-post{% if forloop.first and blog.page == 1 %} sys-post--lead{% endif %}" href="{{ article.url }}">
+              <div class="sys-post__media">
+                {% if article.image %}<img src="{{ article.image }}" alt="" loading="lazy" width="1200" height="750">{% else %}<span class="sys-placeholder">{% render 'snippets/sys-icon', icon: 'photo' %}</span>{% endif %}
+              </div>
+              <div class="sys-stack" style="gap:8px">
+                <span class="sys-muted sys-small">{{ article.date }}{% if article.author %} · {{ article.author }}{% endif %} · {{ article.reading_minutes }} min read</span>
+                <h2 class="sys-post__title">{{ article.title }}</h2>
+                {% if article.excerpt %}<p class="sys-muted">{{ article.excerpt }}</p>{% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+        {% if blog.pages > 1 %}
+          <nav class="sys-row" style="justify-content:center;margin-top:40px" aria-label="Pagination">
+            {% if blog.page > 1 %}<a class="sys-btn sys-btn--secondary sys-btn--sm" href="{{ routes.blog_url }}?page={{ blog.page | minus: 1 }}">Newer posts</a>{% endif %}
+            <span class="sys-muted sys-small">Page {{ blog.page }} of {{ blog.pages }}</span>
+            {% if blog.page < blog.pages %}<a class="sys-btn sys-btn--secondary sys-btn--sm" href="{{ routes.blog_url }}?page={{ blog.page | plus: 1 }}">Older posts</a>{% endif %}
+          </nav>
+        {% endif %}
+      {% else %}
+        <div class="sys-empty">
+          <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'file' %}</span>
+          <h2 class="sys-h2">No posts yet</h2>
+          <p>Stories and guides from {{ shop.name }} will appear here.</p>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{ "name": "Blog", "settings": [] }
+{% endschema %}

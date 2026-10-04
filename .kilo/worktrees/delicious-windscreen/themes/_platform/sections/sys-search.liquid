@@ -1,0 +1,56 @@
+{% comment %} Search results. The query arrives escaped (see storefront/service.js). {% endcomment %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container">
+      <h1 class="sys-h1">{% if search.query != blank %}Results for “{{ search.query }}”{% else %}Search{% endif %}</h1>
+      <form class="sys-searchbar" method="get" action="{{ routes.search_url }}" role="search">
+        <label class="sys-sr-only" for="sys-search-q">Search products</label>
+        <input class="sys-input" id="sys-search-q" type="search" name="q" value="{{ search.query }}" placeholder="Search products" autocomplete="off">
+        <button type="submit" class="sys-btn">{% render 'snippets/sys-icon', icon: 'search' %}<span>Search</span></button>
+      </form>
+      {% if search.query != blank %}
+        <div class="sys-listing" style="margin-top:24px">
+          {% render 'snippets/sys-filters', listing: listing, action: routes.search_url %}
+          <div class="sys-listing__main">
+            <div class="sys-toolbar">
+              <span class="sys-muted">{{ search.result_count }} result{% if search.result_count != 1 %}s{% endif %}</span>
+              <label class="sys-row" style="gap:8px">
+                <span class="sys-muted">Sort by</span>
+                <select class="sys-select" name="sort" form="sys-filter-form" data-sys-autosubmit aria-label="Sort results">
+                  {% for option in listing.sort_options %}
+                    <option value="{{ option.value }}" {% if option.value == listing.sort %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </div>
+            {% render 'snippets/sys-filter-chips', listing: listing %}
+            {% if search.results.size > 0 %}
+              <div class="sys-grid sys-grid--3">
+                {% for item in search.results %}
+                  {% render 'snippets/sys-product-card', product: item %}
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="sys-empty">
+                <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'search' %}</span>
+                {% if listing.active_count > 0 %}
+                  <h2 class="sys-h2">No matches with these filters</h2>
+                  <p>Try removing a filter or two.</p>
+                  <a class="sys-btn sys-btn--secondary" href="{{ listing.clear_url }}">Clear all filters</a>
+                {% else %}
+                  <h2 class="sys-h2">No matches</h2>
+                  <p>Check the spelling, or try a broader word like a category name.</p>
+                  <a class="sys-btn sys-btn--secondary" href="{{ routes.all_products_url }}">Browse all products</a>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{ "name": "Search results", "settings": [] }
+{% endschema %}

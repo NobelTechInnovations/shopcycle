@@ -1,0 +1,6 @@
+{
+  "sections": {
+    "main": { "type": "sys-404", "settings": {} }
+  },
+  "order": ["main"]
+}

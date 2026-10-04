@@ -1,0 +1,120 @@
+{% comment %}
+  Cart. Quantity buttons are real submit buttons carrying the new
+  quantity (no JavaScript needed); "Remove" submits quantity 0.
+{% endcomment %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container">
+      {% if cart.items.size > 0 %}
+        <div class="sys-head" style="margin-bottom:20px">
+          <h1 class="sys-h1">Your cart <span class="sys-muted" style="font-weight:400;font-size:0.6em">({{ cart.item_count }} item{% if cart.item_count != 1 %}s{% endif %})</span></h1>
+          <a class="sys-link sys-small" href="{{ routes.all_products_url }}">Continue shopping</a>
+        </div>
+
+        <div class="sys-cart">
+          <div>
+            {% if cart.free_shipping %}
+              <div class="sys-progress" style="margin-bottom:8px">
+                {% if cart.free_shipping.reached %}
+                  <span>{% render 'snippets/sys-icon', icon: 'truck' %} <strong>You've unlocked free delivery</strong></span>
+                {% else %}
+                  <span>You're <strong>{{ cart.free_shipping.remaining | money }}</strong> away from free delivery</span>
+                {% endif %}
+                <div class="sys-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ cart.free_shipping.percent }}"><span style="width: {{ cart.free_shipping.percent }}%"></span></div>
+              </div>
+            {% endif %}
+
+            <ul class="sys-lines">
+              {% for item in cart.items %}
+                <li class="sys-line">
+                  <a class="sys-line__media" href="{{ item.url }}" tabindex="-1" aria-hidden="true">
+                    {% if item.image %}<img src="{{ item.image }}" alt="" loading="lazy" width="192" height="240">{% else %}<span class="sys-placeholder">{% render 'snippets/sys-icon', icon: 'photo' %}</span>{% endif %}
+                  </a>
+                  <div class="sys-line__info">
+                    <a class="sys-line__title" href="{{ item.url }}">{{ item.title }}</a>
+                    {% if item.detail %}<span class="sys-line__detail">{{ item.detail }}</span>{% endif %}
+                    <span class="sys-muted sys-small sys-num">{{ item.price | money }} each</span>
+                    <form method="post" action="{{ routes.cart_update_url }}" class="sys-line__controls">
+                      <input type="hidden" name="variantId" value="{{ item.variantId }}">
+                      <input type="hidden" name="lineKey" value="{{ item.key | escape }}">
+                      <div class="sys-qty sys-qty--sm">
+                        <button type="submit" name="quantity" value="{{ item.quantity | minus: 1 }}" aria-label="Decrease quantity of {{ item.title }}">{% render 'snippets/sys-icon', icon: 'minus' %}</button>
+                        <input type="number" value="{{ item.quantity }}" readonly tabindex="-1" aria-label="Quantity">
+                        <button type="submit" name="quantity" value="{{ item.quantity | plus: 1 }}" aria-label="Increase quantity of {{ item.title }}">{% render 'snippets/sys-icon', icon: 'plus' %}</button>
+                      </div>
+                      <button type="submit" name="quantity" value="0" class="sys-link sys-small sys-muted">Remove</button>
+                    </form>
+                  </div>
+                  <div class="sys-line__total sys-num">{{ item.lineTotal | money }}</div>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+
+          <aside class="sys-summary">
+            <div class="sys-card sys-stack" style="gap:14px">
+              <h2 class="sys-h3">Order summary</h2>
+
+              {% if discount_error %}<p class="sys-alert sys-alert--error" role="alert" style="margin:0">{{ discount_error }}</p>{% endif %}
+              {% if cart.discount %}
+                <form method="post" action="{{ routes.cart_discount_remove_url }}" class="sys-row sys-row--between">
+                  <span class="sys-applied">{% render 'snippets/sys-icon', icon: 'tag' %} {{ cart.discount.code }}<button type="submit" aria-label="Remove discount {{ cart.discount.code }}">{% render 'snippets/sys-icon', icon: 'x' %}</button></span>
+                  {% if cart.discount.error %}<span class="sys-small" style="color:var(--oy-danger)">No longer valid</span>{% endif %}
+                </form>
+              {% else %}
+                <form method="post" action="{{ routes.cart_discount_url }}" class="sys-inline-form">
+                  <label class="sys-sr-only" for="sys-discount">Discount code</label>
+                  <input class="sys-input" id="sys-discount" type="text" name="code" placeholder="Discount code" autocomplete="off" style="text-transform:uppercase">
+                  <button type="submit" class="sys-btn sys-btn--secondary">Apply</button>
+                </form>
+              {% endif %}
+              {% render 'snippets/sys-gift-card', back: 'cart', slot: 'page' %}
+
+              <div class="sys-stack" style="gap:10px">
+                <div class="sys-sumrow"><span>Subtotal</span><span class="sys-num">{{ cart.subtotal | money }}</span></div>
+                {% if cart.discount and cart.discount.amount > 0 %}
+                  <div class="sys-sumrow sys-sumrow--saving"><span>Discount</span><span class="sys-num">−{{ cart.discount.amount | money }}</span></div>
+                {% endif %}
+                <div class="sys-sumrow"><span>Delivery</span><span class="sys-num">{% if cart.shipping %}{% if cart.shipping.amount > 0 %}{{ cart.shipping.amount | money }}{% else %}Free{% endif %}{% else %}Calculated at checkout{% endif %}</span></div>
+                {% if cart.tax %}<div class="sys-sumrow"><span>{{ cart.tax.name }}</span><span class="sys-num">{{ cart.tax.amount | money }}</span></div>{% endif %}
+                <div class="sys-sumrow sys-sumrow--total"><span>Total</span><span class="sys-num">{{ cart.total | money }}</span></div>
+                {% if cart.gift_card and cart.gift_card.amount > 0 %}
+                  <div class="sys-sumrow sys-sumrow--saving"><span>Gift card</span><span class="sys-num">−{{ cart.gift_card.amount | money }}</span></div>
+                  <div class="sys-sumrow sys-sumrow--total"><span>To pay</span><span class="sys-num">{{ cart.due | money }}</span></div>
+                {% endif %}
+              </div>
+
+              <a class="sys-btn sys-btn--lg sys-btn--block" href="{{ routes.checkout_url }}">{% render 'snippets/sys-icon', icon: 'lock' %} Checkout</a>
+              <div class="sys-stack" style="gap:8px">
+                <span class="sys-note">{% render 'snippets/sys-icon', icon: 'shield' %} Secure checkout</span>
+                {% if shop.cod_enabled %}<span class="sys-note">{% render 'snippets/sys-icon', icon: 'cash' %} Cash on delivery available</span>{% endif %}
+                {% if shop.return_days > 0 %}<span class="sys-note">{% render 'snippets/sys-icon', icon: 'return' %} Easy {{ shop.return_days }}-day returns</span>{% endif %}
+              </div>
+            </div>
+          </aside>
+        </div>
+      {% else %}
+        <div class="sys-empty">
+          <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'bag' %}</span>
+          <h1 class="sys-h2">Your cart is empty</h1>
+          <p>Looks like you haven't added anything yet.</p>
+          <a class="sys-btn" href="{{ routes.all_products_url }}">Start shopping</a>
+        </div>
+        {% if featured_products.size > 0 %}
+          <div class="sys-related" style="margin-top:24px">
+            <div class="sys-related__head"><h2 class="sys-h2">Popular right now</h2></div>
+            <div class="sys-grid">
+              {% for item in featured_products limit: 4 %}
+                {% render 'snippets/sys-product-card', product: item %}
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{ "name": "Cart", "settings": [] }
+{% endschema %}

@@ -1,0 +1,57 @@
+{% comment %}
+  Filters and sort for a product listing (collection and search pages).
+  One GET form: ticking a box or changing the sort reloads the page with
+  the new filters (system.js); without JavaScript, "Apply" does it.
+    listing — from storefront/service.js applyListing
+    action  — the page's own URL
+  Renders the panel (a sidebar on desktop, a drop-down on phones) and the
+  toolbar above the grid; the page puts the grid in `.sys-listing__main`.
+{% endcomment %}
+<form id="sys-filter-form" method="get" action="{{ action }}" class="sys-filters" aria-label="Filter products">
+  {% for field in listing.keep %}<input type="hidden" name="{{ field.name }}" value="{{ field.value }}">{% endfor %}
+  <details class="sys-filters__panel" data-sys-filters open>
+    <summary class="sys-filters__toggle">
+      {% render 'snippets/sys-icon', icon: 'filter' %}
+      Filters{% if listing.active_count > 0 %} <span class="sys-filters__count">{{ listing.active_count }}</span>{% endif %}
+    </summary>
+    <div class="sys-filters__body">
+      <div class="sys-facet">
+        <p class="sys-facet__title">Availability</p>
+        <label class="sys-check"><input type="checkbox" name="in_stock" value="1" data-sys-autosubmit {% if listing.in_stock %}checked{% endif %}> <span>In stock only</span></label>
+      </div>
+
+      {% if listing.price.max > listing.price.min %}
+        <div class="sys-facet">
+          <p class="sys-facet__title">Price</p>
+          <div class="sys-price-range">
+            <label><span class="sys-sr-only">Minimum price</span><span aria-hidden="true">₹</span><input class="sys-input" type="number" name="price_min" min="0" inputmode="numeric" placeholder="{{ listing.price.min }}" value="{{ listing.price.from }}"></label>
+            <span aria-hidden="true">–</span>
+            <label><span class="sys-sr-only">Maximum price</span><span aria-hidden="true">₹</span><input class="sys-input" type="number" name="price_max" min="0" inputmode="numeric" placeholder="{{ listing.price.max }}" value="{{ listing.price.to }}"></label>
+          </div>
+          <button type="submit" class="sys-btn sys-btn--sm sys-btn--secondary sys-price-apply">Apply</button>
+        </div>
+      {% endif %}
+
+      {% for facet in listing.facets %}
+        <details class="sys-facet sys-facet--list" {% if forloop.index <= 3 or facet.active > 0 %}open{% endif %}>
+          <summary class="sys-facet__title">{{ facet.label }}{% if facet.active > 0 %} <span class="sys-filters__count">{{ facet.active }}</span>{% endif %}</summary>
+          <div class="sys-facet__values{% if facet.key == 'size' %} sys-facet__values--chips{% endif %}">
+            {% for v in facet.values %}
+              {% if facet.key == 'size' %}
+                <label class="sys-size-chip{% if v.count == 0 and v.checked == false %} is-empty{% endif %}"><input type="checkbox" name="{{ facet.key }}" value="{{ v.value }}" data-sys-autosubmit {% if v.checked %}checked{% endif %}><span>{{ v.value }}</span></label>
+              {% else %}
+                <label class="sys-check sys-facet__value{% if v.count == 0 and v.checked == false %} is-empty{% endif %}">
+                  <input type="checkbox" name="{{ facet.key }}" value="{{ v.value }}" data-sys-autosubmit {% if v.checked %}checked{% endif %}>
+                  {% if v.swatch %}<i class="sys-facet__dot" style="background:{{ v.swatch }}" aria-hidden="true"></i>{% endif %}
+                  <span>{{ v.value }}</span>
+                  <em>{{ v.count }}</em>
+                </label>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </details>
+      {% endfor %}
+      <noscript><button type="submit" class="sys-btn sys-btn--block">Apply filters</button></noscript>
+    </div>
+  </details>
+</form>

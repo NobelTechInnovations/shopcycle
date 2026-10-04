@@ -1,0 +1,226 @@
+{% comment %}
+  Shopper sign-in and sign-up — one page, four modes:
+    password (default) · code (email me a code, then the code step) · register
+    phone (Phone Login app): number → code → [name + email → [email code]]
+      — with the app on it's the way in (login.phone_only); an emailed code
+      (mode code) is offered only when a phone code can't be sent
+  "Continue with Google" shows whenever the platform has Google sign-in set up.
+{% endcomment %}
+{%- capture return_field -%}{% if login.return_to %}<input type="hidden" name="return_to" value="{{ login.return_to }}">{% endif %}{%- endcapture -%}
+{%- capture return_query -%}{% if login.return_to %}?return_to={{ login.return_to }}{% endif %}{%- endcapture -%}
+{%- capture alt_methods -%}
+  {% if login.phone_enabled or login.google_enabled %}
+    <div class="sys-stack" style="gap:10px">
+      {% if login.phone_enabled %}
+        <a class="sys-btn sys-btn--secondary sys-btn--block" href="{{ routes.account_login_url }}?mode=phone{% if login.return_to %}&return_to={{ login.return_to }}{% endif %}">{% render 'snippets/sys-icon', icon: 'phone' %} Sign in with your phone</a>
+      {% endif %}
+      {% if login.google_enabled %}
+        <a class="sys-btn sys-btn--secondary sys-btn--block" href="{{ routes.account_url }}/google{{ return_query }}">{% render 'snippets/sys-icon', icon: 'google' %} Continue with Google</a>
+      {% endif %}
+    </div>
+  {% endif %}
+{%- endcapture -%}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container">
+      <div class="sys-auth">
+        <p class="sys-eyebrow" style="margin-bottom:10px">{{ shop.name }}</p>
+
+        {% if login.mode == "code" and login.step == "code" %}
+          <h1 class="sys-h1">Check your email</h1>
+          <p class="sys-muted" style="margin:10px 0 24px">We sent a 6-digit code to <strong style="color:var(--oy-text)">{{ login.email }}</strong>. It expires in 10 minutes.</p>
+          <div class="sys-card">
+            {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+            {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
+            <form method="post" action="{{ routes.account_login_url }}" class="sys-stack" data-sys-once>
+              <input type="hidden" name="intent" value="verify">
+              <label class="sys-field">
+                <span class="sys-label">Sign-in code</span>
+                <input class="sys-input sys-code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus placeholder="••••••">
+              </label>
+              <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Signing in…">Sign in</button>
+            </form>
+            <form method="post" action="{{ routes.account_login_url }}" class="sys-row sys-row--between sys-row--wrap sys-small sys-muted" style="margin-top:16px">
+              <input type="hidden" name="intent" value="resend">
+              <span>Didn't get it? Check spam, or <button type="submit" class="sys-link">send a new code</button>.</span>
+              <a class="sys-link" href="{{ routes.account_login_url }}?change=1">Use a different email</a>
+            </form>
+          </div>
+
+        {% elsif login.mode == "phone" %}
+          {% if login.step == "phone-code" %}
+            <h1 class="sys-h1">Enter your code</h1>
+            <p class="sys-muted" style="margin:10px 0 24px">We sent a 6-digit code to <strong style="color:var(--oy-text)">{{ login.phone }}</strong>. It expires in 10 minutes.</p>
+          {% elsif login.step == "phone-profile" %}
+            <h1 class="sys-h1">Almost done</h1>
+            <p class="sys-muted" style="margin:10px 0 24px">Your number is confirmed. Add your name and email so we can send your order updates.</p>
+          {% elsif login.step == "phone-email-code" %}
+            <h1 class="sys-h1">Confirm your email</h1>
+            <p class="sys-muted" style="margin:10px 0 24px">You've shopped here before with <strong style="color:var(--oy-text)">{{ login.email }}</strong>. To keep your orders private, enter the code we just emailed you.</p>
+          {% else %}
+            <h1 class="sys-h1">Sign in with your phone</h1>
+            <p class="sys-muted" style="margin:10px 0 24px">We'll send a one-time code to your mobile number — no password needed.</p>
+          {% endif %}
+          <div class="sys-card">
+            {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+            {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
+            {% if login.step == "phone-code" %}
+              <form method="post" action="{{ routes.account_login_url }}" class="sys-stack" data-sys-once>
+                <input type="hidden" name="intent" value="phone-verify">
+                <label class="sys-field">
+                  <span class="sys-label">Code</span>
+                  <input class="sys-input sys-code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus placeholder="••••••">
+                </label>
+                <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Signing in…">Sign in</button>
+              </form>
+              <form method="post" action="{{ routes.account_login_url }}" class="sys-row sys-row--between sys-row--wrap sys-small sys-muted" style="margin-top:16px">
+                <input type="hidden" name="intent" value="phone-resend">
+                <span>Didn't get it? <button type="submit" class="sys-link">Send a new code</button>.</span>
+                <a class="sys-link" href="{{ routes.account_login_url }}?mode=phone&change=1">Use a different number</a>
+              </form>
+            {% elsif login.step == "phone-profile" %}
+              <form method="post" action="{{ routes.account_login_url }}" class="sys-stack" data-sys-once>
+                <input type="hidden" name="intent" value="phone-profile">
+                <label class="sys-field">
+                  <span class="sys-label">Full name</span>
+                  <input class="sys-input" name="name" autocomplete="name" required autofocus maxlength="120">
+                </label>
+                <label class="sys-field">
+                  <span class="sys-label">Email</span>
+                  <input class="sys-input" type="email" name="email" autocomplete="email" required maxlength="200" value="{{ login.email }}" placeholder="you@example.com">
+                </label>
+                <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Saving…">Continue</button>
+              </form>
+            {% elsif login.step == "phone-email-code" %}
+              <form method="post" action="{{ routes.account_login_url }}" class="sys-stack" data-sys-once>
+                <input type="hidden" name="intent" value="phone-email-verify">
+                <label class="sys-field">
+                  <span class="sys-label">Email code</span>
+                  <input class="sys-input sys-code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus placeholder="••••••">
+                </label>
+                <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Signing in…">Confirm and sign in</button>
+              </form>
+            {% else %}
+              <form method="post" action="{{ routes.account_login_url }}" class="sys-stack" data-sys-once>
+                <input type="hidden" name="intent" value="phone-request">
+                {{ return_field }}
+                <label class="sys-field">
+                  <span class="sys-label">Mobile number</span>
+                  <input class="sys-input" type="tel" name="phone" autocomplete="tel" inputmode="tel" required autofocus maxlength="24" value="{{ login.phone }}" placeholder="98765 43210">
+                </label>
+                {% if login.phone_channels.size > 1 %}
+                  <fieldset class="sys-field" style="border:0;padding:0;margin:0">
+                    <legend class="sys-label">Send the code by</legend>
+                    <div class="sys-row" style="gap:16px">
+                      <label class="sys-check"><input type="radio" name="channel" value="sms" checked> <span>SMS</span></label>
+                      <label class="sys-check"><input type="radio" name="channel" value="whatsapp"> <span>WhatsApp</span></label>
+                    </div>
+                  </fieldset>
+                {% else %}
+                  <input type="hidden" name="channel" value="{{ login.phone_channels.first }}">
+                {% endif %}
+                <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Sending…">Send code{% if login.phone_channels.size == 1 and login.phone_channels.first == "whatsapp" %} on WhatsApp{% endif %}</button>
+              </form>
+            {% endif %}
+          </div>
+          {% if login.phone_only %}
+            {% if form_error != blank and login.step == "phone" %}
+              <p class="sys-small sys-muted" style="margin-top:20px;text-align:center">Code not arriving? <a class="sys-link" href="{{ routes.account_login_url }}?mode=code{% if login.return_to %}&return_to={{ login.return_to }}{% endif %}">Sign in with your email instead</a></p>
+            {% endif %}
+          {% else %}
+            <p class="sys-small sys-muted" style="margin-top:20px;text-align:center"><a class="sys-link" href="{{ routes.account_login_url }}{{ return_query }}">Sign in with your email instead</a></p>
+          {% endif %}
+
+        {% elsif login.mode == "register" %}
+          <h1 class="sys-h1">Create an account</h1>
+          <p class="sys-muted" style="margin:10px 0 24px">Track your orders in one place, and check out faster with your details saved.</p>
+          <div class="sys-card">
+            {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+            <form method="post" action="{{ routes.account_register_url }}" class="sys-stack" data-sys-once>
+              {{ return_field }}
+              <label class="sys-field">
+                <span class="sys-label">Full name</span>
+                <input class="sys-input" name="name" autocomplete="name" required autofocus maxlength="120">
+              </label>
+              <label class="sys-field">
+                <span class="sys-label">Email</span>
+                <input class="sys-input" type="email" name="email" autocomplete="email" required value="{{ login.email }}" placeholder="you@example.com">
+              </label>
+              <label class="sys-field">
+                <span class="sys-label">Password</span>
+                <span class="sys-password">
+                  <input class="sys-input" type="password" name="password" autocomplete="new-password" required minlength="8" maxlength="200" aria-describedby="pw-hint" data-sys-password>
+                  <button type="button" class="sys-password__toggle" data-sys-reveal aria-label="Show password">Show</button>
+                </span>
+                <span class="sys-hint" id="pw-hint">At least 8 characters.</span>
+              </label>
+              <label class="sys-check"><input type="checkbox" name="acceptsMarketing" value="true"> <span>Email me about new arrivals and offers</span></label>
+              <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Creating your account…">Create account</button>
+            </form>
+            {% if alt_methods != blank %}<div class="sys-or"><span>or</span></div>{{ alt_methods }}{% endif %}
+          </div>
+          <p class="sys-small sys-muted" style="margin-top:20px;text-align:center">Already have an account? <a class="sys-link" href="{{ routes.account_login_url }}{{ return_query }}">Sign in</a></p>
+
+        {% elsif login.mode == "code" %}
+          <h1 class="sys-h1">Sign in with a code</h1>
+          <p class="sys-muted" style="margin:10px 0 24px">Enter your email and we'll send you a one-time code — no password needed. Use this if you've forgotten your password, too.</p>
+          <div class="sys-card">
+            {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+            {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
+            <form method="post" action="{{ routes.account_login_url }}" class="sys-stack" data-sys-once>
+              <input type="hidden" name="intent" value="request">
+              {{ return_field }}
+              <label class="sys-field">
+                <span class="sys-label">Email</span>
+                <input class="sys-input" type="email" name="email" autocomplete="email" required autofocus value="{{ login.email }}" placeholder="you@example.com">
+              </label>
+              <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Sending…">Email me a code</button>
+            </form>
+          </div>
+          {% if login.phone_only %}
+            <p class="sys-small sys-muted" style="margin-top:20px;text-align:center"><a class="sys-link" href="{{ routes.account_login_url }}?mode=phone{% if login.return_to %}&return_to={{ login.return_to }}{% endif %}">Sign in with your phone instead</a></p>
+          {% else %}
+            <p class="sys-small sys-muted" style="margin-top:20px;text-align:center"><a class="sys-link" href="{{ routes.account_login_url }}{{ return_query }}">Sign in with a password instead</a></p>
+          {% endif %}
+
+        {% else %}
+          <h1 class="sys-h1">Sign in</h1>
+          <p class="sys-muted" style="margin:10px 0 24px">See your orders, and check out faster with your details saved.</p>
+          <div class="sys-card">
+            {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+            {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
+            <form method="post" action="{{ routes.account_login_url }}" class="sys-stack" data-sys-once>
+              <input type="hidden" name="intent" value="password">
+              {{ return_field }}
+              <label class="sys-field">
+                <span class="sys-label">Email</span>
+                <input class="sys-input" type="email" name="email" autocomplete="email" required {% unless login.email != blank %}autofocus{% endunless %} value="{{ login.email }}" placeholder="you@example.com">
+              </label>
+              <label class="sys-field">
+                <span class="sys-row sys-row--between"><span class="sys-label">Password</span><a class="sys-link sys-small" href="{{ routes.account_login_url }}?mode=code{% if login.return_to %}&return_to={{ login.return_to }}{% endif %}">Forgot password?</a></span>
+                <span class="sys-password">
+                  <input class="sys-input" type="password" name="password" autocomplete="current-password" required maxlength="200" {% if login.email != blank %}autofocus{% endif %} data-sys-password>
+                  <button type="button" class="sys-password__toggle" data-sys-reveal aria-label="Show password">Show</button>
+                </span>
+              </label>
+              <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Signing in…">Sign in</button>
+            </form>
+            <div class="sys-or"><span>or</span></div>
+            <div class="sys-stack" style="gap:10px">
+              <a class="sys-btn sys-btn--secondary sys-btn--block" href="{{ routes.account_login_url }}?mode=code{% if login.return_to %}&return_to={{ login.return_to }}{% endif %}">
+                {% render 'snippets/sys-icon', icon: 'mail' %} Email me a sign-in code
+              </a>
+              {{ alt_methods }}
+            </div>
+          </div>
+          <p class="sys-small sys-muted" style="margin-top:20px;text-align:center">New here? <a class="sys-link" href="{{ routes.account_register_url }}{{ return_query }}">Create an account</a></p>
+          <p class="sys-small sys-muted" style="margin-top:6px;text-align:center">Ordered as a guest? <a class="sys-link" href="{{ routes.order_lookup_url }}">Find your order</a></p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{ "name": "Customer sign in", "settings": [] }
+{% endschema %}

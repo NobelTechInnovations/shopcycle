@@ -1,0 +1,267 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Table, Button, Dropdown, App } from "antd";
+import { Plus, Package, Search, Upload, Download, ChevronDown, X } from "lucide-react";
+import { PageHeader, StatusBadge, EmptyState, ListCard, Thumb, SearchInput, DeleteIconButton, useConfirmDialog } from "@shopcycle/ui";
+import { formatCurrency } from "@shopcycle/utils";
+import { apiFetch, apiDownload } from "@/lib/api";
+import { ProductImportModal } from "@/components/ProductImportModal";
+
+const TABS = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "draft", label: "Draft" },
+  { key: "archived", label: "Archived" },
+];
+
+const LOW_STOCK = 5;
+
+function Inventory({ variants }) {
+  const qty = variants.reduce((sum, v) => sum + v.inventoryQuantity, 0);
+  const across = variants.length > 1 ? ` · ${variants.length} variants` : "";
+  if (qty <= 0) return <span className="text-status-danger text-[13px]">Out of stock{across}</span>;
+  if (qty <= LOW_STOCK) return <span className="text-status-warning text-[13px]">{qty} left{across}</span>;
+  return (
+    <span className="text-[13px] text-ink tabular-nums">
+      {qty} in stock<span className="text-ink-muted">{across}</span>
+    </span>
+  );
+}
+
+function priceLabel(variants) {
+  if (!variants.length) return "—";
+  const prices = variants.map((v) => Number(v.price));
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return min === max ? formatCurrency(min) : `${formatCurrency(min)} – ${formatCurrency(max)}`;
+}
+
+export default function ProductsPage() {
+  const router = useRouter();
+  const { confirmDialog } = useConfirmDialog();
+
+  const [products, setProducts] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+  const [tab, setTab] = useState("all");
+  const [page, setPage] = useState(1);
+  const [importOpen, setImportOpen] = useState(false);
+  const [selected, setSelected] = useState([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const { message } = App.useApp();
+  const pageSize = 20;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+      if (q) params.set("q", q);
+      if (tab !== "all") params.set("status", tab);
+      const data = await apiFetch(`/api/products?${params.toString()}`);
+      setProducts(data.products);
+      setTotal(data.total);
+      setSelected([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [q, tab, page]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  function handleDelete(product) {
+    confirmDialog({
+      title: `Delete "${product.title}"?`,
+      description: "This can't be undone.",
+      okText: "Delete",
+      danger: true,
+      onConfirm: async () => {
+        await apiFetch(`/api/products/${product.id}`, { method: "DELETE" });
+        load();
+      },
+    });
+  }
+
+  async function runBulk(action) {
+    setBulkBusy(true);
+    try {
+      const { count } = await apiFetch("/api/products/bulk", { method: "POST", body: { ids: selected, action } });
+      const verb = { activate: "set to active", draft: "set to draft", archive: "archived", delete: "deleted" }[action];
+      message.success(`${count} ${count === 1 ? "product" : "products"} ${verb}`);
+      load();
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  function bulkDelete() {
+    confirmDialog({
+      title: `Delete ${selected.length} ${selected.length === 1 ? "product" : "products"}?`,
+      description: "They come off your store and out of shoppers' carts. Past orders keep their line items. This can't be undone.",
+      okText: "Delete",
+      danger: true,
+      onConfirm: () => runBulk("delete"),
+    });
+  }
+
+  const columns = [
+    {
+      title: "Product",
+      dataIndex: "title",
+      render: (title, row) => (
+        <div className="flex items-center gap-3 min-w-0">
+          <Thumb src={row.images?.[0]?.url} alt="" />
+          <div className="min-w-0">
+            <Link
+              href={`/admin/products/${row.id}`}
+              className="font-medium text-ink hover:underline block truncate"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {title}
+            </Link>
+            {(row.productType || row.vendor) && (
+              <span className="text-xs text-ink-muted truncate block">
+                {[row.productType, row.vendor].filter(Boolean).join(" · ")}
+              </span>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    { title: "Status", dataIndex: "status", width: 120, render: (s) => <StatusBadge status={s} /> },
+    { title: "Inventory", responsive: ["md"], width: 200, render: (_, row) => <Inventory variants={row.variants} /> },
+    {
+      title: "Price",
+      width: 160,
+      align: "right",
+      render: (_, row) => <span className="tabular-nums">{priceLabel(row.variants)}</span>,
+    },
+    {
+      title: "",
+      width: 56,
+      align: "right",
+      render: (_, row) => <DeleteIconButton label={`Delete ${row.title}`} onClick={() => handleDelete(row)} />,
+    },
+  ];
+
+  const filtered = Boolean(q) || tab !== "all";
+
+  return (
+    <div>
+      <PageHeader
+        title="Products"
+        subtitle={loading ? " " : `${total} ${total === 1 ? "product" : "products"}${filtered ? " match" : ""}`}
+        actions={
+          <>
+            <Dropdown
+              trigger={["click"]}
+              menu={{
+                items: [
+                  { key: "import", icon: <Upload size={14} />, label: "Import from CSV", onClick: () => setImportOpen(true) },
+                  {
+                    key: "export",
+                    icon: <Download size={14} />,
+                    label: "Export to CSV",
+                    onClick: () => apiDownload("/api/data/exports/products", "products.csv").catch((err) => message.error(err.message)),
+                  },
+                ],
+              }}
+            >
+              <Button>
+                Import / export <ChevronDown size={14} aria-hidden="true" />
+              </Button>
+            </Dropdown>
+            <Link href="/admin/products/new">
+              <Button type="primary" icon={<Plus size={15} aria-hidden="true" />}>
+                Add product
+              </Button>
+            </Link>
+          </>
+        }
+      />
+      <ProductImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={load} />
+
+      <ListCard
+        tabs={TABS}
+        activeTab={tab}
+        onTabChange={(key) => {
+          setPage(1);
+          setTab(key);
+        }}
+        toolbar={
+          <SearchInput
+            placeholder="Search products"
+            onSearch={(v) => {
+              setPage(1);
+              setQ(v);
+            }}
+          />
+        }
+      >
+        {selected.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-app-border bg-accent-soft/60" role="region" aria-label="Bulk actions">
+            <span className="text-sm font-medium text-ink mr-1 tabular-nums">{selected.length} selected</span>
+            <Button size="small" loading={bulkBusy} onClick={() => runBulk("activate")}>
+              Set active
+            </Button>
+            <Button size="small" loading={bulkBusy} onClick={() => runBulk("draft")}>
+              Set draft
+            </Button>
+            <Button size="small" loading={bulkBusy} onClick={() => runBulk("archive")}>
+              Archive
+            </Button>
+            <Button size="small" danger loading={bulkBusy} onClick={bulkDelete}>
+              Delete
+            </Button>
+            <Button size="small" type="text" className="ml-auto" icon={<X size={14} aria-hidden="true" />} onClick={() => setSelected([])}>
+              Clear
+            </Button>
+          </div>
+        )}
+        <Table
+          rowKey="id"
+          scroll={{ x: "max-content" }}
+          loading={loading}
+          rowSelection={{
+            selectedRowKeys: selected,
+            onChange: setSelected,
+            columnWidth: 44,
+            // Clicking the checkbox shouldn't also open the product.
+            getCheckboxProps: () => ({ onClick: (e) => e.stopPropagation() }),
+          }}
+          columns={columns}
+          dataSource={products}
+          rowClassName="oy-row-link"
+          onRow={(row) => ({ onClick: () => router.push(`/admin/products/${row.id}`) })}
+          pagination={
+            total > pageSize && { current: page, pageSize, total, onChange: setPage, showSizeChanger: false }
+          }
+          locale={{
+            emptyText: filtered ? (
+              <EmptyState
+                icon={<Search />}
+                title="No products match"
+                description="Try a different search or another tab."
+              />
+            ) : (
+              <EmptyState
+                icon={<Package />}
+                title="Add your first product"
+                description="Photos, a price, and a description are all a product needs to start selling."
+                actionLabel="Add product"
+                onAction={() => router.push("/admin/products/new")}
+              />
+            ),
+          }}
+        />
+      </ListCard>
+    </div>
+  );
+}

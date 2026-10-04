@@ -1,0 +1,133 @@
+{% comment %} Order status page — linked from every order email. {% endcomment %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container sys-container--mid">
+      <div class="sys-head">
+        <div class="sys-stack" style="gap:6px">
+          <span class="sys-eyebrow">{{ shop.name }} · Placed {{ order.date }}</span>
+          <h1 class="sys-h1">Order {{ order.name }}</h1>
+        </div>
+        {% case order.status.key %}
+          {% when 'delivered' %}<span class="sys-badge sys-badge--success">{{ order.status.label }}</span>
+          {% when 'shipped', 'partially_shipped' %}<span class="sys-badge sys-badge--info">{{ order.status.label }}</span>
+          {% when 'cancelled' %}<span class="sys-badge sys-badge--danger">{{ order.status.label }}</span>
+          {% else %}<span class="sys-badge sys-badge--warning">{{ order.status.label }}</span>
+        {% endcase %}
+      </div>
+
+      {% if notice %}<p class="sys-alert sys-alert--success" role="status">{{ notice }}</p>{% endif %}
+      {% if form_error %}<p class="sys-alert sys-alert--error" role="alert">{{ form_error }}</p>{% endif %}
+
+      {% if order.cancelled %}
+        <p class="sys-alert sys-alert--error">This order was cancelled{% if order.cancelReason %} — {{ order.cancelReason }}{% endif %}.{% if order.refundedAmount > 0 %} {{ order.refundedAmount | money }} has been refunded.{% endif %}</p>
+      {% else %}
+        <div class="sys-card" style="margin-bottom:20px">
+          <ol class="sys-steps" aria-label="Order progress">
+            {% for step in order.steps %}
+              <li class="{% if step.done %}is-done{% endif %}"><strong>{{ step.label }}</strong>{% if step.date %}<span>{{ step.date }}</span>{% endif %}</li>
+            {% endfor %}
+          </ol>
+        </div>
+      {% endif %}
+
+      <div class="sys-two">
+        <div>
+          {% for shipment in order.shipments %}
+            <div class="sys-card">
+              <h2 class="sys-card__title">{% if shipment.status == "delivered" %}Delivered {{ shipment.delivered_on }}{% else %}Shipped {{ shipment.shipped_on }}{% endif %}</h2>
+              <p class="sys-muted" style="margin-bottom:14px">
+                {{ shipment.itemCount }} item{% if shipment.itemCount != 1 %}s{% endif %}{% if shipment.courier %} via {{ shipment.courier }}{% endif %}
+                {% if shipment.trackingNumber %}<br>Tracking number <strong style="color:var(--oy-text)">{{ shipment.trackingNumber }}</strong>{% endif %}
+              </p>
+              {% if shipment.trackingUrl %}<a class="sys-btn sys-btn--sm" href="{{ shipment.trackingUrl }}" target="_blank" rel="noopener noreferrer">{% render 'snippets/sys-icon', icon: 'truck' %} Track package</a>{% endif %}
+            </div>
+          {% endfor %}
+
+          <div class="sys-card">
+            <h2 class="sys-card__title">Items</h2>
+            {% for item in order.items %}
+              <div class="sys-row-line"><span>{{ item.title }} <span class="sys-muted">× {{ item.quantity }}</span>{% if item.detail %}<span class="sys-line__detail">{{ item.detail }}</span>{% endif %}</span><span class="sys-num">{{ item.total | money }}</span></div>
+            {% endfor %}
+            <div style="margin-top:8px">
+              <div class="sys-row-line"><span class="sys-muted">Subtotal</span><span class="sys-num">{{ order.subtotal | money }}</span></div>
+              {% if order.discount > 0 %}<div class="sys-row-line"><span class="sys-muted">Discount{% if order.discountCode %} ({{ order.discountCode }}){% endif %}</span><span class="sys-num">−{{ order.discount | money }}</span></div>{% endif %}
+              <div class="sys-row-line"><span class="sys-muted">Delivery</span><span class="sys-num">{% if order.shipping > 0 %}{{ order.shipping | money }}{% else %}Free{% endif %}</span></div>
+              {% if order.tax > 0 %}<div class="sys-row-line"><span class="sys-muted">Tax</span><span class="sys-num">{{ order.tax | money }}</span></div>{% endif %}
+              <div class="sys-sumrow sys-sumrow--total" style="margin-top:6px"><span>Total</span><span class="sys-num">{{ order.total | money }}</span></div>
+              {% if order.giftCardAmount > 0 %}
+                <div class="sys-row-line"><span class="sys-muted">Paid with gift card</span><span class="sys-num">−{{ order.giftCardAmount | money }}</span></div>
+                {% if order.amountDue > 0 %}<div class="sys-row-line"><span>{% if order.paymentMethod == 'cod' %}To pay on delivery{% else %}Paid online{% endif %}</span><span class="sys-num">{{ order.amountDue | money }}</span></div>{% endif %}
+              {% endif %}
+              {% for refund in order.refunds %}
+                <div class="sys-row-line"><span class="sys-muted">Refunded {{ refund.date }}</span><span class="sys-num">−{{ refund.amount | money }}</span></div>
+              {% endfor %}
+            </div>
+          </div>
+
+          {% if order.canReturn %}
+            <div class="sys-card">
+              <details class="sys-disclose">
+                <summary class="sys-row sys-row--between">Return items {% render 'snippets/sys-icon', icon: 'chevron-down' %}</summary>
+                <p class="sys-muted sys-small" style="margin:12px 0 16px">Returns are open until {{ order.returnDeadline }}. Choose what you'd like to send back.</p>
+                <form method="post" action="{{ order.return_url }}" class="sys-stack" data-sys-once>
+                  {% for item in order.items %}
+                    {% if item.returnable > 0 %}
+                      <label class="sys-row-line" style="align-items:center">
+                        <span>{{ item.title }}</span>
+                        <select class="sys-select" name="qty_{{ item.id }}" style="width:auto;min-width:120px;min-height:40px">
+                          <option value="0">Keep</option>
+                          {% for n in (1..item.returnable) %}<option value="{{ n }}">Return {{ n }}</option>{% endfor %}
+                        </select>
+                      </label>
+                    {% endif %}
+                  {% endfor %}
+                  <label class="sys-field"><span class="sys-label">Reason</span>
+                    <select class="sys-select" name="reason" required>
+                      <option value="">Choose a reason</option>
+                      <option>Wrong size or fit</option>
+                      <option>Damaged or defective</option>
+                      <option>Not as described</option>
+                      <option>Received the wrong item</option>
+                      <option>Changed my mind</option>
+                      <option>Other</option>
+                    </select>
+                  </label>
+                  <label class="sys-field"><span class="sys-label">Anything else? <span class="sys-muted" style="font-weight:400">(optional)</span></span><textarea class="sys-textarea" name="note" maxlength="2000"></textarea></label>
+                  <button type="submit" class="sys-btn" data-busy-label="Sending…">Request return</button>
+                </form>
+              </details>
+            </div>
+          {% endif %}
+          {% for ret in order.returns %}
+            <div class="sys-card">
+              <h2 class="sys-card__title">{{ ret.status_label }}</h2>
+              <p class="sys-muted">Requested {{ ret.date }}{% if ret.merchantNote %} · {{ ret.merchantNote }}{% endif %}</p>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div>
+          <div class="sys-card">
+            <h2 class="sys-card__title">Delivery address</h2>
+            <p>{{ order.shippingName }}<br>
+            {{ order.shippingAddress1 }}{% if order.shippingAddress2 %}, {{ order.shippingAddress2 }}{% endif %}<br>
+            {{ order.shippingCity }}, {{ order.shippingProvince }} {{ order.shippingZip }}</p>
+          </div>
+          <div class="sys-card">
+            <h2 class="sys-card__title">Payment</h2>
+            <p>{% if order.paymentMethod == "cod" %}Cash on delivery{% if order.paymentStatus == "pending" %} · pay {{ order.total | money }} when it arrives{% endif %}{% else %}Paid online{% endif %}</p>
+            {% if order.invoiceUrl %}<p style="margin-top:12px"><a class="sys-link" href="{{ order.invoiceUrl }}" target="_blank" rel="noopener">{% render 'snippets/sys-icon', icon: 'file' %} GST invoice {{ order.invoiceNumber }}</a></p>{% endif %}
+          </div>
+          <div class="sys-card sys-card--flat">
+            <h2 class="sys-card__title">Need help?</h2>
+            <p class="sys-muted">{% if shop.support_email %}Write to <a class="sys-link" href="mailto:{{ shop.support_email }}">{{ shop.support_email }}</a>{% if shop.support_phone %} or call {{ shop.support_phone }}{% endif %} — mention order {{ order.name }}.{% else %}Reply to your order confirmation email and mention order {{ order.name }}.{% endif %}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{ "name": "Order status", "settings": [] }
+{% endschema %}

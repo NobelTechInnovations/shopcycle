@@ -1,0 +1,113 @@
+{
+  "color_background": "#FFFFFF",
+  "color_text": "#1F2421",
+  "color_primary": "#123B30",
+  "color_accent": "#B8935A",
+  "color_surface": "#F5F3EF",
+  "color_dark": "#123B30",
+  "heading_font": "Cormorant Garamond",
+  "body_font": "Jost",
+  "heading_weight": "500",
+  "heading_case": "none",
+  "heading_tracking": "normal",
+  "base_size": 15,
+  "container_width": 1360,
+  "section_spacing": "spacious",
+  "button_radius": 0,
+  "card_radius": 0,
+  "card_image_ratio": "square",
+  "card_hover_image": true,
+  "card_show_brand": false,
+  "card_quick_add": false,
+  "card_align": "center",
+  "cart_type": "drawer",
+  "social_instagram": "",
+  "social_facebook": "",
+  "social_youtube": "",
+  "social_x": "",
+  "social_pinterest": "",
+  "social_whatsapp": "",
+  "sections": {
+    "announcement-bar": {
+      "settings": {
+        "show": true,
+        "style": "rotate",
+        "background": "#123B30",
+        "text_color": "#F3EBDD"
+      },
+      "blocks": {
+        "m1": {
+          "type": "message",
+          "settings": {
+            "text": "Free insured shipping across India",
+            "link": ""
+          }
+        },
+        "m2": {
+          "type": "message",
+          "settings": {
+            "text": "BIS hallmarked · Certified stones",
+            "link": ""
+          }
+        },
+        "m3": {
+          "type": "message",
+          "settings": {
+            "text": "Lifetime exchange on gold",
+            "link": ""
+          }
+        }
+      },
+      "block_order": [
+        "m1",
+        "m2",
+        "m3"
+      ]
+    },
+    "header": {
+      "settings": {
+        "menu": "main-menu",
+        "layout": "center",
+        "sticky": true,
+        "transparent": true,
+        "logo_width": 130
+      }
+    },
+    "footer": {
+      "settings": {
+        "about": "Fine jewellery in hallmarked gold and sterling silver, finished by hand.",
+        "show_payments": true,
+        "show_wordmark": false,
+        "copyright": "All rights reserved."
+      },
+      "blocks": {
+        "f1": {
+          "type": "links",
+          "settings": {
+            "heading": "Shop",
+            "menu": "main-menu"
+          }
+        },
+        "f2": {
+          "type": "links",
+          "settings": {
+            "heading": "Help",
+            "menu": "footer-menu"
+          }
+        },
+        "f3": {
+          "type": "newsletter",
+          "settings": {
+            "heading": "The inner circle",
+            "text": "Private previews and early access to festive offers."
+          }
+        }
+      },
+      "block_order": [
+        "f1",
+        "f2",
+        "f3"
+      ]
+    }
+  }
+}

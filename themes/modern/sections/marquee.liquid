@@ -1,0 +1,39 @@
+{% comment %} A band of large scrolling text — promises, press quotes, values. {% endcomment %}
+{% if section.blocks.size > 0 %}
+<section class="marquee marquee--{{ section.settings.style }}" aria-label="{{ section.blocks.first.settings.text | escape }}">
+  <div class="marquee__track" aria-hidden="true" style="--marquee-speed: {{ section.settings.speed }}s">
+    {% for i in (1..4) %}
+      <div class="marquee__group">
+        {% for block in section.blocks %}
+          <span class="marquee__item">{{ block.settings.text }}</span>{% render 'snippets/icon', icon: 'star4', class: 'icon marquee__star' %}
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+  <ul class="visually-hidden">{% for block in section.blocks %}<li>{{ block.settings.text }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Scrolling text",
+  "settings": [
+    { "type": "select", "id": "style", "label": "Colours", "default": "dark", "options": [
+      { "value": "dark", "label": "Dark" },
+      { "value": "accent", "label": "Highlight colour" },
+      { "value": "light", "label": "Light" }
+    ] },
+    { "type": "range", "id": "speed", "label": "Speed (seconds per loop — lower is faster)", "min": 10, "max": 60, "step": 5, "default": 30 }
+  ],
+  "blocks": [
+    { "type": "text", "name": "Text", "settings": [{ "type": "text", "id": "text", "label": "Text", "default": "Free shipping over ₹999" }] }
+  ],
+  "default_blocks": [
+    { "type": "text", "settings": { "text": "Free shipping over ₹999" } },
+    { "type": "text", "settings": { "text": "Cash on delivery" } },
+    { "type": "text", "settings": { "text": "7-day easy returns" } },
+    { "type": "text", "settings": { "text": "Made in India" } }
+  ],
+  "max_blocks": 8
+}
+{% endschema %}

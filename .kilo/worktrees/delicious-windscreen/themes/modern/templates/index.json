@@ -1,0 +1,18 @@
+{
+  "sections": {
+    "hero": { "type": "hero", "settings": {} },
+    "ticker": { "type": "marquee", "settings": {} },
+    "categories": { "type": "category-grid", "settings": {} },
+    "new_arrivals": { "type": "product-grid", "settings": { "eyebrow": "Just in", "heading": "New arrivals", "source": "newest" } },
+    "story": { "type": "editorial-banner", "settings": {} },
+    "promos": { "type": "promo-banner", "settings": {} },
+    "bestsellers": { "type": "product-grid", "settings": { "eyebrow": "Most loved", "heading": "Best sellers", "source": "best_sellers", "surface": true } },
+    "spotlight": { "type": "featured-product", "settings": { "surface": false } },
+    "features": { "type": "usp", "settings": { "surface": true } },
+    "reviews": { "type": "testimonials", "settings": {} },
+    "journal": { "type": "featured-blog", "settings": {} },
+    "faq": { "type": "faq", "settings": { "surface": true } },
+    "newsletter": { "type": "newsletter", "settings": {} }
+  },
+  "order": ["hero", "ticker", "categories", "new_arrivals", "story", "promos", "bestsellers", "spotlight", "features", "reviews", "journal", "faq", "newsletter"]
+}

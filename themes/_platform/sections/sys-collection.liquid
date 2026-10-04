@@ -1,0 +1,63 @@
+{% comment %} Collection page: heading, filters (snippets/sys-filters), sort, grid. {% endcomment %}
+<div class="sys">
+  <section class="sys-section">
+    <div class="sys-container">
+      <ol class="sys-crumbs" aria-label="Breadcrumb">
+        <li><a href="{{ routes.root_url }}">Home</a></li>
+        <li aria-current="page">{{ collection.title }}</li>
+      </ol>
+      <div class="sys-collection-head">
+        <h1 class="sys-h1">{{ collection.title }}</h1>
+        {% if collection.description != blank %}<p>{{ collection.description }}</p>{% endif %}
+      </div>
+
+      <div class="sys-listing">
+        {% render 'snippets/sys-filters', listing: listing, action: collection.url %}
+        <div class="sys-listing__main">
+          <div class="sys-toolbar">
+            <span class="sys-muted">{{ collection.products_count }} product{% if collection.products_count != 1 %}s{% endif %}</span>
+            <label class="sys-row" style="gap:8px">
+              <span class="sys-muted">Sort by</span>
+              <select class="sys-select" name="sort" form="sys-filter-form" data-sys-autosubmit aria-label="Sort products">
+                {% for option in listing.sort_options %}
+                  <option value="{{ option.value }}" {% if option.value == listing.sort %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          {% render 'snippets/sys-filter-chips', listing: listing %}
+
+          {% if collection.products.size > 0 %}
+            <div class="sys-grid sys-grid--3">
+              {% for item in collection.products %}
+                {% render 'snippets/sys-product-card', product: item %}
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="sys-empty">
+              <span class="sys-empty__icon">{% render 'snippets/sys-icon', icon: 'package' %}</span>
+              <h2 class="sys-h2">{% if listing.active_count > 0 %}No products match these filters{% else %}No products here yet{% endif %}</h2>
+              <p>{% if listing.active_count > 0 %}Try removing a filter or two.{% else %}Check back soon — new pieces are on the way.{% endif %}</p>
+              {% if listing.active_count > 0 %}
+                <a class="sys-btn sys-btn--secondary" href="{{ listing.clear_url }}">Clear all filters</a>
+              {% else %}
+                <a class="sys-btn sys-btn--secondary" href="{{ routes.all_products_url }}">Browse all products</a>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+{% schema %}
+{
+  "name": "Collection products",
+  "locked": true,
+  "templates": ["collection"],
+  "settings": [
+    { "type": "paragraph", "content": "The collection's title, filters and products. Add your theme's sections above or below — a banner, a story, a video." }
+  ]
+}
+{% endschema %}

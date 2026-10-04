@@ -1,0 +1,40 @@
+{% comment %} Customer reviews: star rating, quote, name and place. Swipeable on phones. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, align: 'center' %}
+    <div class="reviews">
+      {% for block in section.blocks %}
+        <figure class="review">
+          <div class="review__stars" aria-label="{{ block.settings.rating }} out of 5 stars">
+            {% for i in (1..5) %}<span class="{% if i <= block.settings.rating %}is-on{% endif %}">{% render 'snippets/icon', icon: 'star', class: 'icon icon--xs' %}</span>{% endfor %}
+          </div>
+          <blockquote class="review__quote">“{{ block.settings.quote }}”</blockquote>
+          <figcaption class="review__by">
+            <span class="review__avatar" aria-hidden="true">{{ block.settings.name | slice: 0 }}</span>
+            <span><strong>{{ block.settings.name }}</strong>{% if block.settings.place != blank %}<small>{{ block.settings.place }}</small>{% endif %}</span>
+          </figcaption>
+        </figure>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Testimonials",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Loved by customers" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "What people are saying" },
+    { "type": "checkbox", "id": "surface", "label": "Use alternate background", "default": false }
+  ],
+  "blocks": [
+    { "type": "review", "name": "Review", "settings": [
+      { "type": "range", "id": "rating", "label": "Stars", "min": 1, "max": 5, "step": 1, "default": 5 },
+      { "type": "textarea", "id": "quote", "label": "Review", "default": "Beautiful quality and it arrived in two days. Already ordered another one for my sister." },
+      { "type": "text", "id": "name", "label": "Name", "default": "Ananya R." },
+      { "type": "text", "id": "place", "label": "City", "default": "Bengaluru" }
+    ] }
+  ],
+  "max_blocks": 6
+}
+{% endschema %}
