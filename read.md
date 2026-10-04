@@ -280,6 +280,15 @@ Local `.env` points at the **production** Supabase database, so every local writ
 - "Check again" now asks Vercel to verify the domain (and www) straight away — before, a domain waiting on a TXT record only went live on Vercel's own schedule. It also looks the TXT up itself and shows Found / Not found yet / Wrong value with what DNS has, asks for the www TXT too when Vercel wants one, and says exactly what to type at the provider (name `_vercel` only).
 - DNS checks use Cloudflare and Google's resolvers instead of the server's own, which can keep an old answer (that's why laxmira.net showed "Wrong value" after the A record was already fixed).
 
+### Done 4 Oct, second batch (NOT committed yet)
+
+- Disconnect buttons (Connected accounts, Google Reviews, Google & YouTube, Instagram, Facebook shop) did nothing: `useConfirmDialog` didn't return a promise. It now does (true/false) and accepts `content`.
+- Facebook sign-in landed on `api.oyklane.com/admin/apps/meta/callback` (404): the API now forwards that path (and the Google/Instagram callbacks) to the admin. `META_OAUTH_REDIRECT_URI` defaults to `<ADMIN_ORIGIN>/admin/apps/meta/callback`.
+- Google errors say what's really wrong: Merchant API's "GCP project … is not registered" (a one-time platform registration), APIs not enabled, blocked Places key — instead of "connection expired". **Super admin ▸ Integrations**: keys on the server, redirect URIs to register, "Test the key" for Places, and "Register Oyklane" for Merchant API (uses the Google sign-in of one of your own stores + Oyklane's Merchant Center ID).
+- oyklane.com: `/privacy`, `/terms`, `/data-deletion` (Google Limited Use statement, DPDP rights, Grievance Officer), footer links, `sitemap.xml`, `robots.txt`. Set `NEXT_PUBLIC_LEGAL_ADDRESS`, `NEXT_PUBLIC_GRIEVANCE_OFFICER`, `NEXT_PUBLIC_LEGAL_EMAIL`, `NEXT_PUBLIC_LEGAL_CITY` on the www Vercel project, and have a lawyer review.
+- Products list: search by title, SKU, vendor or tag; filters (category, brand, collection, stock, type, vendor, price range, rented / hidden from Google or Facebook) with removable chips; sort; columns to choose (sold in 30 days, category, brand, collections, SKU, variants, type, vendor, created, updated), remembered per browser.
+- **MCP server** at `/api/mcp` (Streamable HTTP, JSON-RPC, stateless) authenticated with a store API key (Pro): 13 tools over the /api/v1 API (store, products, stock, orders, fulfilment, customers), filtered by the key's permissions. Settings ▸ API & webhooks shows the address and a config to paste. Test: `node apps/api/test/e2e-mcp.js` (26 checks).
+
 ### Left to do
 
 0a. **Security — urgent**: production `JWT_SECRET` is the placeholder from `.env.example` (anyone can sign seller, super-admin and shopper sessions with it). Steps that keep encrypted data (2FA, payment keys, webhooks, Meta/Google tokens) readable: (1) set `DATA_ENCRYPTION_KEY` on Railway to `sha256("<current JWT_SECRET>:data-encryption")` in hex, (2) then set a new random `JWT_SECRET` (everyone signs in again), (3) later re-encrypt with a fresh key. Also rotate the Supabase database password and the Redis password (they were pasted in chat on 4 Oct) and set `TRUST_PROXY=true` on Railway (behind its proxy every visitor otherwise shares one rate-limit).
@@ -307,6 +316,7 @@ pnpm --filter @shopcycle/database push          # additive schema changes (share
 node apps/api/test/e2e-billing.js               # billing lifecycle test (cleans up after itself)
 KEEP_TEST_STORE=1 node apps/api/test/e2e-billing.js   # keep the test stores to inspect
 node apps/api/test/e2e-providers.js             # providers, Google, phone login, paid apps (all mocked)
+node apps/api/test/e2e-mcp.js                   # the store's MCP server for AI agents
 node apps/api/test/e2e-rentals-channels.js      # templates, rentals, shared Google/Facebook sign-in, sales channels, Oyklane account (mocked)
 ```
 

@@ -187,6 +187,8 @@ function buildApp() {
   app.register(metafieldRoutes, { prefix: "/api/metafields" });
   app.register(reviewRoutes, { prefix: "/api/reviews" });
   app.register(publicApiRoutes, { prefix: "/api/v1" });
+  // The same API as an MCP server, for AI agents (developer/mcp.js).
+  app.register(require("./modules/developer/mcp"), { prefix: "/api/mcp" });
   app.register(menuRoutes, { prefix: "/api/menus" });
   app.register(uploadRoutes, { prefix: "/api/files" });
   app.register(teamRoutes, { prefix: "/api/team" });

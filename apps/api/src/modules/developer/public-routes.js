@@ -35,8 +35,14 @@ async function publicApiRoutes(fastify) {
 
   // ── Products ──
   fastify.get("/products", scope("read_products"), async (request) => {
-    const q = pageQuery.extend({ status: z.enum(["active", "draft", "archived"]).optional() }).parse(request.query);
-    const where = { storeId: request.store.id, ...(q.status && { status: q.status }), ...since(q) };
+    const q = pageQuery.extend({ status: z.enum(["active", "draft", "archived"]).optional(), q: z.string().trim().max(120).optional() }).parse(request.query);
+    const where = {
+      storeId: request.store.id,
+      ...(q.status && { status: q.status }),
+      // ?q= matches the title or any variant's SKU.
+      ...(q.q && { OR: [{ title: { contains: q.q, mode: "insensitive" } }, { variants: { some: { sku: { contains: q.q, mode: "insensitive" } } } }] }),
+      ...since(q),
+    };
     const [rows, total] = await Promise.all([
       db.product.findMany({ where, include: webhooks.PRODUCT_INCLUDE, orderBy: { createdAt: "desc" }, skip: (q.page - 1) * q.limit, take: q.limit }),
       db.product.count({ where }),

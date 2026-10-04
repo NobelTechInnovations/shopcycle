@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card, Button, Modal, Input, Checkbox, Alert, App, Switch, Table, Tag, Tooltip } from "antd";
-import { KeyRound, Webhook, Copy, Check, Trash2, Send, RotateCw, Plus } from "lucide-react";
+import { KeyRound, Webhook, Copy, Check, Trash2, Send, RotateCw, Plus, Bot } from "lucide-react";
 import { StatusBadge, EmptyState, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch, API_URL } from "@/lib/api";
 
@@ -407,11 +407,54 @@ function WebhooksCard({ initial }) {
   );
 }
 
+/** How to connect an AI agent (Claude, ChatGPT, Cursor…) through MCP. */
+function McpCard() {
+  const { message } = App.useApp();
+  const url = `${API_URL.replace(/\/$/, "")}/api/mcp`;
+  const config = JSON.stringify({ mcpServers: { "my-store": { type: "http", url, headers: { Authorization: "Bearer oyk_your_key_here" } } } }, null, 2);
+  const copy = (text) => navigator.clipboard.writeText(text).then(() => message.success("Copied"), () => message.info("Select the text and copy it"));
+  return (
+    <Card
+      title={
+        <span className="flex items-center gap-2">
+          <Bot size={16} aria-hidden="true" /> Connect an AI agent (MCP)
+        </span>
+      }
+    >
+      <p className="m-0 text-[13.5px] text-ink-muted">
+        Your store is an MCP server: an AI agent can look up and edit products, change stock and read orders and customers — only what the API key you give it
+        allows. Make a key above with just the permissions the agent needs.
+      </p>
+      <div className="mt-4 flex flex-col gap-1">
+        <span className="text-xs text-ink-muted">Server address (Streamable HTTP)</span>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 min-w-0 rounded-md border border-app-border bg-app-bg px-2.5 py-1.5 text-[12.5px] break-all">{url}</code>
+          <Button size="small" icon={<Copy size={13} aria-hidden="true" />} onClick={() => copy(url)}>
+            Copy
+          </Button>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-col gap-1">
+        <span className="text-xs text-ink-muted">Claude Code, Cursor and others: add to the MCP config, with your key</span>
+        <pre className="m-0 rounded-md border border-app-border bg-app-bg p-3 text-[12px] overflow-x-auto">{config}</pre>
+        <Button size="small" className="self-start mt-1" icon={<Copy size={13} aria-hidden="true" />} onClick={() => copy(config)}>
+          Copy config
+        </Button>
+      </div>
+      <p className="m-0 mt-3 text-[12.5px] text-ink-muted">
+        Tools: store details, list/search/create/update/delete products, stock levels and stock changes, orders and shipping them, customers. The agent is
+        asked to check with you before deleting or bulk changes; revoking the key cuts it off at once.
+      </p>
+    </Card>
+  );
+}
+
 export function DeveloperSettings({ initialKeys, initialHooks, canEdit }) {
   if (!canEdit) return <Alert type="info" showIcon message="Only the store owner or an admin can manage API keys and webhooks." />;
   return (
     <div className="max-w-3xl flex flex-col gap-4">
       <KeysCard initial={initialKeys} />
+      <McpCard />
       <WebhooksCard initial={initialHooks} />
     </div>
   );
