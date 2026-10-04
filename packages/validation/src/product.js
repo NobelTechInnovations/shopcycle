@@ -57,9 +57,23 @@ const updateProductSchema = createProductSchema.partial().extend({
   variants: z.array(variantSchema).optional(),
 });
 
+const optionalId = z.string().trim().max(40).optional().or(z.literal("").transform(() => undefined));
+const optionalMoney = z.coerce.number().min(0).max(10000000).optional().or(z.literal("").transform(() => undefined));
+
 const listProductsQuerySchema = z.object({
   q: z.string().optional(),
   status: z.enum(["active", "draft", "archived"]).optional(),
+  // Filters (the seller's products list).
+  categoryId: optionalId,
+  brandId: optionalId,
+  collectionId: optionalId,
+  productType: z.string().trim().max(100).optional(),
+  vendor: z.string().trim().max(100).optional(),
+  stock: z.enum(["in", "low", "out"]).optional(),
+  priceMin: optionalMoney,
+  priceMax: optionalMoney,
+  channel: z.enum(["hidden-google", "hidden-facebook", "rental"]).optional(),
+  sort: z.enum(["updated", "created", "oldest", "title", "title-desc"]).default("updated"),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });

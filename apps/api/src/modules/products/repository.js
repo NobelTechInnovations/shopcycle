@@ -8,24 +8,94 @@ const include = {
   category: true,
 };
 
-function list(prisma, storeId, { q, status, page, pageSize }) {
-  const where = {
-    storeId,
-    ...(status ? { status } : {}),
-    ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
-  };
+// "Low stock": nothing over this many left in any size.
+const LOW_STOCK = 5;
+const SORTS = {
+  updated: { updatedAt: "desc" },
+  created: { createdAt: "desc" },
+  oldest: { createdAt: "asc" },
+  title: { title: "asc" },
+  "title-desc": { title: "desc" },
+};
 
+/** The products list's filters, as a Prisma where. */
+function listWhere(storeId, f) {
+  const and = [];
+  if (f.q) {
+    const q = f.q.trim();
+    and.push({
+      OR: [
+        { title: { contains: q, mode: "insensitive" } },
+        { variants: { some: { sku: { contains: q, mode: "insensitive" } } } },
+        { vendor: { contains: q, mode: "insensitive" } },
+        { tags: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (f.stock === "out") and.push({ variants: { none: { inventoryQuantity: { gt: 0 } } } });
+  if (f.stock === "in") and.push({ variants: { some: { inventoryQuantity: { gt: LOW_STOCK } } } });
+  if (f.stock === "low") and.push({ variants: { some: { inventoryQuantity: { gt: 0 } } } }, { variants: { none: { inventoryQuantity: { gt: LOW_STOCK } } } });
+  if (f.priceMin != null) and.push({ variants: { some: { price: { gte: f.priceMin } } } });
+  if (f.priceMax != null) and.push({ variants: { some: { price: { lte: f.priceMax } } } });
+  return {
+    storeId,
+    ...(f.status && { status: f.status }),
+    ...(f.categoryId && { categoryId: f.categoryId }),
+    ...(f.brandId && { brandId: f.brandId }),
+    ...(f.collectionId && { collectionProducts: { some: { collectionId: f.collectionId } } }),
+    ...(f.productType && { productType: { equals: f.productType, mode: "insensitive" } }),
+    ...(f.vendor && { vendor: { equals: f.vendor, mode: "insensitive" } }),
+    ...(f.channel === "hidden-google" && { hiddenChannels: { has: "google" } }),
+    ...(f.channel === "hidden-facebook" && { hiddenChannels: { has: "facebook" } }),
+    ...(f.channel === "rental" && { rental: { is: { enabled: true } } }),
+    ...(and.length && { AND: and }),
+  };
+}
+
+function list(prisma, storeId, filters) {
+  const { page, pageSize, sort } = filters;
+  const where = listWhere(storeId, filters);
   return Promise.all([
     prisma.product.findMany({
       where,
       // rental: the theme editor previews the Rental template with a rented product.
-      include: { variants: true, images: { orderBy: { position: "asc" }, take: 1 }, rental: { select: { enabled: true } } },
-      orderBy: { updatedAt: "desc" },
+      include: {
+        variants: { orderBy: { createdAt: "asc" } },
+        images: { orderBy: { position: "asc" }, take: 1 },
+        rental: { select: { enabled: true } },
+        category: { select: { id: true, title: true } },
+        brand: { select: { id: true, title: true } },
+        collectionProducts: { select: { collection: { select: { id: true, title: true } } }, take: 5 },
+      },
+      orderBy: SORTS[sort] || SORTS.updated,
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
     prisma.product.count({ where }),
   ]);
+}
+
+/** Units sold of each product in the last `days` days (cancelled orders left out). */
+async function unitsSold(prisma, storeId, productIds, days = 30) {
+  if (!productIds.length) return {};
+  const rows = await prisma.orderItem.groupBy({
+    by: ["productId"],
+    where: { productId: { in: productIds }, order: { storeId, cancelledAt: null, createdAt: { gte: new Date(Date.now() - days * 86400000) } } },
+    _sum: { quantity: true },
+  });
+  return Object.fromEntries(rows.map((r) => [r.productId, r._sum.quantity || 0]));
+}
+
+/** Product types and vendors the store uses — the list's filter choices. */
+async function facets(prisma, storeId) {
+  const [types, vendors] = await Promise.all([
+    prisma.product.findMany({ where: { storeId, productType: { not: null } }, distinct: ["productType"], select: { productType: true }, take: 100 }),
+    prisma.product.findMany({ where: { storeId, vendor: { not: null } }, distinct: ["vendor"], select: { vendor: true }, take: 100 }),
+  ]);
+  return {
+    productTypes: types.map((t) => t.productType).filter(Boolean).sort(),
+    vendors: vendors.map((v) => v.vendor).filter(Boolean).sort(),
+  };
 }
 
 function findById(prisma, storeId, id) {
@@ -156,4 +226,6 @@ function remove(prisma, id) {
   return prisma.product.delete({ where: { id } });
 }
 
-module.exports = { list, findById, findBySlug, count, create, update, remove };
+module.exports = {
+  unitsSold,
+  facets, list, findById, findBySlug, count, create, update, remove };

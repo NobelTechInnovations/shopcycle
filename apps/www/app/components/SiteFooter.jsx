@@ -52,12 +52,17 @@ export function SiteFooter() {
             <ul>
               <li><Link href="/pricing#faq">FAQ</Link></li>
               <li><Link href="/pricing">Plans</Link></li>
+              <li><Link href="/privacy">Privacy policy</Link></li>
+              <li><Link href="/terms">Terms of service</Link></li>
+              <li><Link href="/data-deletion">Data deletion</Link></li>
             </ul>
           </div>
         </div>
         <div className="footer__bottom">
           <span>© {new Date().getFullYear()} Oyklane. Made in India.</span>
-          <span>Prices in INR, plus 18% GST.</span>
+          <span>
+            Prices in INR, plus 18% GST · <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms</Link>
+          </span>
         </div>
       </div>
     </footer>

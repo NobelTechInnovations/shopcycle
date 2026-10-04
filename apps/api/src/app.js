@@ -136,6 +136,17 @@ function buildApp() {
   app.register(uploadsServe);
 
   app.get("/health", async () => ({ ok: true, service: "@shopcycle/api" }));
+  // Sign-in callbacks belong to the admin. If a provider's redirect URI was
+  // registered with the API's address (META_OAUTH_REDIRECT_URI set to
+  // https://api…/admin/apps/meta/callback), send the browser on to the admin
+  // page with the same code — the code exchange still uses the registered
+  // URI, so it works either way.
+  for (const page of ["/admin/apps/meta/callback", "/admin/apps/google/callback", "/admin/apps/instagram"]) {
+    app.get(page, async (request, reply) => {
+      const query = request.raw.url.includes("?") ? request.raw.url.slice(request.raw.url.indexOf("?")) : "";
+      return reply.redirect(`${env.ADMIN_ORIGIN.replace(/\/$/, "")}${page}${query}`);
+    });
+  }
   // Icons inside emails (public, cached) — see emails/assets.js.
   app.register(require("./emails/assets").emailAssetRoutes, { prefix: "/api/email-assets" });
 

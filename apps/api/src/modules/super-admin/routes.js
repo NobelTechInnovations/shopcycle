@@ -5,6 +5,7 @@ const { overview } = require("./overview");
 const { recordAudit } = require("../../lib/audit");
 const billingAdmin = require("./billing");
 const messagingAdmin = require("./messaging");
+const integrationsAdmin = require("./integrations");
 const supportAdmin = require("./support");
 
 // Human-readable audit action names for platform mutations. Anything
@@ -39,6 +40,8 @@ const AUDIT_ACTIONS = {
   "PUT /billing/plans/:id/features": "billing.plan_features",
   "PUT /messaging/templates": "messaging.templates",
   "POST /messaging/test": "messaging.test_send",
+  "POST /integrations/google-merchant/register": "integrations.merchant_register",
+  "POST /integrations/places/test": "integrations.places_test",
   "POST /support/tickets/:id/reply": "support.reply",
   "PATCH /support/tickets/:id": "support.ticket_update",
   "POST /support/articles": "support.article_create",
@@ -96,6 +99,8 @@ async function superAdminRoutes(fastify) {
 
   // WhatsApp templates shared by every store (messaging.js).
   fastify.register(messagingAdmin, { prefix: "/messaging" });
+  // Google / Meta keys, redirect URIs and the Merchant API registration.
+  fastify.register(integrationsAdmin, { prefix: "/integrations" });
 
   // Seller tickets, help articles and the Help assistant (support.js).
   fastify.register(supportAdmin, { prefix: "/support" });

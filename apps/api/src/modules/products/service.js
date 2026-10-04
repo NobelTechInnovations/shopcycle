@@ -14,7 +14,18 @@ async function uniqueSlug(prisma, storeId, title, excludeId) {
 
 async function listProducts(prisma, storeId, query) {
   const [products, total] = await repository.list(prisma, storeId, query);
-  return { products, total, page: query.page, pageSize: query.pageSize };
+  const sold = await repository.unitsSold(prisma, storeId, products.map((p) => p.id));
+  return {
+    products: products.map(({ collectionProducts, ...p }) => ({ ...p, collections: (collectionProducts || []).map((c) => c.collection), sold30: sold[p.id] || 0 })),
+    total,
+    page: query.page,
+    pageSize: query.pageSize,
+  };
+}
+
+/** Filter choices for the products list. */
+function listFacets(prisma, storeId) {
+  return repository.facets(prisma, storeId);
 }
 
 async function getProduct(prisma, storeId, id) {
@@ -58,4 +69,5 @@ async function bulkProducts(prisma, storeId, { ids, action }) {
   return { count };
 }
 
-module.exports = { listProducts, getProduct, createProduct, updateProduct, deleteProduct, bulkProducts, uniqueSlug };
+module.exports = {
+  listFacets, listProducts, getProduct, createProduct, updateProduct, deleteProduct, bulkProducts, uniqueSlug };

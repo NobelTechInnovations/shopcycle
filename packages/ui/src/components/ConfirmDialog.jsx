@@ -9,15 +9,26 @@ import { App } from "antd";
 export function useConfirmDialog() {
   const { modal } = App.useApp();
 
-  function confirmDialog({ title, description, okText = "Confirm", danger = false, onConfirm, onCancel }) {
-    modal.confirm({
-      title,
-      content: description,
-      okText,
-      cancelText: "Cancel",
-      okButtonProps: { danger },
-      onOk: onConfirm,
-      onCancel,
+  /** Either style works: pass `onConfirm`, or await the result — true
+   * when they confirm, false when they cancel. `content` is accepted as
+   * another name for `description`. */
+  function confirmDialog({ title, description, content, okText = "Confirm", danger = false, onConfirm, onCancel }) {
+    return new Promise((resolve) => {
+      modal.confirm({
+        title,
+        content: description ?? content,
+        okText,
+        cancelText: "Cancel",
+        okButtonProps: { danger },
+        onOk: async () => {
+          if (onConfirm) await onConfirm();
+          resolve(true);
+        },
+        onCancel: () => {
+          onCancel?.();
+          resolve(false);
+        },
+      });
     });
   }
 

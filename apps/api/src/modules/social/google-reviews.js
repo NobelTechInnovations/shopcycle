@@ -37,7 +37,13 @@ async function call(path, { method = "GET", body, fields }) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = json?.error?.message || `Google answered ${res.status}`;
-    throw new HttpError(res.status === 404 ? 404 : 400, res.status === 404 ? "Google couldn't find that business any more. Search for it again." : msg);
+    if (res.status === 404) throw new HttpError(404, "Google couldn't find that business any more. Search for it again.");
+    // Oyklane's key not allowed to use Places (API off, or the key limited
+    // to other APIs): the platform's to fix.
+    if (res.status === 403 || /are blocked|not enabled|has not been used|API key not valid/i.test(msg)) {
+      throw new HttpError(503, "Searching Google Maps isn't switched on for Oyklane yet — a one-time setup on Oyklane's side. Try again later, or sign in with Google above.");
+    }
+    throw new HttpError(400, msg);
   }
   return json;
 }

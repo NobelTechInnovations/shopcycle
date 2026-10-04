@@ -116,6 +116,28 @@ async function accessToken(credentials) {
   return { token: json.access_token, fresh };
 }
 
+// Errors that are about Oyklane's own Google project (an API not switched
+// on, Merchant API not registered yet) — nothing the seller can fix.
+function isPlatformSetup(status, error) {
+  const msg = String(error?.message || "");
+  const reasons = JSON.stringify(error?.details || []);
+  return (
+    /not registered with the merchant account/i.test(msg) ||
+    /SERVICE_DISABLED|API_KEY_SERVICE_BLOCKED|accessNotConfigured/i.test(reasons) ||
+    /has not been used in project|is disabled|are blocked/i.test(msg)
+  );
+}
+
+function explain(status, error) {
+  const msg = String(error?.message || "");
+  if (isPlatformSetup(status, error)) {
+    return "Google hasn't switched this on for Oyklane yet — a one-time setup on Oyklane's side, nothing for you to do. Meanwhile use the other way shown on this page.";
+  }
+  if (status === 401) return "Google says the sign-in has expired or was removed. Sign in with Google again.";
+  if (status === 403 && /insufficient.*scope/i.test(msg)) return "Your Google sign-in didn't allow this. Sign in with Google again and tick every box.";
+  return msg || `Google answered ${status}`;
+}
+
 /** One Google API call. Errors become messages a seller can act on. */
 async function call(accessTokenValue, method, target, body) {
   let res;
@@ -132,10 +154,10 @@ async function call(accessTokenValue, method, target, body) {
   if (res.status === 204) return {};
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = json?.error?.message || `Google answered ${res.status}`;
-    const err = new HttpError(res.status === 401 ? 400 : res.status === 404 ? 404 : 400, res.status === 401 ? "Google says the connection has expired. Connect again." : msg);
+    const err = new HttpError(res.status === 404 ? 404 : 400, explain(res.status, json?.error));
     err.google = json?.error || null;
     err.googleStatus = res.status;
+    err.platformSetup = isPlatformSetup(res.status, json?.error);
     throw err;
   }
   return json;

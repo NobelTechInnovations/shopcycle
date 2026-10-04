@@ -274,7 +274,10 @@ const envSchema = z.object({
   // on the Meta app. Points at the admin app, not the API, since that's
   // where the Connect UI lives; the API only ever receives the resulting
   // `code` as a query param forwarded from there.
-  META_OAUTH_REDIRECT_URI: z.string().default("http://localhost:3000/admin/apps/meta/callback"),
+  // Where Facebook sends sellers back (the admin's callback page). Unset:
+  // <ADMIN_ORIGIN>/admin/apps/meta/callback. Must be listed in the Meta
+  // app's Valid OAuth Redirect URIs exactly as set here.
+  META_OAUTH_REDIRECT_URI: z.string().optional(),
   // Pinned rather than left to "latest" so a Graph API version bump
   // upstream can't silently change response shapes under us.
   META_GRAPH_API_VERSION: z.string().default("v21.0"),
@@ -395,6 +398,11 @@ if (parsed.data.BILLING_SANDBOX && parsed.data.NODE_ENV === "production") {
     const anyWhatsapp = d.WHATSAPP_PROVIDER || d.ZOHO_WHATSAPP_TEMPLATE_KEY || d.META_WHATSAPP_TOKEN || d.TWILIO_WHATSAPP_FROM;
     if (!anySms && !anyWhatsapp) console.warn("No SMS or WhatsApp provider set — Phone Login and One-Click Checkout can't send codes.");
   }
+}
+
+// Facebook's sign-in comes back to the admin unless set otherwise.
+if (!parsed.data.META_OAUTH_REDIRECT_URI) {
+  parsed.data.META_OAUTH_REDIRECT_URI = `${String(parsed.data.ADMIN_ORIGIN).replace(/\/$/, "")}/admin/apps/meta/callback`;
 }
 
 module.exports = { env: parsed.data, isInfraDomain };

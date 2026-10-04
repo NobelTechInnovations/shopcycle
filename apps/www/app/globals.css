@@ -2408,3 +2408,88 @@ html:not(.js) [data-reveal] {
   white-space: nowrap;
   border: 0;
 }
+
+/* ── Legal pages (privacy, terms, data deletion) ─────────────────── */
+.legal {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 56px;
+  padding-top: 40px;
+  padding-bottom: 110px;
+}
+.legal__toc {
+  position: sticky;
+  top: 96px;
+  align-self: start;
+  font-size: 14px;
+}
+.legal__toc ol {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.legal__toc a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.legal__toc a:hover {
+  color: var(--text);
+}
+.legal__body {
+  max-width: 760px;
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--text);
+}
+.legal__body h2 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  margin: 44px 0 10px;
+  scroll-margin-top: 96px;
+}
+.legal__body h3 {
+  font-size: 16.5px;
+  margin: 22px 0 6px;
+}
+.legal__body p,
+.legal__body li {
+  color: var(--muted);
+}
+.legal__body strong {
+  color: var(--text);
+}
+.legal__body ul {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+.legal__body li + li {
+  margin-top: 6px;
+}
+.legal__body a {
+  color: var(--violet);
+}
+.legal__note {
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin: 18px 0;
+}
+.legal__meta {
+  color: var(--subtle);
+  font-size: 14px;
+  margin-top: 14px;
+}
+@media (max-width: 860px) {
+  .legal {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .legal__toc {
+    position: static;
+  }
+}

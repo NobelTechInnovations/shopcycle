@@ -135,7 +135,14 @@ function ChooseBusiness({ current, onConnected, onNeedsAccount, onUnavailable })
         type="info"
         showIcon
         message="Your Google account doesn't manage a business on Google yet"
-        description="Create or claim your free Business Profile at business.google.com, or find your business by name below."
+        description={
+          <>
+            Create your free Business Profile (or claim the one Google already has for your shop), then come back here — or find your business by name below.{" "}
+            <a href="https://business.google.com/create" target="_blank" rel="noopener noreferrer">
+              Create Business Profile
+            </a>
+          </>
+        }
       />
     );
   }

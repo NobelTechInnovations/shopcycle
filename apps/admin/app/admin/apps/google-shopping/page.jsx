@@ -19,16 +19,23 @@ const MANUAL_STEPS = [
 ];
 
 /** The Merchant Center accounts on the store's Google account — pick one. */
-function ChooseMerchant({ onConnected, onNeedsAccount }) {
+function ChooseMerchant({ onConnected, onNeedsAccount, onUnavailable }) {
   const { message } = App.useApp();
   const [list, setList] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
+  // Merchant Center can't be reached through the sign-in yet: the feed link
+  // steps open by themselves.
+  const [manual, setManual] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/channels/google/accounts")
       .then((d) => setList(d.accounts))
-      .catch((err) => (needsAccount(err) ? onNeedsAccount() : setError(err.message)));
+      .catch((err) => {
+        if (needsAccount(err)) return onNeedsAccount();
+        setError(err.message);
+        onUnavailable?.();
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -52,7 +59,14 @@ function ChooseMerchant({ onConnected, onNeedsAccount }) {
         type="info"
         showIcon
         message="No Merchant Center account on this Google account yet"
-        description="Create one free at merchants.google.com (choose India), then come back and refresh this page."
+        description={
+          <>
+            Create one free (choose India), then come back here.{" "}
+            <a href="https://merchants.google.com/mc/merchantsignup" target="_blank" rel="noopener noreferrer">
+              Create Merchant Center account
+            </a>
+          </>
+        }
       />
     );
   }
@@ -139,7 +153,7 @@ export default function GoogleShoppingPage() {
               <Card title="Choose your Merchant Center account">
                 <AccountLine kind="google" account={data.account} />
                 <p className="m-0 mb-3 text-[13px] text-ink-muted">We add your product feed to it — Google then reads your products every day, and again whenever you press Sync.</p>
-                <ChooseMerchant onConnected={setData} onNeedsAccount={load} />
+                <ChooseMerchant onConnected={setData} onNeedsAccount={load} onUnavailable={() => setManual(true)} />
               </Card>
             ) : (
               <AccountSignIn
@@ -216,7 +230,7 @@ export default function GoogleShoppingPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <ManualFeedCard url={data.products.feedUrl} title="Feed link for Merchant Center" steps={MANUAL_STEPS} open={!data.signIn && !data.connected} />
+          <ManualFeedCard url={data.products.feedUrl} title="Feed link for Merchant Center" steps={MANUAL_STEPS} open={(!data.signIn || manual) && !data.connected} />
           <VerificationCard
             which="google"
             title="Verify your website"
