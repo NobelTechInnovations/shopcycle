@@ -54,7 +54,7 @@ async function selectAssetsHandler(request, reply) {
   const body = selectSchema.parse(request.body);
   const existing = await repository.findByStore(request.server.prisma, request.store.id);
   if (!existing) throw new HttpError(400, "Connect Facebook first.");
-  const connection = await repository.upsert(request.server.prisma, request.store.id, body);
+  const connection = await repository.update(request.server.prisma, request.store.id, body);
   reply.send({ connection: serializeConnection(connection) });
 }
 

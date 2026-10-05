@@ -45,12 +45,23 @@ const createTemplateSchema = z.object({
   name: z.string().trim().min(1, "Name the template").max(40),
   // An existing template of the same kind to start from ("" = the default).
   basedOn: z.string().trim().max(30).optional().nullable(),
+  // Products / pages / collections that should use it straight away.
+  assign: z.array(z.string().min(1).max(40)).max(500).optional(),
+});
+
+// Which items use a template: exactly `ids` (others that used it go back to
+// the default). For the default template, `ids` are moved onto it.
+const assignTemplateSchema = z.object({
+  kind: z.enum(["product", "page", "collection"]),
+  name: z.string().trim().regex(/^(product|page|collection)(\.[a-z0-9][a-z0-9-]{0,29})?$/),
+  ids: z.array(z.string().min(1).max(40)).max(1000),
 });
 
 module.exports = {
   TEMPLATE_SUFFIX,
   templateSuffixField,
   createTemplateSchema,
+  assignTemplateSchema,
   installThemeSchema,
   updateThemeSettingsSchema,
   upsertThemeFileSchema,

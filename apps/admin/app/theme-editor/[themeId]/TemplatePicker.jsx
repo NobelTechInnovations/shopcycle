@@ -1,12 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { App, Button, Dropdown, Form, Input, Modal, Select } from "antd";
-import { Plus, MoreHorizontal, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { App, Button, Checkbox, Dropdown, Form, Input, Modal, Select } from "antd";
+import { Plus, MoreHorizontal, Trash2, Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 const KIND_LABEL = { product: "Product", page: "Page", collection: "Collection" };
 const KIND_PLURAL = { product: "products", page: "pages", collection: "collections" };
+
+/** The layout an item really uses on the store: its own template when that
+ * exists, the Rental layout for a rented product, else the default — the
+ * same choice the storefront makes. */
+export function effectiveTemplate(templates, kind, item) {
+  if (!item) return kind;
+  const has = (s) => (templates[kind] || []).some((t) => t.suffix === s);
+  if (item.templateSuffix && has(item.templateSuffix)) return `${kind}.${item.templateSuffix}`;
+  if (kind === "product" && item.rental?.enabled && has("rental")) return "product.rental";
+  return kind;
+}
+
+/** "Default" or the extra template's name. */
+export const layoutName = (templates, name) => templateLabel(templates, name) || "Default";
 
 /** The template a page (About us, Contact…) is shown with. */
 export function pageTemplate(templates, page) {
@@ -58,7 +72,7 @@ export function templateLabel(templates, name) {
  * (Shopify's alternate templates). Products/pages/collections then pick it
  * on their own page in the admin.
  */
-export function CreateTemplateModal({ open, onClose, themeId, templates, defaultKind, onCreated }) {
+export function CreateTemplateModal({ open, onClose, themeId, templates, defaultKind, onCreated, items = {} }) {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
@@ -67,10 +81,11 @@ export function CreateTemplateModal({ open, onClose, themeId, templates, default
   async function submit(values) {
     setSaving(true);
     try {
-      const { template } = await apiFetch(`/api/themes/${themeId}/templates`, { method: "POST", body: { ...values, basedOn: values.basedOn || null } });
-      message.success(`“${template.label}” template created — arrange it, then choose it on any ${values.kind}.`);
+      const { template } = await apiFetch(`/api/themes/${themeId}/templates`, { method: "POST", body: { ...values, basedOn: values.basedOn || null, assign: values.assign || [] } });
+      const n = values.assign?.length || 0;
+      message.success(n ? `“${template.label}” layout created and used by ${n} ${n === 1 ? values.kind : KIND_PLURAL[values.kind]} — arrange it now.` : `“${template.label}” layout created — arrange it, then choose where it's used.`);
       form.resetFields();
-      onCreated(template);
+      onCreated(template, values.assign || []);
     } catch (err) {
       message.error(err.message || "Couldn't create the template");
     } finally {
@@ -100,11 +115,24 @@ export function CreateTemplateModal({ open, onClose, themeId, templates, default
               { value: "collection", label: "Collections" },
               { value: "page", label: "Pages" },
             ]}
-            onChange={() => form.setFieldValue("basedOn", "")}
+            onChange={() => {
+              form.setFieldValue("basedOn", "");
+              form.setFieldValue("assign", []);
+            }}
           />
         </Form.Item>
         <Form.Item name="name" label="Name" rules={[{ required: true, message: "Name the template" }]} extra="Only you see this — e.g. Rental, Size guide, Bridal.">
           <Input maxLength={40} placeholder="e.g. Rental" autoFocus />
+        </Form.Item>
+        <Form.Item name="assign" label={`Use it for`} extra={`Choose ${KIND_PLURAL[kind] || "items"} now, or later from “Used by” in the editor.`}>
+          <Select
+            mode="multiple"
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder={`Pick ${KIND_PLURAL[kind] || "items"}`}
+            options={(items[kind] || []).map((x) => ({ value: x.id, label: x.title }))}
+          />
         </Form.Item>
         <Form.Item name="basedOn" label="Start from">
           <Select
@@ -160,5 +188,84 @@ export function NewTemplateButton({ onClick }) {
     <Button size="small" icon={<Plus size={14} aria-hidden="true" />} onClick={onClick} className="hidden md:inline-flex">
       Template
     </Button>
+  );
+}
+
+/**
+ * "Used by": which products / pages / collections use this layout. Ticking
+ * one moves it onto this layout; unticking moves it back to the default.
+ * The default layout itself can only gain items (to leave it, an item
+ * picks another layout).
+ */
+export function AssignTemplateModal({ open, onClose, kind, name, templates, items, onAssigned }) {
+  const { message } = App.useApp();
+  const [chosen, setChosen] = useState(() => new Set());
+  const [q, setQ] = useState("");
+  const [saving, setSaving] = useState(false);
+  const isDefault = name === kind;
+  const label = layoutName(templates, name);
+  const using = useMemo(() => new Set(items.filter((x) => effectiveTemplate(templates, kind, x) === name).map((x) => x.id)), [items, templates, kind, name]);
+
+  useEffect(() => {
+    if (open) {
+      setChosen(new Set(using));
+      setQ("");
+    }
+    // Only when it opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const shown = items.filter((x) => !q || x.title.toLowerCase().includes(q.toLowerCase()));
+
+  async function save() {
+    setSaving(true);
+    try {
+      const ids = isDefault ? [...chosen].filter((id) => !using.has(id)) : [...chosen];
+      const { usage } = await apiFetch("/api/themes/templates/assign", { method: "POST", body: { kind, name, ids } });
+      message.success(`Saved — the store shows the “${label}” layout on them now`);
+      onAssigned({ kind, name, ids, usage });
+    } catch (err) {
+      message.error(err.message || "Couldn't save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onCancel={onClose} title={`Where the “${label}” ${kind} layout is used`} okText="Save" confirmLoading={saving} onOk={save} destroyOnHidden>
+      <p className="text-[13px] text-ink-muted mt-0">
+        {isDefault
+          ? `Tick ${KIND_PLURAL[kind]} to move them back to the default layout.`
+          : `Tick the ${KIND_PLURAL[kind]} that should look like this. Unticked ones use the default layout.`}
+      </p>
+      {items.length > 8 && (
+        <Input className="mb-3" allowClear prefix={<Search size={14} aria-hidden="true" />} placeholder={`Search ${KIND_PLURAL[kind]}`} value={q} onChange={(e) => setQ(e.target.value)} />
+      )}
+      <div className="max-h-[50vh] overflow-y-auto flex flex-col gap-1.5 pr-1">
+        {shown.length === 0 && <p className="text-[13px] text-ink-muted m-0">Nothing here yet.</p>}
+        {shown.map((x) => {
+          const current = effectiveTemplate(templates, kind, x);
+          const locked = isDefault && using.has(x.id);
+          return (
+            <Checkbox
+              key={x.id}
+              checked={chosen.has(x.id)}
+              disabled={locked}
+              onChange={(e) =>
+                setChosen((cur) => {
+                  const next = new Set(cur);
+                  if (e.target.checked) next.add(x.id);
+                  else next.delete(x.id);
+                  return next;
+                })
+              }
+            >
+              <span className="text-[13.5px] text-ink">{x.title}</span>
+              {current !== name && <span className="text-[12px] text-ink-muted"> · now uses {layoutName(templates, current)}</span>}
+            </Checkbox>
+          );
+        })}
+      </div>
+    </Modal>
   );
 }

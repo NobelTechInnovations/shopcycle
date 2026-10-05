@@ -45,10 +45,18 @@ function scopes() {
 }
 
 /** Facebook's login for this store; `rerequest` asks again for anything
- * the seller unticked last time. */
+ * the seller unticked last time. With META_LOGIN_CONFIG_ID (a Business
+ * app's Facebook Login for Business configuration) the configuration
+ * decides the permissions; otherwise they're asked for by name. */
 function authorizeUrl({ rerequest = false } = {}) {
   if (!meta.metaConfigured()) throw new HttpError(400, "Facebook sign-in isn't set up on Oyklane yet.");
   const url = new URL(meta.buildAuthorizeUrl(scopes()));
+  if (env.META_LOGIN_CONFIG_ID) {
+    url.searchParams.delete("scope");
+    url.searchParams.set("config_id", env.META_LOGIN_CONFIG_ID);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("override_default_response_type", "true");
+  }
   if (rerequest) url.searchParams.set("auth_type", "rerequest");
   return url.toString();
 }

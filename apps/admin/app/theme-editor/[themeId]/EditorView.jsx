@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Button, Select, Segmented, Spin, App, Modal } from "antd";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Undo2, Redo2, Monitor, Smartphone, Settings2, PanelTop, Lock } from "lucide-react";
+import { ArrowLeft, Undo2, Redo2, Monitor, Smartphone, Settings2, PanelTop, Lock, Users, Info } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useEditorStore } from "./store";
 import { buildSectionCatalog, defaultSettingsFor, newSectionKey, hydrateTemplateDefaults, materializeDefaultBlocks } from "./schema-utils";
@@ -14,7 +14,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { AddSectionModal } from "./AddSectionModal";
 import { ThemeSettingsDrawer } from "./ThemeSettingsDrawer";
 import { GlobalSectionsDrawer } from "./GlobalSectionsDrawer";
-import { templateOptions, templateLabel, pageTemplate, CreateTemplateModal, TemplateActions, NewTemplateButton } from "./TemplatePicker";
+import { templateOptions, templateLabel, pageTemplate, effectiveTemplate, layoutName, CreateTemplateModal, AssignTemplateModal, TemplateActions, NewTemplateButton } from "./TemplatePicker";
 
 // The home page is designed in the theme. Product, collection and content
 // pages are Oyklane's own, but their sections can be arranged here — the
@@ -93,6 +93,7 @@ export function EditorView({ theme, platform, templates: initialTemplates, templ
   });
   const [templates, setTemplates] = useState(initialTemplates || { product: [], page: [], collection: [] });
   const [createOpen, setCreateOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   const [pages, setPages] = useState([]);
   const [device, setDevice] = useState("desktop");
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -268,9 +269,20 @@ export function EditorView({ theme, platform, templates: initialTemplates, templ
     addSection(newSectionKey(type), type, defaultSettingsFor(catalog, type), blocks, block_order, at);
   }
 
-  function handleCreated(template) {
+  // Keeps the editor's lists in step after items move between layouts.
+  function applyAssignment({ kind, name, ids }) {
+    const suffix = name.split(".")[1] || null;
+    const update = (list) =>
+      list.map((x) => (ids.includes(x.id) ? { ...x, templateSuffix: suffix } : suffix && x.templateSuffix === suffix ? { ...x, templateSuffix: null } : x));
+    if (kind === "page") setPages(update);
+    if (kind === "product") setProducts(update);
+    if (kind === "collection") setCollections(update);
+  }
+
+  function handleCreated(template, assigned = []) {
     setTemplates((cur) => ({ ...cur, [template.kind]: [...(cur[template.kind] || []).filter((t) => t.name !== template.name), { suffix: template.suffix, name: template.name, label: template.label, source: "theme" }] }));
     filesRef.current = [...filesRef.current.filter((f) => f.path !== `templates/${template.name}.json`), { path: `templates/${template.name}.json`, content: JSON.stringify(template.content) }];
+    if (assigned.length) applyAssignment({ kind: template.kind, name: template.name, ids: assigned });
     setCreateOpen(false);
     handleTemplateChange(template.name);
   }
@@ -287,12 +299,28 @@ export function EditorView({ theme, platform, templates: initialTemplates, templ
 
   const [previewPick, setPreviewPick] = useState({});
   const previewOptions = base === "product" ? products : base === "collection" ? collections : base === "page" ? pages : [];
-  // An extra template previews with something that uses it, when there is one.
-  const suffix = templateName.split(".")[1] || null;
-  const usingIt = suffix ? previewOptions.filter((x) => x.templateSuffix === suffix || (suffix === "rental" && x.rental?.enabled)) : [];
+  // A layout previews with something that really uses it, when there is
+  // one — the default too (a page set to another layout doesn't show this).
+  const usingIt = MAIN_SECTION[base] ? previewOptions.filter((x) => effectiveTemplate(templates, base, x) === templateName) : [];
   const previewSlug =
     previewOptions.length &&
     (previewOptions.find((x) => x.slug === previewPick[templateName])?.slug || usingIt[0]?.slug || previewOptions[0].slug);
+  const previewItem = MAIN_SECTION[base] ? previewOptions.find((x) => x.slug === previewSlug) : null;
+  const previewLayout = previewItem ? effectiveTemplate(templates, base, previewItem) : null;
+  // Previewing something that uses another layout: what's edited here
+  // won't show on it — say so, and offer the two ways out.
+  const mismatch = Boolean(previewItem && previewLayout !== templateName);
+
+  async function useThisLayoutFor(item) {
+    try {
+      const ids = [...usingIt.map((x) => x.id), item.id];
+      await apiFetch("/api/themes/templates/assign", { method: "POST", body: { kind: base, name: templateName, ids: templateName === base ? [item.id] : ids } });
+      applyAssignment({ kind: base, name: templateName, ids: templateName === base ? [item.id] : ids });
+      message.success(`“${item.title}” now uses the “${layoutName(templates, templateName)}” layout`);
+    } catch (err) {
+      message.error(err.message);
+    }
+  }
 
   if (!ready || !template) {
     return (
@@ -332,6 +360,11 @@ export function EditorView({ theme, platform, templates: initialTemplates, templ
           {altLabel && templates[base]?.find((t) => t.name === templateName)?.source !== "app" && (
             <TemplateActions themeId={theme.id} name={templateName} label={altLabel} usage={templateUsage} onDeleted={handleDeleted} />
           )}
+          {MAIN_SECTION[base] && (
+            <Button size="small" icon={<Users size={13} aria-hidden="true" />} onClick={() => setAssignOpen(true)} title={`Which ${base}s use this layout`}>
+              Used by {usingIt.length}
+            </Button>
+          )}
           <NewTemplateButton onClick={() => setCreateOpen(true)} />
           {previewOptions.length > 1 && (
             <Select
@@ -341,7 +374,19 @@ export function EditorView({ theme, platform, templates: initialTemplates, templ
               showSearch
               optionFilterProp="label"
               onChange={(v) => setPreviewPick((cur) => ({ ...cur, [templateName]: v }))}
-              options={previewOptions.map((x) => ({ value: x.slug, label: x.title }))}
+              options={
+                MAIN_SECTION[base]
+                  ? [
+                      { label: "Use this layout", options: usingIt.map((x) => ({ value: x.slug, label: x.title })) },
+                      {
+                        label: "Use another layout",
+                        options: previewOptions
+                          .filter((x) => !usingIt.includes(x))
+                          .map((x) => ({ value: x.slug, label: `${x.title} · ${layoutName(templates, effectiveTemplate(templates, base, x))}` })),
+                      },
+                    ].filter((g) => g.options.length)
+                  : previewOptions.map((x) => ({ value: x.slug, label: x.title }))
+              }
               aria-label="Preview with"
               prefix={<span className="text-ink-subtle text-xs">Preview:</span>}
             />
@@ -409,7 +454,7 @@ export function EditorView({ theme, platform, templates: initialTemplates, templ
               }
               hint={
                 PAGE_HINTS[base]
-                  ? `${PAGE_HINTS[base]}${altLabel ? ` Used by the ${base === "collection" ? "collections" : base + "s"} you set to “${altLabel}”.` : ""}`
+                  ? `${PAGE_HINTS[base]} Shows on the ${usingIt.length} ${base === "collection" ? "collection" : base}${usingIt.length === 1 ? "" : "s"} using this layout (“Used by” at the top).`
                   : undefined
               }
             />
@@ -417,7 +462,24 @@ export function EditorView({ theme, platform, templates: initialTemplates, templ
             <FixedPageNote onOpenSettings={() => setSettingsDrawerOpen(true)} />
           )}
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-col">
+          {mismatch && (
+            <div className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 bg-amber-50 border-b border-amber-200 text-[13px] text-ink" role="status">
+              <Info size={15} className="text-amber-600 shrink-0" aria-hidden="true" />
+              <span className="min-w-0">
+                “{previewItem.title}” uses the <b>{layoutName(templates, previewLayout)}</b> layout, so what you change here won&apos;t show on it.
+              </span>
+              <span className="flex gap-2 ml-auto">
+                <Button size="small" onClick={() => handleTemplateChange(base === "page" ? `page@${previewItem.slug}` : previewLayout)}>
+                  Edit “{layoutName(templates, previewLayout)}”
+                </Button>
+                <Button size="small" type="primary" onClick={() => useThisLayoutFor(previewItem)}>
+                  Use this layout for it
+                </Button>
+              </span>
+            </div>
+          )}
+          <div className="flex-1 min-h-0">
           <PreviewFrame
             themeId={theme.id}
             templateName={templateName}
@@ -426,6 +488,7 @@ export function EditorView({ theme, platform, templates: initialTemplates, templ
             selectable={editable}
             labels={Object.fromEntries(template.order.map((k) => [k, catalog[template.sections[k]?.type]?.name || template.sections[k]?.type]))}
           />
+          </div>
         </div>
         <div className="w-80 shrink-0 border-l border-app-border bg-app-surface">
           {editable ? (
@@ -458,7 +521,22 @@ export function EditorView({ theme, platform, templates: initialTemplates, templ
         templates={templates}
         defaultKind={MAIN_SECTION[base] ? base : "product"}
         onCreated={handleCreated}
+        items={{ product: products, page: pages, collection: collections }}
       />
+      {MAIN_SECTION[base] && (
+        <AssignTemplateModal
+          open={assignOpen}
+          onClose={() => setAssignOpen(false)}
+          kind={base}
+          name={templateName}
+          templates={templates}
+          items={previewOptions}
+          onAssigned={(r) => {
+            applyAssignment(r);
+            setAssignOpen(false);
+          }}
+        />
+      )}
       <ThemeSettingsDrawer
         open={settingsDrawerOpen}
         onClose={() => setSettingsDrawerOpen(false)}

@@ -1,4 +1,5 @@
 const { adjustStock } = require("../../lib/inventory");
+const { sizesAndColours, variantHasPart } = require("../../lib/variant-options");
 
 const include = {
   variants: { orderBy: { createdAt: "asc" } },
@@ -35,6 +36,9 @@ function listWhere(storeId, f) {
   if (f.stock === "out") and.push({ variants: { none: { inventoryQuantity: { gt: 0 } } } });
   if (f.stock === "in") and.push({ variants: { some: { inventoryQuantity: { gt: LOW_STOCK } } } });
   if (f.stock === "low") and.push({ variants: { some: { inventoryQuantity: { gt: 0 } } } }, { variants: { none: { inventoryQuantity: { gt: LOW_STOCK } } } });
+  if (f.size) and.push({ variants: { some: variantHasPart(f.size) } });
+  if (f.colour) and.push({ variants: { some: variantHasPart(f.colour) } });
+  if (f.tag) and.push({ tags: { contains: f.tag, mode: "insensitive" } });
   if (f.priceMin != null) and.push({ variants: { some: { price: { gte: f.priceMin } } } });
   if (f.priceMax != null) and.push({ variants: { some: { price: { lte: f.priceMax } } } });
   return {
@@ -86,16 +90,46 @@ async function unitsSold(prisma, storeId, productIds, days = 30) {
   return Object.fromEntries(rows.map((r) => [r.productId, r._sum.quantity || 0]));
 }
 
-/** Product types and vendors the store uses — the list's filter choices. */
+/** Choices for the list's filters: the product types, vendors, sizes,
+ * colours and tags the store uses. */
 async function facets(prisma, storeId) {
-  const [types, vendors] = await Promise.all([
+  const [types, vendors, variants, tagRows] = await Promise.all([
     prisma.product.findMany({ where: { storeId, productType: { not: null } }, distinct: ["productType"], select: { productType: true }, take: 100 }),
     prisma.product.findMany({ where: { storeId, vendor: { not: null } }, distinct: ["vendor"], select: { vendor: true }, take: 100 }),
+    prisma.productVariant.findMany({ where: { product: { storeId } }, distinct: ["title"], select: { title: true }, take: 2000 }),
+    prisma.product.findMany({ where: { storeId, tags: { not: null } }, select: { tags: true }, take: 2000 }),
   ]);
+  const { sizes, colours } = sizesAndColours(variants.map((v) => v.title));
+  const tags = new Map();
+  for (const row of tagRows) {
+    for (const t of String(row.tags || "").split(",").map((x) => x.trim()).filter(Boolean)) {
+      const k = t.toLowerCase();
+      if (!tags.has(k)) tags.set(k, t);
+    }
+  }
+  const byText = (a, b) => a.localeCompare(b, "en", { numeric: true, sensitivity: "base" });
   return {
-    productTypes: types.map((t) => t.productType).filter(Boolean).sort(),
-    vendors: vendors.map((v) => v.vendor).filter(Boolean).sort(),
+    productTypes: types.map((t) => t.productType).filter(Boolean).sort(byText),
+    vendors: vendors.map((v) => v.vendor).filter(Boolean).sort(byText),
+    sizes: sortSizes(sizes),
+    colours: colours.sort(byText),
+    tags: [...tags.values()].sort(byText).slice(0, 300),
   };
+}
+
+const SIZE_ORDER = ["xxs", "xs", "s", "m", "l", "xl", "xxl", "xxxl", "2xl", "3xl", "4xl", "5xl", "free size", "freesize", "one size", "onesize"];
+function sortSizes(list) {
+  const rank = (v) => {
+    const i = SIZE_ORDER.indexOf(String(v).toLowerCase());
+    if (i !== -1) return [0, i];
+    const n = parseFloat(String(v).replace(/[^\d.]/g, ""));
+    return Number.isFinite(n) ? [1, n] : [2, 0];
+  };
+  return list.sort((a, b) => {
+    const [ga, va] = rank(a);
+    const [gb, vb] = rank(b);
+    return ga - gb || va - vb || String(a).localeCompare(String(b));
+  });
 }
 
 function findById(prisma, storeId, id) {

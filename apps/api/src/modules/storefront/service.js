@@ -415,9 +415,9 @@ const SORTS = {
   "title-asc": { label: "Alphabetically, A–Z", fn: (a, b) => a.title.localeCompare(b.title) },
 };
 
-const SIZE_VALUE = /^(xxs|xs|s|m|l|xl|xxl|xxxl|[2-5]xl|free ?size|one ?size|\d{1,3}(\.\d)?|\d{2}\s?-\s?\d{2}|(uk|us|eu)\s?\d{1,2}(\.\d)?|\d+(\.\d+)?\s?(ml|l|g|gm|kg|cm|mm|in|inch|ct|carat)s?|\d{1,2}\s?(y|yrs?|years?|m|months?)(\s?-\s?\d{1,2}\s?(y|yrs?|years?|m|months?))?)$/i;
-const COLOUR_WORDS =
-  /\b(black|white|ivory|cream|off[- ]?white|beige|tan|camel|brown|chocolate|coffee|grey|gray|charcoal|silver|gold|rose ?gold|red|maroon|wine|burgundy|pink|blush|peach|coral|orange|rust|mustard|yellow|lime|olive|green|mint|sage|teal|turquoise|aqua|blue|navy|indigo|denim|sky|purple|lavender|lilac|violet|magenta|multi|multicolou?r|khaki|nude|stone|sand|emerald|ruby|sapphire)\b/i;
+// What counts as a size or a colour in a variant's name (shared with the
+// admin's product filters).
+const { SIZE_VALUE, COLOUR_WORDS } = require("../../lib/variant-options");
 
 const COLOUR_HEX = {
   black: "#111111", white: "#ffffff", ivory: "#fffff0", cream: "#f3ead8", offwhite: "#f5f2ea", beige: "#d9c8a9", tan: "#c8a27a",

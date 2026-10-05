@@ -7,6 +7,8 @@ async function themeRoutes(fastify) {
 
   fastify.get("/", controller.listHandler);
   fastify.get("/templates", controller.templatesHandler);
+  // Which products / pages / collections use a template.
+  fastify.post("/templates/assign", controller.assignTemplateHandler);
   fastify.post("/install", controller.installHandler);
   fastify.get("/:id", controller.getHandler);
   fastify.post("/:id/activate", controller.activateHandler);

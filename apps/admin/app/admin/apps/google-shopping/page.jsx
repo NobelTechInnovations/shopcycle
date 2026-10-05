@@ -24,9 +24,6 @@ function ChooseMerchant({ onConnected, onNeedsAccount, onUnavailable }) {
   const [list, setList] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
-  // Merchant Center can't be reached through the sign-in yet: the feed link
-  // steps open by themselves.
-  const [manual, setManual] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/channels/google/accounts")
@@ -93,6 +90,9 @@ export default function GoogleShoppingPage() {
   const [data, setData] = useState(null);
   const [missing, setMissing] = useState(false);
   const [busy, setBusy] = useState(null);
+  // Merchant Center can't be reached through the sign-in yet: the feed link
+  // steps open by themselves.
+  const [manual, setManual] = useState(false);
 
   const load = useCallback(async () => {
     try {

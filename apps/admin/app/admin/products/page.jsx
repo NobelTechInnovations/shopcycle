@@ -58,6 +58,7 @@ const OPTIONAL = [
   { key: "collections", label: "Collections" },
   { key: "sku", label: "SKU" },
   { key: "variants", label: "Variants" },
+  { key: "tags", label: "Tags" },
   { key: "type", label: "Type" },
   { key: "vendor", label: "Vendor" },
   { key: "created", label: "Created" },
@@ -65,7 +66,7 @@ const OPTIONAL = [
 ];
 const DEFAULT_COLUMNS = ["inventory", "price", "sold", "category", "sku"];
 const COLUMNS_KEY = "oy:products:columns";
-const NO_FILTERS = { categoryId: undefined, brandId: undefined, collectionId: undefined, stock: undefined, productType: undefined, vendor: undefined, channel: undefined, priceMin: null, priceMax: null };
+const NO_FILTERS = { categoryId: undefined, brandId: undefined, collectionId: undefined, stock: undefined, size: undefined, colour: undefined, tag: undefined, productType: undefined, vendor: undefined, channel: undefined, priceMin: null, priceMax: null };
 const day = (iso) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—");
 
 function readColumns() {
@@ -101,7 +102,7 @@ export default function ProductsPage() {
   const [filters, setFilters] = useState(NO_FILTERS);
   const [sort, setSort] = useState("updated");
   const [shown, setShown] = useState(DEFAULT_COLUMNS);
-  const [options, setOptions] = useState({ categories: [], brands: [], collections: [], productTypes: [], vendors: [] });
+  const [options, setOptions] = useState({ categories: [], brands: [], collections: [], productTypes: [], vendors: [], sizes: [], colours: [], tags: [] });
   const { message } = App.useApp();
   const pageSize = 20;
 
@@ -112,8 +113,19 @@ export default function ProductsPage() {
       apiFetch("/api/categories?pageSize=100").catch(() => ({ categories: [] })),
       apiFetch("/api/brands?pageSize=100").catch(() => ({ brands: [] })),
       apiFetch("/api/collections?pageSize=100").catch(() => ({ collections: [] })),
-      apiFetch("/api/products/facets").catch(() => ({ productTypes: [], vendors: [] })),
-    ]).then(([c, b, col, f]) => setOptions({ categories: c.categories || [], brands: b.brands || [], collections: col.collections || [], productTypes: f.productTypes || [], vendors: f.vendors || [] }));
+      apiFetch("/api/products/facets").catch(() => ({})),
+    ]).then(([c, b, col, f]) =>
+      setOptions({
+        categories: c.categories || [],
+        brands: b.brands || [],
+        collections: col.collections || [],
+        productTypes: f.productTypes || [],
+        vendors: f.vendors || [],
+        sizes: f.sizes || [],
+        colours: f.colours || [],
+        tags: f.tags || [],
+      })
+    );
   }, []);
 
   function setFilter(key, value) {
@@ -249,6 +261,21 @@ export default function ProductsPage() {
         },
       },
       { key: "variants", title: "Variants", width: 90, align: "right", render: (_, row) => <span className="tabular-nums">{row.variants.length}</span> },
+      {
+        key: "tags",
+        title: "Tags",
+        width: 180,
+        render: (_, row) => {
+          const tags = String(row.tags || "").split(",").map((t) => t.trim()).filter(Boolean);
+          return tags.length ? (
+            <span className="text-[12.5px] text-ink-muted truncate block max-w-[170px]" title={tags.join(", ")}>
+              {tags.join(", ")}
+            </span>
+          ) : (
+            <span className="text-ink-subtle">—</span>
+          );
+        },
+      },
       { key: "type", title: "Type", width: 120, render: (_, row) => row.productType || <span className="text-ink-subtle">—</span> },
       { key: "vendor", title: "Vendor", width: 120, render: (_, row) => row.vendor || <span className="text-ink-subtle">—</span> },
       { key: "created", title: "Created", width: 120, render: (_, row) => <span className="text-[13px]">{day(row.createdAt)}</span> },
@@ -283,6 +310,18 @@ export default function ProductsPage() {
       <label className="flex flex-col gap-1 text-xs text-ink-muted">
         Stock
         <Select {...selectProps} showSearch={false} placeholder="Any" value={filters.stock} onChange={(v) => setFilter("stock", v)} options={STOCK} />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
+        Size
+        <Select {...selectProps} placeholder={options.sizes.length ? "Any" : "No sizes yet"} disabled={!options.sizes.length} value={filters.size} onChange={(v) => setFilter("size", v)} options={options.sizes.map((t) => ({ value: t, label: t }))} />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
+        Colour
+        <Select {...selectProps} placeholder={options.colours.length ? "Any" : "No colours yet"} disabled={!options.colours.length} value={filters.colour} onChange={(v) => setFilter("colour", v)} options={options.colours.map((t) => ({ value: t, label: t }))} />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
+        Tag
+        <Select {...selectProps} placeholder={options.tags.length ? "Any" : "No tags yet"} disabled={!options.tags.length} value={filters.tag} onChange={(v) => setFilter("tag", v)} options={options.tags.map((t) => ({ value: t, label: t }))} />
       </label>
       <label className="flex flex-col gap-1 text-xs text-ink-muted">
         Type
@@ -403,6 +442,9 @@ export default function ProductsPage() {
               filters.brandId && ["brandId", `Brand: ${options.brands.find((b) => b.id === filters.brandId)?.title || "…"}`],
               filters.collectionId && ["collectionId", `Collection: ${options.collections.find((c) => c.id === filters.collectionId)?.title || "…"}`],
               filters.stock && ["stock", STOCK.find((x) => x.value === filters.stock)?.label],
+              filters.size && ["size", `Size: ${filters.size}`],
+              filters.colour && ["colour", `Colour: ${filters.colour}`],
+              filters.tag && ["tag", `Tag: ${filters.tag}`],
               filters.productType && ["productType", `Type: ${filters.productType}`],
               filters.vendor && ["vendor", `Vendor: ${filters.vendor}`],
               filters.priceMin != null && ["priceMin", `From ₹${filters.priceMin}`],

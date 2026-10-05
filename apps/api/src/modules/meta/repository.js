@@ -32,8 +32,14 @@ async function upsert(prisma, storeId, data) {
   );
 }
 
+/** Changes an existing connection (the ad account / Page / WhatsApp picks).
+ * Not an upsert: a new connection always needs its access token. */
+async function update(prisma, storeId, data) {
+  return decrypt(await prisma.metaConnection.update({ where: { storeId }, data: encryptData(data) }));
+}
+
 function remove(prisma, storeId) {
   return prisma.metaConnection.delete({ where: { storeId } }).catch(() => null);
 }
 
-module.exports = { findByStore, upsert, remove };
+module.exports = { findByStore, upsert, update, remove };

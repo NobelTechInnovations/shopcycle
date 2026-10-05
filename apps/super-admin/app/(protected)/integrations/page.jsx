@@ -176,6 +176,15 @@ export default function IntegrationsPage() {
           <span className="text-[13px] text-ink-muted">META_APP_ID / SECRET</span>
           <Status ok={data.meta.configured} />
         </div>
+        <div className="flex items-center justify-between py-2 border-b border-app-border">
+          <span className="text-[13px] text-ink-muted">META_LOGIN_CONFIG_ID (Facebook Login for Business)</span>
+          <Status ok={Boolean(data.meta.configId)} yes={data.meta.configId || "Set"} no="Not set — permissions asked by name" />
+        </div>
+        <p className="m-0 py-2 text-[12.5px] text-ink-muted border-b border-app-border">
+          A Business-type Meta app (like “Oyklane - Marketing”) signs people in with a configuration: Facebook Login for Business ▸ Configurations ▸ Create ▸
+          token type <b>User access token</b> ▸ tick the permissions your apps need (only ones the app&apos;s use cases include) ▸ copy its ID into{" "}
+          <code>META_LOGIN_CONFIG_ID</code>. Without it, Meta shows “Feature unavailable” when the login asks for a permission the app doesn&apos;t have.
+        </p>
         <CopyLine label="Valid OAuth redirect URI" value={data.meta.expectedRedirectUri} />
         {metaWrong && (
           <p className="m-0 mt-2 text-[12.5px] text-status-danger">
@@ -184,7 +193,7 @@ export default function IntegrationsPage() {
           </p>
         )}
         <div className="py-2 text-[12.5px] text-ink-muted">
-          Permissions asked for (each needs Advanced Access through App Review for sellers outside your app&apos;s roles):{" "}
+          {data.meta.configId ? "Without a configuration these would be asked for" : "Permissions asked for"} (each needs Advanced Access through App Review for sellers outside your app&apos;s roles):{" "}
           {data.meta.scopes.map((s) => (
             <Tag key={s} className="!mr-1 !mb-1 font-mono text-[11px]">
               {s}

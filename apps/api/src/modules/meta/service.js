@@ -89,6 +89,9 @@ async function exchangeCodeForLongLivedToken(code) {
       code,
     },
   });
+  // A Facebook Login for Business configuration can hand out a business
+  // system-user token, which already lasts and can't be exchanged — keep
+  // the token from the code as it is then.
   const long = await graphRequest("/oauth/access_token", {
     params: {
       grant_type: "fb_exchange_token",
@@ -96,10 +99,11 @@ async function exchangeCodeForLongLivedToken(code) {
       client_secret: env.META_APP_SECRET,
       fb_exchange_token: short.access_token,
     },
-  });
+  }).catch(() => null);
+  const token = long?.access_token ? long : short;
   return {
-    accessToken: long.access_token,
-    expiresAt: long.expires_in ? new Date(Date.now() + long.expires_in * 1000) : null,
+    accessToken: token.access_token,
+    expiresAt: token.expires_in ? new Date(Date.now() + token.expires_in * 1000) : null,
   };
 }
 

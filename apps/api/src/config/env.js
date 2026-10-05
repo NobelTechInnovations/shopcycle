@@ -249,6 +249,11 @@ const envSchema = z.object({
   // Optional: the permissions the one "Continue with Facebook" asks for,
   // comma-separated (defaults to every Meta app's — accounts/facebook.js).
   META_LOGIN_SCOPES: z.string().optional(),
+  // Facebook Login for Business: the configuration's id (Meta app ▸
+  // Facebook Login for Business ▸ Configurations). Business-type apps sign
+  // people in with a configuration, which sets the permissions — then
+  // META_LOGIN_SCOPES isn't used.
+  META_LOGIN_CONFIG_ID: z.string().optional(),
   META_APP_SECRET: z.string().optional(),
   // Instagram feed app: an app on developers.facebook.com with the
   // "Instagram API with Instagram Login" product (instagram_business_basic).

@@ -105,6 +105,23 @@ async function remove(prisma, storeId, themeId, name) {
   return { removed: name };
 }
 
+const MODEL = { product: "product", page: "page", collection: "collection" };
+
+/** Makes exactly `ids` use the template `name` ("page.about-us"); items of
+ * that kind that used it and aren't in `ids` go back to the default. For a
+ * default template ("page"), `ids` simply move onto it. */
+async function assign(prisma, storeId, { kind, name, ids }) {
+  const { base, suffix } = platform.templateParts(name);
+  if (base !== kind) throw new HttpError(400, "That template is for another kind of page.");
+  const model = prisma[MODEL[kind]];
+  const unique = [...new Set(ids)];
+  await prisma.$transaction([
+    ...(suffix ? [model.updateMany({ where: { storeId, templateSuffix: suffix, id: { notIn: unique } }, data: { templateSuffix: null } })] : []),
+    model.updateMany({ where: { storeId, id: { in: unique } }, data: { templateSuffix: suffix || null } }),
+  ]);
+  return { usage: await usage(prisma, storeId) };
+}
+
 /** How many products/pages/collections use each template — shown before
  * deleting one. */
 async function usage(prisma, storeId) {
@@ -120,4 +137,4 @@ async function usage(prisma, storeId) {
   return out;
 }
 
-module.exports = { KINDS, labelFor, slugify, listFromFiles, forActiveTheme, create, remove, usage };
+module.exports = { KINDS, labelFor, slugify, listFromFiles, forActiveTheme, create, remove, usage, assign };

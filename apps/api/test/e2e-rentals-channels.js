@@ -371,6 +371,21 @@ async function main() {
     check("the page shows the section above its text and hides the title", r.data.includes("LANDING-HERO") && r.data.includes("PAGE-BODY-TEXT") && r.data.indexOf("LANDING-HERO") < r.data.lastIndexOf("PAGE-BODY-TEXT") && !r.data.includes(">Festive Story</h1>"), "");
     r = await sf("GET", `/api/storefront/${H}/render/page?slug=${about.slug}`);
     check("other pages are unchanged", !r.data.includes("LANDING-HERO") && r.data.includes(">About Us</h1>"), "");
+    // "Used by" in the editor: move About Us onto the Landing layout…
+    r = await owner("POST", "/api/themes/templates/assign", { kind: "page", name: "page.landing", ids: [landing.id, about.id] });
+    check("assign a layout to pages from the editor", r.status === 200 && r.data.usage["page.landing"] === 2, r.data);
+    r = await sf("GET", `/api/storefront/${H}/render/page?slug=${about.slug}`);
+    check("…the page shows that layout on the store", r.data.includes("LANDING-HERO") && r.data.includes("About text"), "");
+    // …untick it: back to the default layout.
+    r = await owner("POST", "/api/themes/templates/assign", { kind: "page", name: "page.landing", ids: [landing.id] });
+    check("…untick it: back to the default", r.data.usage["page.landing"] === 1 && (await prisma.page.findUnique({ where: { id: about.id } })).templateSuffix === null, r.data);
+    r = await owner("POST", "/api/themes/templates/assign", { kind: "product", name: "page.landing", ids: [] });
+    check("a layout can't be given to the wrong kind", r.status === 400, r.data);
+    r = await other("POST", "/api/themes/templates/assign", { kind: "page", name: "page.landing", ids: [about.id] });
+    check("another store can't move this store's pages", (await prisma.page.findUnique({ where: { id: about.id } })).templateSuffix === null, r.status);
+    r = await owner("POST", `/api/themes/${theme.id}/templates`, { kind: "page", name: "Story", assign: [about.id] });
+    check("create a layout and use it for a page in one go", r.status === 201 && r.data.usage["page.story"] === 1 && (await prisma.page.findUnique({ where: { id: about.id } })).templateSuffix === "story", r.data);
+    await owner("POST", "/api/themes/templates/assign", { kind: "page", name: "page", ids: [about.id] });
 
     // Collections
     r = await owner("POST", `/api/themes/${theme.id}/templates`, { kind: "collection", name: "Bridal" });

@@ -47,6 +47,7 @@ async function integrationsRoutes(fastify) {
         redirectUri: env.META_OAUTH_REDIRECT_URI,
         expectedRedirectUri: `${admin}/admin/apps/meta/callback`,
         scopes: facebookAccount.scopes(),
+        configId: env.META_LOGIN_CONFIG_ID || null,
       },
       instagram: { configured: Boolean(env.INSTAGRAM_APP_ID && env.INSTAGRAM_APP_SECRET), redirectUri: `${admin}/admin/apps/instagram` },
       merchant: registration?.value || null,

@@ -73,6 +73,10 @@ const listProductsQuerySchema = z.object({
   priceMin: optionalMoney,
   priceMax: optionalMoney,
   channel: z.enum(["hidden-google", "hidden-facebook", "rental"]).optional(),
+  // A size, colour or tag ("M", "Red", "Bridal").
+  size: z.string().trim().max(60).optional(),
+  colour: z.string().trim().max(60).optional(),
+  tag: z.string().trim().max(60).optional(),
   sort: z.enum(["updated", "created", "oldest", "title", "title-desc"]).default("updated"),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),

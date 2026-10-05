@@ -6,6 +6,7 @@ const {
   renameThemeFileSchema,
   renderDraftSchema,
   createTemplateSchema,
+  assignTemplateSchema,
 } = require("@shopcycle/validation");
 const templates = require("./templates");
 const service = require("./service");
@@ -42,7 +43,14 @@ async function createTemplateHandler(request, reply) {
   const body = createTemplateSchema.parse(request.body);
   const installed = await appsService.getInstalledAppsContext(request.server.prisma, request.store.id);
   const template = await templates.create(request.server.prisma, request.store.id, request.params.id, body, installed);
-  reply.code(201).send({ template });
+  // "Use it for": the chosen items switch to it right away.
+  const assigned = body.assign?.length ? await templates.assign(request.server.prisma, request.store.id, { kind: body.kind, name: template.name, ids: body.assign }) : null;
+  reply.code(201).send({ template, usage: assigned?.usage });
+}
+
+async function assignTemplateHandler(request, reply) {
+  const body = assignTemplateSchema.parse(request.body);
+  reply.send(await templates.assign(request.server.prisma, request.store.id, body));
 }
 
 async function deleteTemplateHandler(request, reply) {
@@ -172,6 +180,7 @@ async function renderDraftHandler(request, reply) {
 module.exports = {
   templatesHandler,
   createTemplateHandler,
+  assignTemplateHandler,
   deleteTemplateHandler,
   deleteHandler,
   listHandler,
