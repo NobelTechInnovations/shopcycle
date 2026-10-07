@@ -14,3 +14,23 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* Theme editor ▸ text editor (RichTextField) */
+.oy-rte__body:empty::before {
+  content: attr(data-placeholder);
+  color: #9b9ba6;
+  pointer-events: none;
+}
+.oy-rte__body mark.oy-hl {
+  background: #fff1a8;
+  color: inherit;
+  padding: 0 0.1em;
+  border-radius: 3px;
+}
+.oy-rte__body .oy-accent {
+  color: #6a48f5;
+}
+.oy-rte__body a {
+  color: inherit;
+  text-decoration: underline;
+}

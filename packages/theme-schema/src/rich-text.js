@@ -31,7 +31,6 @@ function decodeEntities(s) {
 /** Web, email and phone links, and links within the store. */
 function safeUrl(value) {
   if (!value) return null;
-  // eslint-disable-next-line no-control-regex
   const url = decodeEntities(value).replace(/[\u0000- \u007f-\u009f]/g, "");
   return /^(https?:|mailto:|tel:)/i.test(url) || /^[/#?]/.test(url) ? url : null;
 }

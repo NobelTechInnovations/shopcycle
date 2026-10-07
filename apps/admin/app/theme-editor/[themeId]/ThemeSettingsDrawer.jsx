@@ -4,6 +4,9 @@ import { Drawer } from "antd";
 import { useEditorStore } from "./store";
 import { SettingField } from "./SettingField";
 
+// Stored with the theme's settings; the storefront prints it last in <head>.
+const CUSTOM_CSS = { type: "css", id: "custom_css" };
+
 export function ThemeSettingsDrawer({ open, onClose, schemaGroups }) {
   const settingsData = useEditorStore((s) => s.settingsData);
   const updateThemeSetting = useEditorStore((s) => s.updateThemeSetting);
@@ -28,6 +31,13 @@ export function ThemeSettingsDrawer({ open, onClose, schemaGroups }) {
           )}
         </div>
       ))}
+      <div className="mb-6 border-t border-app-border pt-5">
+        <h4 className="text-xs font-semibold uppercase text-ink-muted mb-1">Custom CSS</h4>
+        <p className="text-xs text-ink-muted mt-0 mb-3">
+          Your own styles for every page — for example the classes in a Custom HTML section. Loaded after the theme&apos;s, so they win. Shows in the preview when you click outside the box.
+        </p>
+        <SettingField setting={CUSTOM_CSS} value={settingsData.custom_css || ""} onChange={(value) => updateThemeSetting("custom_css", value)} />
+      </div>
     </Drawer>
   );
 }

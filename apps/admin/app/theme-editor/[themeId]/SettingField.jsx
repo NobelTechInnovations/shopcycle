@@ -5,6 +5,7 @@ import { Input, InputNumber, Select, Slider, Switch, ColorPicker, Upload, Button
 import { Upload as UploadIcon, X, Images } from "lucide-react";
 import { IMAGE_ACCEPT, uploadImage } from "@/lib/uploads";
 import { MediaLibraryModal } from "@/components/MediaLibraryModal";
+import { RichTextField } from "./RichTextField";
 
 // Google Fonts that read well for Indian storefronts (Latin + good
 // numerals for ₹ prices). Sans first, then serif/display.
@@ -83,8 +84,21 @@ export function SettingField({ setting, value, onChange, products = [], collecti
   switch (setting.type) {
     case "textarea":
     case "richtext":
+      return <RichTextField value={value} onChange={onChange} rows={setting.rows || 3} placeholder={setting.placeholder} />;
+
+    // Custom HTML section and Theme settings ▸ Custom CSS: the seller's own code.
+    case "html":
+    case "css":
       return (
-        <Input.TextArea rows={3} value={local} onChange={(e) => setLocal(e.target.value)} onBlur={() => onChange(local)} />
+        <Input.TextArea
+          rows={setting.type === "css" ? 14 : 10}
+          spellCheck={false}
+          className="!font-mono !text-[12px] !leading-relaxed"
+          placeholder={setting.type === "css" ? ".my-banner {\n  padding: 24px;\n  background: #f6f1ea;\n}" : '<div class="my-banner">\n  <h2>Hello</h2>\n</div>'}
+          value={local}
+          onChange={(e) => setLocal(e.target.value)}
+          onBlur={() => onChange(local)}
+        />
       );
 
     case "number":

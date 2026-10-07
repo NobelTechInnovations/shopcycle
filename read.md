@@ -289,7 +289,7 @@ Local `.env` points at the **production** Supabase database, so every local writ
 - Products list: search by title, SKU, vendor or tag; filters (category, brand, collection, stock, type, vendor, price range, rented / hidden from Google or Facebook) with removable chips; sort; columns to choose (sold in 30 days, category, brand, collections, SKU, variants, type, vendor, created, updated), remembered per browser.
 - **MCP server** at `/api/mcp` (Streamable HTTP, JSON-RPC, stateless) authenticated with a store API key (Pro): 13 tools over the /api/v1 API (store, products, stock, orders, fulfilment, customers), filtered by the key's permissions. Settings ▸ API & webhooks shows the address and a config to paste. Test: `node apps/api/test/e2e-mcp.js` (26 checks).
 
-### Done 5 Oct (NOT committed yet)
+### Done 5 Oct (committed in `8199795` "updates")
 
 - **Google & YouTube page crashed** ("This page couldn't load"): my 4 Oct change declared its `manual` state inside the wrong component. Fixed. Ran an undefined-variable check (ESLint `no-undef`, from a scratch install) over admin, storefront, super admin, www, ui and the API: nothing else.
 - **Meta Ads "Save" (ad account + Page) → 500**: the save used an upsert whose create half lacked the required access token, which Prisma rejects even when the row exists. Now an update (`meta/repository.update`).
@@ -297,6 +297,17 @@ Local `.env` points at the **production** Supabase database, so every local writ
 - **Products list**: Size, Colour and Tag filters (sizes/colours read from variant names like the storefront — `lib/variant-options.js`), a Tags column.
 - **Layouts were confusing**: the editor now says when the previewed page uses another layout ("won't show on it") with "Edit its layout" / "Use this layout for it"; "Used by N" lists and changes which pages/products/collections use a layout; "+ Template" can assign it straight away. API `POST /api/themes/templates/assign`. 6 new checks in e2e-rentals-channels (145/145).
 - **Laxmira's About page**: it uses the "About us" layout, but the design was made on the Default page layout. Copied that design into "About us" (old version kept as a ThemeFileRevision). Live now. The Default page layout still has the same two sections, so the four policy pages show them too — remove them there if unwanted.
+
+### Done 7 Oct (NOT committed yet)
+
+- **Store pages were slow (~5 s; Google's Merchant Center verification timed out on sonchirisweets.com)**: Prisma's engine behind Supabase's transaction pooler (`pgbouncer=true`) wrapped every query in BEGIN · DEALLOCATE ALL · query · COMMIT. `@shopcycle/database` now uses Prisma's pg driver adapter (`@prisma/adapter-pg` + `pg`) — one round trip per query, same results and error codes (checked). The render also runs its independent lookups side by side and records the page view while rendering. Home page locally: ~2.5 s → ~0.45 s. `DB_DRIVER=engine` switches back without a code change; `DATABASE_SSL_CA` (Supabase's CA PEM) turns on certificate checking. Every API endpoint gets the same speed-up.
+- **Admin looked broken until it loaded**: AntD's styles were only added by JavaScript after load. `AntdProvider` now wraps `@ant-design/nextjs-registry`, so they're in the server HTML (admin and super admin).
+- **Google & YouTube "Use this account" → "Unexpected field: fileInput.fileName"**: Merchant API doesn't take a file name for fetched feeds. Removed.
+- **Contact page** (every store, `/contact`, like cart/checkout): the store's details (support email/phone from Settings, WhatsApp, address, hours, more details — all editable in the theme editor ▸ "Contact page") and a form (name, email, phone, message; spam honeypot; rate limits). Messages go to **Customers ▸ Queries** (unread count in the sidebar) and to the seller's email (reply-to the shopper). The seller replies from the admin; the reply is emailed from the store (reply-to the store's email). New table `contact_messages` (pushed). Footer links "Contact" on every store; in the sitemap.
+- **Theme editor text editor**: every textarea/richtext setting has Bold, Italic, Underline, Highlight, Accent colour, Link and Clear formatting. Saved as inline HTML; the storefront cleans it (allowlist, `packages/theme-schema/src/rich-text.js`) before printing.
+- **Custom HTML section** in every theme (Add section ▸ Custom HTML; scripts are stripped — they go in Custom Scripts) and **Theme settings ▸ Custom CSS** (printed last in `<head>` on every page).
+- **Favicon**: Online Store ▸ Preferences ▸ Favicon → `<link rel="icon">` on every store page.
+- Installing packages: `node_modules` was linked by pnpm 11 while `packageManager` says pnpm 10 — I ran pnpm 11 with `packageManager` switched temporarily (lockfile format unchanged, only additions).
 
 ### Left to do
 

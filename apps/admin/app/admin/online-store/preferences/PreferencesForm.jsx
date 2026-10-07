@@ -22,6 +22,7 @@ export function PreferencesForm({ store, seo, canEdit }) {
   const title = Form.useWatch("title", form);
   const description = Form.useWatch("description", form);
   const image = Form.useWatch("image", form);
+  const favicon = Form.useWatch("favicon", form);
   const url = storefrontUrlFor(store);
   const host = url.replace(/^https?:\/\//, "").split("/")[0];
 
@@ -43,7 +44,7 @@ export function PreferencesForm({ store, seo, canEdit }) {
 
   return (
     <div>
-      <PageHeader title="Preferences" subtitle="How your store shows up in search results and when its link is shared" />
+      <PageHeader title="Preferences" subtitle="How your store shows up in search results, when its link is shared, and on the browser tab" />
       {!canEdit && <Alert className="mb-4" type="info" showIcon message="Only the store owner or an admin can change these." />}
 
       <Form
@@ -51,7 +52,7 @@ export function PreferencesForm({ store, seo, canEdit }) {
         layout="vertical"
         requiredMark={false}
         disabled={!canEdit}
-        initialValues={{ title: seo.title || "", description: seo.description || "", image: seo.image || "" }}
+        initialValues={{ title: seo.title || "", description: seo.description || "", image: seo.image || "", favicon: seo.favicon || "" }}
         onValuesChange={() => setDirty(true)}
         onFinish={save}
       >
@@ -80,6 +81,18 @@ export function PreferencesForm({ store, seo, canEdit }) {
           </div>
 
           <div className="flex flex-col gap-6 min-w-0">
+            <Card size="small" title="Favicon">
+              <p className="text-sm text-ink-muted mt-0 mb-4">
+                The small icon on the browser tab and in bookmarks. Use a square image, at least 96 × 96 px (512 × 512 is ideal) — PNG works best.
+              </p>
+              <Form.Item name="favicon" className="mb-3">
+                <ImageUploadField aspect="1 / 1" label="Upload favicon" />
+              </Form.Item>
+              <div className="flex items-center gap-2 rounded-t-lg border border-b-0 border-app-border bg-app-bg px-3 py-2 max-w-[260px]" aria-hidden="true">
+                {favicon ? <img src={favicon} alt="" className="w-4 h-4 rounded-sm object-cover" /> : <span className="w-4 h-4 rounded-sm bg-app-border" />}
+                <span className="text-xs text-ink truncate">{shownTitle}</span>
+              </div>
+            </Card>
             <Card size="small" title="Search result preview">
               <div className="rounded-lg border border-app-border bg-white p-3">
                 <p className="m-0 text-xs text-ink-muted truncate">{host}</p>
