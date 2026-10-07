@@ -2,6 +2,12 @@
   Footer: brand column, then link columns / text / newsletter as blocks,
   social links from Theme settings, and a bottom row with payment methods.
 {% endcomment %}
+<style>
+  /* As many link columns as the seller adds, side by side on a computer. */
+  @media (min-width: 1101px) {
+    .footer__grid { grid-template-columns: minmax(0, 1.4fr) repeat(auto-fit, minmax(150px, 1fr)); }
+  }
+</style>
 <footer class="footer">
   <div class="container footer__grid">
     <div class="footer__brand">
@@ -87,7 +93,7 @@
       { "type": "textarea", "id": "text", "label": "Text", "default": "New arrivals and offers, twice a month. No spam." }
     ] }
   ],
-  "max_blocks": 4,
+  "max_blocks": 8,
   "default_blocks": [
     { "type": "links", "settings": { "heading": "Shop", "menu": "main-menu" } },
     { "type": "links", "settings": { "heading": "Help", "menu": "footer-menu" } },

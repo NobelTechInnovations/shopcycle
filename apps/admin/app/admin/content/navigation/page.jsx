@@ -8,14 +8,6 @@ import { Plus, Navigation as NavigationIcon } from "lucide-react";
 import { PageHeader, EmptyState, ListCard, DeleteIconButton, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
-// The handles themes look up by default — shown as a hint so a merchant
-// knows which menu drives which part of their store.
-const WHERE_USED = {
-  "main-menu": "Store header",
-  "footer-menu": "Store footer",
-  footer: "Store footer",
-};
-
 export default function ContentNavigationPage() {
   const router = useRouter();
   const { confirmDialog } = useConfirmDialog();
@@ -83,8 +75,14 @@ export default function ContentNavigationPage() {
     {
       title: "Shown in",
       responsive: ["md"],
-      width: 150,
-      render: (_, row) => <span className="text-[13px] text-ink-muted">{WHERE_USED[row.handle] || "—"}</span>,
+      width: 220,
+      // Where the live theme shows it (header, footer columns).
+      render: (_, row) =>
+        row.usedIn?.length ? (
+          <span className="text-[13px] text-ink">{row.usedIn.join(", ")}</span>
+        ) : (
+          <span className="text-[13px] text-ink-muted">Not on your store yet</span>
+        ),
     },
     {
       title: "",
@@ -98,7 +96,7 @@ export default function ContentNavigationPage() {
     <div>
       <PageHeader
         title="Navigation"
-        subtitle="Menus for your store's header, footer, and anywhere else your theme shows links."
+        subtitle="Make as many menus as you like. To show one in your footer: Online Store ▸ Customize ▸ Footer ▸ Add block ▸ Links, then pick the menu."
         actions={
           <Link href="/admin/content/navigation/new">
             <Button type="primary" icon={<Plus size={15} aria-hidden="true" />}>

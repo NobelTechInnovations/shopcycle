@@ -31,7 +31,7 @@ const renameThemeFileSchema = z.object({
 
 const renderDraftSchema = z.object({
   // A page, or one of its extra templates ("product.rental").
-  template: z.string().regex(/^(index|product|collection|cart|page|search|404)(\.[a-z0-9][a-z0-9-]{0,29})?$/, "Unknown template"),
+  template: z.string().regex(/^(index|product|collection|cart|page|search|404|contact)(\.[a-z0-9][a-z0-9-]{0,29})?$/, "Unknown template"),
   slug: z.string().optional(),
   templateOverride: z.record(z.any()).optional(),
   settingsOverride: z.record(z.any()).optional(),

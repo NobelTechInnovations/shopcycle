@@ -63,13 +63,17 @@ async function integrationsRoutes(fastify) {
     try {
       const res = await fetch(`${env.GOOGLE_PLACES_URL.replace(/\/$/, "")}/places:searchText`, {
         method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": env.GOOGLE_PLACES_API_KEY, "x-goog-fieldmask": "places.id,places.displayName" },
+        headers: { "content-type": "application/json", "x-goog-api-key": env.GOOGLE_PLACES_API_KEY, "x-goog-fieldmask": "places.id,places.displayName,places.userRatingCount,places.reviews" },
         body: JSON.stringify({ textQuery: "India Gate New Delhi", languageCode: "en" }),
         signal: AbortSignal.timeout(15000),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, error: json?.error?.message || `Google answered ${res.status}` };
-      return { ok: true, found: (json.places || []).length };
+      const top = (json.places || [])[0];
+      // Ratings without review texts: the Google Cloud project has no
+      // billing account, and Google leaves the (paid) reviews field out.
+      const reviews = (top?.reviews || []).length;
+      return { ok: true, found: (json.places || []).length, reviews, reviewsMissing: Boolean(top?.userRatingCount) && reviews === 0 };
     } catch {
       return { ok: false, error: "Couldn't reach Google." };
     }

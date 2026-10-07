@@ -51,13 +51,34 @@ async function ensureDataSource(prisma, store, accountId) {
   });
 }
 
-/** Asks Google to fetch the feed now. Best effort. */
+const notFound = (err) => err?.googleStatus === 404 || /not found/i.test(String(err?.message || ""));
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Asks Google to fetch the feed now. Best effort. A data source made a
+ * moment ago can be "not found" for a few seconds, so that's tried again;
+ * `missing` means it's really gone (deleted in Merchant Center). */
 async function fetchNow(prisma, storeId, dataSourceName) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await api(prisma, storeId, "POST", `/datasources/v1/${dataSourceName}:fetch`, {});
+      return { ok: true };
+    } catch (err) {
+      if (notFound(err) && attempt < 2) {
+        await wait(4000);
+        continue;
+      }
+      return { ok: false, missing: notFound(err), error: err.message };
+    }
+  }
+}
+
+/** Whether the data source is still in Merchant Center (null: unknown). */
+async function dataSourceExists(prisma, storeId, dataSourceName) {
   try {
-    await api(prisma, storeId, "POST", `/datasources/v1/${dataSourceName}:fetch`, {});
-    return { ok: true };
+    await api(prisma, storeId, "GET", `/datasources/v1/${dataSourceName}`);
+    return true;
   } catch (err) {
-    return { ok: false, error: err.message };
+    return notFound(err) ? false : null;
   }
 }
 
@@ -73,19 +94,32 @@ async function useAccount(prisma, store, accountId) {
     profile: { accountId: account.id, accountName: account.name, dataSource: dataSource.name, connectedAt: new Date().toISOString() },
     items: [],
     fetchedAt: new Date(),
-    error: fetched.ok ? null : fetched.error,
+    // Not fetched straight away is fine — Google reads the feed on its
+    // daily schedule anyway.
+    error: fetched.ok || fetched.missing ? null : fetched.error,
   });
 }
 
-/** "Sync now": Google fetches the feed again. */
+/** "Sync now": Google fetches the feed again. If the feed's data source
+ * was deleted in Merchant Center, it's added back first. */
 async function sync(prisma, store) {
   const row = await connections.get(prisma, store.id, APP_KEY);
   if (!row?.credentials?.dataSource) throw new HttpError(400, "Connect your Merchant Center first.");
-  const r = await fetchNow(prisma, store.id, row.credentials.dataSource);
-  return connections.save(prisma, store.id, APP_KEY, { fetchedAt: new Date(), error: r.ok ? null : r.error });
+  let dataSource = row.credentials.dataSource;
+  let r = await fetchNow(prisma, store.id, dataSource);
+  if (r.missing && (await dataSourceExists(prisma, store.id, dataSource)) === false) {
+    dataSource = (await ensureDataSource(prisma, store, row.credentials.accountId)).name;
+    r = await fetchNow(prisma, store.id, dataSource);
+  }
+  return connections.save(prisma, store.id, APP_KEY, {
+    credentials: { ...row.credentials, dataSource },
+    profile: { ...row.profile, dataSource },
+    fetchedAt: new Date(),
+    error: r.ok || r.missing ? null : r.error,
+  });
 }
 
-/** Google's report on its last fetch of the feed. */
+/** Google's report on its last fetch of the feed (null: not read yet). */
 async function lastFetch(prisma, store, row) {
   if (!row?.credentials?.dataSource) return null;
   try {
@@ -99,6 +133,8 @@ async function lastFetch(prisma, store, row) {
       issues: (json.issues || []).slice(0, 20).map((i) => ({ title: i.title || i.code, description: i.description || "", count: Number(i.count || 0), severity: i.severity || "" })),
     };
   } catch (err) {
+    // "File upload not found": Google hasn't fetched the feed yet.
+    if (notFound(err)) return null;
     return { error: err.message };
   }
 }
@@ -122,7 +158,14 @@ async function claimWebsite(prisma, store) {
 }
 
 async function forAdmin(prisma, store, { withStatus = false } = {}) {
-  const row = await connections.get(prisma, store.id, APP_KEY);
+  let row = await connections.get(prisma, store.id, APP_KEY);
+  // An old "data source not found" from the first fetch: clear it once
+  // the data source answers (or say plainly that it's gone).
+  if (withStatus && row?.credentials?.dataSource && /was not found/i.test(row.error || "")) {
+    const exists = await dataSourceExists(prisma, store.id, row.credentials.dataSource);
+    if (exists === true) row = await connections.save(prisma, store.id, APP_KEY, { error: null });
+    else if (exists === false) row = await connections.save(prisma, store.id, APP_KEY, { error: "Your Oyklane feed isn't in Merchant Center anymore — press Sync now to add it back." });
+  }
   const products = await feed.summary(prisma, store, "google");
   return {
     signIn: google.configured(),

@@ -129,10 +129,17 @@ export default function IntegrationsPage() {
             Test the key
           </Button>
         </div>
-        {places && (
+        {places?.ok && places.reviewsMissing && (
+          <p className="m-0 mt-3 text-[13px] text-status-danger">
+            Ratings work, but Google sends no review texts — for any place. The key&apos;s Google Cloud project has no billing account: Google Cloud ▸ Billing ▸ link a
+            billing account to this project (review texts are a billed field; Google&apos;s monthly free usage covers small volumes). Then press “Refresh now” on a
+            store&apos;s Google Reviews page.
+          </p>
+        )}
+        {places && !(places.ok && places.reviewsMissing) && (
           <p className={`m-0 mt-3 text-[13px] ${places.ok ? "text-status-success" : "text-status-danger"}`}>
             {places.ok
-              ? `Works — Google answered with ${places.found} place(s).`
+              ? `Works — Google answered with ${places.found} place(s), ${places.reviews} review text(s).`
               : `${places.error} — In Google Cloud ▸ APIs & Services: enable “Places API (New)”, then ▸ Credentials ▸ this key ▸ API restrictions ▸ add “Places API (New)” (or don't restrict), and Application restrictions ▸ None (the API calls from its server).`}
           </p>
         )}
