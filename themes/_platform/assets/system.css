@@ -3154,3 +3154,46 @@ details.sys-disclose summary::-webkit-details-marker {
     font-size: 23px;
   }
 }
+
+/* Contact page (sys-contact) */
+.sys-contact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: start;
+}
+.sys-contact--stacked {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 720px;
+  margin: 0 auto;
+}
+.sys-contact__intro,
+.sys-contact__more {
+  margin: 14px 0 0;
+  color: var(--oy-muted);
+  line-height: 1.65;
+}
+.sys-contact__list {
+  margin: 28px 0 0;
+  display: grid;
+  gap: 18px;
+}
+.sys-contact__list dt {
+  margin-bottom: 4px;
+}
+.sys-contact__list dd {
+  margin: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.sys-contact__more {
+  margin-top: 28px;
+}
+.sys-contact__form .sys-h3 {
+  margin: 0 0 18px;
+}
+@media (max-width: 860px) {
+  .sys-contact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

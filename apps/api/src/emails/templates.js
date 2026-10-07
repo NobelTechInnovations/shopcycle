@@ -729,8 +729,63 @@ function supportTicketEmail({ title, intro, message, author, cta, ctaUrl, footer
   };
 }
 
+/** Plain text (a shopper's or a seller's words) as paragraphs. */
+function textBlock(text, style = "") {
+  return String(text || "")
+    .split(/\n\s*\n/)
+    .filter((x) => x.trim())
+    .map((para) => p(esc(para.trim()).replace(/\n/g, "<br>"), style))
+    .join("");
+}
+
+const quoteBlock = (text, label = "") =>
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 14px"><tr><td style="border-left:3px solid ${LINE};padding:4px 0 4px 14px">${label ? `<p style="margin:0 0 6px;font:600 13px ${FONT};color:${MUTED}">${label}</p>` : ""}${textBlock(text, "margin-bottom:10px")}</td></tr></table>`;
+
+/** To the seller: a shopper wrote from the Contact page. Replying to this
+ * email reaches the shopper (reply-to is their address). */
+function contactMessageAlert({ store, message, adminUrl }) {
+  const d = PLATFORM_DESIGN;
+  const who = [esc(message.email), message.phone ? esc(message.phone) : ""].filter(Boolean).join(" · ");
+  return {
+    subject: `New message from ${message.name} · ${store.name}`,
+    html: layout({
+      design: d,
+      icon: "mail",
+      brand: store.name,
+      preheader: String(message.message).slice(0, 140),
+      body: [
+        heading("New customer query"),
+        p(`<strong>${esc(message.name)}</strong><br><span style="color:${MUTED}">${who}</span>`),
+        quoteBlock(message.message),
+        p("Answer from Customers ▸ Queries in your admin — or simply reply to this email."),
+        button(adminUrl, "Open the message", d),
+      ].join(""),
+      footer: "Sent from the Contact page of your Oyklane store.",
+    }),
+  };
+}
+
+/** To the shopper: the store's answer to their message. */
+function contactReply({ store, message, reply }) {
+  const d = designFor(store);
+  const when = new Date(message.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return {
+    subject: `Re: your message to ${store.name}`,
+    html: layout({
+      design: d,
+      icon: "mail",
+      brand: store.name,
+      preheader: reply.slice(0, 140),
+      body: [p(`Hi ${esc(message.name || "there")},`), textBlock(reply), quoteBlock(message.message, `Your message · ${esc(when)}`)].join(""),
+      footer: `Reply to this email to write back to ${esc(store.name)}.`,
+    }),
+  };
+}
+
 module.exports = {
   rentalRequestAlert,
+  contactMessageAlert,
+  contactReply,
   rentalRequestUpdate,
   designFor,
   makeDesign,

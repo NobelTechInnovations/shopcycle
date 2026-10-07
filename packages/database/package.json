@@ -12,8 +12,10 @@
     "seed": "dotenv -e ../../.env -- node prisma/seed.js"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "6.19.3",
     "@prisma/client": "^6.2.1",
     "bcryptjs": "^2.4.3",
+    "pg": "^8.23.1",
     "prisma": "^6.2.1"
   },
   "devDependencies": {

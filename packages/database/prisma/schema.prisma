@@ -604,6 +604,7 @@ model Store {
   plan                 Plan?                 @relation(fields: [planId], references: [id], onDelete: SetNull)
   commissionEntries    CommissionEntry[]
   platformInvoices     PlatformInvoice[]
+  contactMessages      ContactMessage[]
   storeUsers           StoreUser[]
   invitations          Invitation[]
   themes               Theme[]
@@ -2616,4 +2617,29 @@ model RentalBooking {
   @@index([productId, startDate])
   @@index([orderId])
   @@map("rental_bookings")
+}
+
+/// A shopper's message from the store's Contact page (Customers ▸ Queries).
+/// One-way: the seller answers by email from the admin; the answers are
+/// kept here, and the shopper replies (if at all) by email to the store.
+model ContactMessage {
+  id         String   @id @default(cuid())
+  storeId    String
+  /// The signed-in shopper, when there was one.
+  customerId String?
+  name       String
+  email      String
+  phone      String?
+  message    String   @db.Text
+  /// "new" → "read" → "replied"; "archived" leaves the inbox.
+  status     String   @default("new")
+  /// The seller's emailed answers: [{ body, at, by }].
+  replies    Json     @default("[]")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, status, createdAt])
+  @@map("contact_messages")
 }

@@ -6,6 +6,8 @@ const { redirectsToDomain } = require("../../lib/storefront-url");
 const service = require("./service");
 const growth = require("./growth");
 const reviews = require("../reviews/service");
+const contact = require("../contact/service");
+const shopperService = require("../shopper/service");
 
 // Public — no auth. This is what apps/storefront calls to get rendered
 // HTML and raw theme assets for anonymous visitors.
@@ -35,6 +37,14 @@ async function storefrontRoutes(fastify) {
     reply.send(await growth.subscribe(fastify, store, request.body));
   });
   fastify.get("/:handle/render/:template", controller.renderHandler);
+  // The Contact page's form (contact/service.js): saved for the seller's
+  // Customers ▸ Queries; the seller answers by email.
+  fastify.post("/:handle/contact", { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async (request) => {
+    const store = await service.loadStoreOrThrow(fastify.prisma, request.params.handle);
+    const token = request.headers["x-shopper-token"];
+    const customer = token ? await shopperService.customerFromToken(fastify, store, token).catch(() => null) : null;
+    return contact.submit(fastify, store, request.body, { customerId: customer?.id || null, log: request.log });
+  });
   // A review written on the product page (Product Reviews app).
   fastify.post("/:handle/products/:slug/reviews", { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async (request) => {
     const store = await service.loadStoreOrThrow(fastify.prisma, request.params.handle);

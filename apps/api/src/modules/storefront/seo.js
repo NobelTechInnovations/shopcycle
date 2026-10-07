@@ -54,6 +54,8 @@ function buildSeo(store, templateName, ctx) {
     description: clip(settings.description || `Shop ${siteName} online.`),
     canonical: null,
     image: absolute(store, settings.image) || null,
+    // Online Store ▸ Preferences ▸ Favicon — the icon on the browser tab.
+    favicon: absolute(store, settings.favicon) || null,
     type: "website",
     noindex: NOINDEX.has(templateName),
     jsonLd: [],
@@ -163,6 +165,11 @@ function buildSeo(store, templateName, ctx) {
   }
 
   if (templateName === "search") seo.title = `Search | ${siteName}`;
+  if (templateName === "contact") {
+    seo.title = `Contact us | ${siteName}`;
+    seo.description = clip(`Get in touch with ${siteName} — send a message and we'll reply by email.`);
+    seo.canonical = storefrontUrl(store, "/contact");
+  }
   if (templateName === "cart") seo.title = `Your cart | ${siteName}`;
   if (templateName === "404") seo.title = `Page not found | ${siteName}`;
   return seo;
@@ -172,6 +179,7 @@ function buildSeo(store, templateName, ctx) {
  * are merchant text; JSON-LD has `<` escaped so it can't close the tag. */
 function seoTags(seo) {
   const tags = [];
+  if (seo.favicon) tags.push(`<link rel="icon" href="${esc(seo.favicon)}"><link rel="apple-touch-icon" href="${esc(seo.favicon)}">`);
   if (seo.description) tags.push(`<meta name="description" content="${esc(seo.description)}">`);
   if (seo.noindex) tags.push('<meta name="robots" content="noindex, follow">');
   if (seo.canonical) tags.push(`<link rel="canonical" href="${esc(seo.canonical)}">`);

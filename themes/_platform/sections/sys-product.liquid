@@ -316,7 +316,7 @@
                   <summary>{{ b.heading | default: 'Delivery & returns' }} {% render 'snippets/sys-icon', icon: 'plus' %}</summary>
                   <div class="sys-accordion__body sys-stack" style="gap:8px">
                     {% if b.text != blank %}
-                      <p>{{ b.text | escape | newline_to_br }}</p>
+                      <p>{{ b.text | newline_to_br }}</p>
                     {% else %}
                       <p>Orders are packed within 1–2 business days and delivered in 3–7 days depending on your PIN code. You'll get tracking by email as soon as it ships.</p>
                       {% if shop.return_days > 0 %}
@@ -330,14 +330,14 @@
 
               {% when 'text' %}
                 {% if b.text != blank %}
-                  <div class="sys-pblock sys-ptext sys-ptext--{{ b.style }}">{% if b.style == 'highlight' %}{% render 'snippets/sys-icon', icon: b.icon %}{% endif %}<p>{{ b.text | escape | newline_to_br }}</p></div>
+                  <div class="sys-pblock sys-ptext sys-ptext--{{ b.style }}">{% if b.style == 'highlight' %}{% render 'snippets/sys-icon', icon: b.icon %}{% endif %}<p>{{ b.text | newline_to_br }}</p></div>
                 {% endif %}
 
               {% when 'collapsible' %}
                 {% if b.heading != blank %}
                   <details class="sys-accordion sys-pblock"{% if b.open %} open{% endif %}>
                     <summary>{{ b.heading | escape }} {% render 'snippets/sys-icon', icon: 'plus' %}</summary>
-                    <div class="sys-accordion__body"><p>{{ b.text | escape | newline_to_br }}</p></div>
+                    <div class="sys-accordion__body"><p>{{ b.text | newline_to_br }}</p></div>
                   </details>
                 {% endif %}
             {% endcase %}

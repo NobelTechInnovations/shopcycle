@@ -45,6 +45,12 @@ const updateStoreSchema = z.object({
             .max(1000)
             .refine((v) => !v || /^(https?:\/\/|\/)/.test(v), "Upload an image")
             .optional(),
+          favicon: z
+            .string()
+            .trim()
+            .max(1000)
+            .refine((v) => !v || /^(https?:\/\/|\/)/.test(v), "Upload an image")
+            .optional(),
         })
         .optional(),
       // Settings ▸ Checkout — see lib/store-settings.js.

@@ -46,7 +46,6 @@ async function ensureDataSource(prisma, store, accountId) {
     displayName: DATA_SOURCE_NAME,
     primaryProductDataSource: { contentLanguage: "en", feedLabel: "IN", countries: ["IN"] },
     fileInput: {
-      fileName: "oyklane-products.xml",
       fetchSettings: { enabled: true, fetchUri: url, frequency: "FREQUENCY_DAILY", timeOfDay: { hours: 4 }, timeZone: "Asia/Kolkata" },
     },
   });

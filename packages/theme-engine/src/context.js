@@ -39,6 +39,7 @@ function buildRoutes(handle, { rootless = false } = {}) {
     account_register_url: `${root}/account/register`,
     account_password_url: `${root}/account/password`,
     order_lookup_url: `${root}/orders/lookup`,
+    contact_url: `${root}/contact`,
     orders_url: `${root}/orders`,
     // Growth (Phase 6)
     blog_url: `${root}/blog`,

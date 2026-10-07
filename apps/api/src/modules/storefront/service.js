@@ -356,8 +356,15 @@ async function buildGlobalContext(prisma, store, { slug, cartId, discountError, 
 
   // Product Reviews app: stars on every product (cards and pages).
   const reviewsApp = apps[reviewsService.APP_KEY] ? { ...reviewsService.DEFAULTS, ...apps[reviewsService.APP_KEY] } : null;
+  // Independent of each other — one round trip's wait instead of five.
+  const [ratings, best, paymentMethods, paymentOptions, social] = await Promise.all([
+    reviewsApp ? reviewsService.summaries(prisma, store.id) : null,
+    bestSellers(prisma, store, all_products),
+    checkoutService.availablePaymentMethods(prisma, store),
+    paymentsService.checkoutOptions(prisma, store),
+    socialConnections.storefrontData(prisma, store.id, apps),
+  ]);
   if (reviewsApp) {
-    const ratings = await reviewsService.summaries(prisma, store.id);
     const tag = (p) => {
       p.rating = ratings[p.id] || { average: 0, count: 0 };
     };
@@ -365,7 +372,6 @@ async function buildGlobalContext(prisma, store, { slug, cartId, discountError, 
     Object.values(collectionsMap).forEach((c) => (c.products || []).forEach(tag));
   }
 
-  const best = await bestSellers(prisma, store, all_products);
   const headerLogo = themeSettings?.sections?.header?.settings?.logo || null;
 
   return {
@@ -392,14 +398,14 @@ async function buildGlobalContext(prisma, store, { slug, cartId, discountError, 
     discount_error: safe(discountError),
     checkout_error: safe(checkoutError),
     gift_card_error: safe(giftCardError),
-    payment_methods: await checkoutService.availablePaymentMethods(prisma, store),
+    payment_methods: paymentMethods,
     // One choice per way to pay (UPI, card, net banking, …, cash on
     // delivery), from what the connected gateways offer.
-    payment_options: await paymentsService.checkoutOptions(prisma, store),
+    payment_options: paymentOptions,
     platform: { fonts_url: platform.fontsUrl(themeSettings) },
     apps,
     // Instagram feed / Google reviews apps: `instagram`, `google_reviews`.
-    ...(await socialConnections.storefrontData(prisma, store.id, apps)),
+    ...social,
     // Stars under product cards (Product Reviews app, "show on cards").
     show_card_ratings: Boolean(reviewsApp && reviewsApp.showOnCards),
     reviews_app: reviewsApp,
@@ -713,6 +719,9 @@ async function renderPage(
   // (The checkout prefill below uses the raw record: it goes into JSON and
   // input values, where HTML-escaping would show "&amp;" to the shopper.)
 
+  // Fetched alongside the global context (awaited below).
+  const policiesLoad = pagePolicies.published(prisma, store.id);
+  policiesLoad.catch(() => {});
   const globalContext = await buildGlobalContext(prisma, store, {
     slug,
     cartId,
@@ -727,11 +736,14 @@ async function renderPage(
   // The store's published policies (Settings ▸ Policies) — linked in every
   // footer through `powered_by`, which every theme prints, so no theme
   // needs changing; `shop.policies` lets a theme list them its own way.
-  const policies = (await pagePolicies.published(prisma, store.id)).map((p) => ({ title: esc(p.title), url: `${routes.pages_url}/${p.slug}` }));
+  const policies = (await policiesLoad).map((p) => ({ title: esc(p.title), url: `${routes.pages_url}/${p.slug}` }));
   globalContext.shop.policies = policies;
   // Phone Login app on: shoppers sign in by phone only (no passwords).
   globalContext.shop.phone_login = Boolean(globalContext.apps?.["phone-login"]);
-  const policyLinks = policies.map((p) => `<a href="${p.url}" style="color:inherit;text-decoration:underline;text-underline-offset:3px;white-space:nowrap">${p.title}</a>`).join(" · ");
+  // …and the Contact page, which every store has.
+  const policyLinks = [...policies, { title: "Contact", url: routes.contact_url }]
+    .map((p) => `<a href="${p.url}" style="color:inherit;text-decoration:underline;text-underline-offset:3px;white-space:nowrap">${p.title}</a>`)
+    .join(" · ");
   // The platform credit every store carries (see POWERED_BY below).
   globalContext.powered_by = policyLinks ? `<span class="oy-policies">${policyLinks}</span> · ${POWERED_BY}` : POWERED_BY;
   globalContext.form_error = safe(formError);

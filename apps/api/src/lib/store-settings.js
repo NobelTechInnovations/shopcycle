@@ -19,7 +19,7 @@ const DEFAULTS = {
   // Products ▸ Inventory flags stock at or below this.
   lowStockThreshold: 5,
   // Online Store ▸ Preferences: the home page's search/social listing.
-  seo: { title: "", description: "", image: "" },
+  seo: { title: "", description: "", image: "", favicon: "" },
   // Settings ▸ Checkout: which fields the checkout form asks for.
   // "required" | "optional" | "hidden" (email is always required — order
   // updates go there). marketing: the "email me offers" box — "unchecked"

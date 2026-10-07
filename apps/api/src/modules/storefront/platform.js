@@ -32,6 +32,7 @@ const SYSTEM_TEMPLATES = new Set([
   "account",
   "blog",
   "article",
+  "contact",
 ]);
 
 /** Templates rendered in the platform's own page shell instead of the
@@ -79,6 +80,9 @@ const ARRANGEABLE = {
   // collection" layout.
   page: { main: "sys-page", sections: ["sys-page"] },
   collection: { main: "sys-collection", sections: ["sys-collection"] },
+  // The Contact page (/contact): the store's details and the form; the
+  // seller writes the details in the editor and adds sections around it.
+  contact: { main: "sys-contact", sections: ["sys-contact"] },
 };
 
 function isArrangeable(name) {
@@ -143,11 +147,15 @@ const APP_SECTIONS = {
   "google-reviews": "sections/app-google-reviews.liquid",
 };
 
-/** The app section files, for renders of theme pages (platform pages get
- * every platform file anyway). */
+/** Sections every theme gets, whatever it ships: Custom HTML (the seller's
+ * own HTML, styled by the theme and Theme settings ▸ Custom CSS). */
+const SHARED_SECTIONS = ["sections/custom-html.liquid"];
+
+/** The app and shared section files, for renders of theme pages (platform
+ * pages get every platform file anyway). */
 async function appSectionFiles() {
   const { renderFiles } = await load();
-  return Object.fromEntries(Object.values(APP_SECTIONS).filter((p) => renderFiles[p]).map((p) => [p, renderFiles[p]]));
+  return Object.fromEntries([...Object.values(APP_SECTIONS), ...SHARED_SECTIONS].filter((p) => renderFiles[p]).map((p) => [p, renderFiles[p]]));
 }
 
 /** The platform's own section files and default layouts for arrangeable
@@ -159,7 +167,7 @@ async function editorPackage({ installed = {} } = {}) {
     .filter(([key]) => installed[key])
     .map(([, p]) => p);
   const sections = Object.entries(renderFiles)
-    .filter(([p]) => (/^sections\/sys-/.test(p) && Object.values(ARRANGEABLE).some((r) => r.sections.includes(p.slice(9, -7)))) || appPaths.includes(p))
+    .filter(([p]) => (/^sections\/sys-/.test(p) && Object.values(ARRANGEABLE).some((r) => r.sections.includes(p.slice(9, -7)))) || appPaths.includes(p) || SHARED_SECTIONS.includes(p))
     .map(([path, content]) => ({ path, content }));
   const templates = {};
   for (const name of Object.keys(ARRANGEABLE)) templates[name] = JSON.parse(renderFiles[`templates/${name}.json`] || '{"sections":{},"order":[]}');
@@ -327,6 +335,12 @@ const THEME_FIXES_CSS = [
   ".footer__wordmark{overflow:hidden}",
   // Swipe rows that bleed to the screen edge start at the page margin.
   "@media (max-width:640px){.products--slider{scroll-padding-inline:clamp(16px,4vw,48px)}}",
+  // The theme editor's text editor: highlighted words and the accent colour.
+  "mark.oy-hl,span.oy-hl{background:#fff1a8;background:color-mix(in srgb,var(--oy-accent,#f5c400) 26%,transparent);color:inherit;padding:0 .12em;border-radius:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone}",
+  ".oy-accent{color:var(--oy-accent-text,var(--oy-accent,inherit))}",
+  // Custom HTML section.
+  ".oy-custom-html{max-width:var(--oy-container,1200px);margin:0 auto;padding:var(--oy-chtml-pt,40px) clamp(16px,4vw,48px) var(--oy-chtml-pb,40px)}",
+  ".oy-custom-html--full{max-width:none;padding-left:0;padding-right:0}",
 ].join("");
 
 /** Sizes text marked data-oy-fit="<min px>" (the header's store name,
@@ -341,7 +355,16 @@ async function headTags(settings, { system, drawer, login, assetBase }) {
   if (system) tags += `<link rel="stylesheet" href="${assetUrl("system.css", version, assetBase)}">`;
   if (drawer) tags += `<link rel="stylesheet" href="${assetUrl("cart-drawer.css", version, assetBase)}">`;
   if (login) tags += `<link rel="stylesheet" href="${assetUrl("login-popup.css", version, assetBase)}">`;
+  // Theme settings ▸ Custom CSS — last, so it wins over the theme's own.
+  const css = customCss(settings);
+  if (css) tags += `<style id="oy-custom-css">${css}</style>`;
   return tags;
+}
+
+/** The seller's CSS, unable to close its <style> tag. */
+function customCss(settings) {
+  const css = typeof settings?.custom_css === "string" ? settings.custom_css.slice(0, 60000).trim() : "";
+  return css.replace(/<\/?(style|script)/gi, "\\3c $1");
 }
 
 /** `drawer` is the drawer's config (routes, currency) when it's on;

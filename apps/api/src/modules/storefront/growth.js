@@ -38,6 +38,7 @@ async function sitemapXml(prisma, store) {
     ...collections.map((c) => ({ loc: storefrontUrl(store, `/collections/${c.slug}`), lastmod: c.updatedAt, priority: "0.8" })),
     ...products.map((p) => ({ loc: storefrontUrl(store, `/products/${p.slug}`), lastmod: p.updatedAt, priority: "0.9" })),
     ...pages.map((p) => ({ loc: storefrontUrl(store, `/pages/${p.slug}`), lastmod: p.updatedAt, priority: "0.5" })),
+    { loc: storefrontUrl(store, "/contact"), lastmod: now, priority: "0.4" },
     ...(articles.length ? [{ loc: storefrontUrl(store, "/blog"), lastmod: now, priority: "0.6" }] : []),
     ...articles.map((a) => ({ loc: storefrontUrl(store, `/blog/${a.slug}`), lastmod: a.updatedAt, priority: "0.6" })),
   ];

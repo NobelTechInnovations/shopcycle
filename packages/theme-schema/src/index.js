@@ -1,3 +1,5 @@
+const { cleanSettingValues, cleanRichText, cleanCustomHtml } = require("./rich-text");
+
 const SCHEMA_RE = /\{%-?\s*schema\s*-?%\}([\s\S]*?)\{%-?\s*endschema\s*-?%\}/;
 
 /** Pulls the `{% schema %}...{% endschema %}` JSON block out of a section's
@@ -48,7 +50,8 @@ function buildDefaultSettings(schema) {
  * sane output, and what lets the Phase 3 editor show every field even
  * before the merchant has touched it. */
 function mergeSettings(schema, settings = {}) {
-  return { ...buildDefaultSettings(schema), ...settings };
+  // Text from the editor's text editor and Custom HTML, made safe to print.
+  return cleanSettingValues(schema, { ...buildDefaultSettings(schema), ...settings });
 }
 
 function findBlockSchema(schema, blockType) {
@@ -60,7 +63,7 @@ function mergeBlockSettings(schema, block) {
   return {
     id: block.id,
     type: block.type,
-    settings: { ...buildDefaultSettings(blockSchema), ...(block.settings || {}) },
+    settings: cleanSettingValues(blockSchema, { ...buildDefaultSettings(blockSchema), ...(block.settings || {}) }),
   };
 }
 
@@ -100,6 +103,8 @@ function globalSectionSettings(entry) {
 }
 
 module.exports = {
+  cleanRichText,
+  cleanCustomHtml,
   globalSectionSettings,
   extractSchema,
   stripSchema,

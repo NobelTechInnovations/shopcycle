@@ -1,0 +1,29 @@
+{% comment %}
+  Custom HTML: the seller's own HTML on any page, styled by the theme and
+  by Theme settings ▸ Custom CSS. Scripts are taken out when the page is
+  rendered (they go in Apps ▸ Custom Scripts).
+{% endcomment %}
+{% assign s = section.settings %}
+<div class="oy-custom-html{% if s.width == 'full' %} oy-custom-html--full{% endif %}" id="oy-html-{{ section.id }}" style="--oy-chtml-pt:{{ s.padding_top | default: 40 }}px;--oy-chtml-pb:{{ s.padding_bottom | default: 40 }}px">
+  {% if s.html != blank %}
+    {{ s.html }}
+  {% elsif design_mode %}
+    <p style="margin:0;padding:24px;border:1px dashed currentColor;border-radius:8px;opacity:.6;text-align:center">Custom HTML — write your HTML in this section's settings.</p>
+  {% endif %}
+</div>
+
+{% schema %}
+{
+  "name": "Custom HTML",
+  "settings": [
+    { "type": "html", "id": "html", "label": "HTML", "info": "Your theme's styles apply. Add CSS under Theme settings ▸ Custom CSS. Scripts aren't run here — use Apps ▸ Custom Scripts." },
+    { "type": "select", "id": "width", "label": "Width", "default": "page", "options": [
+      { "value": "page", "label": "Page width" },
+      { "value": "full", "label": "Full screen width" }
+    ] },
+    { "type": "range", "id": "padding_top", "label": "Space above", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 40 },
+    { "type": "range", "id": "padding_bottom", "label": "Space below", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 40 }
+  ],
+  "presets": [{ "name": "Custom HTML" }]
+}
+{% endschema %}

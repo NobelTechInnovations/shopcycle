@@ -42,6 +42,31 @@ async function renderHandler(request, reply) {
     utm_content: utmContent,
   } = request.query;
 
+  // `?themeId=` only ever appears when the admin's Themes page is
+  // previewing a (possibly inactive) theme through the real storefront
+  // route — that's the merchant testing their own site, not a visitor,
+  // so it's deliberately excluded from analytics. Recorded while the page
+  // renders, not after, so it adds nothing to the wait.
+  const tracking = themeId
+    ? null
+    : analyticsService
+        .trackPageView(request.server.prisma, request.server.redis, handle, {
+          sessionId: visitorId,
+          path: path || `/store/${handle}/${template}`,
+          templateName: template,
+          referrer: request.headers.referer || request.headers.referrer || null,
+          utm: { source: utmSource, medium: utmMedium, campaign: utmCampaign, term: utmTerm, content: utmContent },
+          userAgent: request.headers["user-agent"],
+          headers: request.headers,
+          fastify: request.server,
+          shopperToken: request.headers["x-shopper-token"],
+        })
+        .catch((err) => {
+          // Analytics must never break the storefront for a real visitor.
+          request.log.warn({ err }, "Failed to record page view");
+          return null;
+        });
+
   const { html, cartId: resolvedCartId } = await service.renderPage(request.server.prisma, {
     handle,
     localAssets: true,
@@ -86,29 +111,8 @@ async function renderHandler(request, reply) {
   reply.header("content-type", "text/html; charset=utf-8");
   reply.header("x-cart-id", resolvedCartId);
 
-  // `?themeId=` only ever appears when the admin's Themes page is
-  // previewing a (possibly inactive) theme through the real storefront
-  // route — that's the merchant testing their own site, not a visitor,
-  // so it's deliberately excluded from analytics.
-  if (!themeId) {
-    try {
-      const sessionId = await analyticsService.trackPageView(request.server.prisma, request.server.redis, handle, {
-        sessionId: visitorId,
-        path: path || `/store/${handle}/${template}`,
-        templateName: template,
-        referrer: request.headers.referer || request.headers.referrer || null,
-        utm: { source: utmSource, medium: utmMedium, campaign: utmCampaign, term: utmTerm, content: utmContent },
-        userAgent: request.headers["user-agent"],
-        headers: request.headers,
-        fastify: request.server,
-        shopperToken: request.headers["x-shopper-token"],
-      });
-      reply.header("x-visitor-id", sessionId);
-    } catch (err) {
-      // Analytics must never break the storefront for a real visitor.
-      request.log.warn({ err }, "Failed to record page view");
-    }
-  }
+  const sessionId = await tracking;
+  if (sessionId) reply.header("x-visitor-id", sessionId);
 
   reply.send(html);
 }

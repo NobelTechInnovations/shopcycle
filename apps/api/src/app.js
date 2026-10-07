@@ -186,6 +186,8 @@ function buildApp() {
   app.register(developerAdminRoutes, { prefix: "/api/developer" });
   app.register(metafieldRoutes, { prefix: "/api/metafields" });
   app.register(reviewRoutes, { prefix: "/api/reviews" });
+  // Customers ▸ Queries: messages from each store's Contact page.
+  app.register(require("./modules/contact/routes"), { prefix: "/api/contact-messages" });
   app.register(publicApiRoutes, { prefix: "/api/v1" });
   // The same API as an MCP server, for AI agents (developer/mcp.js).
   app.register(require("./modules/developer/mcp"), { prefix: "/api/mcp" });
