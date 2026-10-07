@@ -29,6 +29,7 @@ const ACTIONS = [
   { id: "a-orders", label: "Orders", href: "/admin/orders", icon: ShoppingCart, keywords: "orders sales" },
   { id: "a-products", label: "Products", href: "/admin/products", icon: Package, keywords: "products catalogue inventory" },
   { id: "a-customers", label: "Customers", href: "/admin/customers", icon: User, keywords: "customers people" },
+  { id: "a-queries", label: "Customer queries", href: "/admin/customers/queries", icon: User, keywords: "contact messages inbox queries enquiries" },
   { id: "a-discount", label: "Create discount", href: "/admin/discounts/new", icon: Tag, keywords: "new discount coupon code" },
   { id: "a-gift", label: "Gift cards", href: "/admin/gift-cards", icon: Gift, keywords: "gift card store credit" },
   { id: "a-blog", label: "Write blog post", href: "/admin/content/blog/new", icon: Newspaper, keywords: "blog post article journal" },

@@ -20,8 +20,11 @@ import { templateOptions, templateLabel, pageTemplate, effectiveTemplate, layout
 // pages are Oyklane's own, but their sections can be arranged here — the
 // default layout and any extra templates (product.rental). The cart is
 // fixed — listed as a preview so a colour or font change can be checked.
-const EDITABLE_BASES = new Set(["index", "product", "collection", "page"]);
+const EDITABLE_BASES = new Set(["index", "product", "collection", "page", "contact"]);
+// Pages whose layout is shared by many items (each can pick another).
 const MAIN_SECTION = { product: "sys-product", collection: "sys-collection", page: "sys-page" };
+// The page's own section, which stays on the page.
+const LOCKED_SECTION = { ...MAIN_SECTION, contact: "sys-contact" };
 const baseOf = (name) => String(name).split(".")[0];
 
 const PAGE_HINTS = {
@@ -49,7 +52,7 @@ function FixedPageNote({ onOpenSettings }) {
 
 function getTemplateJson(files, name, platform) {
   const base = baseOf(name);
-  const main = MAIN_SECTION[base];
+  const main = LOCKED_SECTION[base];
   // A saved layout counts only while its main section is there.
   const usable = (json) => !main || Object.values(json?.sections || {}).some((sec) => sec.type === main);
   const fromFile = (path) => {
@@ -450,10 +453,14 @@ export function EditorView({ theme, platform, templates: initialTemplates, templ
               pageLabel={
                 base === "index"
                   ? "Home page"
-                  : `${base === "product" ? "Product" : base === "collection" ? "Collection" : "Page"} · ${altLabel || "Default"}`
+                  : base === "contact"
+                    ? "Contact page"
+                    : `${base === "product" ? "Product" : base === "collection" ? "Collection" : "Page"} · ${altLabel || "Default"}`
               }
               hint={
-                PAGE_HINTS[base]
+                base === "contact"
+                  ? "Your store's Contact page (/contact). Click “Contact page” to change its details and form; add your theme's sections around it."
+                  : PAGE_HINTS[base]
                   ? `${PAGE_HINTS[base]} Shows on the ${usingIt.length} ${base === "collection" ? "collection" : base}${usingIt.length === 1 ? "" : "s"} using this layout (“Used by” at the top).`
                   : undefined
               }

@@ -57,6 +57,7 @@ export function templateOptions(templates, pages = []) {
     group("collection", "Default collection"),
     group("page", "Default page"),
     ...own,
+    { label: "Other pages", options: [{ value: "contact", label: "Contact page" }] },
     { label: "Previews", options: [{ value: "cart", label: "Cart · preview" }] },
   ];
 }

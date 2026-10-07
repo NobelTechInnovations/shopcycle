@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, Dropdown, Tooltip } from "antd";
@@ -38,9 +39,42 @@ import {
   ExternalLink,
   Settings2,
   Trash2,
+  MessageSquare,
 } from "lucide-react";
 import { useApps, appHref, detailsHref } from "@/lib/apps";
+import { apiFetch } from "@/lib/api";
 import { useAppActions } from "./apps/useAppActions";
+
+/** Customers ▸ Queries, with how many Contact page messages are unread.
+ * The Queries page announces changes with "oy:queries-changed". */
+function QueriesLink() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      apiFetch("/api/contact-messages/unread")
+        .then((r) => alive && setCount(r.count || 0))
+        .catch(() => {});
+    load();
+    const timer = setInterval(load, 120_000);
+    window.addEventListener("oy:queries-changed", load);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      window.removeEventListener("oy:queries-changed", load);
+    };
+  }, []);
+  return (
+    <Link href="/admin/customers/queries" className="inline-flex items-center gap-2">
+      Queries
+      {count > 0 && (
+        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-ink text-white text-[11px] leading-[18px] text-center tabular-nums" aria-label={`${count} unread`}>
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
 
 // Mirrors the full target IA (not just what's wired in Phase 1) so the shell
 // never needs restructuring later — unwired routes render a consistent
@@ -70,7 +104,15 @@ const NAV_ITEMS = [
     ],
   },
   { key: "/admin/collections", icon: <Layers size={16} aria-hidden="true" />, label: <Link href="/admin/collections">Collections</Link> },
-  { key: "/admin/customers", icon: <Users size={16} aria-hidden="true" />, label: <Link href="/admin/customers">Customers</Link> },
+  {
+    key: "customers-group",
+    icon: <Users size={16} aria-hidden="true" />,
+    label: <Link href="/admin/customers">Customers</Link>,
+    children: [
+      { key: "/admin/customers", icon: <Users size={14} aria-hidden="true" />, label: <Link href="/admin/customers">All customers</Link> },
+      { key: "/admin/customers/queries", icon: <MessageSquare size={14} aria-hidden="true" />, label: <QueriesLink /> },
+    ],
+  },
   {
     key: "analytics-group",
     icon: <BarChart3 size={16} aria-hidden="true" />,
@@ -213,6 +255,7 @@ export function SidebarNav() {
   if (pathname.startsWith("/admin/analytics")) openKeys.push("analytics-group");
   if (pathname.startsWith("/admin/products") || pathname.startsWith("/admin/gift-cards")) openKeys.push("products-group");
   if (pathname.startsWith("/admin/orders")) openKeys.push("orders-group");
+  if (pathname.startsWith("/admin/customers")) openKeys.push("customers-group");
 
   return (
     <div className="flex flex-col h-full min-h-0">
