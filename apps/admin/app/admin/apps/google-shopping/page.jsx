@@ -84,6 +84,60 @@ function ChooseMerchant({ onConnected, onNeedsAccount, onUnavailable }) {
 }
 
 /** Apps ▸ Google & YouTube: products on Google through Merchant Center. */
+/** What Merchant Center holds and whether Google shows it — "Last read"
+ * only says the feed was fetched; this says what happened next. */
+function OnGoogle({ data }) {
+  if (!data) return null;
+  if (data.error) return <p className="mt-3 mb-0 text-[12.5px] text-ink-muted">Couldn't ask Merchant Center about your products: {data.error}</p>;
+  const tile = (label, value, tone) => (
+    <div className="rounded-[10px] border border-app-border px-3 py-2 min-w-0">
+      <p className={`m-0 text-[18px] font-semibold tabular-nums ${tone}`}>{value}</p>
+      <p className="m-0 text-[12px] text-ink-muted truncate">{label}</p>
+    </div>
+  );
+  return (
+    <div className="mt-4">
+      <p className="m-0 mb-2 text-[13px] font-medium text-ink">In your Merchant Center</p>
+      {data.total === 0 ? (
+        <Alert
+          type="info"
+          showIcon
+          message="Google read the feed but hasn't added the products to your account yet"
+          description="This usually takes a few hours after the first read. If it's been more than a day: in Merchant Center check Settings ▸ Business info (address, phone verified) and that your website is claimed, then press Sync now."
+        />
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-2">
+            {tile("Showing on Google", data.approved, "text-[#047857]")}
+            {tile("In review", data.pending, "text-[#B45309]")}
+            {tile("Not shown", data.disapproved, data.disapproved ? "text-[#B91C1C]" : "text-ink")}
+          </div>
+          {data.pending > 0 && data.approved === 0 && (
+            <p className="m-0 mt-2 text-[12.5px] text-ink-muted">
+              Google reviews a new store's products before showing them — up to 3 working days. They're in your account already: Merchant Center ▸ Products.
+            </p>
+          )}
+          {data.items.some((i) => i.issues.length) && (
+            <ul className="m-0 mt-2 pl-5 text-[12.5px] text-ink-muted">
+              {data.items
+                .filter((i) => i.issues.length)
+                .slice(0, 8)
+                .map((i) => (
+                  <li key={i.offerId}>
+                    <b className="font-medium text-ink">{i.title}</b>: {i.issues.map((x) => x.text).join("; ")}
+                  </li>
+                ))}
+            </ul>
+          )}
+        </>
+      )}
+      <a href={data.url} target="_blank" rel="noopener noreferrer" className="text-[12.5px] inline-flex items-center gap-1 mt-2">
+        See them in Merchant Center <ExternalLink size={11} aria-hidden="true" />
+      </a>
+    </div>
+  );
+}
+
 export default function GoogleShoppingPage() {
   const { message } = App.useApp();
   const { confirmDialog } = useConfirmDialog();
@@ -206,6 +260,7 @@ export default function GoogleShoppingPage() {
                   </ul>
                 )}
               </div>
+              <OnGoogle data={data.onGoogle} />
               <div className="mt-4 flex flex-wrap items-center gap-2 text-[13px]">
                 <Globe size={14} className="text-ink-muted" aria-hidden="true" />
                 <span className="text-ink">Website: {data.merchant.website || data.website}</span>

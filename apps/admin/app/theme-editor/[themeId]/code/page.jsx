@@ -15,5 +15,7 @@ export default async function ThemeCodeEditorPage({ params }) {
   }
 
   const { theme } = await serverApiFetch(`/api/themes/${themeId}`);
+  // A paid Oyklane Store theme's code is the developer's (and locked).
+  if (theme.locked) redirect(`/theme-editor/${themeId}`);
   return <CodeEditorView theme={theme} />;
 }

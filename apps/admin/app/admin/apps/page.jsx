@@ -9,6 +9,7 @@ import { PageHeader, EmptyState } from "@shopcycle/ui";
 import { useApps, appHref, detailsHref, APP_CATEGORIES, rupees } from "@/lib/apps";
 import { useAppActions } from "@/components/apps/useAppActions";
 import { AppTile } from "@/components/apps/AppTile";
+import { apiFetch } from "@/lib/api";
 
 function PriceTag({ app }) {
   if (app.priceMonthly) {
@@ -67,7 +68,23 @@ function AppCard({ app }) {
             <span className="text-[12px] font-medium text-status-success inline-flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-status-success" aria-hidden="true" /> Installed
             </span>
-            <Button size="small" onClick={(e) => { e.preventDefault(); router.push(appHref(app)); }}>
+            <Button
+              size="small"
+              onClick={async (e) => {
+                e.preventDefault();
+                // A developer's app (Oyklane Store) opens on its own site, signed for this store.
+                if (!app.marketplace) return router.push(appHref(app));
+                const tab = window.open("", "_blank");
+                try {
+                  const { url } = await apiFetch(`/api/market/store/apps/${app.key}/open`);
+                  if (tab) tab.location.href = url;
+                  else window.location.href = url;
+                } catch {
+                  tab?.close();
+                  router.push(appHref(app));
+                }
+              }}
+            >
               Open
             </Button>
           </>
@@ -184,7 +201,15 @@ export default function AppsPage() {
 
   return (
     <div>
-      <PageHeader title="Apps" subtitle="Add features to your store. Installed apps are pinned in your sidebar." />
+      <PageHeader
+        title="Apps"
+        subtitle="Add features to your store. Installed apps are pinned in your sidebar."
+        actions={
+          <a href={`${process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://oyklanestore.com"}/apps`} target="_blank" rel="noopener noreferrer">
+            <Button icon={<Sparkles size={15} aria-hidden="true" />}>More apps — Oyklane Store</Button>
+          </a>
+        }
+      />
       <FeaturedFlow app={(apps || []).find((a) => a.key === "flow")} />
 
       <div className="flex flex-col md:flex-row md:items-center gap-3 mb-5">

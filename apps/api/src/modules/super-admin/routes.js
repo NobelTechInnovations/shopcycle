@@ -48,6 +48,10 @@ const AUDIT_ACTIONS = {
   "PATCH /support/articles/:id": "support.article_update",
   "DELETE /support/articles/:id": "support.article_delete",
   "PUT /support/settings": "support.settings",
+  "POST /market/versions/:id/decide": "market.review",
+  "POST /market/listings/:id/status": "market.listing_status",
+  "POST /market/partners/:id/payout": "market.payout",
+  "POST /market/partners/:id/status": "market.partner_status",
 };
 
 /** Asks the marketing site to show the new prices (fire and forget). */
@@ -104,6 +108,8 @@ async function superAdminRoutes(fastify) {
 
   // Seller tickets, help articles and the Help assistant (support.js).
   fastify.register(supportAdmin, { prefix: "/support" });
+  // Oyklane Store: review queue, developers, payouts.
+  fastify.register(require("../market/routes").adminRoutes, { prefix: "/market" });
 
   fastify.get("/apps", controller.listAppsHandler);
   fastify.post("/apps", controller.createAppHandler);

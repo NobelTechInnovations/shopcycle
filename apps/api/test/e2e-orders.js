@@ -466,6 +466,12 @@ async function main() {
     r = await owner("POST", `/api/orders/${orderId}/invoice`, {});
     check("GST invoices are not on Starter", r.status === 403 && /Growth or Pro/.test(r.data?.error || r.data?.message || ""), r.data);
     await setPlan("growth");
+    const before = await prisma.store.findUnique({ where: { id: store.id }, select: { gstin: true, billingState: true, billingAddress: true } });
+    await prisma.store.update({ where: { id: store.id }, data: { billingAddress: null } });
+    const { gstProfile } = require("../src/modules/orders/invoice");
+    check("no invoice before the GST details", gstProfile({ ...before, billingAddress: null }).ready === false && gstProfile({ billingAddress: "x", billingState: "Goa" }).missing.includes("registered"));
+    r = await owner("PATCH", "/api/billing/details", { gstRegistered: true, gstin: before.gstin || "27AAPFU0939F1ZV", billingAddress: "1 Linking Road, Mumbai 400050", billingState: before.billingState || "Maharashtra" });
+    check("GST details saved", r.status === 200 && r.data.billingDetails?.gstRegistered === true, r.data);
     r = await owner("POST", `/api/orders/${orderId}/invoice`, {});
     check("invoice issued on Growth", r.status === 200 && /^INV-\d{4}-0001$/.test(r.data.invoiceNumber || ""), r.data);
     const firstNumber = r.data.invoiceNumber;
@@ -476,6 +482,17 @@ async function main() {
     check("HSN code on the invoice lines", r.data.invoice?.lines?.[0]?.hsn === "6109", r.data.invoice?.lines);
     r = await sf("GET", `/api/storefront/${store.handle}/orders/${statusToken}/invoice`);
     check("shopper can open the invoice", r.status === 200 && String(r.data).includes(firstNumber) && String(r.data).includes("27AAPFU0939F1ZV"), String(r.data).slice(0, 200));
+    check("…a tax invoice with the amount in words", /Tax Invoice/.test(String(r.data)) && /Rupees [A-Z]/.test(String(r.data)), "");
+    r = await owner("GET", `/api/orders/${orderId}`);
+    check("order shows CGST + SGST", r.data.order.taxSummary?.type === "cgst_sgst" && r.data.order.gst?.ready === true, r.data.order.taxSummary);
+    r = await owner("POST", `/api/orders/${orderId}/invoice/cancel`, { reason: "Wrong address", reissue: true });
+    check("cancel and issue a new invoice", r.status === 200 && /-0002$/.test(r.data.invoiceNumber || ""), r.data);
+    const secondNumber = r.data.invoiceNumber;
+    r = await owner("GET", `/api/orders/${orderId}`);
+    const voided = r.data.order.cancelledInvoices?.[0];
+    check("the cancelled one is kept", voided?.number === firstNumber && voided.reason === "Wrong address", r.data.order.cancelledInvoices);
+    r = await owner("GET", `/api/orders/${orderId}/invoices/cancelled/${voided?.id}`);
+    check("…and opens marked CANCELLED", r.status === 200 && /CANCELLED/.test(String(r.data)) && String(r.data).includes(firstNumber), String(r.data).slice(0, 120));
 
     // ── CSV (Growth and Pro) ──
     await prisma.customer.create({ data: { storeId: store.id, name: '=HYPERLINK("http://evil.test","x")', email: `formula-${stamp}@test.oyklane.dev` } });
@@ -483,7 +500,7 @@ async function main() {
     check("customers export", r.status === 200 && String(r.data).includes("Amount Spent"), String(r.data).slice(0, 120));
     check("formula cells are neutralised in exports", String(r.data).includes(`"'=HYPERLINK(`) && !/(^|,)"?=HYPERLINK/m.test(String(r.data)), String(r.data).split("\n").find((l) => l.includes("HYPERLINK")));
     r = await owner("GET", "/api/data/exports/orders");
-    check("orders export includes the invoice number", String(r.data).includes(firstNumber), "");
+    check("orders export includes the invoice number", String(r.data).includes(secondNumber), "");
     r = await owner("GET", "/api/data/exports/products");
     const productsCsv = String(r.data);
     check("products export", productsCsv.includes(vM.sku), productsCsv.slice(0, 200));

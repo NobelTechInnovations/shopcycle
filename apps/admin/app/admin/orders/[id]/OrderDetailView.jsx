@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { PageHeader, StatusBadge } from "@shopcycle/ui";
 import { formatCurrency } from "@shopcycle/utils";
+import { GstInvoiceCard } from "./GstInvoiceCard";
 import { apiFetch } from "@/lib/api";
 import { FulfillModal } from "./FulfillModal";
 import { RefundModal } from "./RefundModal";
@@ -47,6 +48,28 @@ const PAYMENT_METHOD_LABEL = {
   paypal: "Online · PayPal",
   upi_qr: "UPI QR · to your UPI ID",
 };
+
+/** The order's tax as its invoice splits it: CGST + SGST inside the
+ * seller's state, IGST outside it. */
+function TaxRows({ order }) {
+  const t = order.taxSummary;
+  const money = (n) => formatCurrency(n, order.currency);
+  if (!t || !t.registered) return <SummaryRow label={t?.ratePercent ? `Tax (${t.ratePercent}%)` : "Tax"} value={money(order.tax)} />;
+  const half = Math.round((t.ratePercent / 2) * 100) / 100;
+  return (
+    <>
+      <SummaryRow label="Taxable value" value={money(t.taxable)} muted />
+      {t.type === "igst" ? (
+        <SummaryRow label={`IGST ${t.ratePercent}% · to ${t.placeOfSupply}`} value={money(t.igst)} />
+      ) : (
+        <>
+          <SummaryRow label={`CGST ${half}%`} value={money(t.cgst)} />
+          <SummaryRow label={`SGST ${half}%`} value={money(t.sgst)} />
+        </>
+      )}
+    </>
+  );
+}
 
 function SummaryRow({ label, value, strong, muted }) {
   return (
@@ -154,16 +177,6 @@ export function OrderDetailView({ order, role, hasGstInvoices }) {
       message.error(err.message);
     }
   }
-
-  const issueInvoice = () =>
-    run(
-      "invoice",
-      async () => {
-        const { invoiceNumber } = await apiFetch(`/api/orders/${order.id}/invoice`, { method: "POST", body: {} });
-        message.success(`Invoice ${invoiceNumber} issued`);
-      },
-      null
-    );
 
   const moreItems = [
     { key: "copy", icon: <Copy size={14} />, label: "Copy customer's order link", onClick: copyStatusLink },
@@ -280,8 +293,14 @@ export function OrderDetailView({ order, role, hasGstInvoices }) {
           className="mb-5"
           type="warning"
           showIcon
-          message={order.paymentReference && /^\d{12}$/.test(order.paymentReference) ? `Customer paid by UPI — reference ${order.paymentReference}` : "Waiting for the customer's UPI payment"}
-          description="Check the amount and reference in your UPI or bank app, then confirm it in UPI QR payments."
+          message={
+            order.paymentReference && /^\d{12}$/.test(order.paymentReference)
+              ? `Customer paid by UPI — reference ${order.paymentReference}`
+              : order.paymentReference
+                ? "Customer says they paid by UPI"
+                : "Waiting for the customer's UPI payment"
+          }
+          description="Check the amount in your UPI or bank app, then confirm it in UPI QR payments."
           action={
             <Link href="/admin/apps/upi-qr">
               <Button size="small">Open UPI QR</Button>
@@ -463,7 +482,7 @@ export function OrderDetailView({ order, role, hasGstInvoices }) {
               />
             )}
             <SummaryRow label="Shipping" value={Number(order.shipping) > 0 ? formatCurrency(order.shipping, order.currency) : "Free"} />
-            {Number(order.tax) > 0 && <SummaryRow label="Tax" value={formatCurrency(order.tax, order.currency)} />}
+            {Number(order.tax) > 0 && <TaxRows order={order} />}
             <div className="border-t border-app-border mt-1 pt-1">
               <SummaryRow label="Total" value={formatCurrency(order.total, order.currency)} strong />
             </div>
@@ -595,37 +614,16 @@ export function OrderDetailView({ order, role, hasGstInvoices }) {
             </Card>
           )}
 
-          <Card size="small" title={<CardTitle icon={FileText}>GST invoice</CardTitle>}>
-            {order.invoiceNumber ? (
-              <>
-                <p className="text-sm m-0 font-medium text-ink">{order.invoiceNumber}</p>
-                <p className="text-xs text-ink-muted m-0 mt-0.5">Issued {dateOnly(order.invoicedAt)}</p>
-                <Button className="mt-3" icon={<ExternalLink size={14} aria-hidden="true" />} onClick={() => openStatusPage("/invoice")}>
-                  View invoice
-                </Button>
-              </>
-            ) : hasGstInvoices ? (
-              <>
-                <p className="text-sm text-ink-muted m-0">Issued automatically when the order ships, or now if you need it sooner.</p>
-                <Button
-                  className="mt-3"
-                  loading={busy === "invoice"}
-                  disabled={cancelled || (order.paymentStatus === "pending" && liveShipments.length === 0)}
-                  onClick={issueInvoice}
-                >
-                  Issue invoice
-                </Button>
-              </>
-            ) : (
-              <p className="text-sm text-ink-muted m-0">
-                <Crown size={13} className="inline text-accent mr-1 -mt-0.5" aria-hidden="true" />
-                GST invoices come with the Growth and Pro plans.{" "}
-                <Link href="/admin/settings/billing" className="text-ink underline">
-                  See plans
-                </Link>
-              </p>
-            )}
-          </Card>
+          <GstInvoiceCard
+            order={order}
+            hasGstInvoices={hasGstInvoices}
+            cancelled={cancelled}
+            canIssue={!cancelled && !(order.paymentStatus === "pending" && liveShipments.length === 0)}
+            busy={busy}
+            run={run}
+            openStatusPage={openStatusPage}
+            CardTitle={CardTitle}
+          />
 
           {order.returnDeadline && !cancelled && (
             <p className="text-xs text-ink-muted m-0 px-1">

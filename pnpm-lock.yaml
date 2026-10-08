@@ -120,6 +120,9 @@ importers:
       fastify-plugin:
         specifier: ^5.0.1
         version: 5.1.0
+      fflate:
+        specifier: 0.8.2
+        version: 0.8.2
       ioredis:
         specifier: ^5.4.1
         version: 5.11.1
@@ -139,6 +142,18 @@ importers:
       pino-pretty:
         specifier: ^11.3.0
         version: 11.3.0
+
+  apps/market:
+    dependencies:
+      next:
+        specifier: ^16.2.0
+        version: 16.3.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
 
   apps/storefront:
     dependencies:
@@ -1203,6 +1218,9 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  fflate@0.8.2:
+    resolution: {integrity: sha512-cPJU47OaAoCbg0pBvzsgpTPhmhqI5eJjh/JIu8tPj5q+T7iLvW/JAYUqmE7KOB4R1ZyEhzBaIQpQpardBF5z8A==}
 
   fill-range@7.1.1:
     resolution: {integrity: sha512-YsGpe3WHLK8ZYi4tWDg2Jy3ebRz2rXowDxnld4bkQB00cc/1Zw9AWnC0i9ztDJitivtQvaI9KaLyKrc+hBW0yg==}
@@ -3181,6 +3199,8 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
       picomatch: 4.0.7
+
+  fflate@0.8.2: {}
 
   fill-range@7.1.1:
     dependencies:

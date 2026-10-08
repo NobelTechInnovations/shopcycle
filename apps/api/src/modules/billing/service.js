@@ -130,7 +130,7 @@ async function overview(prisma, store, { log } = {}) {
     staff: { used: staffUsed, limit: ent.limits.staff },
     notifications: notices.map((n) => ({ id: n.id, type: n.type, title: n.title, body: n.body, severity: n.severity, readAt: n.readAt, createdAt: n.createdAt })),
     recentPayments: lastPayments.map(serializePayment),
-    billingDetails: { billingName: store.billingName, gstin: store.gstin, billingAddress: store.billingAddress, billingState: store.billingState },
+    billingDetails: { billingName: store.billingName, gstin: store.gstin, billingAddress: store.billingAddress, billingState: store.billingState, gstRegistered: store.settings?.gstProfile?.registered ?? (store.gstin ? true : null) },
   };
 }
 

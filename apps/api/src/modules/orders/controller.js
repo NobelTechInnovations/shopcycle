@@ -9,7 +9,7 @@ const operations = require("./operations");
 const { createRefund } = require("./refunds");
 const returns = require("./returns");
 const notify = require("./notify");
-const { issueInvoice, buildInvoice } = require("./invoice");
+const { issueInvoice, cancelInvoice, buildInvoice, invoiceLogo } = require("./invoice");
 const { COURIERS } = require("./couriers");
 const { actorNameFrom } = require("./events");
 const { listAbandonedCheckouts } = require("../checkout/abandoned");
@@ -195,6 +195,25 @@ async function issueInvoiceHandler(request, reply) {
   reply.send({ invoiceNumber: updated.invoiceNumber });
 }
 
+const cancelInvoiceSchema = z.object({ reason: z.string().trim().min(3, "Say why — it's kept with the cancelled invoice").max(200), reissue: z.boolean().default(true) });
+
+/** Cancel the order's invoice (kept as printed), and usually issue a new one. */
+async function cancelInvoiceHandler(request, reply) {
+  const { prisma } = request.server;
+  const body = cancelInvoiceSchema.parse(request.body || {});
+  const order = await operations.loadOrder(prisma, request.store.id, request.params.id);
+  const logoUrl = await invoiceLogo(prisma, request.store);
+  const updated = await cancelInvoice(prisma, request.store, order, { ...body, by: actorNameFrom(request), logoUrl });
+  reply.send({ invoiceNumber: updated.invoiceNumber || null });
+}
+
+/** A cancelled invoice, as it was printed. */
+async function cancelledInvoiceHandler(request, reply) {
+  const row = await request.server.prisma.cancelledInvoice.findFirst({ where: { id: request.params.cid, orderId: request.params.id, storeId: request.store.id } });
+  if (!row) throw new HttpError(404, "Invoice not found");
+  reply.header("content-type", "text/html; charset=utf-8").send(row.html);
+}
+
 /** Invoice data for the admin (the printable page itself is the shopper's
  * /orders/<token>/invoice, which the admin opens in a new tab). */
 async function getInvoiceHandler(request, reply) {
@@ -253,6 +272,8 @@ module.exports = {
   createReturnHandler,
   returnActionHandler,
   issueInvoiceHandler,
+  cancelInvoiceHandler,
+  cancelledInvoiceHandler,
   getInvoiceHandler,
   statusLinkHandler,
   abandonedHandler,

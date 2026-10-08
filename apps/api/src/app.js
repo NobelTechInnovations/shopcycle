@@ -190,6 +190,16 @@ function buildApp() {
   app.register(require("./modules/contact/routes"), { prefix: "/api/contact-messages" });
   // Apps ▸ UPI QR (modules/upi): payments straight to the seller's UPI ID.
   app.register(require("./modules/upi/routes"), { prefix: "/api/upi-qr" });
+  // …and the seller's phone forwarding bank "credited" SMS to it.
+  app.register(require("./modules/upi/sms-routes"), { prefix: "/api/public/upi-sms" });
+  // Oyklane Store (oyklanestore.com): themes and apps by developers.
+  {
+    const market = require("./modules/market/routes");
+    app.register(market.publicRoutes, { prefix: "/api/market/public" });
+    app.register(market.mediaRoutes, { prefix: "/api/market/media" });
+    app.register(market.partnerRoutes, { prefix: "/api/partners" });
+    app.register(market.storeRoutes, { prefix: "/api/market/store" });
+  }
   app.register(publicApiRoutes, { prefix: "/api/v1" });
   // The same API as an MCP server, for AI agents (developer/mcp.js).
   app.register(require("./modules/developer/mcp"), { prefix: "/api/mcp" });

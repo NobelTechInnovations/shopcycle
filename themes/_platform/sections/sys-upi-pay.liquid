@@ -2,7 +2,8 @@
   UPI QR app: pay the order by scanning a QR made for its exact amount,
   straight to the seller's UPI ID. A timer runs (Apps ▸ UPI QR sets how
   long); the page watches for the seller's "Received" and moves on by
-  itself. "I've paid" takes the 12-digit UPI reference (UTR).
+  itself — or, with automatic confirmation, as soon as the seller's bank
+  texts them. "I've paid" can take the UPI reference (UTR) but needn't.
 {% endcomment %}
 {% assign u = upi %}
 <section class="sys-section">
@@ -25,12 +26,12 @@
             <span>{{ u.vpa }}</span>
             <button type="button" class="sys-link sys-small" data-upi-copy="{{ u.vpa }}">Copy UPI ID</button>
           </div>
-          <p class="sys-small sys-muted sys-upi__watch" style="margin:12px 0 0;text-align:center">This page moves on by itself once the store sees your payment.</p>
+          <p class="sys-small sys-muted sys-upi__watch" style="margin:12px 0 0;text-align:center">{% if u.auto %}Just pay — this page moves on by itself in a few seconds once your payment arrives.{% else %}This page moves on by itself once the store sees your payment.{% endif %}</p>
         </div>
       {% elsif u.status == 'expired' %}
         <div class="sys-card sys-upi__card" style="text-align:center">
           <p class="sys-h3" style="margin:0 0 6px">The QR timed out</p>
-          <p class="sys-muted" style="margin:0 0 16px">Not paid yet? Get a new QR for the same amount. Already paid? Enter the reference below.</p>
+          <p class="sys-muted" style="margin:0 0 16px">Not paid yet? Get a new QR for the same amount. Already paid? Tap “I've paid” below.</p>
           <form method="post" action="{{ u.action_url }}" data-sys-once>
             <input type="hidden" name="order" value="{{ u.order_id }}">
             <input type="hidden" name="action" value="renew">
@@ -46,11 +47,15 @@
           <input type="hidden" name="order" value="{{ u.order_id }}">
           <input type="hidden" name="action" value="paid">
           <p class="sys-h3" style="margin:0">Paid already?</p>
-          <label class="sys-field">
-            <span class="sys-label">UPI reference (UTR) — 12 digits</span>
-            <input class="sys-input" name="utr" inputmode="numeric" autocomplete="off" pattern="[0-9 ]{12,15}" maxlength="15" required placeholder="e.g. 412345678901">
-            <span class="sys-hint">In your UPI app: open the payment ▸ "UPI transaction ID" or "UTR".</span>
-          </label>
+          {% unless u.auto %}<p class="sys-small sys-muted" style="margin:0">Tap below and the store will check it arrived.</p>{% endunless %}
+          <details class="sys-upi__ref">
+            <summary class="sys-small sys-link">Add the UPI reference (optional)</summary>
+            <label class="sys-field" style="margin-top:10px">
+              <span class="sys-label">UPI reference (UTR) — 12 digits</span>
+              <input class="sys-input" name="utr" inputmode="numeric" autocomplete="off" pattern="[0-9 ]{12,15}" maxlength="15" placeholder="e.g. 412345678901">
+              <span class="sys-hint">In your UPI app: open the payment ▸ "UPI transaction ID" or "UTR". It helps the store find your payment faster.</span>
+            </label>
+          </details>
           <button class="sys-btn sys-btn--block sys-btn--lg" type="submit" data-busy-label="Sending…">I've paid · place my order</button>
         </form>
         <p class="sys-small" style="text-align:center;margin-top:16px"><a class="sys-link" href="{{ u.checkout_url }}">Choose another way to pay</a></p>

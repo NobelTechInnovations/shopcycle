@@ -103,7 +103,7 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
   if (input.paymentMethod === "cod") {
     if (store && !payments.codEnabled(store)) throw new HttpError(400, "Cash on delivery isn't available for this store.");
   } else if (upiQr) {
-    if (!(await upi.activeSettings(prisma, storeId))) throw new HttpError(400, "UPI QR isn't available for this store right now.");
+    if (!(await upi.availableSettings(prisma, storeId))) throw new HttpError(400, "UPI QR isn't available for this store right now.");
   } else if (input.paymentMethod !== "gift_card") {
     gateway = await payments.gateway(prisma, storeId, input.paymentMethod);
     if (!gateway?.enabled) throw new HttpError(400, "That payment method isn't available for this store.");

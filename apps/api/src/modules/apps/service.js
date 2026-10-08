@@ -26,7 +26,13 @@ async function listForStore(prisma, store) {
     entitlements.forStore(prisma, store.id),
   ]);
   const installedByAppId = Object.fromEntries(installs.map((i) => [i.appId, i]));
-  return catalog.map((app) => ({
+  // Developers' apps (Oyklane Store) show while listed — or once installed.
+  const market = catalog.filter((a) => a.key.startsWith("mkt-"));
+  const listed = market.length
+    ? new Set((await prisma.marketListing.findMany({ where: { kind: "app", status: "approved", slug: { in: market.map((a) => a.key.slice(4)) } }, select: { slug: true } })).map((l) => `mkt-${l.slug}`))
+    : new Set();
+  return catalog.filter((app) => !app.key.startsWith("mkt-") || listed.has(app.key) || installedByAppId[app.id]).map((app) => ({
+    marketplace: app.key.startsWith("mkt-"),
     ...app,
     installed: Boolean(installedByAppId[app.id]),
     settings: installedByAppId[app.id]?.settings || {},
@@ -46,7 +52,10 @@ async function installApp(prisma, store, key, settings, { role } = {}) {
   }
   const paid = num(app.priceMonthly) > 0;
   if (paid && role === "staff") throw new HttpError(403, "Only the store owner or an admin can install paid apps.");
+  if (key.startsWith("mkt-") && role === "staff") throw new HttpError(403, "Only the store owner or an admin can install Oyklane Store apps.");
   await repository.upsertInstall(prisma, store.id, app.id, settings);
+  // A developer's app (Oyklane Store): its API key, and the developer told.
+  if (key.startsWith("mkt-")) await require("../market/store").onAppInstalled(prisma, store, key);
   let chargedFrom = null;
   if (paid) {
     const sub = await subscriptions.forStore(prisma, store);
@@ -61,6 +70,10 @@ async function uninstallApp(prisma, storeId, key) {
   const install = await repository.findInstall(prisma, storeId, app.id);
   if (!install) throw new HttpError(404, "This app isn't installed");
   await repository.removeInstall(prisma, storeId, app.id);
+  if (key.startsWith("mkt-")) {
+    const store = await prisma.store.findUnique({ where: { id: storeId } });
+    await require("../market/store").onAppRemoved(prisma, store, key).catch(() => {});
+  }
   // Instagram / Google links go with the app (their tokens too).
   await prisma.appConnection.deleteMany({ where: { storeId, appKey: key } });
 }

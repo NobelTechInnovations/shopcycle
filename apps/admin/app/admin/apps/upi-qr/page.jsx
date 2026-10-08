@@ -3,8 +3,8 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { App, Alert, Button, Card, Form, Input, Select, Skeleton, Table, Tag, Tooltip } from "antd";
-import { Check, X, QrCode, Search } from "lucide-react";
+import { App, Alert, Button, Card, Form, Input, Select, Skeleton, Switch, Table, Tag, Tooltip } from "antd";
+import { Check, X, QrCode, Search, Copy, MessageSquareText } from "lucide-react";
 import { formatCurrency } from "@shopcycle/utils";
 import { PageHeader, EmptyState, ListCard, SearchInput, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
@@ -172,6 +172,15 @@ function UpiQr() {
     <div>
       <PageHeader title="UPI QR payments" backHref="/admin/apps" subtitle="Shoppers pay your UPI ID by QR at checkout — no gateway, no fee. You confirm each payment arrived." />
 
+      {data.hiddenBy && (
+        <Alert
+          className="mb-5"
+          type="info"
+          showIcon
+          message={`Not shown at checkout while ${data.hiddenBy} is live`}
+          description={`${data.hiddenBy} already takes UPI and confirms it by itself, so shoppers see that instead. UPI QR comes back if you turn ${data.hiddenBy} off or put it in test mode.`}
+        />
+      )}
       {!ready || editing ? (
         <SetupCard
           settings={data.settings}
@@ -199,7 +208,11 @@ function UpiQr() {
                   type="warning"
                   showIcon
                   message={`${s.toCheck} payment${s.toCheck === 1 ? "" : "s"} to check`}
-                  description="Find each UPI reference and amount in your UPI or bank app, then press Received. The customer's page moves on by itself."
+                  description={
+                    data.settings.autoSms
+                      ? "Your bank's SMS didn't match these by itself (the SMS hasn't come yet, or two orders had the same amount). Check the amount in your bank app, then press Received."
+                      : "Find each amount (and UPI reference, if given) in your UPI or bank app, then press Received. The customer's page moves on by itself."
+                  }
                 />
               )}
               <ListCard
@@ -246,6 +259,7 @@ function UpiQr() {
                   Change
                 </Button>
               </Card>
+              <AutoSmsCard settings={data.settings} onChanged={load} />
               <Card size="small" title="Test it">
                 <p className="mt-0 text-[13px] text-ink-muted">Scan this ₹1 QR with your phone to check the name and UPI ID shoppers will see.</p>
                 {preview ? <div className="w-44 mx-auto [&_svg]:w-full [&_svg]:h-auto" dangerouslySetInnerHTML={{ __html: preview }} /> : <Skeleton.Image active />}
@@ -288,8 +302,8 @@ function SetupCard({ settings, onSaved, onCancel }) {
   return (
     <Card title="Where should payments go?" className="max-w-2xl">
       <p className="mt-0 text-[13px] text-ink-muted">
-        Shoppers pay this UPI ID directly — Oyklane never touches the money. Since no bank tells us when it arrives, the shopper gives the UPI reference and you
-        press Received once you see it.
+        Shoppers pay this UPI ID directly — Oyklane never touches the money. You press Received when you see it arrive, or turn on automatic confirmation from
+        your bank's SMS after saving.
       </p>
       <Form layout="vertical" requiredMark={false} initialValues={{ upiId: settings.upiId, payeeName: settings.payeeName, minutes: settings.minutes || 5 }} onFinish={save}>
         <Form.Item name="upiId" label="Your UPI ID" rules={[{ required: true, pattern: /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,64}$/, message: "Enter a UPI ID like yourname@okhdfcbank" }]}>
@@ -308,6 +322,92 @@ function SetupCard({ settings, onSaved, onCancel }) {
           {onCancel && <Button onClick={onCancel}>Cancel</Button>}
         </div>
       </Form>
+    </Card>
+  );
+}
+
+/**
+ * Automatic confirmation: the seller's phone forwards each bank SMS to a
+ * secret link; a "credited ₹X" SMS confirms the QR that asked for ₹X.
+ */
+function AutoSmsCard({ settings, onChanged }) {
+  const { message } = App.useApp();
+  const [busy, setBusy] = useState(false);
+  const on = settings.autoSms;
+
+  async function toggle(next) {
+    setBusy(true);
+    try {
+      await apiFetch("/api/upi-qr/auto-sms", { method: "PUT", body: { on: next } });
+      message.success(next ? "On — now set up your phone (steps below)" : "Turned off");
+      onChanged();
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const last = settings.lastSms;
+  return (
+    <Card
+      size="small"
+      title={
+        <span className="inline-flex items-center gap-2">
+          <MessageSquareText size={15} aria-hidden="true" /> Automatic confirmation
+        </span>
+      }
+      extra={<Switch size="small" checked={on} loading={busy} onChange={toggle} aria-label="Automatic confirmation" />}
+    >
+      {!on ? (
+        <p className="m-0 text-[13px] text-ink-muted">
+          No more pressing Received: your phone forwards your bank's “credited” SMS to Oyklane, and the order with that amount is confirmed in seconds. The
+          shopper's page moves on by itself — they don't need to type anything.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3 text-[13px]">
+          <div>
+            <p className="m-0 mb-1 text-ink-muted">Your secret link — anyone with it can confirm payments, so don't share it:</p>
+            <div className="flex gap-1.5">
+              <Input size="small" readOnly value={settings.smsUrl} className="font-mono text-[11.5px]" />
+              <Button
+                size="small"
+                icon={<Copy size={13} aria-hidden="true" />}
+                onClick={() => navigator.clipboard?.writeText(settings.smsUrl).then(() => message.success("Copied"))}
+                aria-label="Copy link"
+              />
+            </div>
+          </div>
+          <div>
+            <p className="m-0 font-medium text-ink">Android</p>
+            <ol className="m-0 pl-5 text-ink-muted">
+              <li>Install an SMS forwarder app (e.g. “SMS Forwarder” — free) on the phone that gets your bank's SMS.</li>
+              <li>Add a rule: forward messages containing “credited” (or from your bank's sender) to a <b>webhook / URL</b> — paste the link above.</li>
+              <li>Send a test from the app — it shows below.</li>
+            </ol>
+          </div>
+          <div>
+            <p className="m-0 font-medium text-ink">iPhone</p>
+            <p className="m-0 text-ink-muted">
+              Shortcuts ▸ Automation ▸ Message ▸ contains “credited” ▸ Run immediately ▸ “Get contents of URL”: the link above, method POST, request body
+              Text = Shortcut Input.
+            </p>
+          </div>
+          <p className="m-0 text-ink-muted">
+            So every SMS points at one order, a QR asks a few paise less when another QR for the same amount is showing (at most ₹0.99). Anything that doesn't
+            match stays in “To check”.
+          </p>
+          <div className={`rounded-[10px] px-3 py-2 ${last ? (last.ok ? "bg-[#ECFDF5] text-[#065F46]" : "bg-[#FFFBEA] text-[#92400E]") : "bg-app-bg text-ink-muted"}`}>
+            {last ? (
+              <>
+                <b className="font-medium">Last SMS {when(last.at)}:</b> {last.note}
+              </>
+            ) : (
+              "Nothing received yet."
+            )}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

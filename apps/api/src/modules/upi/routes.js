@@ -23,6 +23,13 @@ async function upiRoutes(fastify) {
     return { settings: await service.saveSettings(db, request.store.id, request.body) };
   });
 
+  // Bank-SMS matching: on makes a new secret link, off removes it.
+  fastify.put("/auto-sms", async (request) => {
+    manager(request);
+    const { on } = z.object({ on: z.boolean() }).parse(request.body || {});
+    return service.setAutoSms(db, request.store.id, on);
+  });
+
   // A ₹1 sample QR, to test with a real UPI app.
   fastify.get("/preview", async (request) => ({ svg: await service.preview(db, request.store) }));
 

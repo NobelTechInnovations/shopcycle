@@ -158,8 +158,17 @@ async function withDraftRenderSlot(request, fn) {
   }
 }
 
+/** A locked (Oyklane Store) theme previews its JSON edits only. */
+async function allowedOverrides(request, files) {
+  if (!files) return files;
+  const theme = await request.server.prisma.theme.findFirst({ where: { id: request.params.id, storeId: request.store.id }, select: { locked: true } });
+  if (!theme?.locked) return files;
+  return Object.fromEntries(Object.entries(files).filter(([path]) => /\.json$/i.test(path)));
+}
+
 async function renderDraftHandler(request, reply) {
   const body = renderDraftSchema.parse(request.body);
+  const filesOverride = await allowedOverrides(request, body.filesOverride);
   const result = await withDraftRenderSlot(request, () => storefrontService.renderPage(request.server.prisma, {
     handle: request.store.handle,
     themeId: request.params.id,
@@ -167,7 +176,7 @@ async function renderDraftHandler(request, reply) {
     slug: body.slug,
     templateOverride: body.templateOverride,
     settingsOverride: body.settingsOverride,
-    filesOverride: body.filesOverride,
+    filesOverride,
     // The preview is shown inside the admin (store.<root>), so its CSS, JS
     // and images load from the store's own address, like the live store —
     // never from the API's host.

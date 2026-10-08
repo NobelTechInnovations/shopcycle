@@ -606,6 +606,9 @@ model Store {
   platformInvoices     PlatformInvoice[]
   contactMessages      ContactMessage[]
   upiPayments          UpiPayment[]
+  cancelledInvoices    CancelledInvoice[]
+  marketLicenses       MarketLicense[]
+  marketPurchases      MarketPurchase[]
   storeUsers           StoreUser[]
   invitations          Invitation[]
   themes               Theme[]
@@ -779,6 +782,11 @@ model Theme {
   status       ThemeStatus @default(installed)
   isActive     Boolean     @default(false)
   previewImage String?
+  /// From the Oyklane Store: the listing it came from. A paid one is
+  /// `locked` — customised in the editor, but its code can't be read,
+  /// edited or copied (the seller's licence is for this store only).
+  listingId    String?
+  locked       Boolean     @default(false)
   /// Global theme settings (colors, typography, layout) — schema-driven, see config/settings_schema.json in the theme package
   settingsData Json        @default("{}")
   createdAt    DateTime    @default(now())
@@ -1175,6 +1183,7 @@ model Order {
   fulfillments Fulfillment[]
   refunds      Refund[]
   returns      ReturnRequest[]
+  cancelledInvoices CancelledInvoice[]
   events       OrderEvent[]
 
   @@unique([storeId, orderNumber])
@@ -2698,4 +2707,220 @@ model UpiPayment {
   @@index([storeId, status, createdAt])
   @@index([storeId, utr])
   @@map("upi_payments")
+}
+
+/// A GST invoice the seller cancelled (wrong details, changed order) —
+/// kept as it was printed, with its serial, which is never reused. The
+/// order can then get a new invoice with the next serial (orders/invoice.js).
+model CancelledInvoice {
+  id          String   @id @default(cuid())
+  storeId     String
+  orderId     String
+  number      String
+  seq         Int
+  issuedAt    DateTime?
+  cancelledAt DateTime @default(now())
+  reason      String?
+  cancelledBy String?
+  /// The invoice page as it was, marked cancelled.
+  html        String   @db.Text
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, seq])
+  @@index([orderId])
+  @@map("cancelled_invoices")
+}
+
+// ─────────────────────────────────────────────
+// Oyklane Store (oyklanestore.com): themes and apps made by developers
+// ("partners"), free or paid, bought and installed from the seller admin.
+// See modules/market.
+// ─────────────────────────────────────────────
+
+/// A developer account on oyklanestore.com — separate from seller and
+/// platform users (its own sign-in, its own session audience).
+model Partner {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  company      String?
+  website      String?
+  /// Where earnings are paid: a UPI ID (and the name on it).
+  payoutUpi    String?
+  payoutName   String?
+  status       String    @default("active") // active | suspended
+  /// Bumped to sign out every session.
+  tokenVersion Int       @default(0)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  listings MarketListing[]
+  earnings PartnerEarning[]
+  payouts  PartnerPayout[]
+
+  @@map("partners")
+}
+
+/// A theme or an app on the store. `status`: draft → in_review →
+/// approved (listed) | rejected; suspended takes it down.
+model MarketListing {
+  id          String    @id @default(cuid())
+  partnerId   String
+  kind        String // theme | app
+  slug        String    @unique
+  name        String
+  tagline     String?
+  description String?   @db.Text
+  category    String    @default("general")
+  /// Rupees, before GST. null or 0 = free. Themes: one-time; apps: monthly.
+  price       Decimal?  @db.Decimal(10, 2)
+  status      String    @default("draft")
+  reviewNote  String?   @db.Text
+  iconId      String?
+  /// MarketMedia ids, in order.
+  screenshots Json      @default("[]")
+  /// The approved version stores install.
+  liveVersionId String?
+  /// Preview: the version installed (unpublished) on the demo store.
+  previewThemeId String?
+  /// Apps: where the seller opens it, where installs are announced, the
+  /// storefront script it adds, the API permissions it asks for.
+  appUrl         String?
+  installWebhook String?
+  embedScriptUrl String?
+  scopes         String[]  @default([])
+  /// Signs install requests and app links (encrypted at rest).
+  appSecret      String?
+  supportEmail   String?
+  privacyUrl     String?
+  installs       Int       @default(0)
+  publishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  partner   Partner          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  versions  MarketVersion[]
+  licenses  MarketLicense[]
+  purchases MarketPurchase[]
+
+  @@index([status, kind])
+  @@index([partnerId])
+  @@map("market_listings")
+}
+
+/// One uploaded theme package (or app release). Theme files are text
+/// (Liquid, JSON, CSS, JS, SVG) and never served to anyone as files — only
+/// rendered, or copied into a store that holds a licence.
+model MarketVersion {
+  id         String   @id @default(cuid())
+  listingId  String
+  version    String
+  changelog  String?  @db.Text
+  /// [{ path, fileType, content }]
+  files      Json     @default("[]")
+  size       Int      @default(0)
+  status     String   @default("draft") // draft | in_review | approved | rejected
+  reviewNote String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  listing MarketListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, createdAt])
+  @@map("market_versions")
+}
+
+/// A store's right to install a listing: bought (purchaseId) or free.
+/// Bound to the store — another store has to buy its own.
+model MarketLicense {
+  id         String   @id @default(cuid())
+  listingId  String
+  storeId    String
+  purchaseId String?  @unique
+  /// Apps: the API key made for it, and when it was installed / removed.
+  apiKeyId    String?
+  installedAt DateTime?
+  removedAt   DateTime?
+  createdAt  DateTime @default(now())
+
+  listing MarketListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  store   Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, storeId])
+  @@map("market_licenses")
+}
+
+/// A seller paying for a theme (one-time) through Oyklane's Razorpay.
+/// Paid only once the payment is verified with Razorpay — signature,
+/// amount and order all checked server-side.
+model MarketPurchase {
+  id              String    @id @default(cuid())
+  listingId       String
+  storeId         String
+  amount          Decimal   @db.Decimal(10, 2)
+  gst             Decimal   @db.Decimal(10, 2)
+  total           Decimal   @db.Decimal(10, 2)
+  status          String    @default("created") // created | paid | failed | refunded
+  providerOrderId String    @unique
+  paymentId       String?   @unique
+  paidAt          DateTime?
+  buyerUserId     String?
+  createdAt       DateTime  @default(now())
+
+  listing MarketListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  store   Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("market_purchases")
+}
+
+/// The developer's share of a sale (or an app's month), owed until paid out.
+model PartnerEarning {
+  id         String   @id @default(cuid())
+  partnerId  String
+  listingId  String
+  storeId    String?
+  source     String // theme_sale | app_month
+  sourceId   String   @unique
+  gross      Decimal  @db.Decimal(10, 2)
+  share      Decimal  @db.Decimal(10, 2)
+  payoutId   String?
+  createdAt  DateTime @default(now())
+
+  partner Partner        @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  payout  PartnerPayout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId, createdAt])
+  @@map("partner_earnings")
+}
+
+model PartnerPayout {
+  id        String    @id @default(cuid())
+  partnerId String
+  amount    Decimal   @db.Decimal(10, 2)
+  status    String    @default("pending") // pending | paid
+  reference String?
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  partner  Partner          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  earnings PartnerEarning[]
+
+  @@index([partnerId])
+  @@map("partner_payouts")
+}
+
+/// Icons and screenshots for listings (images only, checked by their bytes).
+model MarketMedia {
+  id        String   @id @default(cuid())
+  partnerId String?
+  mimeType  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  @@map("market_media")
 }

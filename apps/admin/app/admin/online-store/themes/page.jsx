@@ -130,6 +130,11 @@ export default function ThemesPage() {
       <PageHeader
         title="Themes"
         subtitle="Your theme designs the home page, header and footer, and sets the fonts and colours for your whole store."
+        actions={
+          <a href={`${process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://oyklanestore.com"}/themes`} target="_blank" rel="noopener noreferrer">
+            <Button icon={<Sparkles size={15} aria-hidden="true" />}>More themes — Oyklane Store</Button>
+          </a>
+        }
       />
 
       <div className="mb-6 flex items-start gap-3 rounded-[14px] border border-app-border bg-app-surface px-4 py-3 shadow-card">
@@ -181,9 +186,11 @@ export default function ThemesPage() {
                 <a href={previewUrl(store, live.id)} target="_blank" rel="noopener noreferrer">
                   <Button icon={<Eye size={15} aria-hidden="true" />}>View store</Button>
                 </a>
-                <Link href={`/theme-editor/${live.id}/code`}>
-                  <Button icon={<Code2 size={15} aria-hidden="true" />}>Edit code</Button>
-                </Link>
+                {!live.locked && (
+                  <Link href={`/theme-editor/${live.id}/code`}>
+                    <Button icon={<Code2 size={15} aria-hidden="true" />}>Edit code</Button>
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -202,13 +209,14 @@ export default function ThemesPage() {
                     <h3 className="text-sm font-semibold m-0 truncate">{theme.name}</h3>
                     <p className="text-xs text-ink-muted m-0">
                       v{theme.version} · added {new Date(theme.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      {theme.listingId ? " · Oyklane Store" : ""}
                     </p>
                   </div>
                   <Dropdown
                     trigger={["click"]}
                     menu={{
                       items: [
-                        { key: "code", icon: <Code2 size={14} />, label: <Link href={`/theme-editor/${theme.id}/code`}>Edit code</Link> },
+                        ...(theme.locked ? [] : [{ key: "code", icon: <Code2 size={14} />, label: <Link href={`/theme-editor/${theme.id}/code`}>Edit code</Link> }]),
                         { key: "delete", icon: <Trash2 size={14} />, danger: true, label: "Delete", onClick: () => remove(theme) },
                       ],
                     }}

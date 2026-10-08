@@ -92,7 +92,11 @@ async function createFulfillment(prisma, store, orderId, input, { actorName, log
   // the store's plan includes GST invoicing. Never blocks the shipment.
   if (await require("../billing/entitlements").storeHas(prisma, store, "gst_invoices")) {
     const { issueInvoice } = require("./invoice");
-    await issueInvoice(prisma, store, order).catch((err) => log?.warn({ err }, "invoice: could not issue on fulfillment"));
+    await issueInvoice(prisma, store, order).catch(async (err) => {
+      if (err.code === "gst_details_needed") {
+        await addOrderEvent(prisma, order.id, { kind: "invoice", message: "No invoice issued yet — add your GST details (order page ▸ GST invoice) and issue it" }).catch(() => {});
+      } else log?.warn({ err }, "invoice: could not issue on fulfillment");
+    });
   }
 
   if (input.notify !== false) {

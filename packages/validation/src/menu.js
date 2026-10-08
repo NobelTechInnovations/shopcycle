@@ -15,6 +15,13 @@ const createMenuSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "Lowercase letters, numbers, and hyphens only"),
   title: z.string().min(1, "Title is required"),
   items: z.array(menuItemSchema).default([]),
+  /// Put it on the live theme straight away.
+  showIn: z.enum(["none", "header", "footer"]).optional(),
+});
+
+const placeMenuSchema = z.object({
+  where: z.enum(["header", "footer"]),
+  remove: z.boolean().optional(),
 });
 
 const updateMenuSchema = z.object({
@@ -22,4 +29,4 @@ const updateMenuSchema = z.object({
   items: z.array(menuItemSchema).optional(),
 });
 
-module.exports = { createMenuSchema, updateMenuSchema, menuItemSchema };
+module.exports = { createMenuSchema, updateMenuSchema, placeMenuSchema, menuItemSchema };

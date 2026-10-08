@@ -470,6 +470,14 @@ export function BillingSettings() {
           disabled={!canManage}
           onFinish={(values) => run("details", () => apiFetch("/api/billing/details", { method: "PATCH", body: values }), "Billing details saved — they'll appear on your next invoice")}
         >
+          <Form.Item name="gstRegistered" label="Registered under GST?" extra="Also decides your invoices to customers: “Tax invoice” with the GST split, or a plain “Invoice”.">
+            <Radio.Group
+              options={[
+                { value: true, label: "Yes" },
+                { value: false, label: "No" },
+              ]}
+            />
+          </Form.Item>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5">
             <Form.Item name="billingName" label="Legal business name" extra="Leave empty to use your store name.">
               <Input maxLength={160} />

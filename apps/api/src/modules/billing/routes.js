@@ -32,6 +32,9 @@ const detailsSchema = z.object({
     .or(z.literal("").transform(() => null)),
   billingAddress: z.string().trim().max(500).optional().nullable(),
   billingState: z.string().trim().max(60).optional().nullable(),
+  /// Registered under GST — decides "Tax invoice" vs "Invoice" on the
+  /// store's invoices to shoppers (orders/invoice.js).
+  gstRegistered: z.boolean().optional(),
 });
 const planSchema = z.object({ planId: z.string().min(1), interval: z.enum(["month", "year"]).optional() });
 const checkoutSchema = z.object({ planId: z.string().optional(), interval: z.enum(["month", "year"]).optional(), method: z.enum(METHODS).optional() });
@@ -167,9 +170,17 @@ async function billingRoutes(fastify) {
 
   fastify.patch("/details", async (request) => {
     assertCanManage(request);
-    const data = detailsSchema.parse(request.body);
+    const { gstRegistered, ...data } = detailsSchema.parse(request.body);
+    if (gstRegistered === true && !(data.gstin ?? request.store.gstin)) throw new HttpError(400, "Enter your GSTIN, or choose “Not registered”.");
+    if (gstRegistered === false) data.gstin = null;
+    if (gstRegistered !== undefined) {
+      const settings = request.store.settings && typeof request.store.settings === "object" ? request.store.settings : {};
+      data.settings = { ...settings, gstProfile: { registered: gstRegistered, confirmedAt: new Date().toISOString() } };
+    }
     const store = await prisma.store.update({ where: { id: request.store.id }, data });
-    return { billingDetails: { billingName: store.billingName, gstin: store.gstin, billingAddress: store.billingAddress, billingState: store.billingState } };
+    return {
+      billingDetails: { billingName: store.billingName, gstin: store.gstin, billingAddress: store.billingAddress, billingState: store.billingState, gstRegistered: store.settings?.gstProfile?.registered ?? (store.gstin ? true : null) },
+    };
   });
 
   fastify.post("/limit-request", async (request, reply) => {

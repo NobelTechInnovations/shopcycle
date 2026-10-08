@@ -34,6 +34,12 @@ const envSchema = z.object({
   // production, not just a different subdomain.
   SUPER_ADMIN_ORIGIN: z.string().default("http://localhost:3003"),
   API_PUBLIC_URL: z.string().default("http://localhost:4000"),
+  // Oyklane Store (oyklanestore.com, apps/market): themes and apps by
+  // developers. Its demo store shows every theme's preview; developers
+  // get MARKET_PARTNER_SHARE of each sale.
+  MARKET_ORIGIN: z.string().default("http://localhost:3005"),
+  MARKET_DEMO_STORE: z.string().default("loomwear"),
+  MARKET_PARTNER_SHARE: z.coerce.number().min(0).max(1).default(0.8),
   // The bare domain every store's default storefront subdomain hangs off
   // of — {handle}.<this> — e.g. "oyklane.com" in production. Used only to
   // reject a merchant trying to "connect" a domain that's actually part of

@@ -96,7 +96,7 @@ export default function ContentNavigationPage() {
     <div>
       <PageHeader
         title="Navigation"
-        subtitle="Make as many menus as you like. To show one in your footer: Online Store ▸ Customize ▸ Footer ▸ Add block ▸ Links, then pick the menu."
+        subtitle="Make as many menus as you like — each can be a footer column (up to 8) or your header menu. Open a menu to choose where it shows."
         actions={
           <Link href="/admin/content/navigation/new">
             <Button type="primary" icon={<Plus size={15} aria-hidden="true" />}>

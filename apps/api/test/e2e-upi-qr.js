@@ -179,6 +179,41 @@ async function main() {
 
     r = await owner("GET", "/api/upi-qr?status=all");
     check("history and numbers", r.data.total === 2 && r.data.stats.confirmed30 === 1 && r.data.stats.collected30 === 900 && r.data.stats.conversion30 === 50, r.data.stats);
+
+    // Third order: "I've paid" without a reference.
+    cartId = await addToCart();
+    r = await sf("POST", `/api/storefront/${store.handle}/checkout`, { cartId, ...shopper, paymentMethod: "upi_qr", returnBase: "https://shop.example" });
+    const order3 = r.data.order?.id;
+    r = await sf("POST", `/api/storefront/${store.handle}/checkout/upi/${order3}/submit`, { cartId, utr: "" });
+    check("'I've paid' without a reference", r.status === 200 && r.data.status === "submitted", r.data);
+    check("…order placed, payment to check", Boolean((await prisma.order.findUnique({ where: { id: order3 } })).paymentReference));
+
+    // Automatic confirmation from bank SMS.
+    r = await owner("PUT", "/api/upi-qr/auto-sms", { on: true });
+    check("auto-confirm on: a secret link", r.status === 200 && /\/api\/public\/upi-sms\/[a-f0-9]{36}$/.test(r.data.smsUrl || ""), r.data);
+    const hook = new URL(r.data.smsUrl).pathname;
+    cartId = await addToCart();
+    r = await sf("POST", `/api/storefront/${store.handle}/checkout`, { cartId, ...shopper, paymentMethod: "upi_qr", returnBase: "https://shop.example" });
+    const order4 = r.data.order?.id;
+    const p4 = await prisma.upiPayment.findUnique({ where: { orderId: order4 } });
+    check("same amount showing → a few paise less", Number(p4.amount) === 899.99, Number(p4.amount));
+    r = await sf("POST", hook, { text: "Rs.500.00 debited from A/c XX1234 to VPA x@ybl UPI Ref No 712345678901" });
+    check("a debit SMS is ignored", r.status === 200 && r.data.ok === false, r.data);
+    r = await sf("POST", hook, { message: "Money Received - INR 899.99 in your A/c XX1234 on 08-10-26 from VPA buyer@ybl UPI Ref:612345678901" });
+    check("credit SMS confirms the matching QR", r.status === 200 && r.data.ok === true && (await prisma.order.findUnique({ where: { id: order4 } })).paymentStatus === "paid", r.data);
+    r = await sf("GET", `/api/storefront/${store.handle}/checkout/upi/${order4}/status?cartId=${cartId}`);
+    check("…and the QR page moves on", r.data.status === "confirmed", r.data);
+    r = await sf("POST", hook, { text: "Your A/c XX1234 is credited with Rs 900.00 (UPI Ref No 812345678901)" });
+    check("…a reported payment too", r.data.ok === true && (await prisma.order.findUnique({ where: { id: order3 } })).paymentStatus === "paid", r.data);
+    r = await sf("POST", hook.replace(/[a-f0-9]{36}$/, "0".repeat(36)), { text: "credited Rs 1" });
+    check("a wrong link is refused", r.status === 404, r.status);
+
+    // A live gateway takes UPI over.
+    const upiService = require("../src/modules/upi/service");
+    const gw = await prisma.paymentProvider.create({ data: { storeId, provider: "razorpay", enabled: true, testMode: false, credentials: "x" } });
+    check("hidden while a gateway is live", (await upiService.availableSettings(prisma, storeId)) === null && (await upiService.liveGateway(prisma, storeId)) === "Razorpay");
+    await prisma.paymentProvider.update({ where: { id: gw.id }, data: { testMode: true } });
+    check("…back when it's in test mode", Boolean(await upiService.availableSettings(prisma, storeId)));
   } catch (err) {
     fail += 1;
     console.log(`FAIL  unexpected error: ${err.stack || err}`);

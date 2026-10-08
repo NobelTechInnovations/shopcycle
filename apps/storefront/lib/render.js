@@ -15,6 +15,24 @@ const VISITOR_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 const UTM_PARAMS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
 
+// Previewing a theme that isn't live (the admin's Themes page, the Oyklane
+// Store): ?themeId=… on any page; the cookie keeps it while you click
+// around, ?themeId=exit ends it. The API only renders a theme that
+// belongs to this store.
+const PREVIEW_COOKIE = "oy_preview_theme";
+const THEME_ID = /^[a-z0-9]{10,40}$/i;
+
+/** The bar on a previewed page, and a script that keeps the preview on
+ * every link (a preview inside the Oyklane Store's frame can't rely on
+ * cookies). */
+function previewTags(themeId) {
+  return `<div id="oy-preview-bar" style="position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:2147483646;background:#111114;color:#fff;font:600 13px/1.2 system-ui,-apple-system,sans-serif;padding:9px 10px 9px 16px;border-radius:999px;box-shadow:0 8px 28px rgba(0,0,0,.25);display:flex;gap:12px;align-items:center">Theme preview<a href="?themeId=exit" style="color:#111114;background:#fff;border-radius:999px;padding:6px 12px;text-decoration:none">Exit preview</a></div>
+<script>(function(){var id=${JSON.stringify(themeId)};if(window.top!==window){var b=document.getElementById("oy-preview-bar");if(b)b.remove();}
+function keep(u){try{var x=new URL(u,location.href);if(x.origin!==location.origin||x.searchParams.has("themeId"))return null;x.searchParams.set("themeId",id);return x.toString();}catch(e){return null;}}
+document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||a.target==="_blank")return;var u=keep(a.getAttribute("href"));if(u)a.setAttribute("href",u);},true);
+document.addEventListener("submit",function(e){var f=e.target;if(!f||f.method&&f.method.toLowerCase()!=="get")return;if(f.querySelector('input[name="themeId"]'))return;var i=document.createElement("input");i.type="hidden";i.name="themeId";i.value=id;f.appendChild(i);},true);})();</script>`;
+}
+
 function errorPage(status, message) {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${status}</title>
   <style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f6f6f7;color:#1a1a1a}
@@ -73,6 +91,8 @@ export async function proxyRender(handle, template, extraParams = {}, request = 
   if (oyklane?.token) shopperSession = oyklane.token;
 
   const params = new URLSearchParams(extraParams);
+  let previewTheme = null;
+  let previewChange = null;
   if (oyklane?.created && !params.get("notice")) params.set("notice", OYKLANE_WELCOME);
   if (cartId) params.set("cartId", cartId);
   if (visitorId) params.set("visitorId", visitorId);
@@ -83,8 +103,12 @@ export async function proxyRender(handle, template, extraParams = {}, request = 
     // Previewing an unpublished theme (Online Store ▸ Themes ▸ Preview) —
     // on any page, not just the home page. The API only renders a theme
     // that belongs to this store.
-    const previewTheme = request.nextUrl.searchParams.get("themeId");
-    if (previewTheme && /^[a-z0-9]{10,40}$/i.test(previewTheme) && !params.has("themeId")) params.set("themeId", previewTheme);
+    const fromUrl = request.nextUrl.searchParams.get("themeId");
+    const fromCookie = cookieStore.get(PREVIEW_COOKIE)?.value;
+    previewTheme = fromUrl === "exit" ? null : THEME_ID.test(fromUrl || "") ? fromUrl : THEME_ID.test(fromCookie || "") ? fromCookie : null;
+    previewChange = fromUrl === "exit" ? "exit" : fromUrl && fromUrl === previewTheme && fromUrl !== fromCookie ? "set" : null;
+    params.delete("themeId");
+    if (previewTheme) params.set("themeId", previewTheme);
     for (const key of ["notice", "formError"]) {
       const value = request.nextUrl.searchParams.get(key);
       if (value && !params.has(key)) params.set(key, value.slice(0, 300));
@@ -101,10 +125,19 @@ export async function proxyRender(handle, template, extraParams = {}, request = 
 
   let res;
   try {
-    res = await fetch(`${API_URL}/api/storefront/${handle}/render/${template}?${params}`, {
-      cache: "no-store",
-      headers: shopperSession ? { "x-shopper-token": shopperSession } : {},
-    });
+    const get = () =>
+      fetch(`${API_URL}/api/storefront/${handle}/render/${template}?${params}`, {
+        cache: "no-store",
+        headers: shopperSession ? { "x-shopper-token": shopperSession } : {},
+      });
+    res = await get();
+    // A remembered preview whose theme is gone: back to the live theme.
+    if (res.status === 404 && previewTheme && previewChange !== "set" && /theme not found/i.test((await res.clone().json().catch(() => ({}))).error || "")) {
+      params.delete("themeId");
+      previewTheme = null;
+      previewChange = "exit";
+      res = await get();
+    }
   } catch {
     return new Response(errorPage(503, "The storefront service is unavailable right now."), {
       status: 503,
@@ -125,7 +158,8 @@ export async function proxyRender(handle, template, extraParams = {}, request = 
     });
   }
 
-  const html = await res.text();
+  let html = await res.text();
+  if (previewTheme && THEME_ID.test(previewTheme)) html = html.includes("</body>") ? html.replace("</body>", `${previewTags(previewTheme)}</body>`) : html + previewTags(previewTheme);
   const newCartId = res.headers.get("x-cart-id");
   const newVisitorId = res.headers.get("x-visitor-id");
   const response = new NextResponse(html, {
@@ -133,6 +167,9 @@ export async function proxyRender(handle, template, extraParams = {}, request = 
     headers: { "content-type": "text/html; charset=utf-8" },
   });
   if (request) applyOyklane(response, request, handle, oyklane);
+  // Session cookie: a preview never outlives the browser.
+  if (previewChange === "set") response.headers.append("set-cookie", `${PREVIEW_COOKIE}=${previewTheme}; Path=/; HttpOnly; SameSite=Lax`);
+  if (previewChange === "exit") response.headers.append("set-cookie", `${PREVIEW_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
   if (newCartId && newCartId !== cartId) {
     response.headers.append(
       "set-cookie",

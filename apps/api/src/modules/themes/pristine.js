@@ -40,8 +40,8 @@ const PRISTINE_UPGRADES = {
   "snippets/product-card.liquid": ["3449020d8c0c6c67", "c1b47d0e8933b270"],
   // Logo size for computers and phones; long store names fit — 2 Oct.
   "sections/header.liquid": ["5b0fdfe67a2d2b73", "9bbe17a98be3d86f", "e9d39b78a56e39d4", "3b72efdf28946448", "33388154c36be4ac", "18745bd7f3870b7b"],
-  // …and up to 8 footer blocks (more menu columns) — 7 Oct.
-  "sections/footer.liquid": ["fa61352f91eee639", "6ba270beadc4a820", "709eb375dd176370", "61380d3ebac02711", "7e95ea83e95a1c4d", "d66f32ea0a96023f", "b154649da9b90eb5"],
+  // …and up to 8 footer blocks (more menu columns) — 7 Oct; Contact link — 8 Oct.
+  "sections/footer.liquid": ["fa61352f91eee639", "6ba270beadc4a820", "709eb375dd176370", "61380d3ebac02711", "7e95ea83e95a1c4d", "d66f32ea0a96023f", "b154649da9b90eb5", "5fc7a05bf891b281", "3c1b0b34edd12400"],
   // Photo shape / fit / layout options — 2 Oct.
   "sections/featured-product.liquid": ["750beb5075152070", "d3d1fd33ac2c8cbc", "e01a3bad53448ce0", "49e4e48249fe1443", "bf43181daf87c87d"],
   "sections/editorial-banner.liquid": ["91dc519bcbcf3b0e", "0a38866cb702f994"],

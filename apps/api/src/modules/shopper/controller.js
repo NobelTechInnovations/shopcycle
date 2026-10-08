@@ -9,7 +9,7 @@ const oyklaneId = require("./oyklane-id");
 const abandoned = require("../checkout/abandoned");
 const returns = require("../orders/returns");
 const { FULL_INCLUDE } = require("../orders/operations");
-const { renderInvoiceHtml } = require("../orders/invoice");
+const { renderInvoiceHtml, invoiceLogo } = require("../orders/invoice");
 const { ensureStatusToken } = require("../orders/notify");
 const { throttle } = require("../../lib/throttle");
 
@@ -241,7 +241,7 @@ async function invoiceHandler(request, reply) {
   const order = await orderByToken(request, store);
   if (!order.invoiceNumber) throw new HttpError(404, "There's no invoice for this order yet.");
   reply.header("content-type", "text/html; charset=utf-8");
-  reply.send(renderInvoiceHtml(store, order));
+  reply.send(renderInvoiceHtml(store, order, { logoUrl: await invoiceLogo(request.server.prisma, store) }));
 }
 
 async function contactHandler(request, reply) {

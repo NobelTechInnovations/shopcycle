@@ -32,12 +32,35 @@ async function getOrder(prisma, store, id) {
         refundable: await giftCards.refundableToCard(prisma, order),
       }
     : null;
+  const { buildInvoice, gstProfile } = require("./invoice");
+  const inv = buildInvoice(store, order);
+  const profile = gstProfile(store);
+  const cancelledInvoices = await prisma.cancelledInvoice.findMany({
+    where: { orderId: order.id, storeId: store.id },
+    orderBy: { cancelledAt: "desc" },
+    select: { id: true, number: true, issuedAt: true, cancelledAt: true, reason: true, cancelledBy: true },
+  });
   return {
     ...order,
     giftCard,
     quantities: itemQuantities(order),
     refundable: Math.max(Number(order.total) - Number(order.refundedAmount), 0),
     returnDeadline: deadline,
+    // How the order's tax splits (what its invoice prints).
+    taxSummary: {
+      registered: inv.registered,
+      ratePercent: inv.ratePercent,
+      taxable: inv.taxable,
+      type: inv.taxType,
+      cgst: inv.cgst,
+      sgst: inv.sgst,
+      igst: inv.igst,
+      placeOfSupply: inv.placeOfSupply,
+      sellerState: inv.seller.state,
+      lines: inv.lines.map((l) => ({ title: l.title, hsn: l.hsn, taxable: l.taxable, tax: l.tax })),
+    },
+    gst: { ready: profile.ready, registered: profile.registered, details: profile.details },
+    cancelledInvoices,
   };
 }
 

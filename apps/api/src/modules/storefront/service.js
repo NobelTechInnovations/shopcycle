@@ -210,6 +210,8 @@ async function resolveDomain(prisma, domain) {
   return { handle: store.handle };
 }
 
+const escapeHtmlAttr = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
 async function resolveTheme(prisma, store, themeId) {
   const theme = themeId
     ? await repository.getThemeById(prisma, store.id, themeId)
@@ -845,6 +847,7 @@ async function renderPage(
       phone: safe(placed.phone),
       giftCardAmount: Number(placed.giftCardAmount || 0),
       amountDue: Math.max(0, Number(placed.total) - Number(placed.giftCardAmount || 0)),
+      taxLines: require("../orders/invoice").taxLines(store, placed),
       status_url: `${routes.orders_url}/${await ensureStatusToken(prisma, placed)}`,
     };
   }
@@ -1018,6 +1021,12 @@ async function renderPage(
   if (!editorPreview) {
     const tracking = trackingTags({ apps: globalContext.apps, templateName, ctx: globalContext, currency: store.currency, html });
     if (tracking) html = html.includes("</head>") ? html.replace("</head>", `${tracking}</head>`) : tracking + html;
+    // Developers' apps from the Oyklane Store that add a script (reviewed
+    // when listed) — never on checkout or payment pages.
+    if (!["checkout", "upi-pay"].includes(templateName)) {
+      const scripts = await require("../market/store").embedScripts(prisma, store.id).catch(() => []);
+      if (scripts.length) html = html.replace("</body>", `${scripts.map((u) => `<script src="${escapeHtmlAttr(u)}" async></script>`).join("")}</body>`);
+    }
   }
 
   // CSS is fetched by the browser via a separate <link> GET to the asset

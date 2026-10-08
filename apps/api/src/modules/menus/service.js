@@ -1,4 +1,6 @@
+const crypto = require("crypto");
 const { HttpError } = require("@shopcycle/utils");
+const { extractSchema, buildDefaultSettings, findBlockSchema } = require("@shopcycle/theme-schema");
 const repository = require("./repository");
 
 /** Every menu, with where the store's live theme shows it ("Header",
@@ -45,10 +47,91 @@ async function getMenu(prisma, storeId, id) {
   return menu;
 }
 
-async function createMenu(prisma, storeId, input) {
+/** One menu with where the live theme shows it. */
+async function getMenuWithPlaces(prisma, storeId, id) {
+  const [menu, theme] = await Promise.all([getMenu(prisma, storeId, id), liveTheme(prisma, storeId)]);
+  return { ...menu, usedIn: menuPlaces(theme?.settingsData)[menu.handle] || [] };
+}
+
+const liveTheme = (prisma, storeId) => prisma.theme.findFirst({ where: { storeId, isActive: true }, select: { id: true, settingsData: true } });
+
+/** The footer's blocks as real entries — a footer never edited shows its
+ * schema's default columns, so those become real blocks first (otherwise
+ * adding one column would hide all the defaults). */
+async function footerEntry(prisma, theme) {
+  const footer = { ...((theme.settingsData?.sections || {}).footer || {}) };
+  const file = await prisma.themeFile.findUnique({ where: { themeId_path: { themeId: theme.id, path: "sections/footer.liquid" } }, select: { content: true } });
+  const schema = file ? extractSchema(file.content) : null;
+  if (!footer.blocks || !(footer.block_order || []).length) {
+    footer.blocks = {};
+    footer.block_order = [];
+    for (const b of schema?.default_blocks || []) {
+      const id = crypto.randomBytes(4).toString("hex");
+      footer.blocks[id] = { type: b.type, settings: { ...buildDefaultSettings(findBlockSchema(schema, b.type)), ...(b.settings || {}) } };
+      footer.block_order.push(id);
+    }
+  } else {
+    footer.blocks = { ...footer.blocks };
+    footer.block_order = [...footer.block_order];
+  }
+  return { footer, schema };
+}
+
+const blockMenu = (b) => b?.settings?.menu ?? b?.menu;
+
+/**
+ * Shows a menu on the live theme: "header" makes it the main navigation,
+ * "footer" adds it as a new footer column (after the other link columns).
+ * `remove: true` takes it off again.
+ */
+async function placeMenu(prisma, storeId, id, { where, remove = false }) {
+  const menu = await getMenu(prisma, storeId, id);
+  const theme = await liveTheme(prisma, storeId);
+  if (!theme) throw new HttpError(400, "Publish a theme first — Online Store ▸ Themes");
+  const data = theme.settingsData || {};
+  const sections = { ...(data.sections || {}) };
+
+  if (where === "header") {
+    const header = { ...(sections.header || {}) };
+    if (remove) {
+      if ((header.menu ?? header.settings?.menu ?? "main-menu") !== menu.handle) return getMenuWithPlaces(prisma, storeId, id);
+      header.menu = "main-menu";
+    } else header.menu = menu.handle;
+    sections.header = header;
+  } else if (where === "footer") {
+    const { footer, schema } = await footerEntry(prisma, theme);
+    const mine = footer.block_order.filter((bid) => footer.blocks[bid]?.type === "links" && blockMenu(footer.blocks[bid]) === menu.handle);
+    if (remove) {
+      for (const bid of mine) delete footer.blocks[bid];
+      footer.block_order = footer.block_order.filter((bid) => !mine.includes(bid));
+    } else {
+      if (mine.some((bid) => !footer.blocks[bid].disabled)) throw new HttpError(409, "This menu is already a footer column");
+      if (!(schema?.blocks || []).some((b) => b.type === "links")) throw new HttpError(400, "Your theme's footer has no link columns");
+      const max = schema?.max_blocks || 8;
+      if (footer.block_order.length >= max) throw new HttpError(400, `Your footer is full (${max} blocks). Remove one in Online Store ▸ Customize ▸ Footer first.`);
+      const bid = crypto.randomBytes(4).toString("hex");
+      footer.blocks[bid] = { type: "links", settings: { heading: menu.title, menu: menu.handle } };
+      let at = -1;
+      footer.block_order.forEach((x, i) => {
+        if (footer.blocks[x]?.type === "links") at = i;
+      });
+      footer.block_order.splice(at + 1, 0, bid);
+    }
+    sections.footer = footer;
+  } else {
+    throw new HttpError(400, "Choose header or footer");
+  }
+
+  await prisma.theme.update({ where: { id: theme.id }, data: { settingsData: { ...data, sections } } });
+  return getMenuWithPlaces(prisma, storeId, id);
+}
+
+async function createMenu(prisma, storeId, { showIn, ...input }) {
   const existing = await repository.findByHandle(prisma, storeId, input.handle);
   if (existing) throw new HttpError(409, `A menu with handle "${input.handle}" already exists`);
-  return repository.create(prisma, storeId, input);
+  const menu = await repository.create(prisma, storeId, input);
+  if (showIn === "header" || showIn === "footer") return placeMenu(prisma, storeId, menu.id, { where: showIn });
+  return menu;
 }
 
 async function updateMenu(prisma, storeId, id, input) {
@@ -57,8 +140,13 @@ async function updateMenu(prisma, storeId, id, input) {
 }
 
 async function deleteMenu(prisma, storeId, id) {
-  await getMenu(prisma, storeId, id);
+  const menu = await getMenu(prisma, storeId, id);
+  // Its footer columns go too (the header falls back to main-menu).
+  const theme = await liveTheme(prisma, storeId);
+  if (theme && (menuPlaces(theme.settingsData)[menu.handle] || []).some((p) => p.startsWith("Footer"))) {
+    await placeMenu(prisma, storeId, id, { where: "footer", remove: true }).catch(() => {});
+  }
   await repository.remove(prisma, id);
 }
 
-module.exports = { listMenus, getMenu, createMenu, updateMenu, deleteMenu };
+module.exports = { listMenus, getMenu, getMenuWithPlaces, placeMenu, createMenu, updateMenu, deleteMenu };

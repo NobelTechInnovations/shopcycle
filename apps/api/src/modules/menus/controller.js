@@ -1,4 +1,4 @@
-const { createMenuSchema, updateMenuSchema } = require("@shopcycle/validation");
+const { createMenuSchema, updateMenuSchema, placeMenuSchema } = require("@shopcycle/validation");
 const service = require("./service");
 
 async function listHandler(request, reply) {
@@ -7,7 +7,7 @@ async function listHandler(request, reply) {
 }
 
 async function getHandler(request, reply) {
-  const menu = await service.getMenu(request.server.prisma, request.store.id, request.params.id);
+  const menu = await service.getMenuWithPlaces(request.server.prisma, request.store.id, request.params.id);
   reply.send({ menu });
 }
 
@@ -23,9 +23,15 @@ async function updateHandler(request, reply) {
   reply.send({ menu });
 }
 
+async function placeHandler(request, reply) {
+  const body = placeMenuSchema.parse(request.body);
+  const menu = await service.placeMenu(request.server.prisma, request.store.id, request.params.id, body);
+  reply.send({ menu });
+}
+
 async function deleteHandler(request, reply) {
   await service.deleteMenu(request.server.prisma, request.store.id, request.params.id);
   reply.code(204).send();
 }
 
-module.exports = { listHandler, getHandler, createHandler, updateHandler, deleteHandler };
+module.exports = { listHandler, getHandler, createHandler, updateHandler, placeHandler, deleteHandler };

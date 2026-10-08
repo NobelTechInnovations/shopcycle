@@ -10,20 +10,38 @@ import { Plus, Trash2, GripVertical, IndentIncrease, IndentDecrease, CornerDownR
 import { PageHeader, SaveBar } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
-// The handles a theme actually looks for — see header.liquid / footer.liquid's
-// `menu` setting defaults in both theme packages. A merchant typing an
-// arbitrary handle here would create a menu no section ever renders, so
-// this is a closed choice, not free text.
-const HANDLE_OPTIONS = [
-  { value: "main-menu", label: "main-menu — Header navigation" },
-  { value: "footer-menu", label: "footer-menu — Footer navigation" },
+// Where a new menu goes on the live theme. Any number of menus can exist;
+// the footer takes up to 8 columns.
+const SHOW_IN = [
+  { value: "footer", label: "Footer — as a new column" },
+  { value: "header", label: "Header — the main navigation" },
+  { value: "none", label: "Not yet" },
 ];
+
+// Pages every store has without making them (they aren't in Content ▸ Pages).
+const STORE_PAGES = [
+  { value: "/contact", label: "Contact us" },
+  { value: "/orders/lookup", label: "Track your order" },
+  { value: "/account", label: "Your account" },
+  { value: "/collections/all", label: "All products" },
+  { value: "/search", label: "Search" },
+  { value: "/blog", label: "Blog" },
+  { value: "/cart", label: "Cart" },
+];
+
+const slugify = (v) =>
+  String(v || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50);
 
 const LINK_TYPES = [
   { value: "home", label: "Home page" },
   { value: "collection", label: "Collection" },
   { value: "product", label: "Product" },
   { value: "page", label: "Page" },
+  { value: "store", label: "Store page (Contact, Track order…)" },
   { value: "custom", label: "Custom URL" },
 ];
 
@@ -35,6 +53,7 @@ const INDENT = 32;
  * existing item shows the right picker instead of falling back to "Custom". */
 function parseUrl(url) {
   if (!url || url === "/") return { linkType: "home", target: undefined };
+  if (STORE_PAGES.some((p) => p.value === url)) return { linkType: "store", target: url };
   const collectionMatch = url.match(/^\/collections\/(.+)$/);
   if (collectionMatch) return { linkType: "collection", target: collectionMatch[1] };
   const productMatch = url.match(/^\/products\/(.+)$/);
@@ -49,6 +68,7 @@ function buildUrl(linkType, target) {
   if (linkType === "collection") return `/collections/${target}`;
   if (linkType === "product") return `/products/${target}`;
   if (linkType === "page") return `/pages/${target}`;
+  // "store" and "custom" keep the path as it is.
   return target || "";
 }
 
@@ -87,7 +107,19 @@ function MenuItemRow({ item, index, items, depth, collections, products, pages, 
     ) : item.linkType === "product" ? (
       <Select size="small" className="w-full" value={item.target} onChange={(target) => onChange({ target })} placeholder="Choose a product" showSearch optionFilterProp="label" options={products.map((p) => ({ value: p.slug, label: p.title }))} />
     ) : item.linkType === "page" ? (
-      <Select size="small" className="w-full" value={item.target} onChange={(target) => onChange({ target })} placeholder="Choose a page" showSearch optionFilterProp="label" options={pages.map((p) => ({ value: p.slug, label: p.title }))} />
+      <Select
+        size="small"
+        className="w-full"
+        value={item.target}
+        onChange={(target) => onChange({ target })}
+        placeholder="Choose a page"
+        showSearch
+        optionFilterProp="label"
+        options={pages.map((p) => ({ value: p.slug, label: p.title }))}
+        notFoundContent={<span className="text-[12px] text-ink-muted">No pages yet. For Contact, Track order and the like, pick “Store page”.</span>}
+      />
+    ) : item.linkType === "store" ? (
+      <Select size="small" className="w-full" value={item.target} onChange={(target) => onChange({ target })} placeholder="Choose a store page" options={STORE_PAGES} />
     ) : item.linkType === "custom" ? (
       <Input size="small" value={item.target} onChange={(e) => onChange({ target: e.target.value })} placeholder="/collections/all or https://…" />
     ) : (
@@ -149,7 +181,24 @@ export function MenuForm({ menu }) {
     normalize((menu?.items || []).map((item) => ({ key: item.id || newKey(), label: item.label, depth: item.depth || 0, ...parseUrl(item.url) })))
   );
   const [drag, setDrag] = useState(null); // { id, offset, overId }
+  const [usedIn, setUsedIn] = useState(menu?.usedIn || []);
+  const [placing, setPlacing] = useState(null);
   const isEdit = Boolean(menu);
+
+  async function place(where, remove = false) {
+    setPlacing(`${where}${remove ? "-x" : ""}`);
+    try {
+      const data = await apiFetch(`/api/menus/${menu.id}/place`, { method: "POST", body: { where, remove } });
+      setUsedIn(data.menu.usedIn || []);
+      message.success(remove ? "Taken off" : where === "footer" ? "Added to your footer" : "It's your header menu now");
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setPlacing(null);
+    }
+  }
+  const inHeader = usedIn.includes("Header");
+  const inFooter = usedIn.some((p) => p.startsWith("Footer"));
 
   useEffect(() => {
     apiFetch("/api/collections?pageSize=100").then((d) => setCollections(d.collections));
@@ -236,8 +285,9 @@ export function MenuForm({ menu }) {
     setSaving(true);
     try {
       const payload = {
-        handle: values.handle,
+        handle: values.handle || slugify(values.title),
         title: values.title,
+        showIn: values.showIn,
         items: items.map((item) => ({ label: item.label.trim(), url: buildUrl(item.linkType, String(item.target || "").trim()), depth: item.depth })),
       };
       if (isEdit) {
@@ -264,21 +314,65 @@ export function MenuForm({ menu }) {
       <Form
         form={form}
         layout="vertical"
-        initialValues={menu ? { handle: menu.handle, title: menu.title } : { handle: "main-menu", title: "Main menu" }}
+        initialValues={menu ? { handle: menu.handle, title: menu.title } : { showIn: "footer" }}
         onFinish={handleSubmit}
-        onValuesChange={() => setDirty(true)}
+        onValuesChange={(changed) => {
+          setDirty(true);
+          // A new menu's handle follows its title until edited by hand.
+          if (!isEdit && "title" in changed && !form.isFieldTouched("handle")) form.setFieldValue("handle", slugify(changed.title));
+        }}
         requiredMark={false}
       >
         <div className="max-w-4xl flex flex-col gap-6">
           <Card size="small" title="Menu">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-              <Form.Item name="title" label="Title" rules={[{ required: true, message: "Title is required" }]}>
-                <Input placeholder="Main menu" />
+              <Form.Item name="title" label="Title" rules={[{ required: true, message: "Title is required" }]} extra={isEdit ? null : "Shown as the column heading in your footer."}>
+                <Input placeholder="e.g. Policies, Company, Shop by category" />
               </Form.Item>
-              <Form.Item name="handle" label="Shown in">
-                <Select options={HANDLE_OPTIONS} disabled={isEdit} />
+              <Form.Item
+                name="handle"
+                label="Handle"
+                extra="How your theme finds this menu. Can't be changed later."
+                rules={isEdit ? [] : [{ pattern: /^[a-z0-9-]+$/, message: "Lowercase letters, numbers and hyphens" }]}
+              >
+                <Input disabled={isEdit} placeholder="policies" />
               </Form.Item>
+              {!isEdit && (
+                <Form.Item name="showIn" label="Show it in" className="sm:col-span-2 mb-0">
+                  <Select options={SHOW_IN} />
+                </Form.Item>
+              )}
             </div>
+            {isEdit && (
+              <div className="border-t border-app-border pt-3 mt-1">
+                <p className="text-[13px] m-0 mb-2">
+                  <span className="text-ink-muted">Shown in: </span>
+                  {usedIn.length ? <b className="font-medium">{usedIn.join(", ")}</b> : <span className="text-ink-muted">not on your store yet</span>}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {inFooter ? (
+                    <Button size="small" loading={placing === "footer-x"} onClick={() => place("footer", true)}>
+                      Remove from footer
+                    </Button>
+                  ) : (
+                    <Button size="small" icon={<Plus size={13} aria-hidden="true" />} loading={placing === "footer"} onClick={() => place("footer")}>
+                      Add as a footer column
+                    </Button>
+                  )}
+                  {inHeader ? (
+                    menu.handle !== "main-menu" && (
+                      <Button size="small" loading={placing === "header-x"} onClick={() => place("header", true)}>
+                        Put the main menu back in the header
+                      </Button>
+                    )
+                  ) : (
+                    <Button size="small" loading={placing === "header"} onClick={() => place("header")}>
+                      Use as header menu
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </Card>
 
           <Card size="small" title="Links">

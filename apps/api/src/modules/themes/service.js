@@ -63,7 +63,8 @@ const REVISION_THROTTLE_MS = 30_000;
 
 async function listThemes(prisma, storeId) {
   const themes = await prisma.theme.findMany({
-    where: { storeId },
+    // Oyklane Store previews on the demo store aren't the seller's themes.
+    where: { storeId, NOT: { listingId: { not: null }, status: "draft" } },
     orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
   });
   return themes.map((t) => {
@@ -78,9 +79,22 @@ async function getTheme(prisma, storeId, id) {
     include: { files: { orderBy: { path: "asc" } } },
   });
   if (!theme) throw new HttpError(404, "Theme not found");
+  if (theme.locked) return { ...theme, files: theme.files.map(protectedFile) };
   // Untouched files the platform has improved since: the editors work on
   // the current version (see pristine.js).
   return pristine.withUpgrades(theme);
+}
+
+/** A locked theme's file as the admin sees it: JSON in full (layouts and
+ * settings are the seller's), a section's settings schema (for the
+ * visual editor) and nothing else of its code. */
+function protectedFile(f) {
+  if (/\.json$/i.test(f.path)) return f;
+  if (f.fileType === "liquid") {
+    const m = f.content.match(/\{%-?\s*schema\s*-?%\}[\s\S]*?\{%-?\s*endschema\s*-?%\}/);
+    return { ...f, content: m ? m[0] : "", protected: true };
+  }
+  return { ...f, content: "", protected: true };
 }
 
 async function assertThemeOwnership(prisma, storeId, themeId) {
@@ -149,7 +163,8 @@ async function installTheme(prisma, storeId, handle) {
  * so there's never a moment (or a failed second write) where a store has
  * zero or two active themes. */
 async function activateTheme(prisma, storeId, id) {
-  await assertThemeOwnership(prisma, storeId, id);
+  const theme = await assertThemeOwnership(prisma, storeId, id);
+  if (theme.listingId && theme.status === "draft") throw new HttpError(400, "This is an Oyklane Store preview, not one of your themes.");
 
   return prisma.$transaction(async (tx) => {
     await tx.theme.updateMany({ where: { storeId, isActive: true }, data: { isActive: false } });

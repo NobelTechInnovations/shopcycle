@@ -9,6 +9,7 @@ async function menuRoutes(fastify) {
   fastify.post("/", controller.createHandler);
   fastify.get("/:id", controller.getHandler);
   fastify.patch("/:id", controller.updateHandler);
+  fastify.post("/:id/place", controller.placeHandler);
   fastify.delete("/:id", controller.deleteHandler);
 }
 

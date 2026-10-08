@@ -139,6 +139,41 @@ async function lastFetch(prisma, store, row) {
   }
 }
 
+/**
+ * What Merchant Center itself holds for this account: each product and
+ * whether Google shows it (approved), is still reviewing it (pending —
+ * a new account's first review takes up to 3 working days) or won't
+ * (disapproved, with the reasons). The feed can be read fine while the
+ * products aren't showing yet — this is the part sellers ask about.
+ */
+async function googleProducts(prisma, store, row) {
+  if (!row?.credentials?.accountId) return null;
+  try {
+    const json = await api(prisma, store.id, "GET", `/products/v1/accounts/${row.credentials.accountId}/products?pageSize=250`);
+    const items = (json.products || []).map((p) => {
+      const attrs = p.productAttributes || p.attributes || {};
+      const dest = p.productStatus?.destinationStatuses || [];
+      const has = (key) => dest.some((d) => (d[key] || []).length);
+      const status = has("approvedCountries") ? "approved" : has("disapprovedCountries") ? "disapproved" : "pending";
+      const issues = (p.productStatus?.itemLevelIssues || [])
+        .filter((i) => i.severity !== "NOT_IMPACTED")
+        .map((i) => ({ text: i.description || i.code, detail: i.detail || "", severity: i.severity || "", link: i.documentation || null }));
+      return { offerId: p.offerId, title: attrs.title || p.offerId, status, issues };
+    });
+    const count = (st) => items.filter((i) => i.status === st).length;
+    return {
+      total: items.length,
+      approved: count("approved"),
+      pending: count("pending"),
+      disapproved: count("disapproved"),
+      items: items.filter((i) => i.status !== "approved" || i.issues.length).slice(0, 25),
+      url: `https://merchants.google.com/mc/products/list?a=${row.credentials.accountId}`,
+    };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
 /** Tells Google which website is the store's (and claims it, once the
  * verification tag is on the store). */
 async function claimWebsite(prisma, store) {
@@ -155,6 +190,11 @@ async function claimWebsite(prisma, store) {
     await connections.save(prisma, store.id, APP_KEY, { profile: { ...row.profile, website: uri, claimed: false } });
     return { website: uri, claimed: false, error: err.message };
   }
+}
+
+async function statusParts(prisma, store, row) {
+  const [fetchReport, onGoogle] = await Promise.all([lastFetch(prisma, store, row), googleProducts(prisma, store, row)]);
+  return { lastFetch: fetchReport, onGoogle };
 }
 
 async function forAdmin(prisma, store, { withStatus = false } = {}) {
@@ -174,10 +214,10 @@ async function forAdmin(prisma, store, { withStatus = false } = {}) {
     merchant: row?.profile?.accountId ? { id: row.profile.accountId, name: row.profile.accountName, website: row.profile.website || null, claimed: Boolean(row.profile.claimed) } : null,
     syncedAt: row?.fetchedAt || null,
     error: row?.error || null,
-    lastFetch: withStatus ? await lastFetch(prisma, store, row) : null,
+    ...(withStatus ? await statusParts(prisma, store, row) : { lastFetch: null, onGoogle: null }),
     products,
     website: storefrontUrl(store, "/"),
   };
 }
 
-module.exports = { APP_KEY, accounts, useAccount, sync, claimWebsite, forAdmin, lastFetch };
+module.exports = { APP_KEY, accounts, useAccount, sync, claimWebsite, forAdmin, lastFetch, googleProducts };

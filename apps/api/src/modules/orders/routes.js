@@ -27,6 +27,8 @@ async function orderRoutes(fastify) {
   fastify.post("/:id/returns/:returnId", controller.returnActionHandler);
   fastify.post("/:id/invoice", controller.issueInvoiceHandler);
   fastify.get("/:id/invoice", controller.getInvoiceHandler);
+  fastify.post("/:id/invoice/cancel", controller.cancelInvoiceHandler);
+  fastify.get("/:id/invoices/cancelled/:cid", controller.cancelledInvoiceHandler);
 }
 
 module.exports = orderRoutes;

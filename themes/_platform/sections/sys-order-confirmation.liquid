@@ -24,7 +24,7 @@
               <div class="sys-row-line"><span class="sys-muted">Subtotal</span><span class="sys-num">{{ order.subtotal | money }}</span></div>
               {% if order.discount > 0 %}<div class="sys-row-line"><span class="sys-muted">Discount{% if order.discountCode %} ({{ order.discountCode }}){% endif %}</span><span class="sys-num">−{{ order.discount | money }}</span></div>{% endif %}
               <div class="sys-row-line"><span class="sys-muted">Delivery</span><span class="sys-num">{% if order.shipping > 0 %}{{ order.shipping | money }}{% else %}Free{% endif %}</span></div>
-              {% if order.tax > 0 %}<div class="sys-row-line"><span class="sys-muted">Tax</span><span class="sys-num">{{ order.tax | money }}</span></div>{% endif %}
+              {% if order.tax > 0 %}{% if order.taxLines.size > 0 %}{% for t in order.taxLines %}<div class="sys-row-line"><span class="sys-muted">{{ t.label }}</span><span class="sys-num">{{ t.amount | money }}</span></div>{% endfor %}{% else %}<div class="sys-row-line"><span class="sys-muted">Tax</span><span class="sys-num">{{ order.tax | money }}</span></div>{% endif %}{% endif %}
               <div class="sys-sumrow sys-sumrow--total" style="margin-top:6px"><span>Total</span><span class="sys-num">{{ order.total | money }}</span></div>
               {% if order.giftCardAmount > 0 %}
                 <div class="sys-row-line"><span class="sys-muted">Paid with gift card</span><span class="sys-num">−{{ order.giftCardAmount | money }}</span></div>

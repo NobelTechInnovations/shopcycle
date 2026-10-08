@@ -64,6 +64,11 @@ async function apply(prisma, evt, { log }) {
           .catch(() => prisma.billingPayment.findUnique({ where: { providerPaymentId: pp.id } }));
       }
     }
+    if (!row && pp.orderId) {
+      // An Oyklane Store purchase (market/store.js)?
+      const market = await require("../market/store").applyWebhookPayment(prisma, pp, { log });
+      if (market) return market;
+    }
     if (!row) return "ignored"; // not a billing payment of ours
     if (!row.providerPaymentId) {
       await prisma.billingPayment.update({ where: { id: row.id }, data: { providerPaymentId: pp.id } }).catch(() => {});

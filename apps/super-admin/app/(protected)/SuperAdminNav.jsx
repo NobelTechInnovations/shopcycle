@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, ConfigProvider } from "antd";
-import { Building2, CreditCard, Grid3x3, Users, LogOut, ShieldCheck, ScrollText, Mail, LayoutDashboard, Wallet, MessageCircle, LifeBuoy, Plug } from "lucide-react";
+import { Building2, CreditCard, Grid3x3, Users, LogOut, ShieldCheck, ScrollText, Mail, LayoutDashboard, Wallet, MessageCircle, LifeBuoy, Plug, Store } from "lucide-react";
 import { BrandMark } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
@@ -32,6 +32,11 @@ const NAV_ITEMS = [
     key: "/apps",
     icon: <Grid3x3 size={16} aria-hidden="true" />,
     label: <Link href="/apps">Apps</Link>,
+  },
+  {
+    key: "/market",
+    icon: <Store size={16} aria-hidden="true" />,
+    label: <Link href="/market">Oyklane Store</Link>,
   },
   {
     key: "/customers",

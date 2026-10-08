@@ -93,6 +93,7 @@ function publicOrder(store, order, { statusUrl, invoiceUrl } = {}) {
     discountCode: order.discountCode,
     shipping: Number(order.shipping),
     tax: Number(order.tax),
+    taxLines: require("./invoice").taxLines(store, order),
     total: Number(order.total),
     giftCardAmount: Number(order.giftCardAmount || 0),
     amountDue: Math.max(0, Number(order.total) - Number(order.giftCardAmount || 0)),
