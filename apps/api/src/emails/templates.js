@@ -288,7 +288,7 @@ function newOrderAlert({ store, order, adminUrl }) {
         heading(`New order #${order.orderNumber}`),
         p(
           `${esc(order.shippingName || order.email || "A customer")} placed an order for <strong>${money(order.total, currency)}</strong> · ${
-            order.paymentMethod === "cod" ? "Cash on delivery" : "Paid online"
+            order.paymentMethod === "cod" ? "Cash on delivery" : order.paymentMethod === "upi_qr" && order.paymentStatus !== "paid" ? "Paid by UPI — check it arrived" : "Paid online"
           }.`
         ),
         orderSummary(order),
@@ -375,7 +375,9 @@ function orderConfirmation({ store, order, statusUrl }) {
       ? `Please keep <strong>${money(order.total, currency)}</strong> ready to pay on delivery.`
       : order.paymentStatus === "paid"
         ? `We've received your payment of <strong>${money(order.total, currency)}</strong>.`
-        : "Your payment is being confirmed.";
+        : order.paymentMethod === "upi_qr"
+          ? `We've got your UPI payment of <strong>${money(order.total, currency)}</strong> and the store is confirming it.`
+          : "Your payment is being confirmed.";
   return {
     subject: `Order #${order.orderNumber} confirmed`,
     html: layout({
@@ -782,8 +784,32 @@ function contactReply({ store, message, reply }) {
   };
 }
 
+/** To the seller: a shopper reports paying an order by UPI QR. */
+function upiPaymentAlert({ store, payment, adminUrl }) {
+  const d = PLATFORM_DESIGN;
+  const amount = money(payment.amount, payment.currency || "INR");
+  return {
+    subject: `Check UPI payment ${amount} · order #${payment.orderNumber}`,
+    html: layout({
+      design: d,
+      icon: "bell",
+      brand: store.name,
+      preheader: `${payment.buyerName || "A customer"} says they paid ${amount} to ${payment.payeeVpa}.`,
+      body: [
+        heading("A UPI payment to check"),
+        p(`<strong>${esc(payment.buyerName || payment.buyerEmail || "A customer")}</strong> says they paid <strong>${amount}</strong> for order #${payment.orderNumber} to <strong>${esc(payment.payeeVpa)}</strong>.`),
+        p(`UPI reference (UTR): <strong style="font-family:monospace;letter-spacing:.04em">${esc(payment.utr || "")}</strong>`),
+        p("Open your UPI or bank app, find this reference and amount, then press <strong>Received</strong> — the order becomes paid. If it never arrived, press <strong>Not received</strong> to cancel the order."),
+        button(adminUrl, "Check the payment", d),
+      ].join(""),
+      footer: "Sent by the UPI QR app in your Oyklane store.",
+    }),
+  };
+}
+
 module.exports = {
   rentalRequestAlert,
+  upiPaymentAlert,
   contactMessageAlert,
   contactReply,
   rentalRequestUpdate,

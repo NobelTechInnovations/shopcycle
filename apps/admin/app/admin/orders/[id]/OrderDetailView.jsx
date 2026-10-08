@@ -45,6 +45,7 @@ const PAYMENT_METHOD_LABEL = {
   payu: "Online · PayU",
   stripe: "Online · Stripe",
   paypal: "Online · PayPal",
+  upi_qr: "UPI QR · to your UPI ID",
 };
 
 function SummaryRow({ label, value, strong, muted }) {
@@ -274,6 +275,21 @@ export function OrderDetailView({ order, role, hasGstInvoices }) {
         />
       )}
 
+      {order.paymentMethod === "upi_qr" && order.paymentStatus === "pending" && !cancelled && (
+        <Alert
+          className="mb-5"
+          type="warning"
+          showIcon
+          message={order.paymentReference && /^\d{12}$/.test(order.paymentReference) ? `Customer paid by UPI — reference ${order.paymentReference}` : "Waiting for the customer's UPI payment"}
+          description="Check the amount and reference in your UPI or bank app, then confirm it in UPI QR payments."
+          action={
+            <Link href="/admin/apps/upi-qr">
+              <Button size="small">Open UPI QR</Button>
+            </Link>
+          }
+        />
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
           {waiting.length > 0 && !cancelled && (
@@ -468,7 +484,7 @@ export function OrderDetailView({ order, role, hasGstInvoices }) {
                 />
                 {Number(order.total) - Number(order.giftCardAmount) > 0 && (
                   <SummaryRow
-                    label={order.paymentMethod === "cod" ? "Cash on delivery" : "Online payment"}
+                    label={order.paymentMethod === "cod" ? "Cash on delivery" : order.paymentMethod === "upi_qr" ? "UPI QR payment" : "Online payment"}
                     value={formatCurrency(Number(order.total) - Number(order.giftCardAmount), order.currency)}
                   />
                 )}

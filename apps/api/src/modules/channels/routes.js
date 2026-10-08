@@ -5,6 +5,7 @@ const connections = require("../social/connections");
 const { throttle } = require("../../lib/throttle");
 const googleChannel = require("./google");
 const facebookChannel = require("./facebook");
+const analytics = require("./google-analytics");
 
 const CODE = /^[A-Za-z0-9_\-:.]{4,120}$/;
 
@@ -22,6 +23,53 @@ async function channelRoutes(fastify) {
 
   const installed = (key) => async (request) => appsService.assertInstalled(prisma, request.store.id, key);
   const limit = (request, what, max = 30) => throttle(fastify, `channel-${what}:${request.store.id}`, { max, windowSeconds: 3600, message: "That's a lot of tries for one hour — try again a little later." });
+
+  // ── Google Analytics & Tag Manager (google-analytics.js) ─────────
+  fastify.register(async (g) => {
+    g.addHook("preHandler", installed(analytics.APP_KEY));
+    const id = z.string().min(3).max(120);
+    g.get("/", async (request) => analytics.forAdmin(prisma, request.store));
+    g.get("/accounts", async (request) => ({ accounts: await analytics.analyticsAccounts(prisma, request.store.id) }));
+    g.get("/streams", async (request) => ({ streams: await analytics.streams(prisma, request.store.id, z.object({ property: id }).parse(request.query).property) }));
+    g.post("/streams", async (request) => {
+      await limit(request, "ga-create", 10);
+      const { property } = z.object({ property: id }).parse(request.body || {});
+      return { stream: await analytics.createStream(prisma, request.store, property) };
+    });
+    g.post("/use", async (request) => {
+      const body = z.object({ property: id, propertyName: z.string().max(200).optional(), measurementId: z.string().max(40) }).parse(request.body || {});
+      await analytics.useStream(prisma, request.store, body);
+      return analytics.forAdmin(prisma, request.store);
+    });
+    g.post("/properties", async (request) => {
+      await limit(request, "ga-create", 10);
+      await analytics.createProperty(prisma, request.store, z.object({ account: id }).parse(request.body || {}).account);
+      return analytics.forAdmin(prisma, request.store);
+    });
+    g.post("/signup", async (request) => {
+      await limit(request, "ga-signup", 10);
+      return analytics.signUpUrl(prisma, request.store);
+    });
+    g.post("/ads", async (request) => {
+      await limit(request, "ga-ads", 10);
+      await analytics.linkAds(prisma, request.store, (request.body || {}).customerId);
+      return analytics.forAdmin(prisma, request.store);
+    });
+    g.get("/gtm", async (request) => ({ accounts: await analytics.gtmContainers(prisma, request.store.id) }));
+    g.post("/gtm/use", async (request) => {
+      await analytics.useContainer(prisma, request.store, z.object({ id: z.string().max(20), name: z.string().max(200).optional() }).parse(request.body || {}));
+      return analytics.forAdmin(prisma, request.store);
+    });
+    g.post("/gtm/create", async (request) => {
+      await limit(request, "gtm-create", 10);
+      await analytics.createContainer(prisma, request.store, z.object({ account: id }).parse(request.body || {}).account);
+      return analytics.forAdmin(prisma, request.store);
+    });
+    g.put("/manual", async (request) => {
+      await analytics.saveManual(prisma, request.store, request.body);
+      return analytics.forAdmin(prisma, request.store);
+    });
+  }, { prefix: "/google-analytics" });
 
   // ── Google & YouTube ─────────────────────────────────────────────
   fastify.register(async (g) => {

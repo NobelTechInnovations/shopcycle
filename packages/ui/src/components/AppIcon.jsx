@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   CalendarDays,
   Store,
+  QrCode,
 } from "lucide-react";
 import { APP_ICON_KEYS } from "@shopcycle/utils";
 
@@ -51,6 +52,7 @@ const ICON_COMPONENTS = {
   shield: ShieldCheck,
   calendar: CalendarDays,
   store: Store,
+  "qr-code": QrCode,
 };
 
 export const APP_ICONS = ICON_COMPONENTS;

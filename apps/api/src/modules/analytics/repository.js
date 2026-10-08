@@ -94,6 +94,7 @@ async function salesPerDay(prisma, storeId, from, to, tz = "Asia/Kolkata") {
     FROM orders
     WHERE "storeId" = ${storeId} AND "createdAt" >= ${from} AND "createdAt" < ${to} AND "fulfillmentStatus" <> 'cancelled'
       AND NOT ("paymentStatus" = 'pending' AND "paymentMethod" = ANY(${PROVIDER_KEYS}))
+      AND NOT ("paymentStatus" = 'pending' AND "paymentMethod" = 'upi_qr' AND "paymentReference" IS NULL)
     GROUP BY 1 ORDER BY 1 ASC
   `;
   return rows.map((r) => ({ date: new Date(r.date).toISOString().slice(0, 10), orders: Number(r.orders), revenue: Number(r.revenue) }));
@@ -116,6 +117,7 @@ async function topProducts(prisma, storeId, from, to) {
     JOIN orders o ON o."id" = oi."orderId"
     WHERE o."storeId" = ${storeId} AND o."createdAt" >= ${from} AND o."createdAt" < ${to} AND o."fulfillmentStatus" <> 'cancelled'
       AND NOT (o."paymentStatus" = 'pending' AND o."paymentMethod" = ANY(${PROVIDER_KEYS}))
+      AND NOT (o."paymentStatus" = 'pending' AND o."paymentMethod" = 'upi_qr' AND o."paymentReference" IS NULL)
     GROUP BY oi."title"
     ORDER BY revenue DESC
   `;

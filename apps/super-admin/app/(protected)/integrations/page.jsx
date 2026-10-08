@@ -110,8 +110,9 @@ export default function IntegrationsPage() {
           <Status ok={data.google.configured} />
         </div>
         <CopyLine label="Authorized redirect URI" value={data.google.redirectUri} />
+        {data.google.analyticsSignupUri && <CopyLine label="Also add (Analytics sign-up)" value={data.google.analyticsSignupUri} />}
         <div className="py-2 text-[12.5px] text-ink-muted">
-          Enable: My Business Account Management API, My Business Business Information API, Google My Business API (reviews), Merchant API, Google Analytics Admin API. Scopes asked for:{" "}
+          Enable: My Business Account Management API, My Business Business Information API, Google My Business API (reviews), Merchant API, Google Analytics Admin API, Tag Manager API. Scopes asked for:{" "}
           {data.google.scopes.map((s) => (
             <Tag key={s} className="!mr-1 !mb-1 font-mono text-[11px]">
               {s.replace("https://www.googleapis.com/auth/", "")}

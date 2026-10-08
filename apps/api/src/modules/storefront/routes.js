@@ -7,6 +7,7 @@ const service = require("./service");
 const growth = require("./growth");
 const reviews = require("../reviews/service");
 const contact = require("../contact/service");
+const upi = require("../upi/service");
 const shopperService = require("../shopper/service");
 
 // Public — no auth. This is what apps/storefront calls to get rendered
@@ -37,6 +38,26 @@ async function storefrontRoutes(fastify) {
     reply.send(await growth.subscribe(fastify, store, request.body));
   });
   fastify.get("/:handle/render/:template", controller.renderHandler);
+  // UPI QR app (upi/service.js): the QR page's watcher, "I've paid" with
+  // the UPI reference, and a fresh QR after the timer. Only for the cart
+  // that's paying for the order.
+  const upiLimit = { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } };
+  fastify.get("/:handle/checkout/upi/:orderId/status", upiLimit, async (request, reply) => {
+    const store = await service.loadStoreOrThrow(fastify.prisma, request.params.handle);
+    reply.header("cache-control", "no-store");
+    return upi.shopperStatus(fastify.prisma, store, request.params.orderId, request.query.cartId);
+  });
+  fastify.post("/:handle/checkout/upi/:orderId/submit", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request) => {
+    const store = await service.loadStoreOrThrow(fastify.prisma, request.params.handle);
+    const body = request.body || {};
+    const row = await upi.submit(fastify.prisma, store, request.params.orderId, body.cartId, body.utr, { log: request.log });
+    return { ok: true, status: row.status };
+  });
+  fastify.post("/:handle/checkout/upi/:orderId/renew", upiLimit, async (request) => {
+    const store = await service.loadStoreOrThrow(fastify.prisma, request.params.handle);
+    const row = await upi.renew(fastify.prisma, store, request.params.orderId, (request.body || {}).cartId);
+    return { ok: true, status: row.status };
+  });
   // The Contact page's form (contact/service.js): saved for the seller's
   // Customers ▸ Queries; the seller answers by email.
   fastify.post("/:handle/contact", { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async (request) => {

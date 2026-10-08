@@ -2,6 +2,7 @@ const { HttpError } = require("@shopcycle/utils");
 const { encryptSecret, decryptSecret } = require("../../lib/crypto");
 const { PROVIDERS, PROVIDER_KEYS } = require("./providers");
 const methods = require("./methods");
+const upi = require("../upi/service");
 
 /**
  * Settings ▸ Payments: which gateways a seller has connected, and cash on
@@ -122,6 +123,7 @@ async function checkoutMethods(prisma, store) {
     const p = PROVIDERS[r.provider];
     if (p) methods.push({ value: r.provider, label: p.name, testMode: r.testMode });
   }
+  if (await upi.activeSettings(prisma, store.id)) methods.push({ value: upi.METHOD, label: "UPI QR" });
   return methods;
 }
 
@@ -164,6 +166,9 @@ async function checkoutOptions(prisma, store, { log } = {}) {
     for (const mode of modes) if (!byMode.has(mode)) byMode.set(mode, { value: r.provider, mode, testMode: r.testMode, gateway: PROVIDERS[r.provider].name });
   }
   const options = methods.MODES.filter((m) => byMode.has(m)).map((m) => ({ ...byMode.get(m), ...OPTION_TEXT[m], ...(m === "card" && byMode.get(m).value === "stripe" && { subtitle: "Visa, Mastercard, Amex", badges: ["VISA", "Mastercard", "Amex"] }) }));
+  // UPI QR app: paid straight to the seller's UPI ID.
+  const upiQr = await upi.checkoutOption(prisma, store.id);
+  if (upiQr) options.push(upiQr);
   if (codEnabled(store)) options.push({ value: "cod", mode: "cod", testMode: false, gateway: null, ...OPTION_TEXT.cod });
   return options;
 }

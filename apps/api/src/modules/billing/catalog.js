@@ -28,13 +28,14 @@ const FEATURES = [
   { key: "automation_advanced", name: "Advanced automation", category: "Marketing", sortOrder: 210 },
   { key: "api_access", name: "API keys & webhooks", category: "Integrations", sortOrder: 220 },
   { key: "integrations_advanced", name: "Advanced integrations", category: "Integrations", sortOrder: 230 },
+  { key: "custom_email", name: "Customer emails from your own email server (SMTP)", category: "Integrations", sortOrder: 235 },
   { key: "priority_support", name: "Priority support", category: "Support", sortOrder: 240 },
   { key: "premium_features", name: "Premium features & early access", category: "Support", sortOrder: 250 },
 ];
 
 const STARTER = ["store", "catalog", "orders", "discounts_basic", "analytics_basic", "checkout_standard", "shipping_basic", "theme_basic"];
 const GROWTH = [...STARTER, "analytics_advanced", "discounts_advanced", "marketing_tools", "customer_segments", "reports_advanced", "gst_invoices", "automation", "shipping_advanced", "theme_advanced"];
-const PRO = [...GROWTH, "automation_advanced", "api_access", "integrations_advanced", "priority_support", "premium_features"];
+const PRO = [...GROWTH, "automation_advanced", "api_access", "integrations_advanced", "custom_email", "priority_support", "premium_features"];
 
 const PLANS = [
   { key: "starter", name: "Starter", priceMonthly: 199, commissionPercent: 2.0, staffLimit: 2, sortOrder: 1, tagline: "Everything to open your store.", features: STARTER },

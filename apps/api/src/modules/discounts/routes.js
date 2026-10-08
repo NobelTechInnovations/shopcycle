@@ -10,6 +10,7 @@ async function discountRoutes(fastify) {
   fastify.get("/:id", controller.getHandler);
   fastify.patch("/:id", controller.updateHandler);
   fastify.delete("/:id", controller.deleteHandler);
+  fastify.post("/:id/duplicate", controller.duplicateHandler);
 }
 
 module.exports = discountRoutes;

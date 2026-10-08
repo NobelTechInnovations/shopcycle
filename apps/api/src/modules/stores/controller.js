@@ -81,7 +81,11 @@ async function getStoreHandler(request, reply) {
   // The admin never builds store addresses itself — these are the only ones
   // it shows (lib/storefront-url.js).
   const store = { ...request.store, subscription: undefined, publicUrl: storefrontBaseUrl(request.store), oyklaneUrl: oyklaneAddress(request.store) };
-  reply.send({ store, role: request.storeRole, resolvedSettings: storeSettings(request.store), access: request.access, billingStatus: request.subscription?.status || null });
+  // The email server's password never leaves the API (store-email/service.js).
+  if (store.settings?.smtp) store.settings = { ...store.settings, smtp: { ...store.settings.smtp, password: undefined } };
+  const resolved = storeSettings(request.store);
+  if (resolved.smtp) resolved.smtp = { ...resolved.smtp, password: undefined };
+  reply.send({ store, role: request.storeRole, resolvedSettings: resolved, access: request.access, billingStatus: request.subscription?.status || null });
 }
 
 async function updateStoreHandler(request, reply) {

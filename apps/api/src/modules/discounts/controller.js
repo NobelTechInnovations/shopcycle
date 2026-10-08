@@ -29,4 +29,9 @@ async function deleteHandler(request, reply) {
   reply.code(204).send();
 }
 
-module.exports = { listHandler, getHandler, createHandler, updateHandler, deleteHandler };
+async function duplicateHandler(request, reply) {
+  const discount = await service.duplicateDiscount(request.server.prisma, request.store.id, request.params.id);
+  reply.code(201).send({ discount });
+}
+
+module.exports = { listHandler, getHandler, createHandler, updateHandler, deleteHandler, duplicateHandler };

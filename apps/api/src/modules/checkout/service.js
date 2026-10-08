@@ -16,6 +16,7 @@ const shopperService = require("../shopper/service");
 const shopperPhone = require("../shopper/phone");
 const abandoned = require("./abandoned");
 const rentals = require("../rentals/service");
+const upi = require("../upi/service");
 const { REPLACED_REASON } = ordersRepository;
 
 /** What checkout offers: cash on delivery (Settings ▸ Payments) and each
@@ -87,6 +88,7 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
   // alongside the new one — its stock and gift card money go back first.
   if (raw.pendingOrderId && store) await replacePendingOrder(prisma, store, raw.pendingOrderId, log);
   if (cart.discount?.error) throw new HttpError(400, cart.discount.error);
+  await discountService.assertUnusedBy(prisma, storeId, cart.discount, input.email);
   if (cart.gift_card?.error) throw new HttpError(400, `${cart.gift_card.error} Remove it from your cart to continue.`);
   // A gift card covering the whole order leaves nothing to collect.
   const giftCard = cart.gift_card && cart.gift_card.amount > 0 ? cart.gift_card : null;
@@ -96,8 +98,12 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     throw new HttpError(400, "Your gift card no longer covers the whole order. Choose how to pay the rest.");
   }
   let gateway = null;
+  // UPI QR app: paid to the seller's own UPI ID — online, but no gateway.
+  const upiQr = input.paymentMethod === upi.METHOD;
   if (input.paymentMethod === "cod") {
     if (store && !payments.codEnabled(store)) throw new HttpError(400, "Cash on delivery isn't available for this store.");
+  } else if (upiQr) {
+    if (!(await upi.activeSettings(prisma, storeId))) throw new HttpError(400, "UPI QR isn't available for this store right now.");
   } else if (input.paymentMethod !== "gift_card") {
     gateway = await payments.gateway(prisma, storeId, input.paymentMethod);
     if (!gateway?.enabled) throw new HttpError(400, "That payment method isn't available for this store.");
@@ -237,12 +243,8 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     return created;
   }));
 
-  if (cart.discount?.code) {
-    const discountRecord = await discountService
-      .resolveApplicableDiscount(prisma, storeId, cart.discount.code, cart.subtotal)
-      .catch(() => null);
-    if (discountRecord) await discountService.recordUsage(prisma, discountRecord.id);
-  }
+  if (cart.discount?.id && !cart.discount.error) await discountService.recordUsage(prisma, cart.discount.id);
+
 
   // Not routed through analytics/service.js — that module imports
   // storefront/service.js, which imports this one, and a third leg back
@@ -280,17 +282,26 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     if (store) await abandoned.captureContact(prisma, store, { cartId, email: input.email, name: input.shippingName }).catch(() => {});
     if (started.kind === "razorpay") razorpay = { orderId: started.orderId, amount: started.amount, currency: started.currency, keyId: started.keyId, method: started.method };
   }
+  // UPI QR: like a gateway, the order waits for its payment and the cart
+  // stays (a shopper who gives up comes back to it); the QR page is next.
+  if (upiQr) {
+    const { ref, ...instruction } = await upi.start(prisma, store || (await prisma.store.findUnique({ where: { id: storeId } })), order, due, input.returnBase);
+    payment = { provider: upi.METHOD, ...instruction };
+    await prisma.order.update({ where: { id: order.id }, data: { paymentGatewayRef: ref } });
+    await cartService.setPendingOrder(prisma, storeId, cartId, order.id);
+    if (store) await abandoned.captureContact(prisma, store, { cartId, email: input.email, name: input.shippingName }).catch(() => {});
+  }
 
   // Cash on delivery (or a gift card) is fully placed: the cart's job is
   // done. Online payments keep the cart until the payment is confirmed — a
   // shopper who cancels on the gateway (or closes Razorpay's window) comes
   // back to a full cart, and paying again replaces the unpaid order.
-  if (!gateway) await cartService.clearCart(prisma, storeId, cartId);
+  if (!gateway && !upiQr) await cartService.clearCart(prisma, storeId, cartId);
 
   // Cash on delivery is final now; an online order is confirmed (and
   // emailed) once its payment is verified.
   if (input.paymentMethod === "gift_card") await syncOrderCommission(prisma, order.id);
-  if (!gateway && store) {
+  if (!gateway && !upiQr && store) {
     await notify.sendOrderPlaced(prisma, store, order, log).catch((err) => log?.error({ err }, "checkout: confirmation email failed"));
   }
 
@@ -307,6 +318,8 @@ async function replacePendingOrder(prisma, store, orderId, log) {
   await cancelOrder(prisma, store, old.id, { reason: REPLACED_REASON, restock: true, refund: false, notify: false }, { actorName: "Oyklane", log }).catch((err) =>
     log?.warn({ err, orderId }, "checkout: couldn't replace the unpaid order")
   );
+  // A UPI QR it was showing is over.
+  await prisma.upiPayment.updateMany({ where: { orderId: old.id, status: "awaiting" }, data: { status: "expired" } }).catch(() => {});
 }
 
 /** Records a confirmed payment exactly once and does what a paid order
@@ -376,6 +389,7 @@ async function verifyRazorpayPayment(prisma, { orderId, razorpay_order_id, razor
 module.exports = {
   getCheckoutContext,
   placeOrder,
+  markOnlinePaid,
   getOrderForConfirmation,
   verifyRazorpayPayment,
   confirmPayment,

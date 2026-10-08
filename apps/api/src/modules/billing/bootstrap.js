@@ -139,6 +139,18 @@ const FACEBOOK_SHOP = {
   settingsSchema: [],
 };
 
+// UPI QR (modules/upi): shoppers pay the seller's own UPI ID by QR at
+// checkout — no gateway, no fee.
+const UPI_QR = {
+  key: "upi-qr",
+  name: "UPI QR payments",
+  description:
+    "Take UPI payments straight to your own UPI ID — no gateway, no fees. At checkout the shopper gets a QR for the exact amount (with a timer), pays with any UPI app and gives the UPI reference; you check it arrived and press Received. Every payment is kept with its reference, so you can see what came in and how fast shoppers pay.",
+  category: "checkout",
+  iconKey: "qr-code",
+  settingsSchema: [],
+};
+
 async function seedCatalog(prisma, { log } = {}) {
   const have = new Set((await prisma.feature.findMany({ select: { key: true } })).map((f) => f.key));
   const missing = FEATURES.filter((f) => !have.has(f.key));
@@ -195,6 +207,7 @@ async function seedCatalog(prisma, { log } = {}) {
     await prisma.app.upsert({ where: { key: RENTALS.key }, update: {}, create: RENTALS });
     await prisma.app.upsert({ where: { key: GOOGLE_SHOPPING.key }, update: {}, create: GOOGLE_SHOPPING });
     await prisma.app.upsert({ where: { key: FACEBOOK_SHOP.key }, update: {}, create: FACEBOOK_SHOP });
+    await prisma.app.upsert({ where: { key: UPI_QR.key }, update: {}, create: UPI_QR });
   }
   await require("../support/articles").seedArticles(prisma, { log });
   await require("../support/articles").addNewArticles(prisma, { log, enabled: env.NODE_ENV === "production" || env.SEED_PREVIEW_APPS === "1" });

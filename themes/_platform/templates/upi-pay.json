@@ -1,0 +1,6 @@
+{
+  "sections": {
+    "main": { "type": "sys-upi-pay", "settings": {} }
+  },
+  "order": ["main"]
+}

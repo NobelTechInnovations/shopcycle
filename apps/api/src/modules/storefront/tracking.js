@@ -16,6 +16,9 @@
 
 const PIXEL_ID = /^\d{6,20}$/;
 const GA_ID = /^(G|AW|GT)-[A-Z0-9]{4,20}$/i;
+const GTM_ID = /^GTM-[A-Z0-9]{4,12}$/i;
+const ADS_ID = /^AW-\d{6,15}$/i;
+const ADS_LABEL = /^[A-Za-z0-9_-]{4,64}$/;
 
 // JSON inside <script>: "<" escaped so a value can't close the tag.
 const js = (value) => JSON.stringify(value).replace(/</g, "\\u003c").replace(/[\u2028\u2029]/g, "");
@@ -35,6 +38,11 @@ function gaBase(id) {
     `<script async src="https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(id)}"></script>` +
     `<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config',${js(id)});</script>`
   );
+}
+
+/** Google Tag Manager's container (Apps ▸ Google Analytics & Tag Manager). */
+function gtmBase(id) {
+  return `<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer',${js(id)});</script>`;
 }
 
 // Pixel event → GA4 event, with the parameters each expects.
@@ -95,18 +103,30 @@ function pageEvent(templateName, ctx, currency) {
  * Empty when neither app is installed.
  */
 function trackingTags({ apps, templateName, ctx, currency, html }) {
+  const ga = apps?.["google-analytics"] || {};
   const pixelId = String(apps?.["facebook-pixel"]?.pixelId || "").trim();
-  const gaId = String(apps?.["google-analytics"]?.measurementId || "").trim();
+  const gaId = String(ga.measurementId || "").trim();
+  const gtmId = String(ga.gtmId || "").trim();
+  const adsId = String(ga.adsConversionId || "").trim();
+  const adsLabel = String(ga.adsConversionLabel || "").trim();
   const hasPixel = PIXEL_ID.test(pixelId);
   const hasGa = GA_ID.test(gaId);
-  if (!hasPixel && !hasGa) return "";
+  const hasGtm = GTM_ID.test(gtmId);
+  // Google Ads purchase conversions: AW-… and the conversion's label.
+  const hasAds = ADS_ID.test(adsId) && ADS_LABEL.test(adsLabel);
+  if (!hasPixel && !hasGa && !hasGtm && !hasAds) return "";
   let out = "";
+  if (hasGtm && !html.includes("googletagmanager.com/gtm.js")) out += gtmBase(gtmId.toUpperCase());
   if (hasPixel && !html.includes("connect.facebook.net/en_US/fbevents.js")) out += pixelBase(pixelId);
-  if (hasGa && !html.includes("googletagmanager.com/gtag/js")) out += gaBase(gaId);
+  if ((hasGa || hasAds) && !html.includes("googletagmanager.com/gtag/js")) out += gaBase(hasGa ? gaId : adsId.toUpperCase());
+  if (hasAds && hasGa) out += `<script>gtag('config',${js(adsId.toUpperCase())});</script>`;
   out += HELPER;
   const ev = pageEvent(templateName, ctx, currency);
+  if (ev && hasAds && ev.name === "Purchase") {
+    ev.adsConversion = { send_to: `${adsId.toUpperCase()}/${adsLabel}`, value: ev.data.value, currency: ev.data.currency, transaction_id: ev.data.orderId };
+  }
   if (ev) {
-    const fire = `oyTrack(${js(ev.name)},${js(ev.data)})`;
+    const fire = `oyTrack(${js(ev.name)},${js(ev.data)})${ev.adsConversion ? `;window.gtag&&gtag("event","conversion",${js(ev.adsConversion)})` : ""}`;
     out += ev.once
       ? `<script>try{if(!localStorage.getItem(${js(ev.once)})){${fire};localStorage.setItem(${js(ev.once)},"1")}}catch(e){${fire}}</script>`
       : `<script>${fire}</script>`;
@@ -114,4 +134,4 @@ function trackingTags({ apps, templateName, ctx, currency, html }) {
   return out;
 }
 
-module.exports = { trackingTags, pageEvent, PIXEL_ID, GA_ID };
+module.exports = { trackingTags, pageEvent, PIXEL_ID, GA_ID, GTM_ID, ADS_ID, ADS_LABEL };

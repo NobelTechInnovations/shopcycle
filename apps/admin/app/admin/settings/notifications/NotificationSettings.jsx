@@ -6,6 +6,7 @@ import { Card, Form, Switch, InputNumber, Input, Button, Table, Modal, Skeleton,
 import { Mail, Eye } from "lucide-react";
 import { StatusBadge } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+import { OwnEmailServer } from "./OwnEmailServer";
 import { SettingsSectionHeader } from "../SettingsNav";
 
 const TEMPLATE_LABEL = {
@@ -211,6 +212,8 @@ export function NotificationSettings({ store, settings, canEdit, hasGstInvoices 
           </div>
         )}
       </Form>
+
+      <OwnEmailServer canEdit={canEdit} storeName={store.name} />
 
       <Card
         size="small"

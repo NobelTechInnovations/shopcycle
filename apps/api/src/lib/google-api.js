@@ -18,6 +18,8 @@ const { encryptSecret, decryptSecret } = require("./crypto");
 const SCOPES = {
   reviews: "https://www.googleapis.com/auth/business.manage",
   merchant: "https://www.googleapis.com/auth/content",
+  analytics: "https://www.googleapis.com/auth/analytics.edit",
+  tagmanager: "https://www.googleapis.com/auth/tagmanager.edit.containers",
 };
 
 const configured = () => Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);

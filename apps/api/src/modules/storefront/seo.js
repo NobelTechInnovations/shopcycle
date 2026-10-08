@@ -14,7 +14,7 @@ const { esc } = require("../../emails/templates");
  * `noindex`.
  */
 
-const NOINDEX = new Set(["search", "cart", "checkout", "account", "account-login", "order-status", "order-lookup", "order-confirmation", "404"]);
+const NOINDEX = new Set(["search", "cart", "checkout", "account", "account-login", "order-status", "order-lookup", "order-confirmation", "404", "upi-pay"]);
 
 const stripHtml = (html) =>
   String(html || "")

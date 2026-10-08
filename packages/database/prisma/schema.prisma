@@ -605,6 +605,7 @@ model Store {
   commissionEntries    CommissionEntry[]
   platformInvoices     PlatformInvoice[]
   contactMessages      ContactMessage[]
+  upiPayments          UpiPayment[]
   storeUsers           StoreUser[]
   invitations          Invitation[]
   themes               Theme[]
@@ -1432,6 +1433,10 @@ model MenuItem {
 enum DiscountType {
   percentage
   fixed_amount
+  /// Delivery free (the order still pays for its items).
+  free_shipping
+  /// Buy `buyQuantity` eligible items, get `getQuantity` more at `value`% off.
+  buy_x_get_y
 }
 
 enum DiscountStatus {
@@ -1451,6 +1456,20 @@ model Discount {
   startsAt    DateTime?
   endsAt      DateTime?
   status      DiscountStatus @default(active)
+  /// "code": shoppers enter it · "automatic": applies by itself, shown by
+  /// its title (its code is generated and never shown).
+  method      String         @default("code")
+  title       String?
+  /// What it's taken off: "order", "collections" or "products" (targetIds).
+  appliesTo   String         @default("order")
+  targetIds   String[]       @default([])
+  minQuantity Int?
+  /// Most a percentage discount can take off one order.
+  maxDiscount Decimal?       @db.Decimal(10, 2)
+  /// Once per customer (by email at checkout).
+  oncePerCustomer Boolean    @default(false)
+  buyQuantity Int?
+  getQuantity Int?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -2642,4 +2661,41 @@ model ContactMessage {
 
   @@index([storeId, status, createdAt])
   @@map("contact_messages")
+}
+
+/// UPI QR app: one QR shown at checkout for an order, paid straight to the
+/// seller's own UPI ID. Kept for the app's history and numbers — who paid,
+/// how much, the UPI reference (UTR) and how long it took.
+model UpiPayment {
+  id          String    @id @default(cuid())
+  storeId     String
+  orderId     String    @unique
+  orderNumber Int
+  amount      Decimal   @db.Decimal(12, 2)
+  currency    String    @default("INR")
+  /// The seller's UPI ID and name the QR paid to (as they were then).
+  payeeVpa    String
+  payeeName   String
+  /// "awaiting" (QR shown) → "submitted" (shopper says paid, gave the
+  /// UTR) → "confirmed" | "rejected" by the seller; "expired" if the
+  /// timer ran out before anything happened.
+  status      String    @default("awaiting")
+  utr         String?
+  buyerName   String?
+  buyerEmail  String?
+  buyerPhone  String?
+  /// How many QRs the shopper was shown (a fresh one after each timeout).
+  attempts    Int       @default(1)
+  expiresAt   DateTime
+  submittedAt DateTime?
+  decidedAt   DateTime?
+  decidedBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, status, createdAt])
+  @@index([storeId, utr])
+  @@map("upi_payments")
 }

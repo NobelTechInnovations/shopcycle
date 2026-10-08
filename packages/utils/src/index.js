@@ -58,6 +58,7 @@ function detectDeviceType(userAgent) {
  * apart. Add a key here first, then to AppIcon's APP_ICONS map.
  */
 const APP_ICON_KEYS = [
+  "qr-code",
   "bar-chart",
   "activity",
   "code",

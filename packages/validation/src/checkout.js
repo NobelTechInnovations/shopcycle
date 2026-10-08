@@ -20,7 +20,7 @@ const checkoutSchema = z.object({
   shippingCountry: z.string().min(1, "Country is required"),
   // "gift_card" only when a gift card covers the whole order — the API
   // decides that from the cart, whatever the form says.
-  paymentMethod: z.enum(["cod", "gift_card", "razorpay", "cashfree", "payu", "stripe", "paypal"]).default("cod"),
+  paymentMethod: z.enum(["cod", "gift_card", "razorpay", "cashfree", "payu", "stripe", "paypal", "upi_qr"]).default("cod"),
   // The way to pay the shopper picked (UPI, card, …): the gateway opens on it.
   payMode: z.enum(["upi", "card", "netbanking", "wallet", "emi", "paylater", "paypal", "cod"]).optional().catch(undefined),
   // The storefront address the shopper is on — where a gateway sends them

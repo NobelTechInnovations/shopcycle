@@ -13,8 +13,8 @@ const connections = require("../social/connections");
 
 const KEY = "google-account";
 // What each Google app needs, by the name the apps use.
-const ACCESS = { reviews: google.SCOPES.reviews, merchant: google.SCOPES.merchant };
-const LABEL = { reviews: "your Business Profile", merchant: "Merchant Center" };
+const ACCESS = { reviews: google.SCOPES.reviews, merchant: google.SCOPES.merchant, analytics: google.SCOPES.analytics, tagmanager: google.SCOPES.tagmanager };
+const LABEL = { reviews: "your Business Profile", merchant: "Merchant Center", analytics: "Google Analytics", tagmanager: "Tag Manager" };
 
 function status(row) {
   const granted = row?.credentials?.scopes || [];

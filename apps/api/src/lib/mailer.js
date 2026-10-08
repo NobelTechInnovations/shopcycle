@@ -173,10 +173,31 @@ async function sendNow({ to, subject, html, fromName, replyTo }) {
   return { provider, providerMessageId: await PROVIDERS[provider]({ sender, to, replyTo, subject, html, text: htmlToText(html) }) };
 }
 
+/** A Pro store's own email server sends its customer emails
+ * (modules/store-email). If that server fails, Oyklane's sends it instead
+ * — the shopper still gets it — and the seller sees the error. */
+async function viaStoreServer(prisma, row, p, log) {
+  // Lazy: store-email needs billing, which needs this module.
+  const own = await require("../modules/store-email/service")
+    .senderFor(prisma, row.storeId, row.template)
+    .catch(() => null);
+  if (!own) return null;
+  try {
+    const html = p.html || "";
+    const id = await own.send({ to: row.to, replyTo: p.replyTo, subject: p.subject || row.subject, html, text: htmlToText(html), fromName: p.fromName });
+    return { provider: "store_smtp", providerMessageId: id };
+  } catch (err) {
+    log?.warn({ err, storeId: row.storeId }, "mailer: store's own SMTP failed, sending through Oyklane");
+    await own.failed(err).catch(() => {});
+    return null;
+  }
+}
+
 async function deliver(prisma, row, log) {
   const p = row.payload || {};
   try {
-    const { provider, providerMessageId } = await sendNow({ to: row.to, subject: p.subject || row.subject, html: p.html || "", fromName: p.fromName, replyTo: p.replyTo });
+    const { provider, providerMessageId } =
+      (await viaStoreServer(prisma, row, p, log)) || (await sendNow({ to: row.to, subject: p.subject || row.subject, html: p.html || "", fromName: p.fromName, replyTo: p.replyTo }));
     await prisma.emailLog.update({ where: { id: row.id }, data: { status: "sent", attempts: row.attempts + 1, provider, providerMessageId: providerMessageId ? String(providerMessageId) : null, error: null, payload: {}, sentAt: new Date(), nextAttemptAt: null } });
   } catch (err) {
     const attempts = row.attempts + 1;

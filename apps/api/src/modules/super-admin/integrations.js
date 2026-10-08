@@ -39,6 +39,8 @@ async function integrationsRoutes(fastify) {
       google: {
         configured: google.configured(),
         redirectUri: google.redirectUri(),
+        // Google Analytics' own sign-up comes back here (accounts:provisionAccountTicket).
+        analyticsSignupUri: `${admin}/admin/apps/google-analytics`,
         scopes: Object.values(googleAccount.ACCESS),
       },
       places: { configured: Boolean(env.GOOGLE_PLACES_API_KEY) },

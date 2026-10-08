@@ -1,0 +1,109 @@
+{% comment %}
+  UPI QR app: pay the order by scanning a QR made for its exact amount,
+  straight to the seller's UPI ID. A timer runs (Apps ▸ UPI QR sets how
+  long); the page watches for the seller's "Received" and moves on by
+  itself. "I've paid" takes the 12-digit UPI reference (UTR).
+{% endcomment %}
+{% assign u = upi %}
+<section class="sys-section">
+  <div class="sys-container sys-container--narrow">
+    <div class="sys-upi" data-upi data-status="{{ u.status }}" data-seconds="{{ u.seconds_left }}" data-status-url="{{ u.status_url }}" data-done-url="{{ u.done_url }}">
+      <p class="sys-eyebrow" style="margin:0 0 6px">Order #{{ u.order_number }}</p>
+      <h1 class="sys-h2" style="margin:0">Pay {{ u.amount | money }} with UPI</h1>
+      <p class="sys-muted" style="margin:8px 0 0">To <strong>{{ u.payee_name }}</strong> · {{ u.vpa }}</p>
+
+      {% if form_error %}<p class="sys-alert sys-alert--error" role="alert" style="margin-top:18px">{{ form_error }}</p>{% endif %}
+
+      {% if u.status == 'awaiting' %}
+        <div class="sys-card sys-upi__card">
+          <div class="sys-upi__qr">{{ u.qr }}</div>
+          <p class="sys-upi__timer" aria-live="polite">QR valid for <strong data-upi-clock>{{ u.minutes }}:00</strong></p>
+          <div class="sys-upi__bar" aria-hidden="true"><span data-upi-bar></span></div>
+          <p class="sys-small sys-muted" style="margin:14px 0 0;text-align:center">Scan with Google Pay, PhonePe, Paytm, BHIM or your bank's app. The amount is filled in for you.</p>
+          <a class="sys-btn sys-btn--block sys-upi__app" href="{{ u.link }}">Open UPI app</a>
+          <div class="sys-upi__copy">
+            <span>{{ u.vpa }}</span>
+            <button type="button" class="sys-link sys-small" data-upi-copy="{{ u.vpa }}">Copy UPI ID</button>
+          </div>
+          <p class="sys-small sys-muted sys-upi__watch" style="margin:12px 0 0;text-align:center">This page moves on by itself once the store sees your payment.</p>
+        </div>
+      {% elsif u.status == 'expired' %}
+        <div class="sys-card sys-upi__card" style="text-align:center">
+          <p class="sys-h3" style="margin:0 0 6px">The QR timed out</p>
+          <p class="sys-muted" style="margin:0 0 16px">Not paid yet? Get a new QR for the same amount. Already paid? Enter the reference below.</p>
+          <form method="post" action="{{ u.action_url }}" data-sys-once>
+            <input type="hidden" name="order" value="{{ u.order_id }}">
+            <input type="hidden" name="action" value="renew">
+            <button class="sys-btn sys-btn--block" type="submit" data-busy-label="Making a new QR…">Show a new QR</button>
+          </form>
+        </div>
+      {% elsif u.status == 'rejected' %}
+        <p class="sys-alert sys-alert--error" style="margin-top:18px">The store couldn't find this payment and cancelled the order. Please contact them.</p>
+      {% endif %}
+
+      {% if u.status == 'awaiting' or u.status == 'expired' %}
+        <form method="post" action="{{ u.action_url }}" class="sys-card sys-upi__paid sys-stack" data-sys-once>
+          <input type="hidden" name="order" value="{{ u.order_id }}">
+          <input type="hidden" name="action" value="paid">
+          <p class="sys-h3" style="margin:0">Paid already?</p>
+          <label class="sys-field">
+            <span class="sys-label">UPI reference (UTR) — 12 digits</span>
+            <input class="sys-input" name="utr" inputmode="numeric" autocomplete="off" pattern="[0-9 ]{12,15}" maxlength="15" required placeholder="e.g. 412345678901">
+            <span class="sys-hint">In your UPI app: open the payment ▸ "UPI transaction ID" or "UTR".</span>
+          </label>
+          <button class="sys-btn sys-btn--block sys-btn--lg" type="submit" data-busy-label="Sending…">I've paid · place my order</button>
+        </form>
+        <p class="sys-small" style="text-align:center;margin-top:16px"><a class="sys-link" href="{{ u.checkout_url }}">Choose another way to pay</a></p>
+      {% endif %}
+
+      <p class="sys-upi__by">{% render 'snippets/sys-icon', icon: 'lock' %} Paid straight to the store · QR by Oyklane</p>
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  var root = document.querySelector("[data-upi]");
+  if (!root) return;
+  var copy = root.querySelector("[data-upi-copy]");
+  if (copy) copy.addEventListener("click", function () {
+    var text = copy.getAttribute("data-upi-copy");
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { copy.textContent = "Copied"; }, function () {});
+  });
+  var status = root.getAttribute("data-status");
+  var statusUrl = root.getAttribute("data-status-url");
+  var doneUrl = root.getAttribute("data-done-url");
+  // Watch for the seller's "Received" (and the timer) — then move on.
+  if (status === "awaiting" || status === "expired") {
+    var watch = setInterval(function () {
+      fetch(statusUrl, { cache: "no-store", credentials: "same-origin" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (s) {
+          if (!s) return;
+          if (s.status === "confirmed" || s.status === "submitted") { clearInterval(watch); location.href = doneUrl; }
+          else if (s.status === "rejected") { clearInterval(watch); location.reload(); }
+        })
+        .catch(function () {});
+    }, 4000);
+  }
+  if (status !== "awaiting") return;
+  var left = parseInt(root.getAttribute("data-seconds"), 10) || 0;
+  var total = Math.max(left, 1);
+  var clock = root.querySelector("[data-upi-clock]");
+  var bar = root.querySelector("[data-upi-bar]");
+  function tick() {
+    var m = Math.floor(left / 60), s = left % 60;
+    if (clock) clock.textContent = m + ":" + (s < 10 ? "0" : "") + s;
+    if (bar) bar.style.transform = "scaleX(" + (left / total) + ")";
+    root.classList.toggle("sys-upi--late", left <= 60);
+    if (left <= 0) { location.reload(); return; }
+    left -= 1;
+    setTimeout(tick, 1000);
+  }
+  tick();
+})();
+</script>
+
+{% schema %}
+{ "name": "UPI QR payment", "settings": [] }
+{% endschema %}

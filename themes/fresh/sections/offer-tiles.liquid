@@ -1,0 +1,52 @@
+{% comment %}
+  Offer tiles — up to three coloured cards ("Flat 20% off fruits",
+  "Free delivery over ₹499") with a photo, a line and a button.
+{% endcomment %}
+<section class="section section--tight">
+  <div class="container">
+    <div class="offers" style="--cols: {{ section.blocks.size | at_most: 3 }}">
+      {% for block in section.blocks limit: 3 %}
+        {% assign b = block.settings %}
+        <a class="offer offer--{{ b.text_color }}" href="{{ b.link | default: routes.all_products_url }}" style="--offer-bg: {{ b.color | default: '#FFE7A8' }}">
+          <span class="offer__copy">
+            {% if b.eyebrow != blank %}<span class="offer__eyebrow">{{ b.eyebrow }}</span>{% endif %}
+            <span class="offer__title">{{ b.heading }}</span>
+            {% if b.text != blank %}<span class="offer__text">{{ b.text }}</span>{% endif %}
+            {% if b.button_label != blank %}<span class="offer__btn">{{ b.button_label }} {% render 'snippets/icon', icon: 'arrow-right', class: 'icon icon--sm' %}</span>{% endif %}
+          </span>
+          <span class="offer__media">
+            {% if b.image != blank %}<img src="{{ b.image | image_url }}" alt="" loading="lazy" width="480" height="480">{% else %}{% assign art = 'product-' | append: forloop.index %}{{ art | placeholder_svg }}{% endif %}
+          </span>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Offer tiles",
+  "settings": [],
+  "blocks": [
+    { "type": "offer", "name": "Offer", "settings": [
+      { "type": "text", "id": "eyebrow", "label": "Small text", "default": "Today only" },
+      { "type": "text", "id": "heading", "label": "Heading", "default": "Flat 20% off" },
+      { "type": "textarea", "id": "text", "label": "Text", "default": "On fresh fruits and vegetables" },
+      { "type": "text", "id": "button_label", "label": "Button", "default": "Shop now" },
+      { "type": "url", "id": "link", "label": "Link" },
+      { "type": "image_picker", "id": "image", "label": "Photo" },
+      { "type": "color", "id": "color", "label": "Background", "default": "#FFE7A8" },
+      { "type": "select", "id": "text_color", "label": "Text", "default": "dark", "options": [
+        { "value": "dark", "label": "Dark" },
+        { "value": "light", "label": "Light" }
+      ] }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "offer", "settings": { "eyebrow": "Today only", "heading": "Flat 20% off", "text": "Fresh fruits & vegetables", "color": "#FFE7A8" } },
+    { "type": "offer", "settings": { "eyebrow": "Free delivery", "heading": "Orders over ₹499", "text": "Delivered to your door today", "color": "#D9F2DF" } },
+    { "type": "offer", "settings": { "eyebrow": "New", "heading": "Cold drinks & juices", "text": "Chilled and ready", "color": "#1F7A3A", "text_color": "light", "button_label": "Explore" } }
+  ],
+  "max_blocks": 3
+}
+{% endschema %}

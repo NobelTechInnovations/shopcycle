@@ -117,6 +117,7 @@ async function savedDetails(prisma, store, phone) {
       AND "shippingAddress1" IS NOT NULL
       AND right(regexp_replace(coalesce("phone", ''), '\\D', '', 'g'), 10) = ${last10}
       AND NOT ("paymentStatus" = 'pending' AND "paymentMethod" = ANY(${PROVIDER_KEYS}))
+      AND NOT ("paymentStatus" = 'pending' AND "paymentMethod" = 'upi_qr' AND "paymentReference" IS NULL)
     ORDER BY "createdAt" DESC
     LIMIT 25
   `;

@@ -1,13 +1,18 @@
-function list(prisma, storeId, { page, pageSize }) {
-  return Promise.all([
-    prisma.discount.findMany({
-      where: { storeId },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-    prisma.discount.count({ where: { storeId } }),
-  ]);
+/** One page (by status as shoppers see it, and code/title search), the
+ * total, and every discount's dates and usage for the tab counts. */
+async function list(prisma, storeId, { page, pageSize, status = "all", q }) {
+  const { effectiveStatus } = require("./service");
+  const term = String(q || "").trim();
+  const where = { storeId, ...(term && { OR: [{ code: { contains: term, mode: "insensitive" } }, { title: { contains: term, mode: "insensitive" } }] }) };
+  const all = await prisma.discount.findMany({ where: { storeId }, select: { id: true, status: true, startsAt: true, endsAt: true, usageLimit: true, usageCount: true } });
+  if (status === "all") {
+    const [rows, total] = await Promise.all([prisma.discount.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }), prisma.discount.count({ where })]);
+    return [rows, total, all];
+  }
+  const ids = all.filter((d) => effectiveStatus(d) === status).map((d) => d.id);
+  const filtered = { ...where, id: { in: ids } };
+  const [rows, total] = await Promise.all([prisma.discount.findMany({ where: filtered, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }), prisma.discount.count({ where: filtered })]);
+  return [rows, total, all];
 }
 
 function findById(prisma, storeId, id) {

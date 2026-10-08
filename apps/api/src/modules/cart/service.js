@@ -146,28 +146,19 @@ async function hydrateCart(prisma, storeId, cartId, raw) {
   const item_count = items.reduce((sum, i) => sum + i.quantity, 0);
   const subtotal = items.reduce((sum, i) => sum + i.lineTotal, 0);
 
-  let discount = null;
-  if (raw.discountCode) {
-    try {
-      const record = await discountService.resolveApplicableDiscount(prisma, storeId, raw.discountCode, subtotal);
-      discount = {
-        code: record.code,
-        amount: round2(discountService.calculateDiscountAmount(record, subtotal)),
-      };
-    } catch (err) {
-      // The code stopped being valid (expired, usage limit hit) between
-      // being applied and now — surface that instead of pretending it's
-      // still saving the shopper money.
-      discount = { code: raw.discountCode, amount: 0, error: err.message };
-    }
-  }
+  // The code the shopper applied (or, without one, the best automatic
+  // discount). A code that stopped being valid (expired, usage limit hit)
+  // comes back with its `error` instead of pretending it still saves money.
+  const discount = await discountService.forCart(prisma, storeId, { code: raw.discountCode, items, subtotal });
   const discountAmount = discount?.amount || 0;
 
   // An empty cart has nothing to ship and nothing to tax — estimating
   // either against a zero subtotal would show a flat shipping fee on a
   // cart with no items in it, which is wrong regardless of what the rate
   // table says.
-  const shipping = items.length > 0 ? await shippingService.estimateShipping(prisma, storeId, subtotal) : null;
+  let shipping = items.length > 0 ? await shippingService.estimateShipping(prisma, storeId, subtotal) : null;
+  // A free-shipping discount.
+  if (shipping && discount?.free_shipping && !discount.error) shipping = { ...shipping, amount: 0, free_by_discount: true };
   const shippingAmount = shipping?.amount || 0;
 
   const taxableAmount = Math.max(subtotal - discountAmount, 0);
@@ -288,7 +279,7 @@ async function applyDiscountCode(prisma, storeId, cartId, code, handle) {
   // Validate against the real current subtotal before saving, so an
   // invalid code never silently "applies."
   const cartPreview = await hydrateCart(prisma, storeId, cartId, raw);
-  await discountService.resolveApplicableDiscount(prisma, storeId, code, cartPreview.subtotal);
+  await discountService.resolveApplicableDiscount(prisma, storeId, code, cartPreview);
   raw.discountCode = code.toUpperCase().trim();
   await writeRaw(prisma, storeId, cartId, raw);
   return getCart(prisma, storeId, cartId, handle);

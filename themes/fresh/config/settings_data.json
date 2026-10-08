@@ -1,0 +1,113 @@
+{
+  "color_background": "#FFFFFF",
+  "color_text": "#17251B",
+  "color_primary": "#1F7A3A",
+  "color_accent": "#FFC83D",
+  "color_surface": "#F2F7EE",
+  "color_dark": "#123821",
+  "heading_font": "Outfit",
+  "body_font": "Nunito Sans",
+  "heading_weight": "700",
+  "heading_case": "none",
+  "heading_tracking": "normal",
+  "base_size": 15,
+  "container_width": 1320,
+  "section_spacing": "compact",
+  "button_radius": 999,
+  "card_radius": 16,
+  "card_image_ratio": "square",
+  "card_hover_image": false,
+  "card_show_brand": false,
+  "card_quick_add": true,
+  "card_align": "left",
+  "cart_type": "drawer",
+  "social_instagram": "",
+  "social_facebook": "",
+  "social_youtube": "",
+  "social_x": "",
+  "social_pinterest": "",
+  "social_whatsapp": "",
+  "sections": {
+    "announcement-bar": {
+      "settings": {
+        "show": true,
+        "style": "rotate",
+        "background": "#1F7A3A",
+        "text_color": "#FFFFFF"
+      },
+      "blocks": {
+        "m1": {
+          "type": "message",
+          "settings": {
+            "text": "Free delivery on orders over ₹499",
+            "link": ""
+          }
+        },
+        "m2": {
+          "type": "message",
+          "settings": {
+            "text": "Fresh stock every morning · Cash on delivery available",
+            "link": ""
+          }
+        },
+        "m3": {
+          "type": "message",
+          "settings": {
+            "text": "Delivered in hours, not days",
+            "link": ""
+          }
+        }
+      },
+      "block_order": [
+        "m1",
+        "m2",
+        "m3"
+      ]
+    },
+    "header": {
+      "settings": {
+        "menu": "main-menu",
+        "layout": "left",
+        "sticky": true,
+        "transparent": false,
+        "logo_width": 110
+      }
+    },
+    "footer": {
+      "settings": {
+        "about": "Modern essentials, made with care and shipped across India.",
+        "show_payments": true,
+        "show_wordmark": true,
+        "copyright": "All rights reserved."
+      },
+      "blocks": {
+        "f1": {
+          "type": "links",
+          "settings": {
+            "heading": "Shop",
+            "menu": "main-menu"
+          }
+        },
+        "f2": {
+          "type": "links",
+          "settings": {
+            "heading": "Help",
+            "menu": "footer-menu"
+          }
+        },
+        "f3": {
+          "type": "newsletter",
+          "settings": {
+            "heading": "Stay in the loop",
+            "text": "Early access to drops and members-only offers."
+          }
+        }
+      },
+      "block_order": [
+        "f1",
+        "f2",
+        "f3"
+      ]
+    }
+  }
+}

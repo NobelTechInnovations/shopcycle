@@ -43,6 +43,7 @@ function statusSummary(order) {
   }
   if (order.fulfillmentStatus === "fulfilled") return { key: "shipped", label: "On its way" };
   if (order.fulfillmentStatus === "partially_fulfilled") return { key: "partially_shipped", label: "Partly shipped" };
+  if (order.paymentStatus === "pending" && order.paymentMethod === "upi_qr" && order.paymentReference) return { key: "processing", label: "Payment being checked" };
   return { key: "processing", label: order.paymentStatus === "pending" && order.paymentMethod !== "cod" ? "Awaiting payment" : "Being prepared" };
 }
 

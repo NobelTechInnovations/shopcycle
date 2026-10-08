@@ -212,6 +212,7 @@ async function onEvent(prisma, storeId, event, subject, { log } = {}) {
     // An online order still waiting for its payment isn't an order yet (orders/placed.js).
     const order = await prisma.order.findFirst({ where: { id: subject.id, storeId }, select: { paymentMethod: true, paymentStatus: true } });
     if (!order || (PROVIDER_KEYS.includes(order.paymentMethod) && order.paymentStatus === "pending")) return 0;
+    if (order.paymentMethod === "upi_qr" && order.paymentStatus === "pending" && !order.paymentReference) return 0;
   }
   let started = 0;
   const shared = { ctx: null };

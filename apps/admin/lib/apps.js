@@ -18,6 +18,8 @@ export const APP_PANELS = {
   rentals: "/admin/apps/rentals",
   "google-shopping": "/admin/apps/google-shopping",
   "facebook-shop": "/admin/apps/facebook-shop",
+  "upi-qr": "/admin/apps/upi-qr",
+  "google-analytics": "/admin/apps/google-analytics",
 };
 
 export const detailsHref = (app) => `/admin/apps/details/${app.key}`;

@@ -15,6 +15,7 @@ const appsService = require("../apps/service");
 const socialConnections = require("../social/connections");
 const { computeAccess } = require("../billing/access");
 const shopperService = require("../shopper/service");
+const upiService = require("../upi/service");
 const paymentsService = require("../payments/service");
 const metafieldService = require("../metafields/service");
 const reviewsService = require("../reviews/service");
@@ -817,6 +818,10 @@ async function renderPage(
         percent: Math.min(100, Math.round((cart.subtotal / threshold) * 100)),
       };
     }
+  }
+  if (templateName === "upi-pay") {
+    if (!orderId) throw new HttpError(400, "Missing order");
+    globalContext.upi = await upiService.pageContext(prisma, store, orderId, cartId, routes);
   }
   if (templateName === "checkout") {
     // Which fields the form asks for — Settings ▸ Checkout.

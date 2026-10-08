@@ -25,7 +25,7 @@
   <div class="sys-stack" style="gap:10px;margin-top:22px">
     <div class="sys-sumrow"><span>Subtotal</span><span class="sys-num">{{ cart.subtotal | money }}</span></div>
     {% if cart.discount and cart.discount.amount > 0 %}
-      <div class="sys-sumrow sys-sumrow--saving"><span>Discount ({{ cart.discount.code }})</span><span class="sys-num">−{{ cart.discount.amount | money }}</span></div>
+      <div class="sys-sumrow sys-sumrow--saving"><span>Discount ({{ cart.discount.code | escape }})</span><span class="sys-num">−{{ cart.discount.amount | money }}</span></div>
     {% endif %}
     <div class="sys-sumrow"><span>Delivery</span><span class="sys-num">{% if cart.shipping %}{% if cart.shipping.amount > 0 %}{{ cart.shipping.amount | money }}{% else %}<span class="sys-co__free">Free</span>{% endif %}{% else %}<span class="sys-co__free">Free</span>{% endif %}</span></div>
     {% if cart.tax %}<div class="sys-sumrow"><span>{{ cart.tax.name }}</span><span class="sys-num">{{ cart.tax.amount | money }}</span></div>{% endif %}
@@ -186,13 +186,13 @@
                   <p class="sys-alert sys-alert--error" style="margin:0">This store isn't taking orders online right now — no payment method is set up. Please contact the store.</p>
                 {% endif %}
                 {% for option in payment_options %}
-                  {% capture pay_label %}{% if option.mode == 'cod' %}Place order · {{ cart.due | money }}{% else %}Pay {{ cart.due | money }}{% case option.mode %}{% when 'upi' %} with UPI{% when 'card' %} by card{% when 'netbanking' %} with net banking{% when 'wallet' %} with a wallet{% when 'emi' %} on EMI{% when 'paylater' %} with Pay later{% when 'paypal' %} with PayPal{% endcase %}{% endif %}{% endcapture %}
+                  {% capture pay_label %}{% if option.mode == 'cod' %}Place order · {{ cart.due | money }}{% else %}Pay {{ cart.due | money }}{% case option.mode %}{% when 'upi' %} with UPI{% when 'upi_qr' %} by UPI QR{% when 'card' %} by card{% when 'netbanking' %} with net banking{% when 'wallet' %} with a wallet{% when 'emi' %} on EMI{% when 'paylater' %} with Pay later{% when 'paypal' %} with PayPal{% endcase %}{% endif %}{% endcapture %}
                   {% if forloop.first %}{% assign first_label = pay_label %}{% endif %}
                   <label class="sys-co__pay">
                     <input type="radio" name="paymentMethod" value="{{ option.value }}:{{ option.mode }}" data-pay-label="{{ pay_label | strip }}" {% if forloop.first %}checked{% endif %}>
                     <span class="sys-co__pay-icon">
                       {% case option.mode %}
-                        {% when 'upi' %}<b class="sys-mark sys-mark--upi">UPI</b>
+                        {% when 'upi', 'upi_qr' %}<b class="sys-mark sys-mark--upi">UPI</b>
                         {% when 'netbanking' %}{% render 'snippets/sys-icon', icon: 'bank' %}
                         {% when 'wallet' %}{% render 'snippets/sys-icon', icon: 'wallet' %}
                         {% when 'emi' %}{% render 'snippets/sys-icon', icon: 'emi' %}

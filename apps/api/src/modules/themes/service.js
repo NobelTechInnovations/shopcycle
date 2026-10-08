@@ -32,6 +32,13 @@ const MASTER_THEMES = {
     bestFor: "Clothing & fashion",
     swatch: { bg: "#FFFFFF", surface: "#F4F4F2", text: "#121212", accent: "#C8102E", font: "Archivo" },
   },
+  fresh: {
+    name: "Fresh",
+    version: "1.0.0",
+    description: "Made for groceries, food and drinks — category circles, deals of the day, offer tiles, product tiles with pack size, a veg / non-veg mark and a one-tap ADD button.",
+    bestFor: "Grocery, food & drinks",
+    swatch: { bg: "#FFFFFF", surface: "#F2F7EE", text: "#17251B", accent: "#1F7A3A", font: "Outfit" },
+  },
   lumiere: {
     name: "Lumière",
     version: "1.0.0",

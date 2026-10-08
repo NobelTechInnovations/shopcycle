@@ -1,0 +1,24 @@
+{
+  "sections": {
+    "hero": {
+      "type": "hero",
+      "settings": {
+        "eyebrow": "Fresh every morning",
+        "heading": "Groceries at your door in hours",
+        "text": "Fruits, vegetables, dairy, snacks and drinks — picked fresh, packed with care, delivered today.",
+        "button_label": "Start shopping",
+        "button2_label": "Today's deals",
+        "height": "medium"
+      }
+    },
+    "categories": { "type": "category-chips", "settings": {} },
+    "deals": { "type": "product-grid", "settings": { "eyebrow": "Grab them fast", "heading": "Deals of the day", "source": "best_sellers", "columns": 5, "limit": 10, "link_text": "See all" } },
+    "offers": { "type": "offer-tiles", "settings": {} },
+    "new_arrivals": { "type": "product-grid", "settings": { "eyebrow": "Just in", "heading": "Fresh arrivals", "source": "newest", "columns": 5, "limit": 10, "surface": true, "link_text": "See all" } },
+    "features": { "type": "usp", "settings": {} },
+    "reviews": { "type": "testimonials", "settings": { "surface": true } },
+    "faq": { "type": "faq", "settings": {} },
+    "newsletter": { "type": "newsletter", "settings": {} }
+  },
+  "order": ["hero", "categories", "deals", "offers", "new_arrivals", "features", "reviews", "faq", "newsletter"]
+}

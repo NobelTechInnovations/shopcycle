@@ -33,11 +33,12 @@ const SYSTEM_TEMPLATES = new Set([
   "blog",
   "article",
   "contact",
+  "upi-pay",
 ]);
 
 /** Templates rendered in the platform's own page shell instead of the
  * theme's layout: checkout is distraction-free (no store navigation). */
-const OWN_LAYOUT = { checkout: "layout/sys-checkout.liquid" };
+const OWN_LAYOUT = { checkout: "layout/sys-checkout.liquid", "upi-pay": "layout/sys-checkout.liquid" };
 
 let cache = null;
 async function load() {
@@ -292,7 +293,7 @@ function assetUrl(name, version, base) {
  * panel in on add-to-cart; "page" goes to the full cart page. Never on the
  * cart and checkout pages themselves. */
 function cartDrawerOn(settings, templateName) {
-  return (settings?.cart_type || "drawer") === "drawer" && templateName !== "cart" && templateName !== "checkout";
+  return (settings?.cart_type || "drawer") === "drawer" && templateName !== "cart" && templateName !== "checkout" && templateName !== "upi-pay";
 }
 
 /** Menu dropdowns (snippets/menu-links: li.oy-has-sub > ul.oy-sub) for
