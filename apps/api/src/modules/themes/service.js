@@ -80,6 +80,15 @@ async function getTheme(prisma, storeId, id) {
   });
   if (!theme) throw new HttpError(404, "Theme not found");
   if (theme.locked) return { ...theme, files: theme.files.map(protectedFile) };
+  // Sections the platform added to this theme since the store copied it
+  // (e.g. "Product grid") — copied in so the editor can add them.
+  const master = await pristine.masterFiles(theme.handle);
+  const have = new Set(theme.files.map((f) => f.path));
+  const missing = Object.keys(master).filter((p) => p.startsWith("sections/") && !have.has(p));
+  if (missing.length) {
+    await prisma.themeFile.createMany({ data: missing.map((p) => ({ themeId: theme.id, path: p, fileType: EXT_TO_TYPE[p.split(".").pop()] || "text", content: master[p] })), skipDuplicates: true });
+    theme.files = await prisma.themeFile.findMany({ where: { themeId: theme.id }, orderBy: { path: "asc" } });
+  }
   // Untouched files the platform has improved since: the editors work on
   // the current version (see pristine.js).
   return pristine.withUpgrades(theme);
@@ -157,6 +166,43 @@ async function installTheme(prisma, storeId, handle) {
   };
   // Inside the caller's transaction (store sign-up) or in one of our own.
   return typeof prisma.$transaction === "function" ? prisma.$transaction(write, { timeout: 30000 }) : write(prisma);
+}
+
+const MAX_THEMES = 20;
+
+/** A copy of a theme — its files, layouts and settings exactly as they are
+ * now — unpublished, to change safely and publish when ready. A copy of an
+ * Oyklane Store theme keeps its licence and its lock. */
+async function duplicateTheme(prisma, storeId, id) {
+  const theme = await prisma.theme.findFirst({ where: { id, storeId }, include: { files: true } });
+  if (!theme) throw new HttpError(404, "Theme not found");
+  if (theme.listingId && theme.status === "draft") throw new HttpError(400, "This is an Oyklane Store preview, not one of your themes.");
+  if ((await prisma.theme.count({ where: { storeId } })) >= MAX_THEMES) throw new HttpError(400, `A store can keep up to ${MAX_THEMES} themes — delete one you don't use first.`);
+  const base = theme.name.replace(/^Copy of /, "");
+  let name = `Copy of ${base}`;
+  for (let i = 2; await prisma.theme.findFirst({ where: { storeId, name }, select: { id: true } }); i += 1) name = `Copy ${i} of ${base}`;
+  return prisma.$transaction(
+    async (tx) => {
+      const copy = await tx.theme.create({
+        data: {
+          storeId,
+          name: name.slice(0, 120),
+          handle: theme.handle,
+          version: theme.version,
+          description: theme.description,
+          status: "installed",
+          isActive: false,
+          previewImage: theme.previewImage,
+          listingId: theme.listingId,
+          locked: theme.locked,
+          settingsData: theme.settingsData,
+        },
+      });
+      await tx.themeFile.createMany({ data: theme.files.map((f) => ({ themeId: copy.id, path: f.path, fileType: f.fileType, content: f.content })) });
+      return copy;
+    },
+    { timeout: 30000 }
+  );
 }
 
 /** Exactly one theme may be active per store — flip both in one transaction
@@ -293,6 +339,7 @@ async function deleteTheme(prisma, storeId, id) {
 
 module.exports = {
   deleteTheme,
+  duplicateTheme,
   isNewer,
   MASTER_THEMES,
   listThemes,

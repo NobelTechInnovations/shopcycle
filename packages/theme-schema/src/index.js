@@ -31,6 +31,9 @@ function defaultForSetting(setting) {
       return setting.min ?? 0;
     case "number":
       return 0;
+    case "collection_list":
+    case "product_list":
+      return [];
     default:
       return "";
   }

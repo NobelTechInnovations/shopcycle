@@ -1,0 +1,120 @@
+{% comment %}
+  Product grid: many products in rows — a grid on every screen size (no
+  swiping). All products, a collection, best sellers, newest, on sale, or
+  products picked by hand; sorted; a "Show more" button reveals the next
+  rows, and "View all" goes to the full collection.
+{% endcomment %}
+{% assign s = section.settings %}
+{% assign view_url = routes.all_products_url %}
+{% case s.source %}
+  {% when 'collection' %}
+    {% assign chosen = collections[s.collection] | default: collections.all %}
+    {% assign items = chosen.products %}{% assign view_url = chosen.url | default: routes.all_products_url %}
+  {% when 'best_sellers' %}{% assign items = best_sellers %}{% assign view_url = routes.all_products_url | append: '?sort=best-selling' %}
+  {% when 'newest' %}{% assign items = collections.all.products | sort: 'created_at' | reverse %}{% assign view_url = routes.all_products_url | append: '?sort=newest' %}
+  {% when 'on_sale' %}{% assign items = collections.all.products | where: 'on_sale', true %}
+  {% when 'picked' %}{% assign items = s.products %}{% assign view_url = '' %}
+  {% else %}{% assign items = collections.all.products %}
+{% endcase %}
+{% if s.source != 'best_sellers' and s.source != 'newest' and s.source != 'picked' %}
+  {% case s.sort %}
+    {% when 'price_asc' %}{% assign items = items | sort: 'price' %}
+    {% when 'price_desc' %}{% assign items = items | sort: 'price' | reverse %}
+    {% when 'newest' %}{% assign items = items | sort: 'created_at' | reverse %}
+    {% when 'title' %}{% assign items = items | sort_natural: 'title' %}
+  {% endcase %}
+{% endif %}
+{% assign per_page = s.columns | times: s.rows %}
+{% comment %} Nothing on sale / nothing picked: hidden on the store, example cards in the editor. {% endcomment %}
+{% assign hide = false %}
+{% if items.size == 0 and design_mode != true %}{% if s.source == 'on_sale' or s.source == 'picked' %}{% assign hide = true %}{% endif %}{% endif %}
+{% unless hide %}
+{% assign gid = 'pg-' | append: section.id %}
+<section class="section{% if s.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: s.eyebrow, title: s.heading, subtitle: s.subheading, align: s.align, link_url: view_url, link_text: s.link_text %}
+    <style>
+      #{{ gid }} { display: grid; grid-template-columns: repeat({{ s.columns_mobile }}, minmax(0, 1fr)); gap: {{ s.gap | divided_by: 2 | plus: 8 }}px {{ s.gap | divided_by: 2 | plus: 4 }}px; }
+      @media (min-width: 750px) { #{{ gid }} { grid-template-columns: repeat({{ s.columns | at_most: 3 }}, minmax(0, 1fr)); gap: {{ s.gap }}px; } }
+      @media (min-width: 1100px) { #{{ gid }} { grid-template-columns: repeat({{ s.columns }}, minmax(0, 1fr)); } }
+      #{{ gid }} > * { min-width: 0; }
+      #{{ gid }}[data-more] > .pg-hidden { display: none; }
+      .pg-more { display: flex; justify-content: center; margin-top: 32px; }
+    </style>
+    <div class="pg" id="{{ gid }}"{% if items.size > per_page and s.show_more %} data-more="{{ per_page }}"{% endif %}>
+      {% if items.size > 0 %}
+        {% for entry in items limit: s.limit %}
+          {% if s.source == 'picked' %}{% assign product = all_products[entry] %}{% else %}{% assign product = entry %}{% endif %}
+          {% if product %}
+            {% if s.show_more and forloop.index > per_page %}<div class="pg-hidden">{% else %}<div>{% endif %}
+              {% render 'snippets/product-card', product: product, eager: false %}
+            </div>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        {% for i in (1..per_page) %}
+          <div>{% render 'snippets/product-card-placeholder', index: i %}</div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% if items.size > per_page and s.show_more and s.limit > per_page %}
+      <div class="pg-more">
+        <button type="button" class="btn btn--ghost" data-pg-more="{{ gid }}">{{ s.more_text | default: 'Show more' }}</button>
+      </div>
+      <script>
+        (function () {
+          var grid = document.getElementById({{ gid | json }});
+          var btn = document.querySelector('[data-pg-more="' + {{ gid | json }} + '"]');
+          if (!grid || !btn) return;
+          var step = parseInt(grid.getAttribute('data-more'), 10) || 8;
+          btn.addEventListener('click', function () {
+            var hidden = grid.querySelectorAll('.pg-hidden');
+            for (var i = 0; i < hidden.length && i < step; i++) hidden[i].classList.remove('pg-hidden');
+            if (grid.querySelectorAll('.pg-hidden').length === 0) btn.parentNode.remove();
+          });
+        })();
+      </script>
+    {% endif %}
+  </div>
+</section>
+{% endunless %}
+
+{% schema %}
+{
+  "name": "Product grid",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Shop all" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "" },
+    { "type": "select", "id": "align", "label": "Heading alignment", "default": "left", "options": [{ "value": "left", "label": "Left" }, { "value": "center", "label": "Centre" }] },
+    { "type": "header", "content": "Products" },
+    { "type": "select", "id": "source", "label": "Show", "default": "all", "options": [
+      { "value": "all", "label": "All products" },
+      { "value": "collection", "label": "A collection" },
+      { "value": "best_sellers", "label": "Best sellers" },
+      { "value": "newest", "label": "Newest products" },
+      { "value": "on_sale", "label": "Products on sale" },
+      { "value": "picked", "label": "Products I pick" }
+    ] },
+    { "type": "collection", "id": "collection", "label": "Collection (for \"A collection\")" },
+    { "type": "product_list", "id": "products", "label": "Products (for \"Products I pick\")", "default": [] },
+    { "type": "select", "id": "sort", "label": "Order", "default": "default", "options": [
+      { "value": "default", "label": "Featured" },
+      { "value": "newest", "label": "Newest first" },
+      { "value": "price_asc", "label": "Price, low to high" },
+      { "value": "price_desc", "label": "Price, high to low" },
+      { "value": "title", "label": "Name, A–Z" }
+    ] },
+    { "type": "range", "id": "limit", "label": "Products to show (at most)", "min": 4, "max": 48, "step": 1, "default": 24 },
+    { "type": "header", "content": "Layout" },
+    { "type": "range", "id": "columns", "label": "Per row on desktop", "min": 2, "max": 6, "step": 1, "default": 4 },
+    { "type": "select", "id": "columns_mobile", "label": "Per row on phones", "default": "2", "options": [{ "value": "1", "label": "1" }, { "value": "2", "label": "2" }] },
+    { "type": "range", "id": "rows", "label": "Rows before \"Show more\"", "min": 1, "max": 8, "step": 1, "default": 2 },
+    { "type": "checkbox", "id": "show_more", "label": "Show a \"Show more\" button (else show them all)", "default": true },
+    { "type": "text", "id": "more_text", "label": "Button text", "default": "Show more" },
+    { "type": "range", "id": "gap", "label": "Space between products", "min": 8, "max": 40, "step": 4, "default": 24, "unit": "px" },
+    { "type": "text", "id": "link_text", "label": "\"View all\" link text", "default": "View all" },
+    { "type": "checkbox", "id": "surface", "label": "Use alternate background", "default": false }
+  ]
+}
+{% endschema %}

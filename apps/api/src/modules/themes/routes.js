@@ -12,6 +12,7 @@ async function themeRoutes(fastify) {
   fastify.post("/install", controller.installHandler);
   fastify.get("/:id", controller.getHandler);
   fastify.post("/:id/activate", controller.activateHandler);
+  fastify.post("/:id/duplicate", controller.duplicateHandler);
   fastify.delete("/:id", controller.deleteHandler);
   fastify.patch("/:id/settings", controller.updateSettingsHandler);
   // Editing theme code is part of Growth and Pro ("theme_advanced"). The

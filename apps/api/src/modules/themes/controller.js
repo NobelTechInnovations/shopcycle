@@ -63,6 +63,11 @@ async function installHandler(request, reply) {
   reply.code(201).send({ theme });
 }
 
+async function duplicateHandler(request, reply) {
+  const theme = await service.duplicateTheme(request.server.prisma, request.store.id, request.params.id);
+  reply.code(201).send({ theme });
+}
+
 async function deleteHandler(request, reply) {
   await service.deleteTheme(request.server.prisma, request.store.id, request.params.id);
   reply.send({ ok: true });
@@ -187,6 +192,7 @@ async function renderDraftHandler(request, reply) {
 }
 
 module.exports = {
+  duplicateHandler,
   templatesHandler,
   createTemplateHandler,
   assignTemplateHandler,

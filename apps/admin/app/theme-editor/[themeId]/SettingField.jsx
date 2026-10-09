@@ -163,6 +163,22 @@ export function SettingField({ setting, value, onChange, products = [], collecti
         />
       );
 
+    // Products picked by hand, shown in the order picked.
+    case "product_list":
+      return (
+        <Select
+          mode="multiple"
+          className="w-full"
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          value={Array.isArray(value) ? value : []}
+          placeholder="Select products"
+          onChange={(v) => onChange(v || [])}
+          options={products.map((p) => ({ value: p.slug, label: p.title }))}
+        />
+      );
+
     // Multi-select — every collection picked renders, in the order picked.
     // Not block-based on purpose: a merchant picking just 2 collections and
     // wanting them center-aligned couldn't do that with one block per

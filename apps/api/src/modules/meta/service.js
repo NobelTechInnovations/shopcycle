@@ -46,7 +46,6 @@ function buildAuthorizeUrl(scopes) {
     "scope",
     (
       scopes || [
-        "ads_management",
         "ads_read",
         "business_management",
         "pages_show_list",

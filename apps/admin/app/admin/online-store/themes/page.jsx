@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Card, Skeleton, Dropdown, App } from "antd";
-import { Palette, Code2, Eye, Sparkles, MoreHorizontal, Trash2, LayoutTemplate, Lock } from "lucide-react";
+import { Button, Card, Skeleton, Dropdown, App, Tooltip } from "antd";
+import { Palette, Code2, Eye, Sparkles, MoreHorizontal, Trash2, LayoutTemplate, Lock, Copy } from "lucide-react";
 import { PageHeader, StatusBadge, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
@@ -103,6 +103,8 @@ export default function ThemesPage() {
       okText: "Publish",
       onConfirm: () => run(`publish-${theme.id}`, () => apiFetch(`/api/themes/${theme.id}/activate`, { method: "POST" }), `${theme.name} is live`),
     });
+  const duplicate = (theme) =>
+    run(`dup-${theme.id}`, () => apiFetch(`/api/themes/${theme.id}/duplicate`, { method: "POST" }), `Copy of ${theme.name} made — change it, preview it, then publish when ready. Your live store doesn't change until then.`);
   const remove = (theme) =>
     confirmDialog({
       title: `Delete ${theme.name}?`,
@@ -191,6 +193,11 @@ export default function ThemesPage() {
                     <Button icon={<Code2 size={15} aria-hidden="true" />}>Edit code</Button>
                   </Link>
                 )}
+                <Tooltip title="Make a copy to change safely — your live store stays as it is until you publish the copy">
+                  <Button icon={<Copy size={15} aria-hidden="true" />} loading={busy === `dup-${live.id}`} onClick={() => duplicate(live)}>
+                    Duplicate
+                  </Button>
+                </Tooltip>
               </div>
             </div>
           </div>
@@ -217,6 +224,7 @@ export default function ThemesPage() {
                     menu={{
                       items: [
                         ...(theme.locked ? [] : [{ key: "code", icon: <Code2 size={14} />, label: <Link href={`/theme-editor/${theme.id}/code`}>Edit code</Link> }]),
+                        { key: "duplicate", icon: <Copy size={14} />, label: "Duplicate", onClick: () => duplicate(theme) },
                         { key: "delete", icon: <Trash2 size={14} />, danger: true, label: "Delete", onClick: () => remove(theme) },
                       ],
                     }}

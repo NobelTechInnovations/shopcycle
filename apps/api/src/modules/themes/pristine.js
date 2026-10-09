@@ -46,6 +46,8 @@ const PRISTINE_UPGRADES = {
   "sections/featured-product.liquid": ["750beb5075152070", "d3d1fd33ac2c8cbc", "e01a3bad53448ce0", "49e4e48249fe1443", "bf43181daf87c87d"],
   "sections/editorial-banner.liquid": ["91dc519bcbcf3b0e", "0a38866cb702f994"],
   "sections/image-with-text.liquid": ["4657bf6395d81657", "d01d99aff0fc11bc"],
+  // Renamed "Featured products" (the new "Product grid" is shop-grid) — 9 Oct.
+  "sections/product-grid.liquid": ["97be823779561c6d"],
 };
 const contentHash = (text) => crypto.createHash("sha256").update(String(text).replace(/\s+/g, " ").trim()).digest("hex").slice(0, 16);
 

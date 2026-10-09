@@ -342,6 +342,12 @@ Local `.env` points at the **production** Supabase database, so every local writ
   - `test/e2e-market.js` 41/41.
 - **Laxmira's Facebook "Feature unavailable"**: Meta side, not code — see 2a1.
 
+### Done 9 Oct (NOT committed yet)
+
+- **Product grid** section in all five themes (`sections/shop-grid.liquid`): a real grid on every screen — all products, a collection, best sellers, newest, on sale, or products picked by hand (new `product_list` setting); order; 2–6 per row on desktop, 1–2 on phones; rows before a "Show more" button (up to 48); "View all". The older "Product grid" sections (a row that swipes on phones) are now called "Featured products". Existing stores get the new section in the editor by themselves (themes/service.getTheme copies new master sections in).
+- **Duplicate theme**: Online Store ▸ Themes ▸ Duplicate (live theme) or ⋯ ▸ Duplicate — an unpublished copy with all files, layouts and settings (up to 20 themes a store).
+- **Facebook "Feature unavailable"**: the Meta app is Live and the business verified, but App Review was never submitted (18 permissions "Not submitted"), so only people with a role on the app can log in. Oyklane uses 9 permissions; `ads_management` is no longer asked for (Oyklane only reads ad accounts and pixels). Full plan, permission texts and screencast list: `docs/meta-app-review.md`.
+
 ### Left to do
 
 0a. **Security — urgent**: production `JWT_SECRET` is the placeholder from `.env.example` (anyone can sign seller, super-admin and shopper sessions with it). Steps that keep encrypted data (2FA, payment keys, webhooks, Meta/Google tokens) readable: (1) set `DATA_ENCRYPTION_KEY` on Railway to `sha256("<current JWT_SECRET>:data-encryption")` in hex, (2) then set a new random `JWT_SECRET` (everyone signs in again), (3) later re-encrypt with a fresh key. Also rotate the Supabase database password and the Redis password (they were pasted in chat on 4 Oct) and set `TRUST_PROXY=true` on Railway (behind its proxy every visitor otherwise shares one rate-limit).
