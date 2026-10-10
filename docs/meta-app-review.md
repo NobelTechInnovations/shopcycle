@@ -1,4 +1,48 @@
-# Meta App Review — Oyklane Store (App ID 1089178333651707)
+# Meta App Review — Oyklane Connect (new app, 9 Oct)
+
+**New app: Oyklane Connect — App ID 1122222970246571** (business Oyklane,
+verified). Made with only Oyklane's use cases: Catalog API, Instagram,
+Measure ad performance (Marketing API), WhatsApp. Set up:
+
+- Basic: app domain oyklane.com, privacy / terms / data-deletion links,
+  category Business and pages, icon.
+- Facebook Login for Business ▸ Settings ▸ Valid OAuth Redirect URIs:
+  `https://store.oyklane.com/admin/apps/meta/callback`.
+- Configuration "Oyklane store connect" — **ID 1092321430248204**, user
+  access token, permissions: ads_read, business_management,
+  catalog_management, instagram_basic, pages_read_engagement,
+  pages_show_list, whatsapp_business_management, whatsapp_business_messaging.
+- Instagram use case also has instagram_business_basic (one-click Instagram
+  login; its own Instagram app ID/secret are under Instagram API ▸ API setup
+  with Instagram login → `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET`).
+- `ads_management` comes with the Marketing use case (can't be removed) —
+  it isn't in the configuration and isn't sent for review.
+
+Railway, to switch Oyklane to it: `META_APP_ID=1122222970246571`,
+`META_LOGIN_CONFIG_ID=1092321430248204`, `META_APP_SECRET` = Basic ▸ App
+secret ▸ Show (copy it yourself). Sellers connected through the old app keep
+working until their token expires, then reconnect.
+
+Status 9 Oct (evening):
+- Tech Provider: done. Website platform `https://store.oyklane.com/` added.
+- Configuration now 9 permissions — **ads_management added back** (the Meta
+  Ads app creates campaigns, ad sets and ads: meta-ads/service.js).
+- App Review draft (submission 1122239030244965): public_profile,
+  business_management, catalog_management, pages_show_list,
+  pages_read_engagement, instagram_basic, ads_read, ads_management,
+  whatsapp_business_management, whatsapp_business_messaging — descriptions
+  written; reviewer instructions written (Facebook Login: Yes). Removed for
+  now: Marketing API Access Tier (needs ~1,500 ad API calls first),
+  instagram_business_basic.
+- Left for the owner: videos (made with the NEW app), the "I agree" box on
+  each permission, Data handling answers, a reviewer store login in the
+  access-code box, then Submit. After approval: Publish.
+- The 9 Oct recording used the OLD app (login URL client_id=1089178333651707),
+  so it can't be used, and the new app's Testing page shows no calls yet.
+
+---
+
+Old app: Oyklane Store (App ID 1089178333651707)
 
 Why sellers see "Feature unavailable": the app is Live and the business is
 verified, but App Review was never submitted, so no permission has Advanced
@@ -31,7 +75,7 @@ API**, **oEmbed**, **Capture & manage ad leads**; and inside the rest:
 Marketing API Access Tier.
 
 Facebook Login for Business ▸ Configurations ▸ the configuration in
-`META_LOGIN_CONFIG_ID` (2153796378538806) must ask for exactly the 9 above.
+`META_LOGIN_CONFIG_ID` must ask for exactly these (done in the new app — 1092321430248204).
 
 ## 2. Test calls (Review ▸ Testing)
 

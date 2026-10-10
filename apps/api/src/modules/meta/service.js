@@ -46,6 +46,7 @@ function buildAuthorizeUrl(scopes) {
     "scope",
     (
       scopes || [
+        "ads_management",
         "ads_read",
         "business_management",
         "pages_show_list",
@@ -117,38 +118,72 @@ async function fetchProfile(token) {
  * under each WABA, which is itself nested under the page's business — kept
  * as a flat, pre-joined list here so the admin UI doesn't have to walk the
  * Graph API's own nesting itself. */
+/**
+ * The seller's WhatsApp Business accounts and their numbers. A WABA
+ * belongs to a business, not a Page, so it's found three ways (de-duped):
+ * the exact accounts the seller ticked in Facebook Login for Business
+ * (the token's granular scopes), the WABAs their businesses own or manage
+ * for clients, and — for older setups — a Page's linked WABA.
+ */
+async function listWabas(token, pages) {
+  const found = new Map();
+  const add = async (waba, owner = {}) => {
+    if (!waba?.id || found.has(waba.id)) return;
+    found.set(waba.id, null);
+    try {
+      const numbers = await graphRequest(`/${waba.id}/phone_numbers`, { token, params: { fields: "id,verified_name,display_phone_number" } });
+      found.set(waba.id, {
+        id: waba.id,
+        pageId: owner.pageId || null,
+        pageName: waba.name || owner.name || "WhatsApp Business account",
+        phoneNumbers: (numbers.data || []).map((n) => ({ id: n.id, label: `${n.verified_name} (${n.display_phone_number})` })),
+      });
+    } catch {
+      found.delete(waba.id);
+    }
+  };
+
+  // 1. What the seller ticked in the login dialog.
+  try {
+    const dbg = await graphRequest("/debug_token", { token: `${env.META_APP_ID}|${env.META_APP_SECRET}`, params: { input_token: token } });
+    const ids = new Set((dbg.data?.granular_scopes || []).filter((g) => /^whatsapp_business_/.test(g.scope)).flatMap((g) => g.target_ids || []));
+    for (const id of ids) {
+      const waba = await graphRequest(`/${id}`, { token, params: { fields: "id,name" } }).catch(() => ({ id }));
+      await add(waba);
+    }
+  } catch {
+    // No granular scopes (older login) — the other two ways cover it.
+  }
+
+  // 2. Their businesses' own and client WABAs.
+  try {
+    const businesses = await graphRequest("/me/businesses", { token, params: { fields: "id,name", limit: 50 } });
+    for (const b of businesses.data || []) {
+      for (const edge of ["owned_whatsapp_business_accounts", "client_whatsapp_business_accounts"]) {
+        const list = await graphRequest(`/${b.id}/${edge}`, { token, params: { fields: "id,name", limit: 50 } }).catch(() => ({ data: [] }));
+        for (const waba of list.data || []) await add(waba, { name: b.name });
+      }
+    }
+  } catch {
+    // business_management not granted — fine.
+  }
+
+  // 3. A Page's linked WABA (older setups).
+  for (const page of pages) {
+    const owned = await graphRequest(`/${page.id}/whatsapp_business_accounts`, { token }).catch(() => ({ data: [] }));
+    for (const waba of owned.data || []) await add(waba, { pageId: page.id, name: page.name });
+  }
+
+  return [...found.values()].filter(Boolean);
+}
+
 async function listConnectableAssets(token) {
   const [adAccounts, pages] = await Promise.all([
     graphRequest("/me/adaccounts", { token, params: { fields: "id,name,account_status" } }),
     graphRequest("/me/accounts", { token, params: { fields: "id,name" } }),
   ]);
 
-  const wabas = [];
-  for (const page of pages.data || []) {
-    // A page's WhatsApp Business Account, if any is attached — most pages
-    // have none, so a per-page 400/empty response here is expected, not
-    // an error worth surfacing.
-    try {
-      const owned = await graphRequest(`/${page.id}/whatsapp_business_accounts`, { token });
-      for (const waba of owned.data || []) {
-        const numbers = await graphRequest(`/${waba.id}/phone_numbers`, {
-          token,
-          params: { fields: "id,verified_name,display_phone_number" },
-        });
-        wabas.push({
-          id: waba.id,
-          pageId: page.id,
-          pageName: page.name,
-          phoneNumbers: (numbers.data || []).map((n) => ({
-            id: n.id,
-            label: `${n.verified_name} (${n.display_phone_number})`,
-          })),
-        });
-      }
-    } catch {
-      // No WhatsApp asset on this page — nothing to add.
-    }
-  }
+  const wabas = await listWabas(token, pages.data || []);
 
   return {
     adAccounts: (adAccounts.data || []).map((a) => ({ id: a.id, name: a.name })),

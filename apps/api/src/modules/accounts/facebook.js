@@ -21,9 +21,9 @@ const DEFAULT_SCOPES = [
   "pages_read_engagement",
   "instagram_basic",
   "catalog_management",
-  // Oyklane reads ad accounts and pixels; it doesn't create ads, so
-  // ads_management isn't asked for (App Review would refuse it).
   "ads_read",
+  // Meta Ads app: creates campaigns, ad sets and ads (meta-ads/service.js).
+  "ads_management",
   "whatsapp_business_management",
   "whatsapp_business_messaging",
 ];
@@ -32,7 +32,7 @@ const ACCESS = {
   instagram: ["instagram_basic", "pages_show_list"],
   catalog: ["catalog_management", "business_management"],
   pixel: ["ads_read"],
-  ads: ["ads_read"],
+  ads: ["ads_management"],
   whatsapp: ["whatsapp_business_management"],
 };
 const LABEL = { instagram: "your Instagram account", catalog: "your catalogues", pixel: "your pixels", ads: "your ad accounts", whatsapp: "WhatsApp" };
