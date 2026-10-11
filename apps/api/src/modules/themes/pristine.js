@@ -37,7 +37,10 @@ const PRISTINE_UPGRADES = {
   // Sub-menus (dropdowns) — 1 Oct.
   "snippets/menu-links.liquid": ["29def272dcaf31df"],
   // Daily rent on cards (Rentals app) — 2 Oct.
-  "snippets/product-card.liquid": ["3449020d8c0c6c67", "c1b47d0e8933b270"],
+  // …and the card design settings (frame, photo box, badge, add button) — 11 Oct.
+  "snippets/product-card.liquid": ["3449020d8c0c6c67", "c1b47d0e8933b270", "17eb1e6763930a19", "276c16581b4006c2", "6f2e3ba19b265605"],
+  "snippets/product-card-placeholder.liquid": ["3b99c04b17867d39", "7c70fff14f8491f3", "ceb1b620c2c3f3d0"],
+  "config/settings_schema.json": ["1a35622546ea486a", "2f978035f916e862", "337e61074841cc4b", "d1d17ffb0b6dd225", "ed661db774b101f5"],
   // Logo size for computers and phones; long store names fit — 2 Oct.
   "sections/header.liquid": ["5b0fdfe67a2d2b73", "9bbe17a98be3d86f", "e9d39b78a56e39d4", "3b72efdf28946448", "33388154c36be4ac", "18745bd7f3870b7b"],
   // …and up to 8 footer blocks (more menu columns) — 7 Oct; Contact link — 8 Oct.

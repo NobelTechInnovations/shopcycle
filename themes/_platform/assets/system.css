@@ -525,6 +525,10 @@
   width: 18px;
   height: 18px;
 }
+/* Shown only by the "Full-width button" card setting. */
+.sys-pcard__quick-text {
+  display: none;
+}
 .sys-pcard-wrap:hover .sys-pcard__quick,
 .sys-pcard__quick:focus-visible {
   opacity: 1;

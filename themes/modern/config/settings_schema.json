@@ -234,6 +234,351 @@
             "label": "Centre"
           }
         ]
+      },
+      {
+        "type": "header",
+        "content": "Card design"
+      },
+      {
+        "type": "select",
+        "id": "card_style",
+        "label": "Card style",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "minimal",
+            "label": "Minimal (no frame)"
+          },
+          {
+            "value": "bordered",
+            "label": "Bordered"
+          },
+          {
+            "value": "shadow",
+            "label": "Soft shadow"
+          },
+          {
+            "value": "filled",
+            "label": "Filled tile"
+          }
+        ]
+      },
+      {
+        "type": "color",
+        "id": "card_bg",
+        "label": "Card background",
+        "default": "",
+        "info": "Used by the Bordered, Soft shadow and Filled styles. Leave empty for the theme's colour."
+      },
+      {
+        "type": "color",
+        "id": "card_border_color",
+        "label": "Border colour",
+        "default": ""
+      },
+      {
+        "type": "range",
+        "id": "card_border_width",
+        "label": "Border width",
+        "min": 0,
+        "max": 3,
+        "step": 1,
+        "unit": "px",
+        "default": 1
+      },
+      {
+        "type": "range",
+        "id": "card_padding",
+        "label": "Space inside the card",
+        "min": 0,
+        "max": 24,
+        "step": 2,
+        "unit": "px",
+        "default": 12
+      },
+      {
+        "type": "select",
+        "id": "card_hover_effect",
+        "label": "On hover",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "none",
+            "label": "Nothing"
+          },
+          {
+            "value": "zoom",
+            "label": "Zoom the photo"
+          },
+          {
+            "value": "lift",
+            "label": "Lift the card"
+          }
+        ]
+      },
+      {
+        "type": "header",
+        "content": "Photo box"
+      },
+      {
+        "type": "color",
+        "id": "card_image_bg",
+        "label": "Photo background",
+        "default": ""
+      },
+      {
+        "type": "select",
+        "id": "card_image_fit",
+        "label": "Photo fit",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "cover",
+            "label": "Fill the box (may crop)"
+          },
+          {
+            "value": "contain",
+            "label": "Show the whole photo"
+          }
+        ]
+      },
+      {
+        "type": "range",
+        "id": "card_image_padding",
+        "label": "Space around the photo",
+        "min": 0,
+        "max": 32,
+        "step": 2,
+        "unit": "px",
+        "default": 0
+      },
+      {
+        "type": "select",
+        "id": "card_image_radius",
+        "label": "Photo corners",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "0",
+            "label": "Square"
+          },
+          {
+            "value": "6",
+            "label": "Slightly rounded"
+          },
+          {
+            "value": "12",
+            "label": "Rounded"
+          },
+          {
+            "value": "20",
+            "label": "Very rounded"
+          }
+        ]
+      },
+      {
+        "type": "header",
+        "content": "Text and price"
+      },
+      {
+        "type": "select",
+        "id": "card_title_size",
+        "label": "Title size",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "small",
+            "label": "Small"
+          },
+          {
+            "value": "medium",
+            "label": "Medium"
+          },
+          {
+            "value": "large",
+            "label": "Large"
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "id": "card_title_lines",
+        "label": "Title length",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "1",
+            "label": "1 line"
+          },
+          {
+            "value": "2",
+            "label": "Up to 2 lines"
+          },
+          {
+            "value": "3",
+            "label": "Up to 3 lines"
+          }
+        ]
+      },
+      {
+        "type": "color",
+        "id": "card_title_color",
+        "label": "Title colour",
+        "default": ""
+      },
+      {
+        "type": "color",
+        "id": "card_price_color",
+        "label": "Price colour",
+        "default": ""
+      },
+      {
+        "type": "color",
+        "id": "card_sale_color",
+        "label": "Sale price colour",
+        "default": ""
+      },
+      {
+        "type": "checkbox",
+        "id": "card_show_compare",
+        "label": "Show the crossed-out old price",
+        "default": true
+      },
+      {
+        "type": "header",
+        "content": "Sale badge"
+      },
+      {
+        "type": "select",
+        "id": "card_badge_label",
+        "label": "Badge text",
+        "default": "percent",
+        "options": [
+          {
+            "value": "percent",
+            "label": "Percent off (−56%)"
+          },
+          {
+            "value": "save",
+            "label": "Amount saved (Save ₹310)"
+          },
+          {
+            "value": "sale",
+            "label": "Just \"Sale\""
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "id": "card_badge_style",
+        "label": "Badge shape",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "pill",
+            "label": "Pill"
+          },
+          {
+            "value": "square",
+            "label": "Square"
+          },
+          {
+            "value": "ribbon",
+            "label": "Corner ribbon"
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "id": "card_badge_position",
+        "label": "Badge position",
+        "default": "left",
+        "options": [
+          {
+            "value": "left",
+            "label": "Top left"
+          },
+          {
+            "value": "right",
+            "label": "Top right"
+          }
+        ]
+      },
+      {
+        "type": "color",
+        "id": "card_badge_bg",
+        "label": "Badge colour",
+        "default": ""
+      },
+      {
+        "type": "color",
+        "id": "card_badge_text",
+        "label": "Badge text colour",
+        "default": ""
+      },
+      {
+        "type": "header",
+        "content": "Add to cart"
+      },
+      {
+        "type": "select",
+        "id": "card_add_style",
+        "label": "Add button",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "button",
+            "label": "Full-width button under the price"
+          },
+          {
+            "value": "icon",
+            "label": "Round + on the photo"
+          }
+        ]
+      },
+      {
+        "type": "color",
+        "id": "card_add_bg",
+        "label": "Button colour",
+        "default": ""
+      },
+      {
+        "type": "color",
+        "id": "card_add_text",
+        "label": "Button text colour",
+        "default": ""
       }
     ]
   },
@@ -248,11 +593,11 @@
         "options": [
           {
             "value": "drawer",
-            "label": "Drawer \u2014 slides in, shoppers stay on the page"
+            "label": "Drawer — slides in, shoppers stay on the page"
           },
           {
             "value": "page",
-            "label": "Page \u2014 go to the full cart page"
+            "label": "Page — go to the full cart page"
           }
         ],
         "info": "The cart page and checkout keep their own layout either way."

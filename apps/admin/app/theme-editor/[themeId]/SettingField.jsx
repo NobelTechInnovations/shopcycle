@@ -134,6 +134,19 @@ export function SettingField({ setting, value, onChange, products = [], collecti
       );
 
     case "color":
+      // A colour with an empty default means "the theme's own": it can be
+      // cleared back to that.
+      if (!setting.default) {
+        return (
+          <ColorPicker
+            value={value || undefined}
+            allowClear
+            onClear={() => onChange("")}
+            onChangeComplete={(c) => onChange(c.cleared ? "" : c.toHexString())}
+            showText={(c) => (value ? c.toHexString() : "Theme default")}
+          />
+        );
+      }
       return <ColorPicker value={value || "#000000"} onChangeComplete={(c) => onChange(c.toHexString())} showText />;
 
     case "font":

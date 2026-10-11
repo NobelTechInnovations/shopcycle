@@ -94,6 +94,16 @@ function createLiquidEngine(filesByPath, meta, settingsData) {
       return `${meta.currency || ""} ${amount.toFixed(2)}`;
     }
   });
+  // Shopify's name: ₹310 rather than ₹310.00 (paise still shown when there are any).
+  engine.registerFilter("money_without_trailing_zeros", (value) => {
+    const amount = Number(value) || 0;
+    const whole = Math.round(amount * 100) % 100 === 0;
+    try {
+      return new Intl.NumberFormat("en-IN", { style: "currency", currency: meta.currency || "INR", minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }).format(amount);
+    } catch {
+      return `${meta.currency || ""} ${whole ? Math.round(amount) : amount.toFixed(2)}`;
+    }
+  });
 
   // Assets are ThemeFile rows, not real files on disk — point at the API's
   // asset-serving endpoint for this exact theme (never the store's *active*

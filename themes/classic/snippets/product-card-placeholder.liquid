@@ -5,10 +5,10 @@
 {% assign n = index | default: 1 | minus: 1 | modulo: 6 | plus: 1 %}
 {% assign prices = '1499,899,2499,649,1199,999' | split: ',' %}
 {% assign price_index = n | minus: 1 %}
-<article class="card card--placeholder" aria-label="Example product">
-  <div class="card__media">{% render 'snippets/placeholder', kind: 'product', n: n %}</div>
-  <div class="card__body">
-    <h3 class="card__title">Example product title</h3>
-    <p class="price"><span class="price__now">{{ prices[price_index] | times: 1 | money }}</span></p>
+<article class="card card--placeholder" data-oy-card aria-label="Example product">
+  <div class="card__media" data-oy-card-media>{% render 'snippets/placeholder', kind: 'product', n: n %}</div>
+  <div class="card__body" data-oy-card-body>
+    <h3 class="card__title" data-oy-card-title>Example product title</h3>
+    <p class="price" data-oy-card-price><span class="price__now" data-oy-card-now>{{ prices[price_index] | times: 1 | money }}</span></p>
   </div>
 </article>

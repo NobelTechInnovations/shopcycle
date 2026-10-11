@@ -327,7 +327,7 @@ Local `.env` points at the **production** Supabase database, so every local writ
 - App settings forms now merge instead of replacing (an app page's own settings survive the details form).
 - Not done (needs Google / gateway partner approval first): creating Business Profiles by API (the "Create Business Profile" link stays), listing Google Ads accounts (developer token), and connecting Razorpay / Cashfree / PayU by login (each needs Oyklane approved as their partner, with OAuth client IDs).
 
-### Done 8 Oct, second batch (NOT committed yet)
+### Done 8 Oct, second batch (committed in `2e9f762`)
 
 - **Menus**: any number of menus; "Show it in" when making one (footer column / header / not yet), and on a menu's page "Add as a footer column", "Use as header menu" (menus/service.placeMenu edits the live theme's footer blocks — an untouched footer's default columns become real blocks first). New link type **Store page** (Contact, Track order, Account, All products, Search, Blog, Cart). Every theme's default Help column now has "Contact us" (pristine upgrade).
 - **UPI QR**: the UTR is optional ("I've paid" alone works). **Automatic confirmation**: Apps ▸ UPI QR ▸ turn on → a secret link; the seller's phone forwards bank "credited" SMS to it (SMS-forwarder app on Android, a Shortcuts automation on iPhone); the QR asking that amount is confirmed by itself (two QRs at once never ask the same amount — the second is a few paise less). Debit SMS are ignored. **Hidden at checkout while a gateway is live** (not in test mode). `e2e-upi-qr` 39/39.
@@ -342,11 +342,18 @@ Local `.env` points at the **production** Supabase database, so every local writ
   - `test/e2e-market.js` 41/41.
 - **Laxmira's Facebook "Feature unavailable"**: Meta side, not code — see 2a1.
 
-### Done 9 Oct (NOT committed yet)
+### Done 9 Oct (committed in `d3cdce9` / `96a510c`)
 
 - **Product grid** section in all five themes (`sections/shop-grid.liquid`): a real grid on every screen — all products, a collection, best sellers, newest, on sale, or products picked by hand (new `product_list` setting); order; 2–6 per row on desktop, 1–2 on phones; rows before a "Show more" button (up to 48); "View all". The older "Product grid" sections (a row that swipes on phones) are now called "Featured products". Existing stores get the new section in the editor by themselves (themes/service.getTheme copies new master sections in).
 - **Duplicate theme**: Online Store ▸ Themes ▸ Duplicate (live theme) or ⋯ ▸ Duplicate — an unpublished copy with all files, layouts and settings (up to 20 themes a store).
-- **Facebook "Feature unavailable"**: the Meta app is Live and the business verified, but App Review was never submitted (18 permissions "Not submitted"), so only people with a role on the app can log in. Oyklane uses 9 permissions; `ads_management` is no longer asked for (Oyklane only reads ad accounts and pixels). Full plan, permission texts and screencast list: `docs/meta-app-review.md`.
+- **Facebook "Feature unavailable"**: the Meta app is Live and the business verified, but App Review was never submitted (18 permissions "Not submitted"), so only people with a role on the app can log in. Oyklane uses 9 permissions, including `ads_management` (the Meta Ads app creates campaigns). New app "Oyklane Connect" (Tech Provider); first App Review round of 5 permissions submitted from the Meta dashboard. Full plan, permission texts and screencast list: `docs/meta-app-review.md`.
+
+### Done 11 Oct (NOT committed yet)
+
+- **Product carousel** section in all five themes (`sections/product-carousel.liquid`, one file): a row of products that moves on its own — one card at a time, a full row at a time, or a smooth non-stop flow — right to left (or left to right); seconds between moves / flow speed; pause while the mouse is over it; loop. Controls: arrows on the sides, by the heading or below (round / square / just the arrow; side arrows on phones optional), dots or a progress bar (dots turn into a bar when there would be more than 10), optional pause/play button; swipe on phones; cards in view 2–6 on computers and 1–2½ on phones (with a peek of the next card). Same product sources as the Product grid. It pauses off screen, in a hidden tab and while keyboard focus is inside, stays still for "reduce motion", and hides its controls when every card already fits.
+- **Card design** (Theme settings ▸ Product cards, all five themes and the platform's collection/search/related cards): card style (theme / minimal / bordered / soft shadow / filled tile), card background, border colour and width, space inside, hover (none / zoom photo / lift card); photo box background, fit (fill / whole photo), space around the photo, photo corners; title size and length (1–3 lines, so rows line up), title / price / sale-price colours, show or hide the crossed-out price; sale badge text (−56% / Save ₹310 / Sale), shape (pill / square / corner tab), position (left / right) and colours; add button (theme / full-width button under the price / round +) and its colours. Every default is "theme", so stores look exactly as before until the seller changes something (`cardCss` in `storefront/platform.js` writes only changed values). Colour fields with an empty default can now be cleared back to "Theme default" in the editor.
+- New Liquid filter `money_without_trailing_zeros` (₹310 rather than ₹310.00).
+- Untouched store copies of `product-card`, `product-card-placeholder` and `config/settings_schema.json` pick up the new versions automatically (hashes in `themes/pristine.js`).
 
 ### Left to do
 

@@ -356,10 +356,153 @@ async function headTags(settings, { system, drawer, login, assetBase }) {
   if (system) tags += `<link rel="stylesheet" href="${assetUrl("system.css", version, assetBase)}">`;
   if (drawer) tags += `<link rel="stylesheet" href="${assetUrl("cart-drawer.css", version, assetBase)}">`;
   if (login) tags += `<link rel="stylesheet" href="${assetUrl("login-popup.css", version, assetBase)}">`;
+  const card = cardCss(settings);
+  if (card) tags += `<style id="oy-card-css">${card}</style>`;
   // Theme settings ▸ Custom CSS — last, so it wins over the theme's own.
   const css = customCss(settings);
   if (css) tags += `<style id="oy-custom-css">${css}</style>`;
   return tags;
+}
+
+/**
+ * Theme settings ▸ Product cards ▸ Card design, for every theme's card and
+ * the platform pages' card (all marked data-oy-card-*). Only what the
+ * seller moved off "Theme default" is written, so an untouched store looks
+ * exactly as before. !important because the themes' own card rules differ
+ * in specificity (".theme-fresh .pcard:hover .pcard__img:first-child").
+ */
+const CARD_COLOR = /^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\))$/i;
+const CARD_SHADOW = "0 1px 2px rgba(0,0,0,.05),0 10px 26px -14px rgba(0,0,0,.22)";
+const CARD_SHADOW_UP = "0 2px 6px rgba(0,0,0,.06),0 20px 38px -16px rgba(0,0,0,.3)";
+function cardCss(s = {}) {
+  const color = (v) => (typeof v === "string" && CARD_COLOR.test(v.trim()) ? v.trim() : "");
+  const num = (v, min, max, dflt) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : dflt;
+  };
+  const out = [];
+  const rule = (sel, ...decls) => {
+    const d = decls.filter(Boolean);
+    if (d.length) out.push(`${sel}{${d.map((x) => `${x}!important`).join(";")}}`);
+  };
+  const C = "[data-oy-card]";
+  const MEDIA = `${C} [data-oy-card-media]`;
+  const ADD = `${C} [data-oy-card-add]`;
+  const R = "var(--r-card,var(--oy-radius,12px))";
+  const BG = "var(--c-bg,var(--oy-bg,#fff))";
+  const style = ["minimal", "bordered", "shadow", "filled"].includes(s.card_style) ? s.card_style : "theme";
+  const framed = style === "bordered" || style === "shadow" || style === "filled";
+  const pad = num(s.card_padding, 0, 24, 12);
+  const hover = ["none", "zoom", "lift"].includes(s.card_hover_effect) ? s.card_hover_effect : "theme";
+  const add = ["button", "icon"].includes(s.card_add_style) ? s.card_add_style : "theme";
+  const badgeRight = s.card_badge_position === "right";
+
+  // The frame: background, border or shadow, the space inside.
+  if (framed) {
+    const bc = color(s.card_border_color);
+    const bw = num(s.card_border_width, 0, 3, 1);
+    const bg = color(s.card_bg) || (style === "filled" ? `color-mix(in srgb,currentColor 5%,${BG})` : BG);
+    rule(C, "position:relative", `background:${bg}`, `border-radius:${R}`, `padding:${pad}px`, "gap:10px",
+      style === "bordered" || bc ? `border:${bw}px solid ${bc || "color-mix(in srgb,currentColor 13%,transparent)"}` : "border:0",
+      `box-shadow:${style === "shadow" ? CARD_SHADOW : "none"}`, pad === 0 ? "overflow:hidden" : "overflow:visible",
+      "transition:box-shadow .25s ease,transform .25s ease,border-color .25s ease");
+    rule(MEDIA, `border-radius:${pad === 0 ? `${R} ${R} 0 0` : `calc(${R} * .65)`}`);
+    rule(`${C} [data-oy-card-body]`, pad === 0 ? "padding:10px 12px 12px" : "padding:0 2px", "gap:3px");
+    // Overlays sit on the photo, which is now inset by the padding.
+    rule(`${C} [data-oy-card-quick=overlay]`, `top:${pad}px`, `left:${pad}px`, `right:${pad}px`, "bottom:auto");
+    rule(`${C} [data-oy-card-quick=corner]`, `top:${pad + 10}px`, `right:${pad + 10}px`);
+    if (hover === "theme") {
+      if (style === "shadow") rule(`${C}:hover`, `box-shadow:${CARD_SHADOW_UP}`);
+      if (style === "bordered" && !bc) rule(`${C}:hover`, "border-color:color-mix(in srgb,currentColor 26%,transparent)");
+    }
+  } else if (style === "minimal") {
+    rule(C, "background:transparent", "border:0", "box-shadow:none", "padding:0", "overflow:visible");
+    rule(`${C}:hover`, "box-shadow:none", "transform:none");
+    rule(MEDIA, `border-radius:${R}`);
+    rule(`${C} [data-oy-card-body]`, "padding:8px 0 0");
+  }
+
+  // On hover.
+  if (hover === "none") {
+    rule(`${C}:hover`, "transform:none", `box-shadow:${style === "shadow" ? CARD_SHADOW : "none"}`);
+    rule(`${C}:hover [data-oy-card-img]`, "transform:none");
+  } else if (hover === "zoom") {
+    rule(`${C} [data-oy-card-img]`, "transition:transform .7s cubic-bezier(.2,.7,.2,1),opacity .4s ease");
+    rule(`${C}:hover [data-oy-card-img]`, "transform:scale(1.07)");
+  } else if (hover === "lift") {
+    rule(C, "transition:box-shadow .25s ease,transform .25s ease");
+    rule(`${C}:hover`, "transform:translateY(-4px)", framed ? `box-shadow:${CARD_SHADOW_UP}` : "");
+    rule(`${C}:hover [data-oy-card-img]`, "transform:none");
+  }
+
+  // The photo box.
+  const imgBg = color(s.card_image_bg);
+  if (imgBg) rule(MEDIA, `background:${imgBg}`);
+  const imgPad = num(s.card_image_padding, 0, 32, 0);
+  if (s.card_image_fit === "contain" || s.card_image_fit === "cover") rule(`${MEDIA} img`, `object-fit:${s.card_image_fit}`, s.card_image_fit === "cover" && !imgPad ? "padding:0" : "");
+  if (imgPad) rule(`${MEDIA} img`, `padding:${imgPad}px`, "box-sizing:border-box");
+  if (["0", "6", "12", "20"].includes(String(s.card_image_radius))) rule(MEDIA, `border-radius:${s.card_image_radius}px`);
+
+  // Title and price.
+  const titleSize = { small: "13px", medium: "15px", large: "17px" }[s.card_title_size];
+  const lines = ["1", "2", "3"].includes(String(s.card_title_lines)) ? Number(s.card_title_lines) : 0;
+  rule(`${C} [data-oy-card-title]`, titleSize ? `font-size:${titleSize}` : "",
+    ...(lines ? ["display:-webkit-box", `-webkit-line-clamp:${lines}`, "-webkit-box-orient:vertical", "overflow:hidden", `min-height:${lines}lh`] : []));
+  const titleColor = color(s.card_title_color);
+  if (titleColor) rule(`${C} [data-oy-card-title],${C} [data-oy-card-title] a`, `color:${titleColor}`);
+  const priceColor = color(s.card_price_color);
+  if (priceColor) rule(`${C} [data-oy-card-now]:not([data-oy-card-now=sale])`, `color:${priceColor}`);
+  const saleColor = color(s.card_sale_color);
+  if (saleColor) rule(`${C} [data-oy-card-now=sale]`, `color:${saleColor}`);
+  if (s.card_show_compare === false) rule(`${C} [data-oy-card-was]`, "display:none");
+
+  // The sale badge.
+  const badgeStyle = ["pill", "square", "ribbon"].includes(s.card_badge_style) ? s.card_badge_style : "theme";
+  if (badgeStyle === "ribbon") {
+    // A tab tucked into the photo's corner.
+    rule(`${C} [data-oy-card-badges]`, "top:0", badgeRight ? "right:0" : "left:0", badgeRight ? "left:auto" : "");
+    rule(`${C} [data-oy-card-badges]>*`, `border-radius:${badgeRight ? "0 0 0 10px" : "0 0 10px 0"}`, "padding:7px 11px");
+  } else {
+    if (badgeRight) rule(`${C} [data-oy-card-badges]`, "left:auto", "right:12px");
+    if (badgeStyle !== "theme") rule(`${C} [data-oy-card-badges]>*`, `border-radius:${badgeStyle === "pill" ? "999px" : "4px"}`);
+  }
+  if (badgeRight) {
+    // Whatever sat in the top-right corner moves to the left.
+    rule(`${C} [data-oy-card-mark]`, "right:auto", "left:10px");
+    if (add !== "button") rule(`${C} [data-oy-card-quick=corner]`, "right:auto", `left:${(framed ? pad : 0) + 10}px`);
+  }
+  const badgeBg = color(s.card_badge_bg);
+  const badgeText = color(s.card_badge_text);
+  rule(`${C} [data-oy-card-badge]`, badgeBg ? `background:${badgeBg}` : "", badgeText ? `color:${badgeText}` : "");
+
+  // Add to cart.
+  const addBg = color(s.card_add_bg);
+  const addText = color(s.card_add_text);
+  if (add === "button") {
+    rule(`${C} [data-oy-card-quick=overlay]`, "position:relative", "inset:auto", "aspect-ratio:auto", "order:5", "display:block", "padding:0", "pointer-events:auto", "z-index:2",
+      framed && pad === 0 ? "margin:0 12px 12px" : "");
+    rule(`${C} [data-oy-card-quick=corner]`, "position:relative", "inset:auto", "display:flex", "width:auto", "height:40px", "margin-top:10px", framed && pad === 0 ? "margin:10px 12px 12px" : "");
+    rule(`${C} [data-oy-card-foot]`, "flex-direction:column", "align-items:stretch", "gap:8px");
+    rule(`${C} [data-oy-card-quick=inline]`, "width:100%");
+    rule(ADD, "opacity:1", "transform:none", "display:flex", "align-items:center", "justify-content:center", "gap:6px", "height:40px", "min-height:40px",
+      "padding:0 14px", "border-radius:var(--r-button,var(--oy-radius-button,8px))", "box-shadow:none",
+      `background:${addBg || "var(--c-text,var(--oy-text,#111))"}`, `color:${addText || BG}`, `border:1px solid ${addBg || "var(--c-text,var(--oy-text,#111))"}`,
+      "font-size:13.5px", "font-weight:600", "letter-spacing:.01em", "transition:opacity .2s ease");
+    rule(`${C} [data-oy-card-quick] [data-oy-card-add],${C} [data-oy-card-add][data-oy-card-quick=inline]`, "width:100%");
+    rule(`${ADD} span`, "display:inline");
+    rule(`${ADD}:hover`, "opacity:.86");
+  } else if (add === "icon") {
+    rule(`${C} [data-oy-card-quick=overlay]`, "justify-content:flex-end", "align-items:flex-end", "padding:10px");
+    rule(ADD, "opacity:1", "transform:none", "display:inline-grid", "place-items:center", "width:40px", "min-width:40px", "height:40px", "min-height:40px", "padding:0", "border-radius:50%",
+      addBg ? `background:${addBg}` : "", addText ? `color:${addText}` : "", addBg ? `border-color:${addBg}` : "");
+    rule(`${ADD} span`, "display:none");
+    // The grocery card's ADD button says ADD; as an icon it says +.
+    rule(`${C} [data-oy-card-quick=inline] [data-oy-card-add],${C} [data-oy-card-add][data-oy-card-quick=inline]`, "font-size:0", "width:36px", "min-width:36px", "height:36px", "min-height:36px");
+    rule(`${C} [data-oy-card-quick=inline] [data-oy-card-add]::before,${C} [data-oy-card-add][data-oy-card-quick=inline]::before`, 'content:"+"', "font-size:22px", "line-height:1", "font-weight:600");
+  } else {
+    rule(ADD, addBg ? `background:${addBg}` : "", addText ? `color:${addText}` : "", addBg ? `border-color:${addBg}` : "");
+  }
+  return out.join("");
 }
 
 /** The seller's CSS, unable to close its <style> tag. */
