@@ -201,6 +201,8 @@ const envSchema = z.object({
   // phone_number_id, plus an approved "authentication" template.
   META_WHATSAPP_TOKEN: z.string().optional(),
   META_WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  // Its WhatsApp Business account id (templates, webhooks) — optional.
+  META_WHATSAPP_WABA_ID: z.string().optional(),
   META_WHATSAPP_OTP_TEMPLATE: z.string().optional(),
   META_WHATSAPP_OTP_LANGUAGE: z.string().default("en"),
   // Authentication templates with a "Copy code" button need the code there too.

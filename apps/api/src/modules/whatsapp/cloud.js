@@ -73,7 +73,9 @@ async function health(prisma, store) {
       check("webhooks", false, `Couldn't check message delivery: ${err.message}`);
     }
   }
-  if (!out.webhookConfigured) check("platform", false, "Incoming messages aren't set up on Oyklane yet", "Ask the Oyklane team to finish the WhatsApp webhook setup.");
+  // Oyklane's own webhook setup is a platform matter (Super admin ▸
+  // Messaging shows it) — never something a seller can act on.
+  if (out.number?.test) check("test", true, "This is one of Meta's test numbers — it can only message the few numbers listed as test recipients in Meta's API setup. Add your real number to message customers.");
   return out;
 }
 
@@ -158,8 +160,15 @@ async function send(conn, payload) {
 
 const TEMPLATE_FIELDS = "id,name,language,status,category,components,rejected_reason,quality_score,previous_category";
 
-async function listTemplates(conn, { status } = {}) {
+// Templates change rarely; order updates look them up on every send.
+const templateCache = new Map();
+const TEMPLATE_TTL = 5 * 60 * 1000;
+const bust = (conn) => conn?.wabaId && templateCache.delete(conn.wabaId);
+
+async function listTemplates(conn, { status, fresh = false } = {}) {
   if (!conn.wabaId) return [];
+  const hit = templateCache.get(conn.wabaId);
+  if (!fresh && !status && hit && Date.now() - hit.at < TEMPLATE_TTL) return hit.list;
   const out = [];
   let after = null;
   for (let page = 0; page < 10; page += 1) {
@@ -168,22 +177,26 @@ async function listTemplates(conn, { status } = {}) {
     after = r.paging?.cursors?.after;
     if (!r.paging?.next || !after) break;
   }
+  if (!status) templateCache.set(conn.wabaId, { at: Date.now(), list: out });
   return out;
 }
 
 async function createTemplate(conn, spec) {
   if (!conn.wabaId) throw new HttpError(400, "Choose your WhatsApp account first.");
+  bust(conn);
   return meta.graphRequest(`/${conn.wabaId}/message_templates`, { method: "POST", token: waToken(conn), body: spec });
 }
 
 /** Meta allows editing a template's components (and category, once
  * approved) — the edit goes back into review. */
 async function editTemplate(conn, templateId, spec) {
+  bust(conn);
   return meta.graphRequest(`/${templateId}`, { method: "POST", token: waToken(conn), body: spec });
 }
 
 async function deleteTemplate(conn, { name, id }) {
   if (!conn.wabaId) throw new HttpError(400, "Choose your WhatsApp account first.");
+  bust(conn);
   return meta.graphRequest(`/${conn.wabaId}/message_templates`, { method: "DELETE", token: waToken(conn), params: { name, hsm_id: id } });
 }
 

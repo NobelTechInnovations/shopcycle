@@ -158,8 +158,23 @@ export function MetaConnectPanel({ focus, children }) {
                   <Select
                     placeholder="Facebook Page"
                     options={assets.pages.map((p) => ({ value: p.id, label: p.name }))}
-                    onChange={(v, opt) => setSelection((s) => ({ ...s, pageId: v, pageName: opt.label }))}
+                    onChange={(v, opt) => {
+                      // The Page's own Instagram account is the natural pair.
+                      const ig = (assets.instagramAccounts || []).find((i) => i.pageId === v);
+                      setSelection((s) => ({ ...s, pageId: v, pageName: opt.label, instagramAccountId: ig?.id || null, instagramUsername: ig?.username || null }));
+                    }}
                   />
+                  <Select
+                    placeholder="Instagram account"
+                    allowClear
+                    value={selection.instagramAccountId || undefined}
+                    options={(assets.instagramAccounts || [])
+                      .filter((i) => !selection.adAccountId || i.pageId === selection.pageId || (i.adAccountIds || []).includes(selection.adAccountId))
+                      .map((i) => ({ value: i.id, label: `@${i.username || i.id}${i.pageId && i.pageId === selection.pageId ? " · linked to this Page" : ""}` }))}
+                    onChange={(v, opt) => setSelection((s) => ({ ...s, instagramAccountId: v || null, instagramUsername: v ? String(opt?.label || "").replace(/^@/, "").split(" ·")[0] : null }))}
+                    notFoundContent="No Instagram account linked — link it to your Facebook Page (Page settings ▸ Linked accounts), then reconnect."
+                  />
+                  <p className="text-xs text-ink-muted m-0 -mt-1">Ads on Instagram run from this account. Without one, Instagram placements show your Facebook Page&apos;s name and picture.</p>
                 </>
               )}
               {focus === "whatsapp" && (
@@ -283,6 +298,7 @@ export function MetaConnectPanel({ focus, children }) {
                 <>
                   <Tag>{status.connection.adAccountName}</Tag>
                   <Tag>{status.connection.pageName}</Tag>
+                  {status.connection.instagramUsername ? <Tag>@{status.connection.instagramUsername}</Tag> : <Tag color="default">No Instagram</Tag>}
                 </>
               )}
               {focus === "whatsapp" && <Tag>{status.connection.phoneNumberLabel}</Tag>}

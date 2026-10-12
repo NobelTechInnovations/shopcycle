@@ -110,7 +110,7 @@ async function handleInbound(prisma, conn, value, m, { log, onReceived }) {
   });
   await prisma.whatsappConversation.update({
     where: { id: convo.id },
-    data: { lastInboundAt: at, lastMessageAt: at, lastPreview: (text || PREVIEW[m.type] || "Message").slice(0, 140), unread: { increment: 1 }, status: "open" },
+    data: { lastInboundAt: at, lastMessageAt: at, lastPreview: (text || PREVIEW[m.type] || "Message").slice(0, 140), unread: { increment: 1 }, status: "open", viaPlatform: Boolean(conn.platform) },
   });
 
   // Opt-out / opt-in by keyword.
@@ -165,6 +165,24 @@ async function handleStatus(prisma, conn, s) {
   if (Object.keys(inc).length) await prisma.whatsappBroadcast.update({ where: { id: r.broadcastId }, data: inc });
 }
 
+/**
+ * Oyklane's shared number: a reply belongs to the store that last messaged
+ * that customer from it; delivery receipts update whichever store's
+ * message it was (matched by message id, so the store doesn't matter).
+ */
+async function platformTargets(prisma, phoneNumberId, value, log) {
+  const platform = await require("./platform").connection(prisma);
+  if (!platform || String(platform.phoneNumberId) !== phoneNumberId) return [];
+  const out = [];
+  if ((value.statuses || []).length) out.push({ storeId: undefined, platform: true, statusesOnly: true });
+  for (const m of value.messages || []) {
+    const convo = await prisma.whatsappConversation.findFirst({ where: { phone: String(m.from), viaPlatform: true }, orderBy: { lastMessageAt: "desc" }, select: { storeId: true } });
+    if (convo) out.push({ storeId: convo.storeId, platform: true, onlyMessage: m.id });
+    else log?.info({ from: "hidden" }, "whatsapp: message to Oyklane's number from someone no store has messaged");
+  }
+  return out;
+}
+
 /** One webhook delivery. Returns how many changes it handled. */
 async function processWebhook(prisma, payload, { log, onReceived, onTemplate } = {}) {
   if (payload?.object !== "whatsapp_business_account") return 0;
@@ -175,12 +193,17 @@ async function processWebhook(prisma, payload, { log, onReceived, onTemplate } =
       if (change.field === "messages") {
         const phoneNumberId = value.metadata?.phone_number_id;
         if (!phoneNumberId) continue;
-        const conns = await prisma.metaConnection.findMany({ where: { phoneNumberId: String(phoneNumberId) } });
+        let conns = await prisma.metaConnection.findMany({ where: { phoneNumberId: String(phoneNumberId) } });
+        if (!conns.length) conns = await platformTargets(prisma, String(phoneNumberId), value, log);
         for (const conn of conns) {
-          for (const m of value.messages || []) {
-            await handleInbound(prisma, conn, value, m, { log, onReceived });
-            handled += 1;
+          if (!conn.statusesOnly) {
+            for (const m of value.messages || []) {
+              if (conn.onlyMessage && conn.onlyMessage !== m.id) continue;
+              await handleInbound(prisma, conn, value, m, { log, onReceived });
+              handled += 1;
+            }
           }
+          if (conn.onlyMessage) continue;
           for (const s of value.statuses || []) {
             await handleStatus(prisma, conn, s);
             handled += 1;

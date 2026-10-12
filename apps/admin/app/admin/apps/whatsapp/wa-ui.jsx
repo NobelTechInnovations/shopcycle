@@ -136,7 +136,7 @@ export function HealthCard({ compact = false, onChange }) {
   return (
     <>
       {compact ? (
-        <Alert type="warning" showIcon message={failing[0].text} description={body} />
+        <Alert type="warning" showIcon message={`Your WhatsApp number needs attention (${failing.length})`} description={body} />
       ) : (
         <Card size="small" title="Connection health">
           {body}

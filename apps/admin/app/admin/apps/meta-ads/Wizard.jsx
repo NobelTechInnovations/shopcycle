@@ -10,8 +10,10 @@ import { inr, useCaps } from "./ads-ui";
 const rid = () => Math.random().toString(36).slice(2, 9);
 
 function blankAd(caps, link, n = 1) {
-  const page = caps?.pages?.[0];
-  return { key: rid(), name: `Ad ${n}`, format: "image", identity: { pageId: page?.id || null, instagramId: page?.instagram?.id || null }, primaryText: "", headline: "", description: "", link: link || "", cta: "SHOP_NOW", imageHash: null, imagePreview: null, videoId: null, videoPreview: null, thumbnailHash: null, thumbnailPreview: null, cards: [] };
+  // The Page and Instagram account chosen when connecting; else the first Page and its Instagram.
+  const page = caps?.pages?.find((p) => p.id === caps?.defaults?.pageId) || caps?.pages?.[0];
+  const igId = caps?.defaults?.instagramId || page?.instagram?.id || null;
+  return { key: rid(), name: `Ad ${n}`, format: "image", identity: { pageId: page?.id || null, instagramId: igId }, primaryText: "", headline: "", description: "", link: link || "", cta: "SHOP_NOW", imageHash: null, imagePreview: null, videoId: null, videoPreview: null, thumbnailHash: null, thumbnailPreview: null, cards: [] };
 }
 function blankAdSet(caps, objective, link, n = 1) {
   const goal = caps?.objectives?.[objective]?.recommended || "landing_page_views";
@@ -431,10 +433,17 @@ function AdEditor({ ad, update, caps, goal, advanced }) {
           <Input value={ad.name} onChange={(e) => update({ name: e.target.value })} />
         </Form.Item>
         <Form.Item label="Facebook Page" className="!mb-0">
-          <Select value={ad.identity.pageId} onChange={(pageId) => update({ identity: { pageId, instagramId: caps.pages.find((p) => p.id === pageId)?.instagram?.id || null } })} options={caps.pages.map((p) => ({ value: p.id, label: p.name }))} />
+          <Select value={ad.identity.pageId} onChange={(pageId) => update({ identity: { pageId, instagramId: caps.pages.find((p) => p.id === pageId)?.instagram?.id || ad.identity.instagramId || null } })} options={caps.pages.map((p) => ({ value: p.id, label: p.name }))} />
         </Form.Item>
         <Form.Item label="Instagram account" className="!mb-0">
-          <Select allowClear placeholder={page?.instagram ? "" : "Not linked to this Page"} value={ad.identity.instagramId} onChange={(instagramId) => update({ identity: { ...ad.identity, instagramId: instagramId || null } })} options={page?.instagram ? [{ value: page.instagram.id, label: `@${page.instagram.username}` }] : []} />
+          <Select
+            allowClear
+            placeholder="None — use the Page"
+            value={ad.identity.instagramId}
+            onChange={(instagramId) => update({ identity: { ...ad.identity, instagramId: instagramId || null } })}
+            options={(caps.instagramAccounts || []).map((i) => ({ value: i.id, label: `@${i.username || i.id}${i.pageId === ad.identity.pageId ? " · this Page's" : ""}` }))}
+            notFoundContent="No Instagram account linked to your Page or ad account."
+          />
         </Form.Item>
       </div>
       <Form.Item label="Format" className="!mb-0">

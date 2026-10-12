@@ -191,6 +191,46 @@ async function whatsappRoutes(fastify) {
     return { settings: settings.whatsapp };
   });
 
+  // ── Order updates (confirmed / shipped / delivered) ──
+  fastify.get("/order-updates", async (request) => {
+    const notifications = require("./notifications");
+    const standard = require("./standard-templates");
+    const platform = require("./platform");
+    const def = (await platform.load(db)).notifications || { enabled: false, events: {} };
+    const settings = notifications.storeSettings(request.store);
+    const conn = await require("../meta/repository").findByStore(db, request.store.id);
+    let own = { connected: Boolean(conn?.phoneNumberId), templates: {} };
+    if (conn?.wabaId) {
+      const all = await service.templates(db, request.store, { conn }).catch(() => []);
+      for (const k of Object.values(standard.KINDS)) own.templates[k.name] = all.find((t) => t.name === k.name)?.status || null;
+    }
+    return {
+      kinds: Object.fromEntries(Object.entries(standard.KINDS).map(([k, v]) => [k, { label: v.label, template: v.name, body: v.body }])),
+      settings,
+      platformDefault: def,
+      platformReady: Boolean(await platform.connection(db)),
+      platformNumber: (await platform.load(db)).phoneNumberLabel || null,
+      own,
+    };
+  });
+  fastify.put("/order-updates", async (request) => {
+    ownerOnly(request, "change WhatsApp order updates");
+    const body = z.object({ orderConfirmed: z.boolean(), shipped: z.boolean(), delivered: z.boolean(), sender: z.enum(["auto", "own", "platform"]) }).parse(request.body || {});
+    const current = await db.store.findUnique({ where: { id: request.store.id }, select: { settings: true } });
+    const settings = { ...(current.settings || {}), whatsapp: { ...(current.settings?.whatsapp || {}), notifications: body } };
+    await db.store.update({ where: { id: request.store.id }, data: { settings } });
+    audit(request, "whatsapp.order_updates", body);
+    return { settings: body };
+  });
+  fastify.post("/order-updates/install", async (request) => {
+    ownerOnly(request, "add WhatsApp templates");
+    const conn = await cloud.connectionOrThrow(db, request.store.id, { needNumber: false });
+    const { storefrontBaseUrl } = require("../../lib/storefront-url");
+    const results = await require("./platform").installStandard(conn, { linkBase: `${storefrontBaseUrl(request.store)}/orders/` });
+    audit(request, "whatsapp.standard_templates", { results: results.map((r) => `${r.name}:${r.status}`) });
+    return { results };
+  });
+
   // ── Consent & opt-outs ──
   fastify.get("/opt-outs", async (request) => ({ optOuts: await service.listOptOuts(db, request.store.id) }));
   fastify.post("/opt-outs", async (request, reply) => {

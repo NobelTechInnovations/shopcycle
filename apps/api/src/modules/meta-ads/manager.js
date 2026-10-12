@@ -24,14 +24,15 @@ const ACCOUNT_STATUS = { 1: "active", 2: "disabled", 3: "unsettled", 7: "pending
  * learns about a missing Pixel or permission before building a campaign. */
 async function capabilities(prisma, store) {
   const conn = await connection(prisma, store.id);
-  const out = { adAccount: null, pages: [], pixels: [], audiences: [], permissions: [], problems: [] };
+  const out = { adAccount: null, pages: [], instagramAccounts: [], pixels: [], audiences: [], permissions: [], problems: [], defaults: { pageId: conn.pageId || null, instagramId: conn.instagramAccountId || null } };
   const problem = (text, fix) => out.problems.push({ text, fix: fix || null });
-  const [acct, perms, pages, pixels, audiences] = await Promise.allSettled([
+  const [acct, perms, pages, pixels, audiences, igs] = await Promise.allSettled([
     g(conn, `/${conn.adAccountId}`, { params: { fields: "id,name,currency,timezone_name,account_status,disable_reason,amount_spent,spend_cap,balance,funding_source_details,business" } }),
     g(conn, "/me/permissions"),
     g(conn, "/me/accounts", { params: { fields: "id,name,picture{url},instagram_business_account{id,username,profile_picture_url},whatsapp_number", limit: 50 } }),
     g(conn, `/${conn.adAccountId}/adspixels`, { params: { fields: "id,name,last_fired_time,is_unavailable", limit: 50 } }),
     g(conn, `/${conn.adAccountId}/customaudiences`, { params: { fields: "id,name,subtype,approximate_count_lower_bound,approximate_count_upper_bound,delivery_status,operation_status", limit: 100 } }),
+    g(conn, `/${conn.adAccountId}/instagram_accounts`, { params: { fields: "id,username,profile_pic", limit: 25 } }),
   ]);
   if (acct.status === "fulfilled") {
     const a = acct.value;
@@ -66,6 +67,11 @@ async function capabilities(prisma, store) {
     }));
     if (!out.pages.length) problem("No Facebook Page found.", "Ads run from a Facebook Page. Create one, or reconnect Facebook and allow your Pages.");
   }
+  // Instagram identities: each Page's linked account plus any connected to the ad account.
+  const igMap = new Map(out.pages.filter((p) => p.instagram).map((p) => [p.instagram.id, { ...p.instagram, pageId: p.id }]));
+  if (igs.status === "fulfilled") for (const ig of igs.value.data || []) if (!igMap.has(ig.id)) igMap.set(ig.id, { id: ig.id, username: ig.username, picture: ig.profile_pic || null, pageId: null });
+  out.instagramAccounts = [...igMap.values()];
+  if (!out.instagramAccounts.length && out.pages.length) problem("No Instagram account linked.", "Link your Instagram professional account to your Facebook Page (Page settings ▸ Linked accounts), then reconnect — otherwise Instagram ads show your Page's name.");
   if (pixels.status === "fulfilled") {
     out.pixels = (pixels.value.data || []).filter((p) => !p.is_unavailable).map((p) => ({ id: p.id, name: p.name, lastFired: p.last_fired_time || null, active: Boolean(p.last_fired_time && Date.now() - new Date(p.last_fired_time).getTime() < 7 * 86400e3) }));
     if (!out.pixels.length) problem("No Meta Pixel on this ad account.", "Without it, Meta can't optimise for purchases or report sales. Set it up in Apps ▸ Meta Pixel.");

@@ -44,6 +44,8 @@ const selectSchema = z.object({
   adAccountName: z.string().optional(),
   pageId: z.string().optional(),
   pageName: z.string().optional(),
+  instagramAccountId: z.string().nullable().optional(),
+  instagramUsername: z.string().nullable().optional(),
   wabaId: z.string().optional(),
   wabaName: z.string().optional(),
   phoneNumberId: z.string().optional(),

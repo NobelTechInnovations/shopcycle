@@ -3,6 +3,10 @@ const { z } = require("zod");
 const templates = require("../../lib/whatsapp-templates");
 const messaging = require("../../lib/messaging");
 const { toE164 } = require("../../lib/phone");
+const platform = require("../whatsapp/platform");
+const cloud = require("../whatsapp/cloud");
+const waService = require("../whatsapp/service");
+const standard = require("../whatsapp/standard-templates");
 
 /**
  * /api/super-admin/messaging — the platform's WhatsApp templates, shared by
@@ -38,6 +42,56 @@ async function messagingRoutes(fastify) {
     status: messaging.whatsappStatus(),
     recent: await recent(prisma),
   }));
+
+  // ── Oyklane's own WhatsApp number (the default sender for every store) ──
+  fastify.get("/platform", async () => platform.status(prisma));
+  fastify.post("/platform/token", async (request) => {
+    const { token } = z.object({ token: z.string().min(20).max(2000) }).parse(request.body || {});
+    return platform.useToken(prisma, token, request.currentUser.id);
+  });
+  fastify.post("/platform/number", async (request) => {
+    const body = z.object({ wabaId: z.string().min(1), phoneNumberId: z.string().min(1) }).parse(request.body || {});
+    await platform.choose(prisma, body, request.currentUser.id);
+    return platform.status(prisma);
+  });
+  fastify.post("/platform/activate", async (request) => {
+    const { pin } = z.object({ pin: z.string().regex(/^\d{6}$/) }).parse(request.body || {});
+    await platform.activate(prisma, pin, request.currentUser.id);
+    return platform.status(prisma);
+  });
+  fastify.delete("/platform", async (request) => {
+    await platform.save(prisma, { token: null, wabaId: null, wabaName: null, phoneNumberId: null, phoneNumberLabel: null, activatedAt: null, subscribedAt: null }, request.currentUser.id);
+    return platform.status(prisma);
+  });
+  fastify.get("/platform/templates", async () => {
+    const conn = await platform.connection(prisma);
+    if (!conn) return { templates: [], standard: standard.KINDS };
+    return { templates: (await cloud.listTemplates(conn, { fresh: true })).map(waService.shapeTemplate), standard: standard.KINDS, otp: standard.OTP_TEMPLATE };
+  });
+  fastify.post("/platform/templates/install", async () => {
+    const conn = await platform.connection(prisma);
+    if (!conn?.wabaId) return { error: "Connect Oyklane's number first." };
+    return { results: await platform.installStandard(conn, { withOtp: true }) };
+  });
+  fastify.put("/platform/notifications", async (request) => {
+    const body = z.object({ enabled: z.boolean(), events: z.object({ orderConfirmed: z.boolean(), shipped: z.boolean(), delivered: z.boolean() }) }).parse(request.body || {});
+    await platform.save(prisma, { notifications: body }, request.currentUser.id);
+    return platform.status(prisma);
+  });
+  // A real order-confirmation message (sample values) to a number you choose.
+  fastify.post("/platform/test", async (request, reply) => {
+    const { to } = testSchema.parse(request.body || {});
+    const phone = toE164(to);
+    if (!phone) return reply.code(400).send({ error: "Enter the number with its country code, e.g. +91 98765 43210." });
+    const conn = await platform.connection(prisma);
+    if (!conn) return reply.code(400).send({ error: "Connect Oyklane's number first." });
+    const all = (await cloud.listTemplates(conn, { fresh: true })).map(waService.shapeTemplate);
+    const tpl = all.find((t) => t.name === standard.KINDS.orderConfirmed.name && t.status === "APPROVED") || all.find((t) => t.name === "hello_world" && t.status === "APPROVED");
+    if (!tpl) return reply.code(400).send({ error: "No approved template to test with yet — install the standard templates and wait for Meta's approval." });
+    const body = tpl.bodyVariables ? standard.KINDS.orderConfirmed.examples : [];
+    const sent = await cloud.send(conn, { to: phone, type: "template", template: { name: tpl.name, language: { code: tpl.language }, components: waService.templateComponents(tpl, { body, buttonUrl: "test" }) } });
+    return { ok: true, id: sent.id, template: tpl.name, to: masked(phone) };
+  });
 
   fastify.put("/templates", async (request) => {
     const body = saveSchema.parse(request.body || {});

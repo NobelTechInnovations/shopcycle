@@ -153,8 +153,10 @@ function shapeTemplate(t) {
   };
 }
 
-async function templates(prisma, store) {
-  const conn = await cloud.connectionOrThrow(prisma, store.id, { needNumber: false });
+/** Approved and pending templates on the store's account — or on
+ * Oyklane's shared account when `conn` is that one. */
+async function templates(prisma, store, { conn } = {}) {
+  conn = conn || (await cloud.connectionOrThrow(prisma, store.id, { needNumber: false }));
   return (await cloud.listTemplates(conn)).map(shapeTemplate);
 }
 
@@ -221,6 +223,9 @@ async function deliver(prisma, store, { phone, payload, record, dedupeKey, conn 
     throw err;
   }
   const now = new Date();
+  // Sent from Oyklane's shared number: the customer's replies arrive there,
+  // so the conversation remembers it (and replies go out from it too).
+  if (Boolean(conn.platform) !== Boolean(convo.viaPlatform)) await prisma.whatsappConversation.update({ where: { id: convo.id }, data: { viaPlatform: Boolean(conn.platform) } });
   const message = await prisma.whatsappMessage.create({
     data: {
       storeId: store.id,
@@ -246,20 +251,24 @@ async function sendFromInbox(prisma, store, conversationId, input, user) {
   const convo = await prisma.whatsappConversation.findFirst({ where: { id: conversationId, storeId: store.id }, include: { customer: true } });
   if (!convo) throw new HttpError(404, "Conversation not found");
   const who = { sentById: user?.id || null, sentByName: userName(user), source: "inbox" };
+  // The customer is talking to Oyklane's shared number (order updates sent
+  // for this store): replies must come from that number.
+  const conn = convo.viaPlatform ? await require("./platform").connection(prisma) : undefined;
+  if (convo.viaPlatform && !conn) throw new HttpError(400, "This customer wrote to Oyklane's shared number, which isn't available right now.");
   if (input.kind === "text" || input.kind === "media") {
     if (!windowOpen(convo)) throw new HttpError(400, "It's been more than 24 hours since this customer's last message, so WhatsApp only allows an approved template. Choose \"Template\".", { reason: "window_closed" });
     if (input.kind === "text") {
       const text = String(input.body || "").trim();
       if (!text) throw new HttpError(400, "Write a message.");
-      return deliver(prisma, store, { phone: convo.phone, payload: { type: "text", text: { body: text.slice(0, 4096), preview_url: true } }, record: { kind: "text", messageType: "text", body: text, ...who } });
+      return deliver(prisma, store, { conn, phone: convo.phone, payload: { type: "text", text: { body: text.slice(0, 4096), preview_url: true } }, record: { kind: "text", messageType: "text", body: text, ...who } });
     }
     const type = ["image", "video", "document", "audio"].includes(input.mediaType) ? input.mediaType : "document";
     if (!input.mediaId) throw new HttpError(400, "Upload the file first.");
     const media = { id: input.mediaId, ...(input.caption && type !== "audio" ? { caption: String(input.caption).slice(0, 1024) } : {}), ...(type === "document" && input.filename ? { filename: input.filename } : {}) };
-    return deliver(prisma, store, { phone: convo.phone, payload: { type, [type]: media }, record: { kind: type, messageType: type, body: input.caption || `[${type}]`, mediaId: input.mediaId, ...who } });
+    return deliver(prisma, store, { conn, phone: convo.phone, payload: { type, [type]: media }, record: { kind: type, messageType: type, body: input.caption || `[${type}]`, mediaId: input.mediaId, ...who } });
   }
   // Template.
-  const all = await templates(prisma, store);
+  const all = await templates(prisma, store, { conn });
   const tpl = all.find((t) => t.name === input.templateName && t.language === input.language && t.status === "APPROVED");
   if (!tpl) throw new HttpError(400, "Choose an approved template.");
   if (tpl.category === "MARKETING") {
@@ -269,6 +278,7 @@ async function sendFromInbox(prisma, store, conversationId, input, user) {
   }
   const components = templateComponents(tpl, input);
   return deliver(prisma, store, {
+    conn,
     phone: convo.phone,
     payload: { type: "template", template: { name: tpl.name, language: { code: tpl.language }, components } },
     record: { kind: "template", messageType: "template", templateName: tpl.name, templateLanguage: tpl.language, body: renderTemplateText(tpl, input.body), ...who },

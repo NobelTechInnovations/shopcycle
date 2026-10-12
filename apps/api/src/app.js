@@ -219,6 +219,19 @@ function buildApp() {
   app.register(publicAppsRoutes, { prefix: "/api/public" });
   // Flow automations react to the same store events webhooks carry.
   flowsEngine.register(app.log);
+  // …and so do WhatsApp order updates (whatsapp/notifications.js).
+  require("./modules/whatsapp/notifications").register(app.log);
+
+  // Order links in WhatsApp messages sent from Oyklane's shared number:
+  // api.oyklane.com/o/<order code> → that order's page on its own store.
+  app.get("/o/:token", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request, reply) => {
+    const token = String(request.params.token || "");
+    if (!/^[A-Za-z0-9_-]{6,80}$/.test(token)) return reply.code(404).send("Not found");
+    const order = await app.prisma.order.findFirst({ where: { statusToken: token }, select: { storeId: true } });
+    if (!order) return reply.code(404).send("Not found");
+    const store = await app.prisma.store.findUnique({ where: { id: order.storeId } });
+    return reply.redirect(require("./lib/storefront-url").storefrontUrl(store, `/orders/${token}`), 302);
+  });
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) {

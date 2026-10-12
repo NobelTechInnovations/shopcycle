@@ -20,13 +20,35 @@ function smsProvider() {
 
 const zohoToken = () => String(env.ZOHO_CPAAS_TOKEN || env.ZEPTOMAIL_TOKEN || "").replace(/^Zoho-enczapikey\s+/i, "").trim();
 
+/**
+ * Oyklane's own WhatsApp number (Super admin ▸ Messaging ▸ Oyklane
+ * WhatsApp) with its approved "oy_login_code" Authentication template —
+ * used for codes only when no other WhatsApp provider is set up. Checked in
+ * the background (jobs tick and each send), so channels() stays synchronous.
+ */
+const platformOtp = { at: 0, ready: false };
+function refreshPlatformOtp(prisma) {
+  if (!prisma || Date.now() - platformOtp.at < 60 * 1000) return;
+  platformOtp.at = Date.now();
+  (async () => {
+    const platform = require("../modules/whatsapp/platform");
+    const cloud = require("../modules/whatsapp/cloud");
+    const { OTP_TEMPLATE } = require("../modules/whatsapp/standard-templates");
+    const conn = await platform.connection(prisma);
+    platformOtp.ready = Boolean(conn) && (await cloud.listTemplates(conn)).some((t) => t.name === OTP_TEMPLATE && t.status === "APPROVED");
+  })().catch(() => {
+    platformOtp.ready = false;
+  });
+}
+
 function whatsappProvider() {
   // Zoho's code template is set in Super admin ▸ Messaging (whatsapp-templates.js).
   const zohoReady = zohoToken() && env.ZOHO_WHATSAPP_FROM && templates.otpTemplate();
   const p = env.WHATSAPP_PROVIDER || (zohoReady ? "zoho" : env.META_WHATSAPP_TOKEN ? "meta" : env.TWILIO_WHATSAPP_FROM ? "twilio" : "log");
   if (p === "zoho" && !zohoReady) return "log";
   if (p === "twilio" && !(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_WHATSAPP_FROM)) return "log";
-  if (p === "meta" && !(env.META_WHATSAPP_TOKEN && env.META_WHATSAPP_PHONE_NUMBER_ID && env.META_WHATSAPP_OTP_TEMPLATE)) return "log";
+  if (p === "meta" && !(env.META_WHATSAPP_TOKEN && env.META_WHATSAPP_PHONE_NUMBER_ID && env.META_WHATSAPP_OTP_TEMPLATE)) return platformOtp.ready ? "oyklane" : "log";
+  if (p === "log" && platformOtp.ready) return "oyklane";
   return p;
 }
 
@@ -124,6 +146,20 @@ const SENDERS = {
       });
       return data.messages?.[0]?.id || null;
     },
+    // Oyklane's own number, Authentication template with a copy-code button.
+    async oyklane({ to, code, prisma }) {
+      const platform = require("../modules/whatsapp/platform");
+      const cloud = require("../modules/whatsapp/cloud");
+      const { OTP_TEMPLATE } = require("../modules/whatsapp/standard-templates");
+      const conn = await platform.connection(prisma);
+      if (!conn) throw new Error("Oyklane's WhatsApp number isn't connected");
+      const sent = await cloud.send(conn, {
+        to,
+        type: "template",
+        template: { name: OTP_TEMPLATE, language: { code: "en" }, components: [{ type: "body", parameters: [{ type: "text", text: code }] }, { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: code }] }] },
+      });
+      return sent.id;
+    },
   },
 };
 
@@ -133,6 +169,7 @@ const SENDERS = {
  */
 async function sendOtp(prisma, { to, code, channel = "sms", storeId = null, storeName = "Oyklane", log }) {
   templates.cached(prisma); // keeps Super admin's templates fresh (background, once a minute)
+  refreshPlatformOtp(prisma);
   const provider = channel === "whatsapp" ? whatsappProvider() : smsProvider();
   const text = `${code} is your ${storeName} sign-in code. It expires in 10 minutes. Don't share it with anyone.`;
   let status = "logged";
@@ -141,7 +178,7 @@ async function sendOtp(prisma, { to, code, channel = "sms", storeId = null, stor
 
   if (provider !== "log") {
     try {
-      providerMessageId = await SENDERS[channel][provider]({ to, code, text });
+      providerMessageId = await SENDERS[channel][provider]({ to, code, text, prisma });
       status = "sent";
     } catch (err) {
       status = "failed";
@@ -159,4 +196,4 @@ async function sendOtp(prisma, { to, code, channel = "sms", storeId = null, stor
   return { status, provider, ...(error && { error }) };
 }
 
-module.exports = { sendOtp, channels, smsProvider, whatsappProvider, whatsappStatus };
+module.exports = { sendOtp, channels, smsProvider, whatsappProvider, whatsappStatus, refreshPlatformOtp };

@@ -113,6 +113,8 @@ function startJobs(fastify) {
     }
     // Super admin's WhatsApp templates, in case another API process changed them.
     await whatsappTemplates.load(fastify.prisma).catch(() => {});
+    // …and whether Oyklane's own number can send sign-in codes.
+    require("./lib/messaging").refreshPlatformOtp(fastify.prisma);
     try {
       const sent = await drainQueue(fastify.prisma, { log: fastify.log });
       if (sent) fastify.log.info({ sent }, "jobs: queued emails delivered");

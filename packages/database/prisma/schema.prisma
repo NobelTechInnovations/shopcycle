@@ -645,6 +645,7 @@ model Store {
   adMedia               AdMedia[]
   adActivities          AdActivity[]
   adRules               AdRule[]
+  googleAdsAccount      GoogleAdsAccount?
   emailLogs             EmailLog[]
   shopperOtps           ShopperOtp[]
   shopperPhoneOtps      ShopperPhoneOtp[]
@@ -1752,14 +1753,17 @@ model MetaConnection {
   /// WhatsApp Business assets the granted token can see (see
   /// integrations/meta/service.js#listAssets). Null until the merchant
   /// actually picks one on the Connect screen.
-  adAccountId      String?
-  adAccountName    String?
-  pageId           String?
-  pageName         String?
-  wabaId           String?
-  wabaName         String?
-  phoneNumberId    String?
-  phoneNumberLabel String?
+  adAccountId        String?
+  adAccountName      String?
+  pageId             String?
+  pageName           String?
+  /// The Instagram account ads run from (linked to the Page or the ad account).
+  instagramAccountId String?
+  instagramUsername  String?
+  wabaId             String?
+  wabaName           String?
+  phoneNumberId      String?
+  phoneNumberLabel   String?
 
   /// WhatsApp Embedded Signup: the business integration token Meta gives
   /// for the seller's WhatsApp account (encrypted like accessToken). Used
@@ -1887,6 +1891,9 @@ model WhatsappConversation {
   lastPreview    String?
   /// "ai" while the approved AI workflow may answer; "human" after a hand-off.
   handledBy      String    @default("human")
+  /// The customer wrote to Oyklane's shared number (order updates from a
+  /// store without its own number) — replies go out from that number too.
+  viaPlatform    Boolean   @default(false)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -2005,6 +2012,8 @@ model WhatsappBroadcastRecipient {
 model AdDraft {
   id          String   @id @default(cuid())
   storeId     String
+  /// meta | google
+  platform    String   @default("meta")
   name        String
   /// The whole campaign → ad sets → ads spec (see meta-ads/spec.js).
   data        Json     @default("{}")
@@ -2028,6 +2037,8 @@ model AdDraft {
 model AdMedia {
   id          String   @id @default(cuid())
   storeId     String
+  /// meta | google
+  platform    String   @default("meta")
   adAccountId String
   /// image | video
   kind        String
@@ -2056,6 +2067,8 @@ model AdMedia {
 model AdActivity {
   id         String   @id @default(cuid())
   storeId    String
+  /// meta | google
+  platform   String   @default("meta")
   userId     String?
   userName   String?
   /// user | recommendation | rule
@@ -2075,10 +2088,40 @@ model AdActivity {
   @@map("ad_activities")
 }
 
+/// The store's Google Ads account (the Google sign-in itself lives in
+/// app_connections "google-account"): which customer id Oyklane manages,
+/// through which manager account, and the store's purchase conversion.
+model GoogleAdsAccount {
+  id               String   @id @default(cuid())
+  storeId          String   @unique
+  /// 10 digits, no dashes.
+  customerId       String
+  customerName     String?
+  /// Set when access to the account comes through a manager (MCC) account.
+  loginCustomerId  String?
+  currency         String?
+  timeZone         String?
+  /// The "Purchase" conversion action Oyklane created or the seller chose,
+  /// and its tag (AW-123456789 / label) the storefront fires on orders.
+  conversionAction String?
+  conversionTagId  String?
+  conversionLabel  String?
+  /// Merchant Center linked for Shopping / Performance Max.
+  merchantId       String?
+  connectedAt      DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("google_ads_accounts")
+}
+
 /// Opt-in automatic optimisation: one rule, its limits, its switch.
 model AdRule {
   id             String    @id @default(cuid())
   storeId        String
+  /// meta | google
+  platform       String    @default("meta")
   name           String
   /// pause_high_cpa | pause_low_ctr | raise_budget_good_roas | lower_budget_poor_roas
   kind           String
