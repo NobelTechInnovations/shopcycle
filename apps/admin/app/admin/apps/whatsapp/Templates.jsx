@@ -50,6 +50,11 @@ const STARTERS = [
     values: { name: "delivery_feedback", category: "MARKETING", body: "Hi {{1}}, we hope you're enjoying your order! Could you take a minute to tell us how we did?", examples: ["Asha"], footer: "Reply STOP to opt out", buttons: [{ type: "QUICK_REPLY", text: "Loved it" }, { type: "QUICK_REPLY", text: "Could be better" }] },
   },
   {
+    key: "reorder",
+    label: "Reorder reminder",
+    values: { name: "reorder_reminder", category: "MARKETING", body: "Hi {{1}}, running low on {{2}}? Reorder in a few taps and we'll ship it right away.", examples: ["Asha", "Kaju Katli"], footer: "Reply STOP to opt out", buttons: [{ type: "URL", text: "Reorder", url: "https://yourstore.com" }] },
+  },
+  {
     key: "offer",
     label: "Festive offer",
     values: { name: "festive_offer", category: "MARKETING", body: "Hi {{1}}, our festive sale is live! Get {{2}} off on everything this week only.", examples: ["Asha", "20%"], footer: "Reply STOP to opt out", buttons: [{ type: "COPY_CODE", example: "FESTIVE20" }, { type: "URL", text: "Shop now", url: "https://yourstore.com" }] },

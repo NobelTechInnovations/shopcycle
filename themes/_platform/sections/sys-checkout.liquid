@@ -86,6 +86,12 @@
                 <span>Email me news and offers from {{ shop.name }}. You can unsubscribe any time.</span>
               </label>
             {% endif %}
+            {% if checkout_whatsapp and cf.phone != 'hidden' %}
+              <label class="sys-check">
+                <input type="checkbox" name="acceptsWhatsapp" value="true">
+                <span>Send me offers on WhatsApp from {{ shop.name }}. Reply STOP any time to stop.</span>
+              </label>
+            {% endif %}
           </section>
 
           <section class="sys-co__step" aria-labelledby="co-delivery">

@@ -20,13 +20,9 @@ function verifySignature(rawBody, header) {
 
 /** Claims a message key; false when it was already handled. */
 async function claim(prisma, key, storeId) {
-  try {
-    await prisma.messageDedupe.create({ data: { key, storeId } });
-    return true;
-  } catch (err) {
-    if (err.code === "P2002") return false;
-    throw err;
-  }
+  // skipDuplicates: a repeat is a normal event here, not an error to log.
+  const { count } = await prisma.messageDedupe.createMany({ data: [{ key, storeId }], skipDuplicates: true });
+  return count === 1;
 }
 
 const STOP_WORDS = /^\s*(stop|unsubscribe|stop all|opt ?out|cancel offers|band karo)\s*[.!]*\s*$/i;

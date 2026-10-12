@@ -12,6 +12,7 @@ const createCustomerSchema = z.object({
   country: z.string().optional().nullable(),
   acceptsEmailMarketing: z.boolean().optional(),
   acceptsSmsMarketing: z.boolean().optional(),
+  acceptsWhatsappMarketing: z.boolean().optional(),
 });
 
 const updateCustomerSchema = createCustomerSchema.partial();

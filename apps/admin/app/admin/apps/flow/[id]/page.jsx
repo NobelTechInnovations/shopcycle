@@ -3,12 +3,13 @@
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { App, Button, Dropdown, Input, InputNumber, Modal, Radio, Segmented, Select, Skeleton, Switch, Tag, Tooltip } from "antd";
+import { Alert, App, Button, Dropdown, Input, InputNumber, Modal, Radio, Segmented, Select, Skeleton, Switch, Tag, Tooltip } from "antd";
 import { ArrowDown, ArrowUp, Braces, ChevronDown, Flag, MoreHorizontal, Plus, Send, Trash2, X } from "lucide-react";
 import { PageHeader, SaveBar, EmptyState, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 import { StepIcon, TriggerIcon, stepSummary, stepTitle, stepShort, stepHeadline, newStep, relative } from "../flow-ui";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { WaPreview } from "../../whatsapp/wa-ui";
 
 const STATUS_TAG = {
   running: { color: "processing", label: "Running" },
@@ -17,7 +18,7 @@ const STATUS_TAG = {
   stopped: { color: "default", label: "Stopped" },
   failed: { color: "error", label: "Failed" },
 };
-const RESULT_LABEL = { passed: "Condition met", not_met: "Condition not met — stopped", sent: "Sent", skipped: "Skipped", failed: "Failed", waiting: "Waited", stopped: "Stopped" };
+const RESULT_LABEL = { passed: "Condition met", not_met: "Condition not met", sent: "Sent", skipped: "Skipped", failed: "Failed", waiting: "Waited", stopped: "Stopped" };
 
 // ── Canvas ────────────────────────────────────────────────────────────
 
@@ -104,7 +105,11 @@ function Canvas({ draft, catalog, selected, setSelected, update }) {
     update({ steps: next });
     setSelected("trigger");
   };
-  const invalid = (s) => (s.type === "send_email" && (!s.subject?.trim() || !s.body?.trim())) || (s.type === "condition" && !(s.rules || []).length) || (s.type === "notify_owner" && !s.subject?.trim());
+  const invalid = (s) =>
+    (s.type === "send_email" && (!s.subject?.trim() || !s.body?.trim())) ||
+    (s.type === "condition" && !(s.rules || []).length) ||
+    (s.type === "notify_owner" && !s.subject?.trim()) ||
+    (s.type === "send_whatsapp" && !s.templateName);
 
   return (
     <div className="rounded-[16px] border border-app-border px-3 sm:px-4 py-6 sm:py-8" style={{ backgroundColor: "#FAFAFB", backgroundImage: "radial-gradient(#E4E4E9 1px, transparent 1px)", backgroundSize: "18px 18px" }}>
@@ -247,13 +252,27 @@ function RuleRow({ rule, fields, catalog, onChange, onRemove }) {
   );
 }
 
-function ConditionForm({ step, set, catalog, subject }) {
+function ConditionForm({ step, set, catalog, subject, steps = [] }) {
   const fields = Object.entries(catalog.fields).filter(([, f]) => f.subjects.includes(subject));
   const rules = step.rules || [];
   const setRule = (i, r) => set({ rules: rules.map((x, j) => (j === i ? r : x)) });
+  const index = steps.findIndex((x) => x.id === step.id);
+  const later = steps.slice(index + 2).map((x, k) => ({ value: x.id, label: `Step ${index + 3 + k} · ${stepShort(x)}` }));
   return (
     <div>
-      <p className="text-[13px] text-ink-muted mt-0 mb-3">If this isn't true, the flow stops here for that {subject === "cart" ? "checkout" : subject}.</p>
+      <Field label="If it isn't true" hint="Stop is the safe choice. Skipping or jumping lets one flow handle both cases.">
+        <Select
+          className="w-full"
+          value={step.otherwise || "stop"}
+          onChange={(otherwise) => set({ otherwise, gotoStepId: otherwise === "goto" ? later[0]?.value || "" : "" })}
+          options={[
+            { value: "stop", label: `Stop the flow for this ${subject === "cart" ? "checkout" : subject}` },
+            { value: "skip", label: "Skip the next step and carry on" },
+            { value: "goto", label: "Jump to a later step", disabled: !later.length },
+          ]}
+        />
+        {step.otherwise === "goto" && <Select className="w-full mt-2" value={step.gotoStepId} onChange={(gotoStepId) => set({ gotoStepId })} options={later} />}
+      </Field>
       <Field label="Carry on when">
         <Segmented
           value={step.match}
@@ -456,6 +475,125 @@ function OwnerForm({ step, set, catalog, subject, trigger }) {
   );
 }
 
+function WhatsappForm({ step, set, catalog, subject }) {
+  const [templates, setTemplates] = useState(null);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    apiFetch("/api/whatsapp/templates?status=approved")
+      .then((d) => setTemplates(d.templates))
+      .catch((err) => {
+        setTemplates([]);
+        setError(err.message);
+      });
+  }, []);
+  const sources = (catalog.waSources || []).filter((x) => x.subjects.includes(subject)).map((x) => ({ value: x.key, label: x.label }));
+  const tpl = (templates || []).find((t) => t.name === step.templateName && t.language === step.language) || (templates || []).find((t) => t.name === step.templateName);
+  const vars = step.variables || [];
+  const sample = vars.map((v) => (v.source === "text" ? v.value : sources.find((x) => x.value === v.source)?.label || ""));
+  if (error) return <Alert type="warning" showIcon message="WhatsApp isn't ready" description={<>{error} <Link href="/admin/apps/whatsapp">Open WhatsApp</Link></>} />;
+  return (
+    <div>
+      <Field label="Template" hint="Only Meta-approved templates can be sent. Create them in WhatsApp ▸ Templates.">
+        <Select
+          className="w-full"
+          loading={templates === null}
+          showSearch
+          value={tpl ? `${tpl.name}|${tpl.language}` : step.templateName || undefined}
+          placeholder="Choose a template"
+          notFoundContent={<span className="text-xs">No approved templates yet. <Link href="/admin/apps/whatsapp?tab=templates">Create one</Link></span>}
+          onChange={(v) => {
+            const t = templates.find((x) => `${x.name}|${x.language}` === v);
+            set({
+              templateName: t.name,
+              language: t.language,
+              category: t.category === "MARKETING" ? "MARKETING" : "UTILITY",
+              variables: Array.from({ length: t.bodyVariables }, (_, i) => vars[i] || { source: i === 0 ? "customer.first_name" : "text", value: "" }),
+              button: t.urlButtonVariable >= 0 ? step.button || { source: sources.find((x) => /token/.test(x.value))?.value || "text", value: "" } : null,
+            });
+          }}
+          options={(templates || []).map((t) => ({ value: `${t.name}|${t.language}`, label: `${t.name} · ${t.language} · ${t.category.toLowerCase()}` }))}
+        />
+        {step.templateName && templates && !tpl && <p className="text-[12px] text-status-warning mt-1 mb-0">“{step.templateName}” isn&apos;t an approved template in your WhatsApp account yet — create it with that name, or pick another.</p>}
+      </Field>
+      {tpl?.category === "MARKETING" && <Alert className="mb-3" type="info" showIcon message="Marketing template: only customers who agreed to WhatsApp marketing get it. Others are skipped (and shown in Activity)." />}
+      {vars.map((v, i) => (
+        <Field key={i} label={`{{${i + 1}}} is`}>
+          <Select className="w-full" value={v.source} options={sources} onChange={(source) => set({ variables: vars.map((x, j) => (j === i ? { source, value: "" } : x)) })} />
+          {v.source === "text" && <Input className="mt-1" value={v.value} maxLength={300} onChange={(e) => set({ variables: vars.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)) })} />}
+        </Field>
+      ))}
+      {tpl?.mediaHeader && (
+        <Field label={`Header ${tpl.mediaHeader} link`}>
+          <Input value={step.headerMediaUrl} placeholder="https://…" onChange={(e) => set({ headerMediaUrl: e.target.value })} />
+        </Field>
+      )}
+      {tpl?.urlButtonVariable >= 0 && (
+        <Field label="Button link ends with" hint="The part after the fixed link in your template's button.">
+          <Select className="w-full" value={step.button?.source} options={sources} onChange={(source) => set({ button: { source, value: "" } })} />
+          {step.button?.source === "text" && <Input className="mt-1" value={step.button.value} onChange={(e) => set({ button: { ...step.button, value: e.target.value } })} />}
+        </Field>
+      )}
+      {tpl && (
+        <div className="mt-2">
+          <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-muted">Preview</p>
+          <WaPreview header={tpl.header ? { type: tpl.header.format?.toLowerCase(), text: tpl.header.text } : null} body={tpl.body} footer={tpl.footer} buttons={tpl.buttons} values={sample} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const TIMES = Array.from({ length: 48 }, (_, i) => {
+  const hh = String(Math.floor(i / 2)).padStart(2, "0");
+  const mm = i % 2 ? "30" : "00";
+  const h12 = Math.floor(i / 2) % 12 || 12;
+  return { value: `${hh}:${mm}`, label: `${h12}:${mm} ${i < 24 ? "am" : "pm"}` };
+});
+
+function SettingsForm({ draft, update }) {
+  const st = draft.settings || {};
+  const q = st.quietHours || { enabled: false, from: "21:00", to: "09:00" };
+  const set = (patch) => update({ settings: { ...st, ...patch } });
+  return (
+    <div className="bg-app-surface border border-app-border rounded-[16px] shadow-card p-5 max-w-2xl flex flex-col gap-5">
+      <div>
+        <label className="flex items-center gap-2 font-medium text-[14px]">
+          <Switch size="small" checked={q.enabled} onChange={(enabled) => set({ quietHours: { ...q, enabled } })} /> Quiet hours for WhatsApp
+        </label>
+        <p className="text-[12.5px] text-ink-muted mt-1 mb-2">A WhatsApp step due at night waits until the morning. Uses your store&apos;s time zone.</p>
+        {q.enabled && (
+          <div className="flex items-center gap-2 text-[13px]">
+            From
+            <Select className="w-32" value={q.from} options={TIMES} onChange={(from) => set({ quietHours: { ...q, from } })} />
+            to
+            <Select className="w-32" value={q.to} options={TIMES} onChange={(to) => set({ quietHours: { ...q, to } })} />
+          </div>
+        )}
+      </div>
+      <div>
+        <p className="font-medium text-[14px] m-0">Frequency limit</p>
+        <p className="text-[12.5px] text-ink-muted mt-1 mb-2">Don&apos;t WhatsApp the same customer from any flow more than once in this many days (0 = no limit).</p>
+        <InputNumber min={0} max={60} value={st.maxPerCustomerDays || 0} onChange={(v) => set({ maxPerCustomerDays: v || 0 })} addonAfter="days" />
+      </div>
+      <div>
+        <label className="flex items-center gap-2 font-medium text-[14px]">
+          <Switch size="small" checked={Boolean(st.testMode)} onChange={(testMode) => set({ testMode })} /> Test mode
+        </label>
+        <p className="text-[12.5px] text-ink-muted mt-1 mb-2">While on, the flow runs for real events but every email and WhatsApp goes to you instead of the customer — marked [Test].</p>
+        {st.testMode && (
+          <div className="grid sm:grid-cols-2 gap-2">
+            <Input placeholder="Your WhatsApp number, +91…" value={st.testPhone} onChange={(e) => set({ testPhone: e.target.value })} />
+            <Input placeholder="Your email" value={st.testEmail} onChange={(e) => set({ testEmail: e.target.value })} />
+          </div>
+        )}
+      </div>
+      <p className="text-[12.5px] text-ink-muted m-0">
+        Each event runs a flow once per order, customer or checkout — a repeated or retried event never sends twice. Activity shows why every message was sent or skipped.
+      </p>
+    </div>
+  );
+}
+
 function Inspector({ draft, catalog, selected, update, changeTrigger }) {
   const subject = catalog.triggers[draft.trigger]?.subject;
   if (selected === "trigger") {
@@ -469,13 +607,14 @@ function Inspector({ draft, catalog, selected, update, changeTrigger }) {
   const step = draft.steps[index];
   if (!step) return <InspectorShell title="Select a step">Click a step on the left to edit it.</InspectorShell>;
   const set = (patch) => update({ steps: draft.steps.map((s) => (s.id === step.id ? { ...s, ...patch } : s)) });
-  const props = { step, set, catalog, subject, trigger: draft.trigger };
+  const props = { step, set, catalog, subject, trigger: draft.trigger, steps: draft.steps };
   return (
     <InspectorShell icon={<StepIcon type={step.type} />} title={`Step ${index + 1} · ${stepTitle(step, catalog)}`} hint={catalog.stepTypes[step.type]?.hint}>
       {step.type === "wait" && <WaitForm {...props} />}
       {step.type === "condition" && <ConditionForm {...props} />}
       {step.type === "send_email" && <EmailForm {...props} />}
       {step.type === "notify_owner" && <OwnerForm {...props} />}
+      {step.type === "send_whatsapp" && <WhatsappForm {...props} />}
     </InspectorShell>
   );
 }
@@ -552,7 +691,7 @@ function Activity({ runs, flow, catalog }) {
 
 // ── Page ──────────────────────────────────────────────────────────────
 
-const pick = (f) => ({ name: f.name, trigger: f.trigger, steps: f.steps });
+const pick = (f) => ({ name: f.name, trigger: f.trigger, steps: f.steps, settings: f.settings || {} });
 
 export default function FlowEditorPage({ params }) {
   const { id } = use(params);
@@ -674,7 +813,7 @@ export default function FlowEditorPage({ params }) {
             {flow.enabled ? <span className="text-status-success font-medium">On</span> : "Off"}
           </label>
         }
-        subtitle={`${flow.runsCount} run${flow.runsCount === 1 ? "" : "s"} · ${flow.emailsSent} email${flow.emailsSent === 1 ? "" : "s"} sent · last run ${relative(flow.lastRunAt).toLowerCase()}`}
+        subtitle={`${flow.runsCount} run${flow.runsCount === 1 ? "" : "s"} · ${flow.emailsSent} email${flow.emailsSent === 1 ? "" : "s"}${flow.whatsappSent ? ` · ${flow.whatsappSent} WhatsApp` : ""} sent · last run ${relative(flow.lastRunAt).toLowerCase()}${draft.settings?.testMode ? " · TEST MODE" : ""}`}
         actions={
           <>
             <Button icon={<Send size={14} aria-hidden="true" />} onClick={() => setTesting(true)} disabled={!draft.steps.some((s) => s.type === "send_email" || s.type === "notify_owner")}>
@@ -693,11 +832,14 @@ export default function FlowEditorPage({ params }) {
         onChange={setTab}
         options={[
           { value: "editor", label: "Editor" },
+          { value: "settings", label: "Settings" },
           { value: "activity", label: `Activity${runs.length ? ` · ${runs.length}` : ""}` },
         ]}
       />
 
-      {tab === "editor" ? (
+      {tab === "settings" ? (
+        <SettingsForm draft={draft} update={update} />
+      ) : tab === "editor" ? (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)] items-start">
           <Canvas draft={draft} catalog={catalog} selected={selected} setSelected={setSelected} update={update} />
           <Inspector draft={draft} catalog={catalog} selected={selected} update={update} changeTrigger={changeTrigger} />

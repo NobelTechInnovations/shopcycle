@@ -828,6 +828,8 @@ async function renderPage(
   if (templateName === "checkout") {
     // Which fields the form asks for — Settings ▸ Checkout.
     globalContext.checkout_fields = storeSettings(store).checkout;
+    // "Message me on WhatsApp" box: only when the store has a WhatsApp number connected.
+    globalContext.checkout_whatsapp = Boolean(await prisma.metaConnection.findFirst({ where: { storeId: store.id, phoneNumberId: { not: null } }, select: { id: true } }));
     globalContext.checkout_countries = CHECKOUT_COUNTRIES;
     globalContext.indian_states = INDIAN_STATES.map((s) => s.name);
   }

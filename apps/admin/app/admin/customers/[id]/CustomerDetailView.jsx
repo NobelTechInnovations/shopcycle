@@ -162,6 +162,7 @@ export function CustomerDetailView({ customer }) {
           country: customer.country,
           acceptsEmailMarketing: customer.acceptsEmailMarketing,
           acceptsSmsMarketing: customer.acceptsSmsMarketing,
+          acceptsWhatsappMarketing: customer.acceptsWhatsappMarketing,
         }}
         onFinish={handleSave}
         onValuesChange={() => setDirty(true)}
@@ -245,8 +246,11 @@ export function CustomerDetailView({ customer }) {
               <Form.Item name="acceptsEmailMarketing" valuePropName="checked" className="mb-2">
                 <Checkbox>Email subscriber</Checkbox>
               </Form.Item>
-              <Form.Item name="acceptsSmsMarketing" valuePropName="checked" className="mb-0">
+              <Form.Item name="acceptsSmsMarketing" valuePropName="checked" className="mb-2">
                 <Checkbox>SMS subscriber</Checkbox>
+              </Form.Item>
+              <Form.Item name="acceptsWhatsappMarketing" valuePropName="checked" className="mb-0" extra={customer.whatsappConsentAt ? `Changed ${new Date(customer.whatsappConsentAt).toLocaleDateString()} (${customer.whatsappConsentSource || "unknown"})` : null}>
+                <Checkbox>Agreed to WhatsApp marketing</Checkbox>
               </Form.Item>
             </Card>
           </div>

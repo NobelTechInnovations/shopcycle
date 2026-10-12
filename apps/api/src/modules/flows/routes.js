@@ -26,6 +26,8 @@ function shape(flow) {
     templateKey: flow.templateKey,
     runsCount: flow.runsCount,
     emailsSent: flow.emailsSent,
+    whatsappSent: flow.whatsappSent,
+    settings: flow.settings || {},
     lastRunAt: flow.lastRunAt,
     createdAt: flow.createdAt,
     updatedAt: flow.updatedAt,

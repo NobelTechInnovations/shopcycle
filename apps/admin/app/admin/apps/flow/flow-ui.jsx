@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, GitBranch, Mail, BellRing, ShoppingCart, Truck, PackageCheck, XCircle, Undo2, UserPlus, ShoppingBag, Zap } from "lucide-react";
+import { Clock, GitBranch, Mail, BellRing, ShoppingCart, Truck, PackageCheck, XCircle, Undo2, UserPlus, ShoppingBag, Zap, MessageCircle, Wallet } from "lucide-react";
 
 /** Pieces shared by the Flow home and the editor: icons, one-line
  * summaries of triggers and steps, the tints that tell steps apart. */
@@ -13,6 +13,7 @@ export const TRIGGER_ICON = {
   order_refunded: Undo2,
   customer_created: UserPlus,
   checkout_abandoned: ShoppingBag,
+  payment_pending: Wallet,
 };
 
 export const STEP_META = {
@@ -21,6 +22,7 @@ export const STEP_META = {
   condition: { icon: GitBranch, tint: "bg-[#ECFDF5] text-[#047857]", ring: "ring-[#A7F3D0]" },
   send_email: { icon: Mail, tint: "bg-accent-soft text-accent", ring: "ring-[#D8CCFF]" },
   notify_owner: { icon: BellRing, tint: "bg-[#FDF2F8] text-[#BE185D]", ring: "ring-[#FBCFE8]" },
+  send_whatsapp: { icon: MessageCircle, tint: "bg-[#E7F8EE] text-[#15803D]", ring: "ring-[#BBF7D0]" },
 };
 
 export function StepIcon({ type, size = 16, className = "" }) {
@@ -70,6 +72,8 @@ export function stepSummary(step, catalog) {
       return step.subject ? `Email the customer: “${step.subject}”` : "Email the customer";
     case "notify_owner":
       return step.subject ? `Email me: “${step.subject}”` : "Email me";
+    case "send_whatsapp":
+      return step.templateName ? `WhatsApp the customer: ${step.templateName}` : "WhatsApp the customer";
     default:
       return step.type;
   }
@@ -77,7 +81,7 @@ export function stepSummary(step, catalog) {
 
 export const stepTitle = (step, catalog) => catalog.stepTypes[step.type]?.label || step.type;
 
-const SHORT = { wait: "Wait", condition: "Condition", send_email: "Email customer", notify_owner: "Email me" };
+const SHORT = { wait: "Wait", condition: "Condition", send_email: "Email customer", notify_owner: "Email me", send_whatsapp: "WhatsApp" };
 export const stepShort = (step) => SHORT[step.type] || step.type;
 
 /** The card's main line: what's specific to this step. */
@@ -92,6 +96,8 @@ export function stepHeadline(step, catalog) {
     case "send_email":
     case "notify_owner":
       return step.subject || "Add a subject";
+    case "send_whatsapp":
+      return step.templateName ? `Template “${step.templateName}”` : "Choose a template";
     default:
       return "";
   }
@@ -121,6 +127,7 @@ export function newStep(type, catalog, trigger) {
       includeSummary: false,
     };
   }
+  if (type === "send_whatsapp") return { id, type, templateName: "", language: "en", category: "UTILITY", variables: [], headerMediaUrl: "", button: null };
   return { id, type: "notify_owner", subject: "Flow alert", body: "" };
 }
 

@@ -25,10 +25,14 @@ async function createCustomer(prisma, storeId, input) {
 }
 
 async function updateCustomer(prisma, storeId, id, input) {
-  await getCustomer(prisma, storeId, id);
+  const current = await getCustomer(prisma, storeId, id);
   if (input.email) {
     const existing = await repository.findByEmail(prisma, storeId, input.email, id);
     if (existing) throw new HttpError(409, "A customer with that email already exists");
+  }
+  // WhatsApp consent: when and how it changed is kept as the record.
+  if (input.acceptsWhatsappMarketing !== undefined && input.acceptsWhatsappMarketing !== current.acceptsWhatsappMarketing) {
+    input = { ...input, whatsappConsentAt: new Date(), whatsappConsentSource: "admin" };
   }
   return repository.update(prisma, id, input);
 }

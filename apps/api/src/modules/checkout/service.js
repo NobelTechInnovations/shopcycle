@@ -134,6 +134,7 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
     // Consent is only ever given here, never taken away: unticking the box
     // on a later order doesn't unsubscribe someone who opted in before.
     ...(input.acceptsMarketing && { acceptsEmailMarketing: true }),
+    ...(input.acceptsWhatsapp && input.phone && { acceptsWhatsappMarketing: true, whatsappConsentAt: new Date(), whatsappConsentSource: "checkout" }),
   };
   // Signed in and checking out with the account's own email: the order
   // belongs to the account. A guest using an account's email still gets

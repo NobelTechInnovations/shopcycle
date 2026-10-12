@@ -1,132 +1,68 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Card, Button, Table, Tag, Modal, Form, Input, Select, Radio, App } from "antd";
-import { Send } from "lucide-react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Tabs } from "antd";
+import { MessagesSquare, FileText, Megaphone, Zap, Settings } from "lucide-react";
 import { PageHeader } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 import { MetaConnectPanel } from "@/components/MetaConnectPanel";
+import { HealthCard } from "./wa-ui";
+import Inbox from "./Inbox";
+import Templates from "./Templates";
+import Broadcasts from "./Broadcasts";
+import Automations from "./Automations";
+import WaSettings from "./WaSettings";
 
-function MessagesPanel() {
-  const { message } = App.useApp();
-  const [messages, setMessages] = useState([]);
-  const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [composing, setComposing] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [kind, setKind] = useState("template");
-  const [form] = Form.useForm();
+const TABS = ["inbox", "templates", "broadcasts", "automations", "settings"];
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [m, t] = await Promise.all([apiFetch("/api/whatsapp/messages"), apiFetch("/api/whatsapp/templates")]);
-      setMessages(m.messages);
-      setTemplates(t.templates);
-    } catch (err) {
-      message.error(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [message]);
-
+function Suite() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const [tab, setTab] = useState(TABS.includes(params.get("tab")) ? params.get("tab") : "inbox");
+  const [role, setRole] = useState(null);
   useEffect(() => {
-    load();
-  }, [load]);
-
-  async function handleSend(values) {
-    setSubmitting(true);
-    try {
-      await apiFetch("/api/whatsapp/messages", { method: "POST", body: { ...values, kind } });
-      message.success("Sent");
-      setComposing(false);
-      form.resetFields();
-      load();
-    } catch (err) {
-      message.error(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
+    apiFetch("/api/store")
+      .then((d) => setRole(d.role))
+      .catch(() => setRole("staff"));
+  }, []);
+  const canEdit = role && role !== "staff";
+  const label = (Icon, text) => (
+    <span className="inline-flex items-center gap-1.5">
+      <Icon size={14} aria-hidden="true" />
+      {text}
+    </span>
+  );
   return (
-    <Card
-      size="small"
-      title="Messages"
-      extra={
-        <Button size="small" type="primary" icon={<Send size={14} aria-hidden="true" />} onClick={() => setComposing(true)}>
-          Send message
-        </Button>
-      }
-    >
-      {templates.length === 0 && (
-        <p className="text-xs text-ink-muted mt-0 mb-3">
-          No approved templates found yet — a template is required to message a customer who hasn't messaged you in
-          the last 24 hours. Create and get one approved in Meta Business Manager first.
-        </p>
-      )}
-      <Table
-        size="small"
-        rowKey="id"
-        loading={loading}
-        dataSource={messages}
-        pagination={false}
-        locale={{ emptyText: "No messages sent yet." }}
-        columns={[
-          { title: "To", dataIndex: "toPhone" },
-          { title: "Type", dataIndex: "kind", render: (v) => <Tag>{v}</Tag> },
-          { title: "Message", dataIndex: "body", ellipsis: true },
-          { title: "Status", dataIndex: "status" },
-          { title: "Sent", dataIndex: "createdAt", render: (v) => new Date(v).toLocaleString() },
+    <div className="flex flex-col gap-3">
+      <HealthCard compact />
+      <Tabs
+        activeKey={tab}
+        onChange={(k) => {
+          setTab(k);
+          router.replace(`/admin/apps/whatsapp?tab=${k}`, { scroll: false });
+        }}
+        items={[
+          { key: "inbox", label: label(MessagesSquare, "Inbox"), children: <Inbox /> },
+          { key: "templates", label: label(FileText, "Templates"), children: <Templates canEdit={canEdit} /> },
+          { key: "broadcasts", label: label(Megaphone, "Broadcasts"), children: <Broadcasts canEdit={canEdit} /> },
+          { key: "automations", label: label(Zap, "Automations"), children: <Automations /> },
+          { key: "settings", label: label(Settings, "Settings"), children: <WaSettings canEdit={canEdit} /> },
         ]}
+        destroyOnHidden
       />
-
-      <Modal
-        title="Send WhatsApp message"
-        open={composing}
-        onCancel={() => setComposing(false)}
-        onOk={() => form.submit()}
-        confirmLoading={submitting}
-        okText="Send"
-      >
-        <Form layout="vertical" form={form} onFinish={handleSend} requiredMark={false}>
-          <Form.Item name="toPhone" label="Customer phone (with country code)" rules={[{ required: true, message: "Required" }]}>
-            <Input placeholder="+91 98765 43210" />
-          </Form.Item>
-          <Radio.Group value={kind} onChange={(e) => setKind(e.target.value)} className="mb-4">
-            <Radio.Button value="template">Template</Radio.Button>
-            <Radio.Button value="text">Free text</Radio.Button>
-          </Radio.Group>
-          {kind === "template" ? (
-            <Form.Item name="templateName" label="Template" rules={[{ required: true, message: "Required" }]}>
-              <Select
-                options={templates.map((t) => ({ value: t.name, label: `${t.name} (${t.language})` }))}
-                onChange={(_, opt) => form.setFieldValue("templateLanguage", opt?.label?.match(/\(([^)]+)\)/)?.[1])}
-              />
-            </Form.Item>
-          ) : (
-            <Form.Item name="body" label="Message" rules={[{ required: true, message: "Required" }]}>
-              <Input.TextArea rows={4} maxLength={1000} showCount />
-            </Form.Item>
-          )}
-          <p className="text-xs text-ink-muted -mt-2">
-            {kind === "text"
-              ? "Free text only delivers if this customer has messaged you in the last 24 hours."
-              : "A template message works any time and is the only way to start a new conversation."}
-          </p>
-        </Form>
-      </Modal>
-    </Card>
+    </div>
   );
 }
 
 export default function WhatsappPage() {
   return (
     <div>
-      <PageHeader title="WhatsApp" />
-      <p className="text-sm text-ink-muted -mt-4 mb-4">Connect WhatsApp Business to message your customers.</p>
+      <PageHeader title="WhatsApp" subtitle="Your customers' conversations, templates, broadcasts and automatic messages — on the official WhatsApp Business Platform." />
       <MetaConnectPanel focus="whatsapp">
-        <MessagesPanel />
+        <Suspense fallback={null}>
+          <Suite />
+        </Suspense>
       </MetaConnectPanel>
     </div>
   );
