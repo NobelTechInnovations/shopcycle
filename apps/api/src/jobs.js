@@ -8,6 +8,7 @@ const billingEngine = require("./modules/billing/engine");
 const { drainQueue } = require("./lib/mailer");
 const whatsappTemplates = require("./lib/whatsapp-templates");
 const flowsEngine = require("./modules/flows/engine");
+const whatsappBroadcasts = require("./modules/whatsapp/broadcasts");
 
 // The billing engine bills real stores, and local development shares the
 // production database — so it runs only in production unless BILLING_JOBS
@@ -78,6 +79,15 @@ function startJobs(fastify) {
       } catch (err) {
         fastify.log.error({ err }, "jobs: flow runs failed");
       }
+      // WhatsApp broadcasts (same switch as flows: on in production, off
+      // locally — local dev shares production's database).
+      try {
+        const sent = await whatsappBroadcasts.processDue(fastify.prisma, { log: fastify.log });
+        if (sent) fastify.log.info({ sent }, "jobs: whatsapp broadcast messages sent");
+      } catch (err) {
+        fastify.log.error({ err }, "jobs: whatsapp broadcasts failed");
+      }
+      await fastify.prisma.messageDedupe.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 45 * 24 * 3600 * 1000) } } }).catch(() => {});
     }
     try {
       const result = await webhooksService.processDue(fastify.prisma);

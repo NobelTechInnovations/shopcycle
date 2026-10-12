@@ -7,8 +7,28 @@ function metaConfigured() {
 
 const GRAPH_BASE = () => `${env.META_GRAPH_API_URL.replace(/\/$/, "")}/${env.META_GRAPH_API_VERSION}`;
 
-async function graphRequest(path, { method = "GET", token, params, body } = {}) {
-  const url = new URL(`${GRAPH_BASE()}${path}`);
+/** Meta's error, in words a seller can act on. Code 190 is an expired or
+ * revoked login (the seller changed their password, removed the app or the
+ * token aged out) — the admin offers "Reconnect" for it. */
+function metaError(res, data) {
+  const e = data?.error || {};
+  const expired = e.code === 190 || e.type === "OAuthException" && /expired|session has been invalidated|validating access token/i.test(e.message || "");
+  const permission = e.code === 10 || e.code === 200 || (e.code >= 200 && e.code < 300);
+  const message =
+    e.error_user_msg ||
+    (expired
+      ? "Your Facebook connection has expired. Reconnect Facebook to continue."
+      : permission
+        ? `Meta didn't allow this: ${e.message || "missing permission"}. The permission may still be waiting for Meta's App Review, or wasn't ticked when connecting.`
+        : e.message || `Meta API request failed: ${res.status}`);
+  return new HttpError(expired ? 424 : 502, message, {
+    meta: { code: e.code ?? null, subcode: e.error_subcode ?? null, title: e.error_user_title || null, type: e.type || null, trace: e.fbtrace_id || null },
+    reason: expired ? "meta_expired" : permission ? "meta_permission" : "meta_error",
+  });
+}
+
+async function graphRequest(path, { method = "GET", token, params, body, form } = {}) {
+  const url = /^https?:/.test(path) ? new URL(path) : new URL(`${GRAPH_BASE()}${path}`);
   if (token) url.searchParams.set("access_token", token);
   for (const [k, v] of Object.entries(params || {})) {
     if (v !== undefined && v !== null) url.searchParams.set(k, typeof v === "object" ? JSON.stringify(v) : v);
@@ -17,12 +37,11 @@ async function graphRequest(path, { method = "GET", token, params, body } = {}) 
   const res = await fetch(url, {
     method,
     headers: body ? { "content-type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
+    // `form`: a FormData (file uploads: ad images and videos, media).
+    body: form || (body ? JSON.stringify(body) : undefined),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new HttpError(502, data?.error?.message || `Meta API request failed: ${res.status}`);
-  }
+  if (!res.ok || data?.error) throw metaError(res, data);
   return data;
 }
 
@@ -111,48 +130,117 @@ async function fetchProfile(token) {
   return graphRequest("/me", { token, params: { fields: "id,name" } });
 }
 
-/** Everything the Connect screen needs to let the merchant pick which ad
- * account / page / WhatsApp number to actually use — a single connection
- * can see several of each (e.g. an agency-run Business Manager), so this
- * is a picker, not an auto-selection. WhatsApp phone numbers are nested
- * under each WABA, which is itself nested under the page's business — kept
- * as a flat, pre-joined list here so the admin UI doesn't have to walk the
- * Graph API's own nesting itself. */
+/** Plain-language state of one WhatsApp number: can Oyklane send from it,
+ * and if not, what the seller has to do. */
+function numberState(n) {
+  const problems = [];
+  let action = null;
+  if (n.code_verification_status && n.code_verification_status !== "VERIFIED") {
+    problems.push("The number isn't verified yet. In WhatsApp Manager ▸ Phone numbers, verify it with the code Meta sends by SMS or call.");
+  }
+  if (n.platform_type === "ON_PREMISE") problems.push("This number uses Meta's old On-Premises API. Migrate it to the Cloud API in WhatsApp Manager.");
+  if (n.name_status === "DECLINED" || n.name_status === "NON_EXISTS") problems.push("Meta declined the display name. Change it in WhatsApp Manager ▸ Phone numbers ▸ Profile.");
+  if (n.status === "FLAGGED" || n.status === "RESTRICTED") problems.push("Meta has limited this number because of low message quality. Check WhatsApp Manager ▸ Insights.");
+  if (n.status === "BANNED") problems.push("Meta has banned this number. Contact Meta support from WhatsApp Manager.");
+  if (n.status === "MIGRATED") problems.push("This number moved to another WhatsApp Business account.");
+  const connected = n.status === "CONNECTED" && n.platform_type === "CLOUD_API";
+  if (!connected && !problems.length) {
+    // Verified but not registered on the Cloud API (added in WhatsApp
+    // Manager, or registered with a different provider) — Oyklane can
+    // register it with the seller's two-step PIN.
+    action = "activate";
+  }
+  return {
+    ready: connected && !problems.length,
+    action,
+    problems,
+  };
+}
+
+const WABA_NUMBER_FIELDS =
+  "id,verified_name,display_phone_number,status,code_verification_status,platform_type,name_status,quality_rating,messaging_limit_tier";
+
+function shapeNumber(n) {
+  const st = numberState(n);
+  return {
+    id: n.id,
+    label: `${n.verified_name || "WhatsApp"} (${n.display_phone_number})`,
+    displayPhoneNumber: n.display_phone_number,
+    verifiedName: n.verified_name || null,
+    status: n.status || null,
+    codeVerification: n.code_verification_status || null,
+    platform: n.platform_type || null,
+    nameStatus: n.name_status || null,
+    quality: n.quality_rating || null,
+    limitTier: n.messaging_limit_tier || null,
+    ...st,
+  };
+}
+
+/** WhatsApp ids the token was granted (Facebook Login for Business: the
+ * accounts the seller ticked). null when the token has no granular scopes. */
+async function grantedWhatsappIds(token) {
+  try {
+    const dbg = await graphRequest("/debug_token", { token: `${env.META_APP_ID}|${env.META_APP_SECRET}`, params: { input_token: token } });
+    const gs = dbg.data?.granular_scopes;
+    if (!Array.isArray(gs)) return { ids: null, scopes: dbg.data?.scopes || [] };
+    const ids = new Set(gs.filter((g) => g.scope === "whatsapp_business_management").flatMap((g) => g.target_ids || []));
+    return { ids, scopes: dbg.data?.scopes || [], all: !gs.some((g) => g.scope === "whatsapp_business_management" && Array.isArray(g.target_ids)) };
+  } catch {
+    return { ids: null, scopes: [] };
+  }
+}
+
 /**
  * The seller's WhatsApp Business accounts and their numbers. A WABA
  * belongs to a business, not a Page, so it's found three ways (de-duped):
  * the exact accounts the seller ticked in Facebook Login for Business
  * (the token's granular scopes), the WABAs their businesses own or manage
  * for clients, and — for older setups — a Page's linked WABA.
+ *
+ * Every account found is returned, with why it can't be used when that's
+ * the case (no number yet, not ticked when connecting, Meta refused) —
+ * the seller sees the reason instead of an empty list.
  */
 async function listWabas(token, pages) {
   const found = new Map();
+  const grant = await grantedWhatsappIds(token);
+  const hasWaScope = grant.scopes.includes("whatsapp_business_management");
   const add = async (waba, owner = {}) => {
     if (!waba?.id || found.has(waba.id)) return;
-    found.set(waba.id, null);
+    const entry = {
+      id: waba.id,
+      pageId: owner.pageId || null,
+      pageName: waba.name || owner.name || "WhatsApp Business account",
+      name: waba.name || owner.name || "WhatsApp Business account",
+      businessName: owner.businessName || null,
+      granted: grant.ids ? grant.all || grant.ids.has(waba.id) : hasWaScope ? true : false,
+      phoneNumbers: [],
+      problem: null,
+      manageUrl: `https://business.facebook.com/wa/manage/phone-numbers/?waba_id=${encodeURIComponent(waba.id)}`,
+    };
+    found.set(waba.id, entry);
     try {
-      const numbers = await graphRequest(`/${waba.id}/phone_numbers`, { token, params: { fields: "id,verified_name,display_phone_number" } });
-      found.set(waba.id, {
-        id: waba.id,
-        pageId: owner.pageId || null,
-        pageName: waba.name || owner.name || "WhatsApp Business account",
-        phoneNumbers: (numbers.data || []).map((n) => ({ id: n.id, label: `${n.verified_name} (${n.display_phone_number})` })),
-      });
-    } catch {
-      found.delete(waba.id);
+      const numbers = await graphRequest(`/${waba.id}/phone_numbers`, { token, params: { fields: WABA_NUMBER_FIELDS, limit: 50 } });
+      entry.phoneNumbers = (numbers.data || []).map(shapeNumber);
+    } catch (err) {
+      entry.problem = err.message;
+    }
+    if (!entry.problem && !entry.phoneNumbers.length) {
+      entry.problem = !hasWaScope
+        ? "Oyklane wasn't given WhatsApp access when you connected. Reconnect Facebook and allow WhatsApp."
+        : !entry.granted
+          ? "This WhatsApp account wasn't ticked when you connected Facebook, so Meta hides its numbers. Reconnect and tick it under WhatsApp accounts."
+          : "This WhatsApp Business account has no phone number yet. Add one with \"Add a WhatsApp number\" below, or in WhatsApp Manager ▸ Phone numbers.";
     }
   };
 
   // 1. What the seller ticked in the login dialog.
-  try {
-    const dbg = await graphRequest("/debug_token", { token: `${env.META_APP_ID}|${env.META_APP_SECRET}`, params: { input_token: token } });
-    const ids = new Set((dbg.data?.granular_scopes || []).filter((g) => /^whatsapp_business_/.test(g.scope)).flatMap((g) => g.target_ids || []));
-    for (const id of ids) {
+  if (grant.ids) {
+    for (const id of grant.ids) {
       const waba = await graphRequest(`/${id}`, { token, params: { fields: "id,name" } }).catch(() => ({ id }));
       await add(waba);
     }
-  } catch {
-    // No granular scopes (older login) — the other two ways cover it.
   }
 
   // 2. Their businesses' own and client WABAs.
@@ -161,7 +249,7 @@ async function listWabas(token, pages) {
     for (const b of businesses.data || []) {
       for (const edge of ["owned_whatsapp_business_accounts", "client_whatsapp_business_accounts"]) {
         const list = await graphRequest(`/${b.id}/${edge}`, { token, params: { fields: "id,name", limit: 50 } }).catch(() => ({ data: [] }));
-        for (const waba of list.data || []) await add(waba, { name: b.name });
+        for (const waba of list.data || []) await add(waba, { businessName: b.name });
       }
     }
   } catch {
@@ -174,7 +262,8 @@ async function listWabas(token, pages) {
     for (const waba of owned.data || []) await add(waba, { pageId: page.id, name: page.name });
   }
 
-  return [...found.values()].filter(Boolean);
+  // Usable accounts first.
+  return [...found.values()].sort((a, b) => Number(b.phoneNumbers.some((n) => n.ready)) - Number(a.phoneNumbers.some((n) => n.ready)));
 }
 
 async function listConnectableAssets(token) {
@@ -193,6 +282,11 @@ async function listConnectableAssets(token) {
 }
 
 module.exports = {
+  graphBase: GRAPH_BASE,
+  metaError,
+  numberState,
+  shapeNumber,
+  WABA_NUMBER_FIELDS,
   listPixels,
   metaConfigured,
   graphRequest,

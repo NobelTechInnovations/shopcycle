@@ -337,20 +337,23 @@ model CartSession {
 /// list of steps — wait, check a condition, email the customer, email the
 /// owner. See flows/catalog.js for the shapes.
 model Flow {
-  id          String    @id @default(cuid())
-  storeId     String
-  name        String
-  trigger     String
+  id           String    @id @default(cuid())
+  storeId      String
+  name         String
+  trigger      String
   /// [{ id, type: "wait" | "condition" | "send_email" | "notify_owner", ... }]
-  steps       Json      @default("[]")
-  enabled     Boolean   @default(false)
+  steps        Json      @default("[]")
+  enabled      Boolean   @default(false)
   /// The ready-made recipe it started from, if any.
-  templateKey String?
-  runsCount   Int       @default(0)
-  emailsSent  Int       @default(0)
-  lastRunAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  templateKey  String?
+  /// { quietHours: { from: "21:00", to: "09:00" }, maxPerCustomerDays, testMode, testPhone, testEmail, exitOn: [...] }
+  settings     Json      @default("{}")
+  runsCount    Int       @default(0)
+  whatsappSent Int       @default(0)
+  emailsSent   Int       @default(0)
+  lastRunAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   store Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
   runs  FlowRun[]
@@ -601,55 +604,62 @@ model Store {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  plan                 Plan?                 @relation(fields: [planId], references: [id], onDelete: SetNull)
-  commissionEntries    CommissionEntry[]
-  platformInvoices     PlatformInvoice[]
-  contactMessages      ContactMessage[]
-  upiPayments          UpiPayment[]
-  cancelledInvoices    CancelledInvoice[]
-  marketLicenses       MarketLicense[]
-  marketPurchases      MarketPurchase[]
-  storeUsers           StoreUser[]
-  invitations          Invitation[]
-  themes               Theme[]
-  products             Product[]
-  collections          Collection[]
-  brands               Brand[]
-  categories           Category[]
-  customers            Customer[]
-  orders               Order[]
-  files                File[]
-  pages                Page[]
-  menus                Menu[]
-  discounts            Discount[]
-  shippingZones        ShippingZone[]
-  taxRates             TaxRate[]
-  visitorSessions      VisitorSession[]
-  pageViews            PageView[]
-  campaigns            Campaign[]
-  installedApps        StoreApp[]
-  appConnections       AppConnection[]
-  rentalProducts       RentalProduct[]
-  rentalBookings       RentalBooking[]
-  cartSessions         CartSession[]
-  metaConnection       MetaConnection?
-  adCampaigns          AdCampaign[]
-  whatsappMessages     WhatsappMessage[]
-  emailLogs            EmailLog[]
-  shopperOtps          ShopperOtp[]
-  shopperPhoneOtps     ShopperPhoneOtp[]
-  appCharges           AppCharge[]
-  inventoryAdjustments InventoryAdjustment[]
-  articles             Article[]
-  giftCards            GiftCard[]
-  paymentProviders     PaymentProvider[]
-  apiKeys              ApiKey[]
-  webhookEndpoints     WebhookEndpoint[]
-  metafieldDefinitions MetafieldDefinition[]
-  productReviews       ProductReview[]
-  flows                Flow[]
-  supportChats         SupportChat[]
-  supportTickets       SupportTicket[]
+  plan                  Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
+  commissionEntries     CommissionEntry[]
+  platformInvoices      PlatformInvoice[]
+  contactMessages       ContactMessage[]
+  upiPayments           UpiPayment[]
+  cancelledInvoices     CancelledInvoice[]
+  marketLicenses        MarketLicense[]
+  marketPurchases       MarketPurchase[]
+  storeUsers            StoreUser[]
+  invitations           Invitation[]
+  themes                Theme[]
+  products              Product[]
+  collections           Collection[]
+  brands                Brand[]
+  categories            Category[]
+  customers             Customer[]
+  orders                Order[]
+  files                 File[]
+  pages                 Page[]
+  menus                 Menu[]
+  discounts             Discount[]
+  shippingZones         ShippingZone[]
+  taxRates              TaxRate[]
+  visitorSessions       VisitorSession[]
+  pageViews             PageView[]
+  campaigns             Campaign[]
+  installedApps         StoreApp[]
+  appConnections        AppConnection[]
+  rentalProducts        RentalProduct[]
+  rentalBookings        RentalBooking[]
+  cartSessions          CartSession[]
+  metaConnection        MetaConnection?
+  adCampaigns           AdCampaign[]
+  whatsappMessages      WhatsappMessage[]
+  whatsappConversations WhatsappConversation[]
+  whatsappBroadcasts    WhatsappBroadcast[]
+  whatsappOptOuts       WhatsappOptOut[]
+  adDrafts              AdDraft[]
+  adMedia               AdMedia[]
+  adActivities          AdActivity[]
+  adRules               AdRule[]
+  emailLogs             EmailLog[]
+  shopperOtps           ShopperOtp[]
+  shopperPhoneOtps      ShopperPhoneOtp[]
+  appCharges            AppCharge[]
+  inventoryAdjustments  InventoryAdjustment[]
+  articles              Article[]
+  giftCards             GiftCard[]
+  paymentProviders      PaymentProvider[]
+  apiKeys               ApiKey[]
+  webhookEndpoints      WebhookEndpoint[]
+  metafieldDefinitions  MetafieldDefinition[]
+  productReviews        ProductReview[]
+  flows                 Flow[]
+  supportChats          SupportChat[]
+  supportTickets        SupportTicket[]
 
   // Billing engine (modules/billing) — one subscription per store.
   subscription           Subscription?
@@ -1029,8 +1039,14 @@ model Customer {
   zip      String?
   country  String?
 
-  acceptsEmailMarketing Boolean @default(false)
-  acceptsSmsMarketing   Boolean @default(false)
+  acceptsEmailMarketing    Boolean   @default(false)
+  acceptsSmsMarketing      Boolean   @default(false)
+  /// Agreed to receive WhatsApp marketing (offers, broadcasts). Order
+  /// updates are transactional and don't need this. When and where it was
+  /// given is kept as proof of consent.
+  acceptsWhatsappMarketing Boolean   @default(false)
+  whatsappConsentAt        DateTime?
+  whatsappConsentSource    String?
 
   /// The same shopper's identity across every store on the platform,
   /// resolved by phone (falling back to email) whenever a Customer row is
@@ -1062,11 +1078,12 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  platformCustomer PlatformCustomer? @relation(fields: [platformCustomerId], references: [id], onDelete: SetNull)
-  orders           Order[]
-  sessions         VisitorSession[]
-  whatsappMessages WhatsappMessage[]
+  store                 Store                  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  platformCustomer      PlatformCustomer?      @relation(fields: [platformCustomerId], references: [id], onDelete: SetNull)
+  orders                Order[]
+  sessions              VisitorSession[]
+  whatsappMessages      WhatsappMessage[]
+  whatsappConversations WhatsappConversation[]
 
   @@unique([storeId, email])
   @@index([storeId])
@@ -1176,15 +1193,15 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  store        Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  customer     Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  session      VisitorSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  items        OrderItem[]
-  fulfillments Fulfillment[]
-  refunds      Refund[]
-  returns      ReturnRequest[]
+  store             Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer          Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  session           VisitorSession?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  items             OrderItem[]
+  fulfillments      Fulfillment[]
+  refunds           Refund[]
+  returns           ReturnRequest[]
   cancelledInvoices CancelledInvoice[]
-  events       OrderEvent[]
+  events            OrderEvent[]
 
   @@unique([storeId, orderNumber])
   @@unique([storeId, invoiceSeq])
@@ -1454,33 +1471,33 @@ enum DiscountStatus {
 }
 
 model Discount {
-  id          String         @id @default(cuid())
-  storeId     String
-  code        String
-  type        DiscountType
-  value       Decimal        @db.Decimal(10, 2)
-  minSubtotal Decimal?       @db.Decimal(10, 2)
-  usageLimit  Int?
-  usageCount  Int            @default(0)
-  startsAt    DateTime?
-  endsAt      DateTime?
-  status      DiscountStatus @default(active)
+  id              String         @id @default(cuid())
+  storeId         String
+  code            String
+  type            DiscountType
+  value           Decimal        @db.Decimal(10, 2)
+  minSubtotal     Decimal?       @db.Decimal(10, 2)
+  usageLimit      Int?
+  usageCount      Int            @default(0)
+  startsAt        DateTime?
+  endsAt          DateTime?
+  status          DiscountStatus @default(active)
   /// "code": shoppers enter it · "automatic": applies by itself, shown by
   /// its title (its code is generated and never shown).
-  method      String         @default("code")
-  title       String?
+  method          String         @default("code")
+  title           String?
   /// What it's taken off: "order", "collections" or "products" (targetIds).
-  appliesTo   String         @default("order")
-  targetIds   String[]       @default([])
-  minQuantity Int?
+  appliesTo       String         @default("order")
+  targetIds       String[]       @default([])
+  minQuantity     Int?
   /// Most a percentage discount can take off one order.
-  maxDiscount Decimal?       @db.Decimal(10, 2)
+  maxDiscount     Decimal?       @db.Decimal(10, 2)
   /// Once per customer (by email at checkout).
-  oncePerCustomer Boolean    @default(false)
-  buyQuantity Int?
-  getQuantity Int?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  oncePerCustomer Boolean        @default(false)
+  buyQuantity     Int?
+  getQuantity     Int?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
@@ -1744,6 +1761,16 @@ model MetaConnection {
   phoneNumberId    String?
   phoneNumberLabel String?
 
+  /// WhatsApp Embedded Signup: the business integration token Meta gives
+  /// for the seller's WhatsApp account (encrypted like accessToken). Used
+  /// for WhatsApp calls when set; the Facebook login token otherwise.
+  waAccessToken  String?   @db.Text
+  waBusinessId   String?
+  /// When the number was registered on the Cloud API and Oyklane was
+  /// subscribed to the account's webhooks (messages, statuses, templates).
+  waActivatedAt  DateTime?
+  waSubscribedAt DateTime?
+
   connectedAt DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1789,17 +1816,286 @@ model WhatsappMessage {
   kind      String
   body      String @db.Text
 
-  status            String  @default("sent") // sent | delivered | read | failed
+  status            String  @default("sent") // queued | sent | delivered | read | failed | received
   providerMessageId String?
+
+  /// The inbox thread (one per customer phone).
+  conversationId   String?
+  /// What started it: inbox | broadcast | flow | api | customer
+  source           String?
+  /// text | template | image | video | document | audio | sticker | location | interactive | button | reaction | unsupported
+  messageType      String?
+  templateName     String?
+  templateLanguage String?
+  mediaId          String?
+  mediaMime        String?
+  error            String?   @db.Text
+  sentById         String?
+  sentByName       String?
+  broadcastId      String?
+  flowRunId        String?
+  deliveredAt      DateTime?
+  readAt           DateTime?
+  failedAt         DateTime?
+  /// The key it was claimed under in message_dedupe (see that model).
+  dedupeKey        String?
 
   createdAt DateTime @default(now())
 
-  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  store        Store                 @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer     Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  conversation WhatsappConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   @@index([storeId])
   @@index([customerId])
+  @@index([conversationId, createdAt])
+  @@index([providerMessageId])
   @@map("whatsapp_messages")
+}
+
+/// "Has this exact message already been handled?" — one row per message:
+/// "in:<wamid>" for a received message, "bc:<broadcast>:<phone>" for a
+/// broadcast send, "flow:<run>:<step>" for a flow step. A row is claimed
+/// before sending or storing, so a retried webhook or job never does it
+/// twice.
+model MessageDedupe {
+  key       String   @id
+  storeId   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("message_dedupe")
+}
+
+/// A WhatsApp inbox thread: one per customer phone number per store.
+model WhatsappConversation {
+  id             String    @id @default(cuid())
+  storeId        String
+  /// Digits only, with country code (WhatsApp's wa_id), e.g. 919876543210.
+  phone          String
+  customerId     String?
+  /// The customer's WhatsApp profile name.
+  profileName    String?
+  status         String    @default("open") // open | closed
+  assignedToId   String?
+  assignedToName String?
+  labels         String[]  @default([])
+  unread         Int       @default(0)
+  lastMessageAt  DateTime?
+  /// Free-form replies are only possible within 24 hours of this.
+  lastInboundAt  DateTime?
+  lastPreview    String?
+  /// "ai" while the approved AI workflow may answer; "human" after a hand-off.
+  handledBy      String    @default("human")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  store    Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  messages WhatsappMessage[]
+  notes    WhatsappNote[]
+
+  @@unique([storeId, phone])
+  @@index([storeId, lastMessageAt])
+  @@index([storeId, status])
+  @@map("whatsapp_conversations")
+}
+
+/// Internal note on a conversation — never sent to the customer.
+model WhatsappNote {
+  id             String   @id @default(cuid())
+  conversationId String
+  storeId        String
+  authorId       String?
+  authorName     String?
+  body           String   @db.Text
+  createdAt      DateTime @default(now())
+
+  conversation WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("whatsapp_notes")
+}
+
+/// Numbers that asked not to get marketing (replied STOP, or the seller
+/// added them). Broadcasts and marketing flows skip them.
+model WhatsappOptOut {
+  id        String   @id @default(cuid())
+  storeId   String
+  phone     String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, phone])
+  @@map("whatsapp_opt_outs")
+}
+
+/// A bulk send of one approved template to a segment of customers.
+model WhatsappBroadcast {
+  id               String    @id @default(cuid())
+  storeId          String
+  name             String
+  templateName     String
+  templateLanguage String
+  templateCategory String?
+  /// [{ index, source: "customer.first_name" | "text", value }] for {{1}}, {{2}}…
+  variables        Json      @default("[]")
+  /// Header image/video/document link when the template has a media header.
+  headerMediaUrl   String?
+  /// { segment: "all_consented" | "customers" | "recent_buyers" | …, filters }
+  audience         Json      @default("{}")
+  /// draft | scheduled | sending | sent | cancelled | failed
+  status           String    @default("draft")
+  scheduledAt      DateTime?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  createdById      String?
+  createdByName    String?
+  recipients       Int       @default(0)
+  sent             Int       @default(0)
+  delivered        Int       @default(0)
+  read             Int       @default(0)
+  failed           Int       @default(0)
+  skipped          Int       @default(0)
+  replied          Int       @default(0)
+  orders           Int       @default(0)
+  revenue          Decimal   @default(0) @db.Decimal(12, 2)
+  /// Per-message price used for the estimate (₹), as the seller saw it.
+  pricePerMessage  Decimal?  @db.Decimal(8, 4)
+  error            String?   @db.Text
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  store          Store                        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  recipientsList WhatsappBroadcastRecipient[]
+
+  @@index([storeId, createdAt])
+  @@index([status, scheduledAt])
+  @@map("whatsapp_broadcasts")
+}
+
+model WhatsappBroadcastRecipient {
+  id                String    @id @default(cuid())
+  broadcastId       String
+  storeId           String
+  customerId        String?
+  phone             String
+  name              String?
+  /// queued | sent | delivered | read | failed | skipped
+  status            String    @default("queued")
+  skipReason        String?
+  error             String?   @db.Text
+  providerMessageId String?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  repliedAt         DateTime?
+
+  broadcast WhatsappBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, phone])
+  @@index([broadcastId, status])
+  @@index([providerMessageId])
+  @@map("whatsapp_broadcast_recipients")
+}
+
+/// The Ads Manager's create-campaign wizard, saved as the seller goes.
+model AdDraft {
+  id          String   @id @default(cuid())
+  storeId     String
+  name        String
+  /// The whole campaign → ad sets → ads spec (see meta-ads/spec.js).
+  data        Json     @default("{}")
+  /// draft | publishing | published | failed
+  status      String   @default("draft")
+  /// What Meta created, so a retry continues instead of duplicating:
+  /// { campaignId, adSets: { <draftId>: id }, ads: { <draftId>: id }, creatives: {…} }
+  published   Json     @default("{}")
+  error       String?  @db.Text
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, updatedAt])
+  @@map("ad_drafts")
+}
+
+/// The seller's ad media library — images and videos uploaded to their ad account.
+model AdMedia {
+  id          String   @id @default(cuid())
+  storeId     String
+  adAccountId String
+  /// image | video
+  kind        String
+  name        String
+  /// Meta's image hash (images) or video id (videos).
+  hash        String?
+  videoId     String?
+  /// A link to show it in the library.
+  previewUrl  String?  @db.Text
+  width       Int?
+  height      Int?
+  bytes       Int?
+  /// ready | processing | error
+  status      String   @default("ready")
+  error       String?
+  createdAt   DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, adAccountId, createdAt])
+  @@map("ad_media")
+}
+
+/// Every change made to ads from Oyklane — by a person, an approved
+/// recommendation or an automatic rule.
+model AdActivity {
+  id         String   @id @default(cuid())
+  storeId    String
+  userId     String?
+  userName   String?
+  /// user | recommendation | rule
+  source     String   @default("user")
+  action     String
+  targetType String?
+  targetId   String?
+  targetName String?
+  detail     Json     @default("{}")
+  ok         Boolean  @default(true)
+  error      String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+  @@map("ad_activities")
+}
+
+/// Opt-in automatic optimisation: one rule, its limits, its switch.
+model AdRule {
+  id             String    @id @default(cuid())
+  storeId        String
+  name           String
+  /// pause_high_cpa | pause_low_ctr | raise_budget_good_roas | lower_budget_poor_roas
+  kind           String
+  enabled        Boolean   @default(false)
+  /// { level, minSpend, threshold, changePercent, lookbackDays, … }
+  config         Json      @default("{}")
+  /// Never take any budget above this (₹ per day), whatever the rule says.
+  maxDailyBudget Decimal?  @db.Decimal(12, 2)
+  lastRunAt      DateTime?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([enabled, lastRunAt])
+  @@map("ad_rules")
 }
 
 // ─────────────────────────────────────────────
@@ -2713,17 +3009,17 @@ model UpiPayment {
 /// kept as it was printed, with its serial, which is never reused. The
 /// order can then get a new invoice with the next serial (orders/invoice.js).
 model CancelledInvoice {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   storeId     String
   orderId     String
   number      String
   seq         Int
   issuedAt    DateTime?
-  cancelledAt DateTime @default(now())
+  cancelledAt DateTime  @default(now())
   reason      String?
   cancelledBy String?
   /// The invoice page as it was, marked cancelled.
-  html        String   @db.Text
+  html        String    @db.Text
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -2768,23 +3064,23 @@ model Partner {
 /// A theme or an app on the store. `status`: draft → in_review →
 /// approved (listed) | rejected; suspended takes it down.
 model MarketListing {
-  id          String    @id @default(cuid())
-  partnerId   String
-  kind        String // theme | app
-  slug        String    @unique
-  name        String
-  tagline     String?
-  description String?   @db.Text
-  category    String    @default("general")
+  id             String    @id @default(cuid())
+  partnerId      String
+  kind           String // theme | app
+  slug           String    @unique
+  name           String
+  tagline        String?
+  description    String?   @db.Text
+  category       String    @default("general")
   /// Rupees, before GST. null or 0 = free. Themes: one-time; apps: monthly.
-  price       Decimal?  @db.Decimal(10, 2)
-  status      String    @default("draft")
-  reviewNote  String?   @db.Text
-  iconId      String?
+  price          Decimal?  @db.Decimal(10, 2)
+  status         String    @default("draft")
+  reviewNote     String?   @db.Text
+  iconId         String?
   /// MarketMedia ids, in order.
-  screenshots Json      @default("[]")
+  screenshots    Json      @default("[]")
   /// The approved version stores install.
-  liveVersionId String?
+  liveVersionId  String?
   /// Preview: the version installed (unpublished) on the demo store.
   previewThemeId String?
   /// Apps: where the seller opens it, where installs are announced, the
@@ -2836,15 +3132,15 @@ model MarketVersion {
 /// A store's right to install a listing: bought (purchaseId) or free.
 /// Bound to the store — another store has to buy its own.
 model MarketLicense {
-  id         String   @id @default(cuid())
-  listingId  String
-  storeId    String
-  purchaseId String?  @unique
+  id          String    @id @default(cuid())
+  listingId   String
+  storeId     String
+  purchaseId  String?   @unique
   /// Apps: the API key made for it, and when it was installed / removed.
   apiKeyId    String?
   installedAt DateTime?
   removedAt   DateTime?
-  createdAt  DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   listing MarketListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
   store   Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -2879,16 +3175,16 @@ model MarketPurchase {
 
 /// The developer's share of a sale (or an app's month), owed until paid out.
 model PartnerEarning {
-  id         String   @id @default(cuid())
-  partnerId  String
-  listingId  String
-  storeId    String?
-  source     String // theme_sale | app_month
-  sourceId   String   @unique
-  gross      Decimal  @db.Decimal(10, 2)
-  share      Decimal  @db.Decimal(10, 2)
-  payoutId   String?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  partnerId String
+  listingId String
+  storeId   String?
+  source    String // theme_sale | app_month
+  sourceId  String   @unique
+  gross     Decimal  @db.Decimal(10, 2)
+  share     Decimal  @db.Decimal(10, 2)
+  payoutId  String?
+  createdAt DateTime @default(now())
 
   partner Partner        @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   payout  PartnerPayout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)

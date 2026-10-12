@@ -16,6 +16,13 @@ const TRIGGERS = {
     subject: "order",
     events: ["order.created", "order.paid"],
   },
+  payment_pending: {
+    label: "Payment pending",
+    hint: "An online or UPI order is waiting for the customer to pay. Add a Wait and a \"payment received\" check so it stops once they pay.",
+    subject: "order",
+    events: ["order.created"],
+    pendingOnly: true,
+  },
   order_shipped: { label: "Order shipped", hint: "When you mark the order (or its first part) as shipped.", subject: "order", events: ["order.fulfilled"] },
   order_delivered: { label: "Order delivered", hint: "When a shipment is marked delivered.", subject: "order", events: ["order.delivered"] },
   order_cancelled: { label: "Order cancelled", hint: "When an order is cancelled.", subject: "order", events: ["order.cancelled"] },
@@ -50,6 +57,7 @@ const FIELDS = {
   "order.is_cancelled": { label: "The order is cancelled", type: "boolean", subjects: ["order"] },
   "order.is_refunded": { label: "The order is refunded", type: "boolean", subjects: ["order"] },
   "order.is_delivered": { label: "The order is delivered", type: "boolean", subjects: ["order"] },
+  "order.is_paid": { label: "The order is paid", type: "boolean", subjects: ["order"] },
   "cart.total": { label: "Checkout total (₹)", type: "number", subjects: ["cart"] },
   "cart.items_count": { label: "Items in the checkout", type: "number", subjects: ["cart"] },
   "cart.recovered": { label: "They came back to the checkout", type: "boolean", subjects: ["cart"] },
@@ -58,6 +66,7 @@ const FIELDS = {
   "customer.total_spent": { label: "Customer's total spent (₹)", type: "number", subjects: ANY },
   "customer.ordered_since": { label: "Customer ordered again since this started", type: "boolean", subjects: ANY },
   "customer.has_phone": { label: "Customer has a phone number", type: "boolean", subjects: ANY },
+  "customer.accepts_whatsapp": { label: "Customer agreed to WhatsApp marketing", type: "boolean", subjects: ANY },
 };
 
 const OPS = {
@@ -92,6 +101,10 @@ const STEP_TYPES = {
   condition: { label: "Check a condition", hint: "Carry on only if these are true — otherwise stop here." },
   send_email: { label: "Email the customer", hint: "Sent from your store's name; replies come to your support email." },
   notify_owner: { label: "Email me", hint: "A note to you (and your support email)." },
+  send_whatsapp: {
+    label: "WhatsApp the customer",
+    hint: "Sends one of your Meta-approved templates. Marketing templates only go to customers who agreed to WhatsApp messages; anyone who replied STOP is skipped.",
+  },
 };
 
 const VARIABLES = [
@@ -123,6 +136,29 @@ const MAX_WAIT_MS = 90 * UNIT_MS.days;
 
 const newId = () => crypto.randomBytes(6).toString("base64url");
 const str = (v, max) => String(v ?? "").trim().slice(0, max);
+
+/** What a WhatsApp step's {{1}}, {{2}}… and button link can be filled with. */
+const WA_SOURCES = [
+  { key: "customer.first_name", label: "Customer's first name", subjects: ANY },
+  { key: "customer.name", label: "Customer's full name", subjects: ANY },
+  { key: "store.name", label: "Your store's name", subjects: ANY },
+  { key: "order.number", label: "Order number", subjects: ["order"] },
+  { key: "order.total", label: "Order total", subjects: ["order"] },
+  { key: "order.first_item", label: "First product in the order", subjects: ["order"] },
+  { key: "order.courier", label: "Courier", subjects: ["order"] },
+  { key: "order.tracking_number", label: "Tracking number", subjects: ["order"] },
+  { key: "order.status_token", label: "Order page code (for a link ending in {{1}})", subjects: ["order"] },
+  { key: "cart.total", label: "Checkout total", subjects: ["cart"] },
+  { key: "cart.first_item", label: "First product in the checkout", subjects: ["cart"] },
+  { key: "cart.recovery_token", label: "Checkout link code (for a link ending in {{1}})", subjects: ["cart"] },
+  { key: "text", label: "Fixed text", subjects: ANY },
+];
+
+function cleanSource(v, subject) {
+  const src = WA_SOURCES.find((x) => x.key === v?.source && x.subjects.includes(subject));
+  if (!src) return null;
+  return { source: src.key, value: src.key === "text" ? str(v.value, 300) : "" };
+}
 
 function cleanRule(rule, subject) {
   const field = FIELDS[rule?.field];
@@ -158,7 +194,10 @@ function cleanSteps(steps, trigger) {
       case "condition": {
         const rules = (Array.isArray(s.rules) ? s.rules : []).map((r) => cleanRule(r, subject)).filter(Boolean).slice(0, 10);
         if (!rules.length) throw new HttpError(400, `${n}: add at least one condition.`);
-        return { id, type: "condition", match: s.match === "any" ? "any" : "all", rules };
+        // What happens when it isn't met: stop (default), skip the next
+        // step, or jump to a later step (simple branching).
+        const otherwise = ["stop", "skip", "goto"].includes(s.otherwise) ? s.otherwise : "stop";
+        return { id, type: "condition", match: s.match === "any" ? "any" : "all", rules, otherwise, gotoStepId: otherwise === "goto" ? str(s.gotoStepId, 24) : "" };
       }
       case "send_email": {
         const subjectLine = str(s.subject, 200);
@@ -190,6 +229,23 @@ function cleanSteps(steps, trigger) {
         if (!subjectLine) throw new HttpError(400, `${n}: the note needs a subject.`);
         return { id, type: "notify_owner", subject: subjectLine, body: str(s.body, 3000) };
       }
+      case "send_whatsapp": {
+        const templateName = str(s.templateName, 512);
+        if (!/^[a-z0-9_]+$/.test(templateName)) throw new HttpError(400, `${n}: choose an approved WhatsApp template.`);
+        const variables = (Array.isArray(s.variables) ? s.variables : []).slice(0, 20).map((v) => cleanSource(v, subject) || { source: "text", value: str(v?.value, 300) });
+        const headerMediaUrl = str(s.headerMediaUrl, 1000);
+        if (headerMediaUrl && !/^https:\/\//i.test(headerMediaUrl)) throw new HttpError(400, `${n}: the header file's link must start with https://`);
+        return {
+          id,
+          type: "send_whatsapp",
+          templateName,
+          language: str(s.language, 10) || "en",
+          category: ["MARKETING", "UTILITY"].includes(s.category) ? s.category : "UTILITY",
+          variables,
+          headerMediaUrl,
+          button: cleanSource(s.button, subject),
+        };
+      }
       default:
         throw new HttpError(400, `${n}: unknown step.`);
     }
@@ -207,13 +263,118 @@ function cleanFlow(input, { partial = false } = {}) {
     out.trigger = input.trigger;
   }
   if (input.enabled !== undefined) out.enabled = Boolean(input.enabled);
+  if (input.settings !== undefined) out.settings = cleanSettings(input.settings);
   return out;
 }
 
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** Quiet hours (no WhatsApp at night — it waits until morning), how often
+ * one customer may get this flow's WhatsApp messages, and test mode
+ * (every message goes to the seller instead of customers). */
+function cleanSettings(v = {}) {
+  const q = v.quietHours || {};
+  return {
+    quietHours: { enabled: Boolean(q.enabled), from: HHMM.test(q.from) ? q.from : "21:00", to: HHMM.test(q.to) ? q.to : "09:00" },
+    maxPerCustomerDays: Math.max(0, Math.min(60, Math.floor(Number(v.maxPerCustomerDays) || 0))),
+    testMode: Boolean(v.testMode),
+    testPhone: str(v.testPhone, 20),
+    testEmail: str(v.testEmail, 200),
+  };
+}
+
 const email = (o) => ({ type: "send_email", buttonLabel: "", buttonLink: "", buttonUrl: "", discountCode: "", includeSummary: false, heading: "", ...o });
+const whatsapp = (o) => ({ type: "send_whatsapp", language: "en", category: "UTILITY", variables: [], headerMediaUrl: "", button: null, ...o });
+const QUIET = { quietHours: { enabled: true, from: "21:00", to: "09:00" } };
 
 /** Ready-made flows — a seller picks one, reads it, turns it on. */
 const RECIPES = [
+  {
+    key: "wa_order_confirmation",
+    name: "WhatsApp order confirmation",
+    category: "WhatsApp",
+    channel: "whatsapp",
+    description: "Confirms every order on WhatsApp with its number and a link to the order page. Uses your \"order_confirmed\" template.",
+    trigger: "order_placed",
+    settings: QUIET,
+    steps: [
+      { type: "condition", match: "all", rules: [{ field: "customer.has_phone", op: "is_true", value: null }] },
+      whatsapp({ templateName: "order_confirmed", variables: [{ source: "customer.first_name" }, { source: "order.number" }], button: { source: "order.status_token" } }),
+    ],
+  },
+  {
+    key: "wa_shipped",
+    name: "WhatsApp shipping update",
+    category: "WhatsApp",
+    channel: "whatsapp",
+    description: "Tells the customer their order is on its way, with the courier and tracking link. Uses your \"order_shipped\" template.",
+    trigger: "order_shipped",
+    settings: QUIET,
+    steps: [whatsapp({ templateName: "order_shipped", variables: [{ source: "customer.first_name" }, { source: "order.number" }, { source: "order.courier" }], button: { source: "order.status_token" } })],
+  },
+  {
+    key: "wa_payment_reminder",
+    name: "WhatsApp payment reminder",
+    category: "WhatsApp",
+    channel: "whatsapp",
+    description: "30 minutes after an unpaid online order, a reminder with a link to pay — stops as soon as they pay. Uses your \"payment_pending\" template.",
+    trigger: "payment_pending",
+    settings: QUIET,
+    steps: [
+      { type: "wait", amount: 30, unit: "minutes" },
+      { type: "condition", match: "all", rules: [{ field: "order.is_paid", op: "is_false", value: null }, { field: "order.is_cancelled", op: "is_false", value: null }] },
+      whatsapp({ templateName: "payment_pending", variables: [{ source: "customer.first_name" }, { source: "order.number" }], button: { source: "order.status_token" } }),
+    ],
+  },
+  {
+    key: "wa_abandoned",
+    name: "WhatsApp abandoned-checkout reminder",
+    category: "WhatsApp",
+    channel: "whatsapp",
+    description: "An hour after a checkout is left, a WhatsApp nudge with a link back — only to customers who agreed to WhatsApp, and never once they've ordered. Uses your \"checkout_reminder\" template.",
+    trigger: "checkout_abandoned",
+    settings: { ...QUIET, maxPerCustomerDays: 7 },
+    steps: [
+      { type: "wait", amount: 1, unit: "hours" },
+      {
+        type: "condition",
+        match: "all",
+        rules: [
+          { field: "cart.recovered", op: "is_false", value: null },
+          { field: "customer.ordered_since", op: "is_false", value: null },
+          { field: "customer.accepts_whatsapp", op: "is_true", value: null },
+        ],
+      },
+      whatsapp({ templateName: "checkout_reminder", category: "MARKETING", variables: [{ source: "customer.first_name" }, { source: "store.name" }], button: { source: "cart.recovery_token" } }),
+    ],
+  },
+  {
+    key: "wa_feedback",
+    name: "WhatsApp feedback after delivery",
+    category: "WhatsApp",
+    channel: "whatsapp",
+    description: "Two days after delivery, asks how it went with quick-reply buttons. Uses your \"delivery_feedback\" template.",
+    trigger: "order_delivered",
+    settings: QUIET,
+    steps: [
+      { type: "wait", amount: 2, unit: "days" },
+      { type: "condition", match: "all", rules: [{ field: "order.is_refunded", op: "is_false", value: null }, { field: "customer.accepts_whatsapp", op: "is_true", value: null }] },
+      whatsapp({ templateName: "delivery_feedback", category: "MARKETING", variables: [{ source: "customer.first_name" }] }),
+    ],
+  },
+  {
+    key: "wa_replenish",
+    name: "WhatsApp reorder reminder",
+    category: "WhatsApp",
+    channel: "whatsapp",
+    description: "30 days after delivery — when they're likely running out — a reminder to reorder, if they haven't already. Opted-in customers only.",
+    trigger: "order_delivered",
+    settings: { ...QUIET, maxPerCustomerDays: 20 },
+    steps: [
+      { type: "wait", amount: 30, unit: "days" },
+      { type: "condition", match: "all", rules: [{ field: "customer.ordered_since", op: "is_false", value: null }, { field: "customer.accepts_whatsapp", op: "is_true", value: null }] },
+      whatsapp({ templateName: "reorder_reminder", category: "MARKETING", variables: [{ source: "customer.first_name" }, { source: "order.first_item" }] }),
+    ],
+  },
   {
     key: "first_order_thanks",
     name: "Thank first-time buyers",
@@ -374,7 +535,7 @@ const RECIPES = [
 function recipe(key) {
   const r = RECIPES.find((x) => x.key === key);
   if (!r) throw new HttpError(404, "That recipe doesn't exist.");
-  return { name: r.name, trigger: r.trigger, templateKey: r.key, steps: cleanSteps(r.steps.map((s) => ({ ...s, id: newId() })), r.trigger) };
+  return { name: r.name, trigger: r.trigger, templateKey: r.key, settings: cleanSettings(r.settings || {}), steps: cleanSteps(r.steps.map((s) => ({ ...s, id: newId() })), r.trigger) };
 }
 
 /** Everything the admin's builder needs, in one object. */
@@ -387,10 +548,11 @@ function builderCatalog() {
     variables: VARIABLES,
     links: LINKS,
     recipes: RECIPES,
+    waSources: WA_SOURCES,
     maxSteps: MAX_STEPS,
     // Pictures for the top of an email (white on the store's colour).
     icons: ICON_CHOICES.map((key) => ({ key, url: iconUrl(key, { dark: true }) })),
   };
 }
 
-module.exports = { TRIGGERS, FIELDS, OPS, STEP_TYPES, VARIABLES, LINKS, RECIPES, UNIT_MS, cleanSteps, cleanFlow, recipe, builderCatalog, newId };
+module.exports = { TRIGGERS, FIELDS, OPS, STEP_TYPES, VARIABLES, LINKS, RECIPES, UNIT_MS, WA_SOURCES, cleanSteps, cleanFlow, cleanSettings, recipe, builderCatalog, newId };

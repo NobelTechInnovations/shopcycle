@@ -46,6 +46,8 @@ async function forOrder(prisma, store, orderId) {
   return {
     subject: "order",
     email,
+    phone: order.phone || order.customer?.phone || null,
+    customer: order.customer || null,
     order,
     facts: {
       "order.total": Number(order.total),
@@ -59,6 +61,8 @@ async function forOrder(prisma, store, orderId) {
       "order.is_cancelled": Boolean(order.cancelledAt),
       "order.is_refunded": Number(order.refundedAmount) > 0,
       "order.is_delivered": order.fulfillments.some((f) => f.status === "delivered"),
+      "order.is_paid": order.paymentStatus === "paid",
+      "customer.accepts_whatsapp": Boolean(order.customer?.acceptsWhatsappMarketing),
       "customer.accepts_marketing": Boolean(order.customer?.acceptsEmailMarketing),
       "customer.orders_count": stats.orders_count,
       "customer.total_spent": stats.total_spent,
@@ -75,6 +79,7 @@ async function forOrder(prisma, store, orderId) {
       "order.items_count": String(itemsCount),
       "order.courier": shipment?.courier || "",
       "order.tracking_number": shipment?.trackingNumber || "",
+      "order.status_token": order.statusToken || "",
     },
   };
 }
@@ -86,8 +91,10 @@ async function forCustomer(prisma, store, customerId, since) {
   return {
     subject: "customer",
     email: customer.email,
+    phone: customer.phone || null,
     customer,
     facts: {
+      "customer.accepts_whatsapp": Boolean(customer.acceptsWhatsappMarketing),
       "customer.accepts_marketing": Boolean(customer.acceptsEmailMarketing),
       "customer.orders_count": stats.orders_count,
       "customer.total_spent": stats.total_spent,
@@ -115,12 +122,15 @@ async function forCart(prisma, store, cartId) {
   return {
     subject: "cart",
     email: row.email,
+    phone: customer?.phone || row.data?.phone || null,
+    customer: customer || null,
     cart,
     cartRow: row,
     facts: {
       "cart.total": Number(cart.total || 0),
       "cart.items_count": cart.item_count || 0,
       "cart.recovered": Boolean(row.recoveredAt),
+      "customer.accepts_whatsapp": Boolean(customer?.acceptsWhatsappMarketing),
       "customer.accepts_marketing": Boolean(customer?.acceptsEmailMarketing),
       "customer.orders_count": stats.orders_count,
       "customer.total_spent": stats.total_spent,
@@ -133,6 +143,7 @@ async function forCart(prisma, store, cartId) {
       "customer.email": row.email,
       "cart.total": formatCurrency(Number(cart.total || 0), store.currency),
       "cart.first_item": cart.items[0]?.title || "cart",
+      "cart.recovery_token": row.recoveryToken || "",
     },
   };
 }
@@ -163,6 +174,8 @@ function sample(store, subjectType) {
     "order.tracking_number": "1490001234567",
     "cart.total": formatCurrency(1899, store.currency),
     "cart.first_item": "Pure Linen Shirt",
+    "order.status_token": "sample",
+    "cart.recovery_token": "sample",
     "store.name": store.name,
   };
   const order = {

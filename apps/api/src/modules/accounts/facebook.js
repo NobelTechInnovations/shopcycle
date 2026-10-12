@@ -110,7 +110,20 @@ async function connect(prisma, storeId, code) {
     tokenExpiresAt: expiresAt,
     facebookUserId: String(profile.id),
     facebookUserName: profile.name || null,
-    ...(otherPerson && { adAccountId: null, adAccountName: null, pageId: null, pageName: null, wabaId: null, wabaName: null, phoneNumberId: null, phoneNumberLabel: null }),
+    ...(otherPerson && {
+      adAccountId: null,
+      adAccountName: null,
+      pageId: null,
+      pageName: null,
+      wabaId: null,
+      wabaName: null,
+      phoneNumberId: null,
+      phoneNumberLabel: null,
+      waAccessToken: null,
+      waBusinessId: null,
+      waActivatedAt: null,
+      waSubscribedAt: null,
+    }),
   });
   return status(prisma, storeId);
 }

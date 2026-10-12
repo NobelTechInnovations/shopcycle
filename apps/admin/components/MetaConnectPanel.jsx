@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Button, Select, App, Tag } from "antd";
-import { Facebook, CheckCircle2 } from "lucide-react";
+import { Card, Button, Select, App, Tag, Alert } from "antd";
+import { Facebook, CheckCircle2, RefreshCw, ExternalLink } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { WhatsappSignupButton } from "@/components/WhatsappSignupButton";
 
 // Where MetaConnectPanel sends the browser to authorize, and where it
 // expects to land back — see apps/admin/app/admin/apps/meta/callback,
@@ -31,6 +32,8 @@ export function MetaConnectPanel({ focus, children }) {
   const [loadingAssets, setLoadingAssets] = useState(false);
   const [selection, setSelection] = useState({});
   const [saving, setSaving] = useState(false);
+  // "Change" on a ready connection reopens the picker.
+  const [changing, setChanging] = useState(false);
 
   const load = useCallback(async () => {
     const data = await apiFetch("/api/meta/status");
@@ -75,6 +78,7 @@ export function MetaConnectPanel({ focus, children }) {
     try {
       const { connection } = await apiFetch("/api/meta/assets/select", { method: "POST", body: selection });
       setStatus((s) => ({ ...s, connection }));
+      setChanging(false);
       message.success("Saved");
     } catch (err) {
       message.error(err.message);
@@ -120,7 +124,9 @@ export function MetaConnectPanel({ focus, children }) {
     );
   }
 
-  const ready = assetsReady(status.connection, focus);
+  const ready = assetsReady(status.connection, focus) && !changing;
+  const waba = focus === "whatsapp" && assets ? assets.wabas.find((w) => w.id === selection.wabaId) : null;
+  const number = waba?.phoneNumbers.find((n) => n.id === selection.phoneNumberId);
 
   return (
     <div className="flex flex-col gap-4">
@@ -159,30 +165,112 @@ export function MetaConnectPanel({ focus, children }) {
               {focus === "whatsapp" && (
                 <>
                   <Select
-                    placeholder="WhatsApp Business Account"
-                    options={assets.wabas.map((w) => ({ value: w.id, label: `${w.pageName}` }))}
-                    onChange={(v) => setSelection((s) => ({ ...s, wabaId: v, phoneNumberId: undefined }))}
+                    placeholder="WhatsApp Business account"
+                    value={selection.wabaId}
+                    options={assets.wabas.map((w) => ({
+                      value: w.id,
+                      label: (
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate">
+                            {w.name}
+                            {w.businessName && w.businessName !== w.name ? <span className="text-ink-muted"> · {w.businessName}</span> : null}
+                          </span>
+                          <Tag className="!m-0" color={w.phoneNumbers.some((n) => n.ready) ? "green" : w.phoneNumbers.length ? "gold" : "default"}>
+                            {w.phoneNumbers.length ? `${w.phoneNumbers.length} number${w.phoneNumbers.length === 1 ? "" : "s"}` : "No number"}
+                          </Tag>
+                        </span>
+                      ),
+                    }))}
+                    onChange={(v) => {
+                      const w = assets.wabas.find((x) => x.id === v);
+                      const only = w?.phoneNumbers.length === 1 ? w.phoneNumbers[0] : null;
+                      setSelection((s) => ({ ...s, wabaId: v, wabaName: w?.name, phoneNumberId: only?.id, phoneNumberLabel: only?.label }));
+                    }}
                   />
-                  {selection.wabaId && (
+                  {waba?.problem && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message={waba.problem}
+                      description={
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <WhatsappSignupButton onDone={loadAssets} />
+                          <Button size="small" icon={<ExternalLink size={13} aria-hidden="true" />} href={waba.manageUrl} target="_blank" rel="noreferrer">
+                            Open WhatsApp Manager
+                          </Button>
+                          {!waba.granted && (
+                            <Button size="small" icon={<Facebook size={13} aria-hidden="true" />} onClick={handleConnect}>
+                              Reconnect Facebook
+                            </Button>
+                          )}
+                          <Button size="small" icon={<RefreshCw size={13} aria-hidden="true" />} onClick={loadAssets}>
+                            Refresh
+                          </Button>
+                        </div>
+                      }
+                    />
+                  )}
+                  {waba && waba.phoneNumbers.length > 0 && (
                     <Select
                       placeholder="Phone number"
-                      options={(assets.wabas.find((w) => w.id === selection.wabaId)?.phoneNumbers || []).map((n) => ({
+                      value={selection.phoneNumberId}
+                      options={waba.phoneNumbers.map((n) => ({
                         value: n.id,
-                        label: n.label,
+                        label: (
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="truncate">{n.label}</span>
+                            <Tag className="!m-0" color={n.ready ? "green" : n.action === "activate" ? "blue" : "gold"}>
+                              {n.ready ? "Live" : n.action === "activate" ? "Needs activating" : "Needs attention"}
+                            </Tag>
+                          </span>
+                        ),
                       }))}
-                      onChange={(v, opt) => setSelection((s) => ({ ...s, phoneNumberId: v, phoneNumberLabel: opt.label }))}
+                      onChange={(v) => {
+                        const n = waba.phoneNumbers.find((x) => x.id === v);
+                        setSelection((s) => ({ ...s, phoneNumberId: v, phoneNumberLabel: n?.label }));
+                      }}
+                    />
+                  )}
+                  {number && !number.ready && (
+                    <Alert
+                      type={number.action === "activate" ? "info" : "warning"}
+                      showIcon
+                      message={
+                        number.action === "activate"
+                          ? "Save, then click “Activate number” on the next screen. You'll need the number's 6-digit two-step verification PIN."
+                          : number.problems[0]
+                      }
                     />
                   )}
                 </>
               )}
-              <Button type="primary" loading={saving} onClick={handleSaveSelection}>
-                Save
-              </Button>
+              <div className="flex gap-2">
+                <Button type="primary" loading={saving} onClick={handleSaveSelection} disabled={focus === "whatsapp" && !selection.phoneNumberId}>
+                  Save
+                </Button>
+                {changing && <Button onClick={() => setChanging(false)}>Cancel</Button>}
+              </div>
               {focus === "whatsapp" && assets.wabas.length === 0 && (
-                <p className="text-xs text-ink-muted m-0">
-                  No WhatsApp Business number found on this Facebook account. Set one up in Meta Business Manager
-                  first, then reconnect.
-                </p>
+                <Alert
+                  type="info"
+                  showIcon
+                  message="No WhatsApp Business account found on this Facebook login"
+                  description={
+                    <div className="flex flex-col gap-2 mt-1">
+                      <span>
+                        Create one and verify your number in Meta&apos;s window — it takes about two minutes. If you already have one, reconnect
+                        Facebook and tick it under WhatsApp accounts.
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        <WhatsappSignupButton onDone={loadAssets} />
+                        <WhatsappSignupButton coexistence type="default" onDone={loadAssets} />
+                        <Button icon={<Facebook size={13} aria-hidden="true" />} onClick={handleConnect}>
+                          Reconnect Facebook
+                        </Button>
+                      </div>
+                    </div>
+                  }
+                />
               )}
             </div>
           )}
@@ -198,7 +286,15 @@ export function MetaConnectPanel({ focus, children }) {
                 </>
               )}
               {focus === "whatsapp" && <Tag>{status.connection.phoneNumberLabel}</Tag>}
-              <Button size="small" type="link" onClick={() => setAssets(null) || loadAssets()}>
+              <Button
+                size="small"
+                type="link"
+                onClick={() => {
+                  setChanging(true);
+                  setSelection({});
+                  loadAssets();
+                }}
+              >
                 Change
               </Button>
             </div>

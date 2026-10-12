@@ -1,4 +1,7 @@
 const controller = require("./controller");
+const { env } = require("../../config/env");
+const inbound = require("../whatsapp/inbound");
+const whatsappEvents = require("../whatsapp/events");
 
 /** Registered with its own plugin scope (see app.js) specifically so this
  * custom JSON content-type parser — which keeps the raw bytes around for
@@ -19,6 +22,30 @@ async function webhookRoutes(fastify) {
   });
 
   fastify.post("/razorpay", controller.razorpayWebhookHandler);
+
+  // WhatsApp Business Platform (Meta app ▸ WhatsApp ▸ Configuration).
+  // GET: Meta's one-time check of the verify token. POST: events, signed
+  // with the app secret (X-Hub-Signature-256) over the raw body.
+  fastify.get("/meta/whatsapp", async (request, reply) => {
+    const q = request.query || {};
+    if (q["hub.mode"] === "subscribe" && env.META_WEBHOOK_VERIFY_TOKEN && q["hub.verify_token"] === env.META_WEBHOOK_VERIFY_TOKEN) {
+      return reply.type("text/plain").send(String(q["hub.challenge"] || ""));
+    }
+    return reply.code(403).send({ error: "Verification failed" });
+  });
+  fastify.post("/meta/whatsapp", { config: { rateLimit: false } }, async (request, reply) => {
+    if (!inbound.verifySignature(request.rawBody, request.headers["x-hub-signature-256"])) {
+      return reply.code(401).send({ error: "Invalid signature" });
+    }
+    try {
+      await inbound.processWebhook(fastify.prisma, request.body, { log: request.log, onReceived: whatsappEvents.onReceived(fastify) });
+    } catch (err) {
+      // Meta retries non-200s; every event is idempotent, so a retry is safe.
+      request.log.error({ err }, "whatsapp webhook: processing failed");
+      return reply.code(500).send({ error: "Processing failed" });
+    }
+    return reply.send({ ok: true });
+  });
 }
 
 module.exports = webhookRoutes;

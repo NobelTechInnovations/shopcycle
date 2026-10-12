@@ -8,8 +8,8 @@ const facebookAccount = require("../accounts/facebook");
  * the connection (who it's connected as, what's selected) is fine to show. */
 function serializeConnection(connection) {
   if (!connection) return null;
-  const { accessToken, ...rest } = connection;
-  return rest;
+  const { accessToken, waAccessToken, ...rest } = connection;
+  return { ...rest, whatsappSignup: Boolean(waAccessToken) };
 }
 
 async function statusHandler(request, reply) {

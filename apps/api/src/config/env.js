@@ -260,6 +260,20 @@ const envSchema = z.object({
   // people in with a configuration, which sets the permissions — then
   // META_LOGIN_SCOPES isn't used.
   META_LOGIN_CONFIG_ID: z.string().optional(),
+  // WhatsApp Embedded Signup: a second Facebook Login for Business
+  // configuration made from Meta's "WhatsApp Embedded Signup" template
+  // (Meta app ▸ Facebook Login for Business ▸ Configurations). With it the
+  // WhatsApp app offers "Add a WhatsApp number" — the seller creates their
+  // WhatsApp account and verifies a number inside Meta's own popup.
+  META_WA_SIGNUP_CONFIG_ID: z.string().optional(),
+  // Webhooks (Meta app ▸ WhatsApp ▸ Configuration ▸ Webhook): callback
+  // <API_PUBLIC_URL>/api/webhooks/meta/whatsapp, verify token = this.
+  // Messages, delivery/read receipts and template reviews arrive there.
+  META_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
+  // WhatsApp's per-message price (₹, India) for the bulk-send estimate —
+  // update when Meta changes its rate card.
+  WHATSAPP_PRICE_MARKETING: z.coerce.number().default(0.7846),
+  WHATSAPP_PRICE_UTILITY: z.coerce.number().default(0.115),
   META_APP_SECRET: z.string().optional(),
   // Instagram feed app: an app on developers.facebook.com with the
   // "Instagram API with Instagram Login" product (instagram_business_basic).

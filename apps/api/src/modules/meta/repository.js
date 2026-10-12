@@ -10,11 +10,18 @@ const { encryptSecret, decryptSecret } = require("../../lib/crypto");
  */
 function decrypt(connection) {
   if (!connection) return connection;
-  return { ...connection, accessToken: decryptSecret(connection.accessToken) };
+  return {
+    ...connection,
+    accessToken: decryptSecret(connection.accessToken),
+    waAccessToken: connection.waAccessToken ? decryptSecret(connection.waAccessToken) : null,
+  };
 }
 
 function encryptData(data) {
-  return "accessToken" in data ? { ...data, accessToken: encryptSecret(data.accessToken) } : data;
+  const out = { ...data };
+  if ("accessToken" in out) out.accessToken = encryptSecret(out.accessToken);
+  if (out.waAccessToken) out.waAccessToken = encryptSecret(out.waAccessToken);
+  return out;
 }
 
 async function findByStore(prisma, storeId) {
