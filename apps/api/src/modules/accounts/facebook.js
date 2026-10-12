@@ -22,7 +22,7 @@ const DEFAULT_SCOPES = [
   "instagram_basic",
   "catalog_management",
   "ads_read",
-  // Meta Ads app: creates campaigns, ad sets and ads (meta-ads/service.js).
+  // Meta Ads app: creates campaigns, ad sets and ads (meta-ads/publish.js).
   "ads_management",
   "whatsapp_business_management",
   "whatsapp_business_messaging",

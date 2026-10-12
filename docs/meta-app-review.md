@@ -155,3 +155,28 @@ has a role on our test business.
 Add each seller who must connect now under **App roles ▸ Roles ▸ Add
 people ▸ Testers** (their Facebook profile); they accept at
 https://developers.facebook.com/requests. Then login works for them.
+
+## 7. WhatsApp Business Platform setup (12 Oct)
+
+Oyklane now has a full WhatsApp workspace (inbox, templates, broadcasts, WhatsApp steps in Flows). For it to work for sellers, the "Oyklane Connect" app needs:
+
+1. **Webhook** — App dashboard ▸ WhatsApp ▸ Configuration ▸ Webhook ▸ Edit:
+   - Callback URL: `https://api.oyklane.com/api/webhooks/meta/whatsapp`
+   - Verify token: any long random string; put the same value in Railway `META_WEBHOOK_VERIFY_TOKEN` *before* clicking Verify.
+   - Webhook fields ▸ Subscribe: `messages`, `message_template_status_update`, `account_update`, `phone_number_quality_update`.
+   - Events are signed with the app secret (`META_APP_SECRET`) and checked by Oyklane.
+2. **Embedded Signup** (sellers add and verify a number inside Meta's popup — the way Tech Providers onboard numbers):
+   - Facebook Login for Business ▸ Configurations ▸ Create ▸ choose the **WhatsApp Embedded Signup** template, permissions `whatsapp_business_management`, `whatsapp_business_messaging`, `business_management`.
+   - Put its ID in Railway `META_WA_SIGNUP_CONFIG_ID`.
+   - Facebook Login for Business ▸ Settings: turn on "Login with the JavaScript SDK" and add `store.oyklane.com` to "Allowed domains for the JavaScript SDK".
+   - Until this is set, the "Add a WhatsApp number" button stays hidden and sellers add numbers in WhatsApp Manager.
+3. **App Review, round two**: `whatsapp_business_management`, `whatsapp_business_messaging`, `ads_management`. Screencast: connect WhatsApp ▸ pick the number ▸ Activate ▸ create a template ▸ reply in the inbox; and for ads: create a campaign in the wizard ▸ publish (paused) ▸ turn on.
+
+### Why a WhatsApp account shows "No number"
+
+The picker now says why. The usual reasons:
+
+- **The account has no phone number yet.** Add one: "Add a WhatsApp number" (Embedded Signup) or WhatsApp Manager ▸ Phone numbers ▸ Add phone number, and verify it with the SMS/call code.
+- **The number is in the WhatsApp Business app on a phone.** A number can't be on the app and the API at once, except through Meta's coexistence onboarding: "Use my WhatsApp Business app number" (needs Embedded Signup). Otherwise delete it from the app first.
+- **The account wasn't ticked when connecting Facebook.** Meta hides its numbers; reconnect and tick it under WhatsApp accounts.
+- After choosing a number, **Activate number** registers it on the Cloud API with the seller's 6-digit two-step PIN and subscribes Oyklane to its messages.

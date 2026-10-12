@@ -9,6 +9,7 @@ const { drainQueue } = require("./lib/mailer");
 const whatsappTemplates = require("./lib/whatsapp-templates");
 const flowsEngine = require("./modules/flows/engine");
 const whatsappBroadcasts = require("./modules/whatsapp/broadcasts");
+const adsRules = require("./modules/meta-ads/rules");
 
 // The billing engine bills real stores, and local development shares the
 // production database — so it runs only in production unless BILLING_JOBS
@@ -88,6 +89,13 @@ function startJobs(fastify) {
         fastify.log.error({ err }, "jobs: whatsapp broadcasts failed");
       }
       await fastify.prisma.messageDedupe.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 45 * 24 * 3600 * 1000) } } }).catch(() => {});
+      // Ads automatic rules the seller turned on (each runs every 6 hours).
+      try {
+        const changed = await adsRules.processDue(fastify.prisma, { log: fastify.log });
+        if (changed) fastify.log.info({ changed }, "jobs: ads rules made changes");
+      } catch (err) {
+        fastify.log.error({ err }, "jobs: ads rules failed");
+      }
     }
     try {
       const result = await webhooksService.processDue(fastify.prisma);

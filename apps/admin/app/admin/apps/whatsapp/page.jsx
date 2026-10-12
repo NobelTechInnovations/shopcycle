@@ -2,7 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Tabs } from "antd";
+import Link from "next/link";
+import { Button, Tabs } from "antd";
 import { MessagesSquare, FileText, Megaphone, Zap, Settings } from "lucide-react";
 import { PageHeader } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
@@ -58,7 +59,16 @@ function Suite() {
 export default function WhatsappPage() {
   return (
     <div>
-      <PageHeader title="WhatsApp" subtitle="Your customers' conversations, templates, broadcasts and automatic messages — on the official WhatsApp Business Platform." />
+      <PageHeader
+        title="WhatsApp"
+        subtitle="Your customers' conversations, templates, broadcasts and automatic messages — on the official WhatsApp Business Platform."
+        actions={
+          <>
+            <Link href="/admin/customers"><Button>Customers</Button></Link>
+            <Link href="/admin/apps/meta-ads"><Button>Meta Ads</Button></Link>
+          </>
+        }
+      />
       <MetaConnectPanel focus="whatsapp">
         <Suspense fallback={null}>
           <Suite />

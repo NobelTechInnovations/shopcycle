@@ -82,7 +82,7 @@ async function whatsappRoutes(fastify) {
     reply.code(201).send(out);
   });
   fastify.post("/conversations/:id/media", async (request) => {
-    const file = await request.file();
+    const file = await request.file({ limits: { fileSize: 100 * 1024 * 1024 } });
     if (!file) throw new HttpError(400, "Choose a file.");
     const buffer = await file.toBuffer();
     const mime = file.mimetype || "application/octet-stream";
@@ -139,7 +139,7 @@ async function whatsappRoutes(fastify) {
   });
   fastify.post("/templates/sample", async (request) => {
     ownerOnly(request, "create WhatsApp templates");
-    const file = await request.file();
+    const file = await request.file({ limits: { fileSize: 16 * 1024 * 1024 } });
     if (!file) throw new HttpError(400, "Choose a file.");
     const buffer = await file.toBuffer();
     if (buffer.length > 16 * 1024 * 1024) throw new HttpError(400, "The sample must be under 16 MB.");
