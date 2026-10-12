@@ -129,6 +129,16 @@ const GOOGLE_SHOPPING = {
   settingsSchema: [],
 };
 
+const GOOGLE_ADS = {
+  key: "google-ads",
+  name: "Google Ads",
+  description:
+    "Run Search, Shopping, Performance Max and Display campaigns on Google from your dashboard — guided setup, keyword ideas, purchase tracking on your store, results in plain words and suggestions you approve.",
+  category: "marketing",
+  iconKey: "megaphone",
+  settingsSchema: [],
+};
+
 const FACEBOOK_SHOP = {
   key: "facebook-shop",
   name: "Facebook & Instagram",
@@ -206,6 +216,7 @@ async function seedCatalog(prisma, { log } = {}) {
     await prisma.app.upsert({ where: { key: GOOGLE_REVIEWS.key }, update: {}, create: GOOGLE_REVIEWS });
     await prisma.app.upsert({ where: { key: RENTALS.key }, update: {}, create: RENTALS });
     await prisma.app.upsert({ where: { key: GOOGLE_SHOPPING.key }, update: {}, create: GOOGLE_SHOPPING });
+    await prisma.app.upsert({ where: { key: GOOGLE_ADS.key }, update: {}, create: GOOGLE_ADS });
     await prisma.app.upsert({ where: { key: FACEBOOK_SHOP.key }, update: {}, create: FACEBOOK_SHOP });
     await prisma.app.upsert({ where: { key: UPI_QR.key }, update: {}, create: UPI_QR });
   }

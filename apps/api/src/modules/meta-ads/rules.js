@@ -57,22 +57,22 @@ function clean(input) {
 }
 
 async function list(prisma, storeId) {
-  return prisma.adRule.findMany({ where: { storeId }, orderBy: { createdAt: "asc" } });
+  return prisma.adRule.findMany({ where: { storeId, platform: "meta" }, orderBy: { createdAt: "asc" } });
 }
 
 async function save(prisma, store, input, user, id) {
   const data = clean(input);
   if (id) {
-    const r = await prisma.adRule.findFirst({ where: { id, storeId: store.id } });
+    const r = await prisma.adRule.findFirst({ where: { id, storeId: store.id, platform: "meta" } });
     if (!r) throw new HttpError(404, "Rule not found");
     return prisma.adRule.update({ where: { id }, data });
   }
-  if ((await prisma.adRule.count({ where: { storeId: store.id } })) >= 10) throw new HttpError(400, "Up to 10 rules.");
+  if ((await prisma.adRule.count({ where: { storeId: store.id, platform: "meta" } })) >= 10) throw new HttpError(400, "Up to 10 rules.");
   return prisma.adRule.create({ data: { storeId: store.id, createdById: user?.id || null, ...data } });
 }
 
 async function remove(prisma, storeId, id) {
-  await prisma.adRule.deleteMany({ where: { id, storeId } });
+  await prisma.adRule.deleteMany({ where: { id, storeId, platform: "meta" } });
   return { ok: true };
 }
 
@@ -99,7 +99,7 @@ async function run(prisma, rule, { dryRun = false, log } = {}) {
     if (rule.kind === "pause_no_results" && m.spend >= c.minSpend && results === 0) change = { status: "PAUSED", why: `₹${Math.round(m.spend)} spent in ${c.lookbackDays} days with no results` };
     if (rule.kind === "pause_high_cpa" && m.spend >= c.minSpend && m.purchases > 0 && m.cpa > c.maxCpa) change = { status: "PAUSED", why: `₹${Math.round(m.cpa)} per purchase, above your ₹${c.maxCpa} limit` };
     if ((rule.kind === "raise_budget_good_roas" || rule.kind === "lower_budget_poor_roas") && set.daily_budget) {
-      const recent = await prisma.adActivity.findFirst({ where: { storeId: rule.storeId, targetId: set.id, source: "rule", action: "budget_changed", createdAt: { gte: new Date(Date.now() - COOLDOWN_MS) } } });
+      const recent = await prisma.adActivity.findFirst({ where: { storeId: rule.storeId, platform: "meta", targetId: set.id, source: "rule", action: "budget_changed", createdAt: { gte: new Date(Date.now() - COOLDOWN_MS) } } });
       if (!recent) {
         const budget = Number(set.daily_budget) / 100;
         if (rule.kind === "raise_budget_good_roas" && m.purchases >= c.minPurchases && m.roas >= c.minRoas) {
@@ -127,7 +127,7 @@ async function run(prisma, rule, { dryRun = false, log } = {}) {
 
 /** Jobs tick: enabled rules not run in the last 6 hours. */
 async function processDue(prisma, { log } = {}) {
-  const due = await prisma.adRule.findMany({ where: { enabled: true, OR: [{ lastRunAt: null }, { lastRunAt: { lt: new Date(Date.now() - RUN_EVERY_MS) } }] }, take: 20 });
+  const due = await prisma.adRule.findMany({ where: { platform: "meta", enabled: true, OR: [{ lastRunAt: null }, { lastRunAt: { lt: new Date(Date.now() - RUN_EVERY_MS) } }] }, take: 20 });
   let changed = 0;
   for (const rule of due) {
     try {
@@ -140,4 +140,4 @@ async function processDue(prisma, { log } = {}) {
   return changed;
 }
 
-module.exports = { KINDS, list, save, remove, run, processDue };
+module.exports = { KINDS, clean, list, save, remove, run, processDue };

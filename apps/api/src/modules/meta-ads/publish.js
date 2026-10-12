@@ -15,11 +15,11 @@ const manager = require("./manager");
 const MAX_DRAFT_BYTES = 400 * 1024;
 
 async function listDrafts(prisma, storeId) {
-  return prisma.adDraft.findMany({ where: { storeId, status: { in: ["draft", "failed", "publishing"] } }, orderBy: { updatedAt: "desc" }, take: 50, select: { id: true, name: true, status: true, error: true, updatedAt: true, createdAt: true } });
+  return prisma.adDraft.findMany({ where: { storeId, platform: "meta", status: { in: ["draft", "failed", "publishing"] } }, orderBy: { updatedAt: "desc" }, take: 50, select: { id: true, name: true, status: true, error: true, updatedAt: true, createdAt: true } });
 }
 
 async function getDraft(prisma, storeId, id) {
-  const d = await prisma.adDraft.findFirst({ where: { id, storeId } });
+  const d = await prisma.adDraft.findFirst({ where: { id, storeId, platform: "meta" } });
   if (!d) throw new HttpError(404, "Draft not found");
   return d;
 }

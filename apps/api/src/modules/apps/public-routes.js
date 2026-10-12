@@ -6,7 +6,7 @@ const { num } = require("../billing/money");
  * (apps/www), no sign-in. Only what a visitor may see: names, descriptions,
  * prices — never settings or anything about a store.
  */
-const PLAN_APPS = new Set(["meta-ads", "whatsapp"]);
+const PLAN_APPS = new Set(["meta-ads", "google-ads", "whatsapp"]);
 
 async function publicAppsRoutes(fastify) {
   fastify.get("/apps", async (request, reply) => {

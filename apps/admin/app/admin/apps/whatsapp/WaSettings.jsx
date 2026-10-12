@@ -1,10 +1,123 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, Select, Switch, Input, Button, Table, App, Alert, Popconfirm, Space } from "antd";
+import { Card, Select, Switch, Input, Button, Table, App, Alert, Popconfirm, Space, Radio, Tag, Checkbox } from "antd";
 import { Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { HealthCard } from "./wa-ui";
+
+const TSTATUS = { APPROVED: ["green", "approved"], PENDING: ["blue", "in review"], REJECTED: ["red", "rejected"] };
+
+/** Order confirmed / shipped / delivered on WhatsApp, and which number sends them. */
+function OrderUpdates({ canEdit }) {
+  const { message } = App.useApp();
+  const [d, setD] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const load = useCallback(
+    () =>
+      apiFetch("/api/whatsapp/order-updates")
+        .then((x) => {
+          setD(x);
+          const def = x.platformDefault || {};
+          setDraft({
+            orderConfirmed: x.settings.orderConfirmed ?? Boolean(def.enabled && def.events?.orderConfirmed !== false),
+            shipped: x.settings.shipped ?? Boolean(def.enabled && def.events?.shipped !== false),
+            delivered: x.settings.delivered ?? Boolean(def.enabled && def.events?.delivered !== false),
+            sender: x.settings.sender || "auto",
+          });
+        })
+        .catch((err) => message.error(err.message)),
+    [message]
+  );
+  useEffect(() => {
+    load();
+  }, [load]);
+  if (!d || !draft) return <Card size="small" title="Order updates" loading />;
+  const ownReady = d.own.connected && Object.values(d.own.templates).every((st) => st === "APPROVED");
+  const ownMissing = Object.values(d.own.templates).some((st) => !st);
+  return (
+    <Card
+      size="small"
+      title="Order updates on WhatsApp"
+      extra={
+        canEdit && (
+          <Button
+            type="primary"
+            size="small"
+            loading={busy === "save"}
+            onClick={async () => {
+              setBusy("save");
+              try {
+                await apiFetch("/api/whatsapp/order-updates", { method: "PUT", body: draft });
+                message.success("Saved");
+                load();
+              } catch (err) {
+                message.error(err.message);
+              } finally {
+                setBusy(null);
+              }
+            }}
+          >
+            Save
+          </Button>
+        )
+      }
+    >
+      <p className="text-xs text-ink-muted mt-0">Sent automatically with the order number, total, courier and a link to the order page. Customers who replied STOP don&apos;t get them.</p>
+      <div className="flex flex-col gap-2 mb-3">
+        {Object.entries(d.kinds).map(([k, v]) => (
+          <Checkbox key={k} disabled={!canEdit} checked={draft[k]} onChange={(e) => setDraft({ ...draft, [k]: e.target.checked })}>
+            {v.label}
+            <span className="block text-xs text-ink-muted">{v.body.replace("{{1}}", "Asha").replace("{{2}}", "#1042").replace("{{3}}", "your store").replace("{{4}}", v.label === "Order shipped" ? "Delhivery" : "₹1,299")}</span>
+          </Checkbox>
+        ))}
+      </div>
+      <p className="text-sm font-medium m-0 mb-1">Sent from</p>
+      <Radio.Group disabled={!canEdit} value={draft.sender} onChange={(e) => setDraft({ ...draft, sender: e.target.value })} className="flex flex-col gap-1">
+        <Radio value="auto">Automatic — your number when it&apos;s ready, otherwise Oyklane&apos;s</Radio>
+        <Radio value="own" disabled={!d.own.connected}>Only my WhatsApp number</Radio>
+        <Radio value="platform" disabled={!d.platformReady}>Oyklane&apos;s WhatsApp number{d.platformNumber ? ` (${d.platformNumber})` : ""}</Radio>
+      </Radio.Group>
+      {!d.platformReady && <p className="text-xs text-ink-muted mt-2 mb-0">Oyklane&apos;s shared number isn&apos;t available yet, so updates need your own number.</p>}
+      {d.own.connected && (
+        <div className="mt-3 rounded-md border border-app-border p-2">
+          <p className="text-xs font-semibold m-0 mb-1">Templates on your WhatsApp account</p>
+          <div className="flex flex-wrap gap-1 mb-2">
+            {Object.entries(d.own.templates).map(([name, st]) => (
+              <Tag key={name} color={TSTATUS[st]?.[0]}>
+                {name} · {st ? TSTATUS[st]?.[1] || st.toLowerCase() : "not added"}
+              </Tag>
+            ))}
+          </div>
+          {ownMissing && canEdit && (
+            <Button
+              size="small"
+              loading={busy === "install"}
+              onClick={async () => {
+                setBusy("install");
+                try {
+                  const r = await apiFetch("/api/whatsapp/order-updates/install", { method: "POST" });
+                  const bad = r.results.filter((x) => x.status === "error");
+                  if (bad.length) message.error(`${bad[0].name}: ${bad[0].error}`);
+                  else message.success("Sent to Meta for review — usually approved within minutes");
+                  load();
+                } catch (err) {
+                  message.error(err.message);
+                } finally {
+                  setBusy(null);
+                }
+              }}
+            >
+              Add them to my WhatsApp account
+            </Button>
+          )}
+          {ownReady && <p className="text-xs text-status-success m-0">Your number sends order updates.</p>}
+        </div>
+      )}
+    </Card>
+  );
+}
 
 function InboxSettings({ canEdit }) {
   const { message } = App.useApp();
@@ -143,6 +256,7 @@ export default function WaSettings({ canEdit }) {
         </Card>
       </div>
       <div className="flex flex-col gap-4">
+        <OrderUpdates canEdit={canEdit} />
         <InboxSettings canEdit={canEdit} />
         <OptOuts canEdit={canEdit} />
       </div>

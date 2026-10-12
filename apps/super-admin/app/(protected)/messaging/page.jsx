@@ -5,6 +5,7 @@ import { App, Button, Form, Input, Skeleton, Switch, Table, Tag } from "antd";
 import { MessageCircle, Send } from "lucide-react";
 import { PageHeader, EmptyState, StatusBadge, useHasMounted } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+import OyklaneWhatsapp from "./OyklaneWhatsapp";
 
 const PROVIDERS = { zoho: "Zoho CPaaS", meta: "Meta WhatsApp Cloud", twilio: "Twilio", log: "Off — codes are only logged" };
 
@@ -18,12 +19,6 @@ function explain(error) {
   if (/number|recipient|invalid.*to/i.test(e)) return "Zoho refused the number — it must include the country code.";
   return null;
 }
-const COMING = [
-  { label: "Order confirmed", hint: "Order number, total and a link to track it." },
-  { label: "Shipped", hint: "Courier and tracking number." },
-  { label: "Delivered", hint: "With a link to leave a review." },
-];
-
 function when(iso) {
   return new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
 }
@@ -188,19 +183,7 @@ export default function MessagingPage() {
           </Section>
         </Form>
 
-        <Section title="Order & delivery updates" note="These come with the Phone Login app — stores that install it get them on WhatsApp.">
-          <div className="grid gap-3 md:grid-cols-3">
-            {COMING.map((c) => (
-              <div key={c.label} className="rounded-[10px] border border-dashed border-app-border p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[13px] font-medium text-ink">{c.label}</span>
-                  <Tag className="!m-0">Coming soon</Tag>
-                </div>
-                <p className="text-[12px] text-ink-muted mt-1 mb-0">{c.hint}</p>
-              </div>
-            ))}
-          </div>
-        </Section>
+        <OyklaneWhatsapp />
 
         <Section title="Recent WhatsApp messages" note="The last ten, from every store. Numbers are masked.">
           <Table

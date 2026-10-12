@@ -213,6 +213,7 @@ function buildApp() {
   app.register(metaRoutes, { prefix: "/api/meta" });
   app.register(metaAdsRoutes, { prefix: "/api/meta-ads" });
   app.register(whatsappRoutes, { prefix: "/api/whatsapp" });
+  app.register(require("./modules/google-ads/routes"), { prefix: "/api/google-ads" });
   app.register(platformCustomersRoutes, { prefix: "/api/super-admin/platform-customers" });
   app.register(flowsRoutes, { prefix: "/api/flows" });
   app.register(supportRoutes, { prefix: "/api/support" });

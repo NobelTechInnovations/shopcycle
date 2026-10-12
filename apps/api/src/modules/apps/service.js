@@ -11,6 +11,7 @@ const { num } = require("../billing/money");
  * itself and tells the Apps page which cards to badge. */
 const PLAN_APPS = {
   "meta-ads": "marketing_tools",
+  "google-ads": "marketing_tools",
   whatsapp: "marketing_tools",
 };
 

@@ -142,7 +142,7 @@ function numberState(n) {
   // Only a real rejection is a problem — test numbers and numbers without a
   // reviewed name report NONE / NON_EXISTS and still send.
   if (n.name_status === "DECLINED") problems.push("Meta declined the display name. Change it in WhatsApp Manager ▸ Phone numbers ▸ Profile.");
-  if (n.name_status === "PENDING_REVIEW" || n.status === "PENDING") problems.push("Meta is still reviewing this number's display name (usually 1–2 days). It can send once Meta approves it — nothing to do until then.");
+  if (n.name_status === "PENDING_REVIEW") problems.push("Meta is still reviewing this number's display name (usually 1–2 days). It can send once Meta approves it — nothing to do until then.");
   if (n.status === "FLAGGED" || n.status === "RESTRICTED") problems.push("Meta has limited this number because of low message quality. Check WhatsApp Manager ▸ Insights.");
   if (n.status === "BANNED") problems.push("Meta has banned this number. Contact Meta support from WhatsApp Manager.");
   if (n.status === "MIGRATED") problems.push("This number moved to another WhatsApp Business account.");

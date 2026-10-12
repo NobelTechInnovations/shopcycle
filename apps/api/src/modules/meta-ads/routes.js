@@ -113,12 +113,12 @@ async function metaAdsRoutes(fastify) {
     return rules.remove(db, request.store.id, request.params.id);
   });
   fastify.post("/rules/:id/preview", async (request) => {
-    const rule = await db.adRule.findFirst({ where: { id: request.params.id, storeId: request.store.id } });
+    const rule = await db.adRule.findFirst({ where: { id: request.params.id, storeId: request.store.id, platform: "meta" } });
     if (!rule) throw new HttpError(404, "Rule not found");
     return { changes: await rules.run(db, rule, { dryRun: true }) };
   });
   fastify.get("/activity", async (request) => ({
-    activity: await db.adActivity.findMany({ where: { storeId: request.store.id }, orderBy: { createdAt: "desc" }, take: 200 }),
+    activity: await db.adActivity.findMany({ where: { storeId: request.store.id, platform: "meta" }, orderBy: { createdAt: "desc" }, take: 200 }),
   }));
 }
 

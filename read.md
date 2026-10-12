@@ -375,6 +375,27 @@ Local `.env` points at the **production** Supabase database, so every local writ
 - New tables: whatsapp_conversations, whatsapp_notes, whatsapp_opt_outs, whatsapp_broadcasts, whatsapp_broadcast_recipients, message_dedupe, ad_drafts, ad_media, ad_activities, ad_rules; new columns on whatsapp_messages, meta_connections, customers, flows (all additive, pushed).
 - Railway env to add: `META_WEBHOOK_VERIFY_TOKEN`, `META_WA_SIGNUP_CONFIG_ID` (optional `WHATSAPP_PRICE_MARKETING`, `WHATSAPP_PRICE_UTILITY`).
 
+### Done 13 Oct (NOT committed yet)
+
+- **WhatsApp fixes**: test numbers and numbers without a reviewed name no longer show "display name declined"; a name still in review says so; Meta test numbers (+1 555) are labelled. The webhook check is no longer shown to sellers (it's Oyklane's setup — now in Super admin ▸ Messaging).
+- **Oyklane's own WhatsApp number (default sender)** — Super admin ▸ Messaging:
+  - *Meta app setup* checklist read from Meta itself (`/{app-id}/subscriptions`): webhook URL, fields, verify token, app secret, Embedded Signup.
+  - Connect Oyklane's number with a permanent System User token (stored encrypted), pick the number, Activate (PIN).
+  - *Install them*: Oyklane's standard templates `oy_order_confirmed`, `oy_order_shipped`, `oy_order_delivered` (Utility, store name in every message, button → `api.oyklane.com/o/<code>` which redirects to that store's order page) and `oy_login_code` (Authentication).
+  - *Default order updates*: on/off and which events, for every store that hasn't chosen; test send.
+- **Order updates on WhatsApp** (whatsapp/notifications.js, on order placed/paid, shipped, delivered): sent from the store's own number when its copy of the template is approved, otherwise Oyklane's; once per order and event. Seller side: WhatsApp ▸ Settings ▸ *Order updates* (which ones, "Sent from": automatic / my number / Oyklane's, and "Add them to my WhatsApp account" to install the same templates on theirs). Customers' replies to Oyklane's number land in the right store's inbox (tagged "via Oyklane's number"; replies go out from that number). Sign-in codes can use Oyklane's number too, only when no other provider (Zoho) is set.
+- **Meta Ads + Instagram**: the connect screen now picks the Instagram account with the Page (Page-linked or ad-account accounts); ads default to it; the wizard lists all of them; a missing Instagram link is flagged.
+- **Google Ads Manager** (new app "Google Ads", Apps ▸ Google Ads; Premium like Meta Ads):
+  - Sign in with Google (new "ads" permission, `adwords` scope), choose the account (incl. accounts under a manager/MCC).
+  - *Account check*: billing, test account, auto-tagging, Merchant Center link, purchase tracking — **one click "Set up purchase tracking"** creates the Purchase conversion in Google Ads and turns on the tag on the storefront (fires on the order page with value and order id).
+  - *Campaigns*: campaign → ad groups (Search, Display, Shopping) or asset groups (Performance Max) → ads, results for any period, on/off, edit name/budget, remove, search terms per Search campaign; policy rejections and ad strength shown.
+  - *Create wizard* (autosaved drafts): Search (ad groups, keywords with match types, **Keyword Planner ideas**, responsive search ads 3–15 headlines / 2–4 descriptions, paths), Performance Max (asset groups: headlines, long headlines, descriptions, business name, landscape/square/portrait/logo images, Merchant Center products), Shopping (Merchant Center, CPC), Display (responsive display ads). Bidding per type (most purchases / most sales value / most clicks / manual CPC / target ROAS), budgets, dates, locations (Google's geo search) and exclusions, languages, search partners, negative keywords, AI headline/description ideas. **"Check with Google"** runs the real request in validate-only mode and points Google's errors at the right step; publishing is **one atomic request** (nothing half-created), paused; "Turn on" is separate. Every ad link carries `utm_source=google&utm_campaign={campaignid}…`.
+  - *Images*: uploaded as Google Ads assets, sorted by the slots they fit.
+  - *Insights*: Google's numbers vs store orders from Google clicks, plain-language summary with confidence/caveats, suggestions to approve (pause, budget step, **negative keywords from search terms that cost money without sales**) and Google's own recommendations (apply / dismiss).
+  - *Automation & activity*: the same opt-in rules as Meta, per campaign, with limits and log.
+- New: table google_ads_accounts; columns meta_connections.instagramAccountId/instagramUsername, whatsapp_conversations.viaPlatform, platform on ad_drafts/ad_media/ad_activities/ad_rules (pushed).
+- Railway: `GOOGLE_ADS_DEVELOPER_TOKEN` (and `GOOGLE_ADS_API_VERSION` if v24 isn't current). Google Cloud OAuth consent screen: add the `.../auth/adwords` scope.
+
 ### Left to do
 
 0a. **Security — urgent**: production `JWT_SECRET` is the placeholder from `.env.example` (anyone can sign seller, super-admin and shopper sessions with it). Steps that keep encrypted data (2FA, payment keys, webhooks, Meta/Google tokens) readable: (1) set `DATA_ENCRYPTION_KEY` on Railway to `sha256("<current JWT_SECRET>:data-encryption")` in hex, (2) then set a new random `JWT_SECRET` (everyone signs in again), (3) later re-encrypt with a fresh key. Also rotate the Supabase database password and the Redis password (they were pasted in chat on 4 Oct) and set `TRUST_PROXY=true` on Railway (behind its proxy every visitor otherwise shares one rate-limit).

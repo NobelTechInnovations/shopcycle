@@ -93,6 +93,8 @@ function startJobs(fastify) {
       try {
         const changed = await adsRules.processDue(fastify.prisma, { log: fastify.log });
         if (changed) fastify.log.info({ changed }, "jobs: ads rules made changes");
+        const gChanged = await require("./modules/google-ads/rules").processDue(fastify.prisma, { log: fastify.log });
+        if (gChanged) fastify.log.info({ changed: gChanged }, "jobs: google ads rules made changes");
       } catch (err) {
         fastify.log.error({ err }, "jobs: ads rules failed");
       }

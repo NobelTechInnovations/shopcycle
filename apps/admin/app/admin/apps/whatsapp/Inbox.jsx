@@ -450,6 +450,7 @@ export default function Inbox() {
                   </div>
                   <div className="flex gap-1 mt-0.5 flex-wrap">
                     {cv.handledBy === "ai" && <Tag color="purple" className="!text-[10px] !leading-4 !m-0">AI</Tag>}
+                    {cv.viaPlatform && <Tag color="cyan" className="!text-[10px] !leading-4 !m-0">Oyklane number</Tag>}
                     {cv.assignedToName && <Tag className="!text-[10px] !leading-4 !m-0">{cv.assignedToName}</Tag>}
                     {cv.labels.slice(0, 2).map((l) => (
                       <Tag key={l} className="!text-[10px] !leading-4 !m-0" color={l === "Needs a person" ? "orange" : undefined}>
@@ -477,7 +478,14 @@ export default function Inbox() {
             <div className="px-3 py-2 border-b border-app-border flex items-center gap-2">
               <Button type="text" className="md:!hidden" icon={<ArrowLeft size={16} aria-hidden="true" />} onClick={() => setActiveId(null)} aria-label="Back to conversations" />
               <div className="min-w-0 flex-1">
-                <p className="m-0 font-semibold truncate">{displayName(c)}</p>
+                <p className="m-0 font-semibold truncate">
+                  {displayName(c)}
+                  {c.viaPlatform && (
+                    <Tooltip title="This customer is chatting with Oyklane's shared number (it sent your order updates). Your replies go from that number too.">
+                      <Tag color="cyan" className="!ml-2 !text-[10px]">via Oyklane&apos;s number</Tag>
+                    </Tooltip>
+                  )}
+                </p>
                 <p className="m-0 text-xs text-ink-muted flex items-center gap-1">
                   {c.windowOpen ? (
                     <>

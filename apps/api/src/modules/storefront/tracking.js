@@ -107,8 +107,10 @@ function trackingTags({ apps, templateName, ctx, currency, html }) {
   const pixelId = String(apps?.["facebook-pixel"]?.pixelId || "").trim();
   const gaId = String(ga.measurementId || "").trim();
   const gtmId = String(ga.gtmId || "").trim();
-  const adsId = String(ga.adsConversionId || "").trim();
-  const adsLabel = String(ga.adsConversionLabel || "").trim();
+  // From the Google Analytics app, or set up by the Google Ads app.
+  const gads = apps?.["google-ads"] || {};
+  const adsId = String(ga.adsConversionId || gads.adsConversionId || "").trim();
+  const adsLabel = String(ga.adsConversionLabel || gads.adsConversionLabel || "").trim();
   const hasPixel = PIXEL_ID.test(pixelId);
   const hasGa = GA_ID.test(gaId);
   const hasGtm = GTM_ID.test(gtmId);

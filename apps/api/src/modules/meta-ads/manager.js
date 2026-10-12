@@ -398,7 +398,7 @@ async function uploadMedia(prisma, store, { buffer, mime, name }) {
 /** The library — videos still processing at Meta are checked as it's opened. */
 async function library(prisma, store) {
   const conn = await connection(prisma, store.id);
-  const rows = await prisma.adMedia.findMany({ where: { storeId: store.id, adAccountId: conn.adAccountId }, orderBy: { createdAt: "desc" }, take: 200 });
+  const rows = await prisma.adMedia.findMany({ where: { storeId: store.id, platform: "meta", adAccountId: conn.adAccountId }, orderBy: { createdAt: "desc" }, take: 200 });
   for (const v of rows.filter((r) => r.kind === "video" && r.status === "processing")) {
     try {
       const info = await g(conn, `/${v.videoId}`, { params: { fields: "status,picture,length" } });
@@ -416,7 +416,7 @@ async function library(prisma, store) {
 }
 
 async function removeMedia(prisma, store, id) {
-  await prisma.adMedia.deleteMany({ where: { id, storeId: store.id } });
+  await prisma.adMedia.deleteMany({ where: { id, storeId: store.id, platform: "meta" } });
   return { ok: true };
 }
 

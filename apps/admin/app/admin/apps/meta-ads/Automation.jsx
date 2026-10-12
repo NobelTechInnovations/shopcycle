@@ -16,7 +16,7 @@ const FIELD = {
   lookbackDays: { label: "Looking at the last", suffix: "days" },
 };
 
-function RuleModal({ open, onClose, kinds, rule, onSaved }) {
+function RuleModal({ open, onClose, kinds, rule, onSaved, base }) {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const kind = Form.useWatch("kind", form);
@@ -37,8 +37,8 @@ function RuleModal({ open, onClose, kinds, rule, onSaved }) {
         const { name, kind: k, maxDailyBudget, ...config } = v;
         try {
           const body = { name, kind: k, maxDailyBudget, config, enabled: rule?.enabled || false };
-          if (rule) await apiFetch(`/api/meta-ads/rules/${rule.id}`, { method: "PUT", body });
-          else await apiFetch("/api/meta-ads/rules", { method: "POST", body });
+          if (rule) await apiFetch(`${base}/rules/${rule.id}`, { method: "PUT", body });
+          else await apiFetch(`${base}/rules`, { method: "POST", body });
           message.success(rule ? "Saved" : "Rule saved — it's off until you switch it on");
           onSaved();
         } catch (err) {
@@ -76,14 +76,14 @@ function RuleModal({ open, onClose, kinds, rule, onSaved }) {
   );
 }
 
-export function Activity() {
+export function Activity({ base = "/api/meta-ads" }) {
   const [rows, setRows] = useState(null);
   useEffect(() => {
-    apiFetch("/api/meta-ads/activity")
+    apiFetch(`${base}/activity`)
       .then((d) => setRows(d.activity))
       .catch(() => setRows([]));
-  }, []);
-  const ACTION = { turned_on: "Turned on", paused: "Paused", budget_changed: "Changed budget", edited: "Edited", duplicated: "Duplicated", archived: "Deleted", published: "Published", publish_failed: "Publish failed", update: "Change failed" };
+  }, [base]);
+  const ACTION = { turned_on: "Turned on", paused: "Paused", budget_changed: "Changed budget", edited: "Edited", duplicated: "Duplicated", archived: "Deleted", published: "Published", publish_failed: "Publish failed", update: "Change failed", negative_keyword_added: "Added a negative keyword", google_recommendation_applied: "Applied Google's suggestion", google_recommendation_dismissed: "Dismissed Google's suggestion" };
   return (
     <Table
       size="small"
@@ -96,7 +96,7 @@ export function Activity() {
         { title: "When", dataIndex: "createdAt", render: (v) => new Date(v).toLocaleString([], { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) },
         { title: "Who", render: (_, r) => (r.source === "rule" ? <Tag color="purple">{r.userName || "Automatic rule"}</Tag> : r.source === "recommendation" ? <span>{r.userName} <Tag>suggestion</Tag></span> : r.userName || "—") },
         { title: "What", render: (_, r) => <span className={r.ok ? "" : "text-status-danger"}>{ACTION[r.action] || r.action}</span> },
-        { title: "On", render: (_, r) => (r.targetName ? `${r.targetType === "adset" ? "Ad set" : r.targetType === "ad" ? "Ad" : "Campaign"} “${r.targetName}”` : "—") },
+        { title: "On", render: (_, r) => (r.targetName ? `${{ adset: "Ad set", ad: "Ad", adgroup: "Ad group", assetgroup: "Asset group" }[r.targetType] || "Campaign"} “${r.targetName}”` : r.targetId || "—") },
         {
           title: "Details",
           render: (_, r) =>
@@ -113,19 +113,19 @@ export function Activity() {
   );
 }
 
-export default function Automation({ canEdit }) {
+export default function Automation({ canEdit, base = "/api/meta-ads", unit = "ad sets" }) {
   const { message } = App.useApp();
   const [data, setData] = useState(null);
   const [editing, setEditing] = useState({ open: false });
   const [preview, setPreview] = useState(null);
-  const load = useCallback(() => apiFetch("/api/meta-ads/rules").then(setData).catch((err) => message.error(err.message)), [message]);
+  const load = useCallback(() => apiFetch(`${base}/rules`).then(setData).catch((err) => message.error(err.message)), [message, base]);
   useEffect(() => {
     load();
   }, [load]);
 
   async function toggle(rule, enabled) {
     try {
-      await apiFetch(`/api/meta-ads/rules/${rule.id}`, { method: "PUT", body: { name: rule.name, kind: rule.kind, config: rule.config, maxDailyBudget: rule.maxDailyBudget ? Number(rule.maxDailyBudget) : null, enabled } });
+      await apiFetch(`${base}/rules/${rule.id}`, { method: "PUT", body: { name: rule.name, kind: rule.kind, config: rule.config, maxDailyBudget: rule.maxDailyBudget ? Number(rule.maxDailyBudget) : null, enabled } });
       message.success(enabled ? "Rule on — it checks every 6 hours" : "Rule off");
       load();
     } catch (err) {
@@ -139,7 +139,7 @@ export default function Automation({ canEdit }) {
         type="info"
         showIcon
         message="Automatic rules are optional"
-        description="Each rule only changes ad sets that are running, within the limits you set, every 6 hours at most. Every change is in the Activity log. Switch a rule off any time."
+        description={`Each rule only changes ${unit} that are running, within the limits you set, every 6 hours at most. Every change is in the Activity log. Switch a rule off any time.`}
       />
       <div className="flex justify-end">
         {canEdit && (
@@ -171,7 +171,7 @@ export default function Automation({ canEdit }) {
                   icon={<Eye size={13} aria-hidden="true" />}
                   onClick={async () => {
                     try {
-                      setPreview({ rule: r, changes: (await apiFetch(`/api/meta-ads/rules/${r.id}/preview`, { method: "POST" })).changes });
+                      setPreview({ rule: r, changes: (await apiFetch(`${base}/rules/${r.id}/preview`, { method: "POST" })).changes });
                     } catch (err) {
                       message.error(err.message);
                     }
@@ -181,7 +181,7 @@ export default function Automation({ canEdit }) {
                 </Button>
                 {canEdit && <Button size="small" onClick={() => setEditing({ open: true, rule: r })}>Edit</Button>}
                 {canEdit && (
-                  <Popconfirm title="Delete this rule?" onConfirm={() => apiFetch(`/api/meta-ads/rules/${r.id}`, { method: "DELETE" }).then(load)}>
+                  <Popconfirm title="Delete this rule?" onConfirm={() => apiFetch(`${base}/rules/${r.id}`, { method: "DELETE" }).then(load)}>
                     <Button size="small" danger icon={<Trash2 size={13} aria-hidden="true" />} aria-label="Delete rule" />
                   </Popconfirm>
                 )}
@@ -194,9 +194,9 @@ export default function Automation({ canEdit }) {
       )}
       <div>
         <h3 className="text-[15px] font-semibold mt-2 mb-2">Activity</h3>
-        <Activity />
+        <Activity base={base} />
       </div>
-      {data && <RuleModal open={editing.open} rule={editing.rule} kinds={data.kinds} onClose={() => setEditing({ open: false })} onSaved={() => { setEditing({ open: false }); load(); }} />}
+      {data && <RuleModal base={base} open={editing.open} rule={editing.rule} kinds={data.kinds} onClose={() => setEditing({ open: false })} onSaved={() => { setEditing({ open: false }); load(); }} />}
       <Modal open={Boolean(preview)} onCancel={() => setPreview(null)} footer={null} title={`If “${preview?.rule?.name}” ran now`}>
         {preview?.changes?.length ? (
           <ul className="pl-4 text-sm">
