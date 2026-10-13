@@ -34,6 +34,75 @@ function Check({ ok, text, fix }) {
   );
 }
 
+/** Getting the "System user" key from Meta — one action per step. */
+const GUIDE = [
+  {
+    title: "Open your business settings",
+    body: (
+      <>
+        Open{" "}
+        <a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noreferrer">
+          Meta Business Settings ▸ System users
+        </a>
+        . If Meta asks, choose <b>Oyklane&apos;s business</b> — the one that owns the &ldquo;Oyklane Connect&rdquo; app and Oyklane&apos;s WhatsApp number.
+      </>
+    ),
+  },
+  {
+    title: "Create a system user",
+    body: (
+      <>
+        Click <b>Add</b>. Name it <b>Oyklane WhatsApp</b>, choose role <b>Admin</b>, click <b>Create system user</b>. (A system user is a robot login for your business — its key never expires, so messages keep going.)
+      </>
+    ),
+  },
+  {
+    title: "Give it the app",
+    body: (
+      <>
+        With <b>Oyklane WhatsApp</b> selected, click <b>Assign assets</b> ▸ <b>Apps</b> ▸ tick <b>Oyklane Connect</b> ▸ turn on <b>Full control</b> ▸ <b>Assign</b>.
+      </>
+    ),
+  },
+  {
+    title: "Give it the WhatsApp account",
+    body: (
+      <>
+        Click <b>Assign assets</b> again ▸ <b>WhatsApp accounts</b> ▸ tick Oyklane&apos;s WhatsApp account (the one with the number Oyklane will send from) ▸ <b>Full control</b> ▸ <b>Assign</b>.
+      </>
+    ),
+  },
+  {
+    title: "Generate the key",
+    body: (
+      <>
+        Click <b>Generate token</b>. App: <b>Oyklane Connect</b>. Expiry: <b>Never</b>. Permissions — tick these two:
+        <span className="block mt-1">
+          <code>whatsapp_business_management</code> and <code>whatsapp_business_messaging</code>
+        </span>
+        Click <b>Generate token</b>, then <b>Copy</b>. Meta shows it only once.
+      </>
+    ),
+  },
+  { title: "Paste it here", body: <>Back here, click <b>Connect</b>, paste the key, then pick the WhatsApp number and click <b>Activate</b>.</> },
+];
+
+function TokenGuide() {
+  return (
+    <ol className="list-none p-0 m-0 flex flex-col gap-3">
+      {GUIDE.map((g, i) => (
+        <li key={g.title} className="flex gap-3">
+          <span className="w-6 h-6 rounded-full bg-accent-soft text-accent text-[12px] font-semibold grid place-items-center shrink-0">{i + 1}</span>
+          <span className="text-[13px] text-ink min-w-0">
+            <b className="block">{g.title}</b>
+            <span className="text-ink-muted">{g.body}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export default function OyklaneWhatsapp() {
   const { message } = App.useApp();
   const [st, setSt] = useState(null);
@@ -103,19 +172,12 @@ export default function OyklaneWhatsapp() {
         }
       >
         {!st.source ? (
-          <Alert
-            type="info"
-            showIcon
-            message="Not connected"
-            description={
-              <ol className="m-0 pl-4 text-[13px]">
-                <li>business.facebook.com ▸ Oyklane&apos;s business ▸ Settings ▸ Users ▸ System users ▸ Add (Admin).</li>
-                <li>Add assets ▸ Apps ▸ “Oyklane Connect” (full control) and WhatsApp accounts ▸ Oyklane&apos;s account (full control).</li>
-                <li>Generate token ▸ app “Oyklane Connect”, expiry Never, tick whatsapp_business_management and whatsapp_business_messaging ▸ copy it.</li>
-                <li>Click Connect above and paste it.</li>
-              </ol>
-            }
-          />
+          <div className="flex flex-col gap-3">
+            <p className="text-[13px] text-ink m-0">
+              Not connected yet. Oyklane needs a <b>permanent key</b> from Meta to send from your WhatsApp number. It takes about 3 minutes, once:
+            </p>
+            <TokenGuide />
+          </div>
         ) : (
           <div className="flex flex-col gap-2 text-[13px]">
             <div className="flex flex-wrap items-center gap-2">
@@ -197,7 +259,7 @@ export default function OyklaneWhatsapp() {
       )}
 
       <Modal
-        title="Connect Oyklane's WhatsApp"
+        title="Connect Oyklane's WhatsApp number"
         open={tokenOpen}
         onCancel={() => {
           setTokenOpen(false);
@@ -209,8 +271,17 @@ export default function OyklaneWhatsapp() {
       >
         {!wabas ? (
           <div className="flex flex-col gap-3">
-            <p className="text-[13px] m-0">Paste the System User access token (Business settings ▸ System users ▸ Generate token, expiry Never, with whatsapp_business_management and whatsapp_business_messaging). It&apos;s stored encrypted and never shown again.</p>
-            <Input.TextArea rows={4} value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" spellCheck={false} />
+            <details className="rounded-lg border border-app-border p-3">
+              <summary className="cursor-pointer text-[13px] font-medium">Where do I get this key?</summary>
+              <div className="mt-3">
+                <TokenGuide />
+              </div>
+            </details>
+            <label className="text-[13px] font-medium" htmlFor="oy-wa-token">
+              Paste the key (it starts with <code>EAA</code> and is very long)
+            </label>
+            <Input.TextArea id="oy-wa-token" rows={4} value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" spellCheck={false} placeholder="EAA…" />
+            <p className="text-[12px] text-ink-muted m-0">Stored encrypted. Nobody can see it again here — not even you.</p>
             <Button type="primary" className="self-end" loading={busy === "token"} disabled={token.trim().length < 40} onClick={() => run("token", () => apiFetch("/api/super-admin/messaging/platform/token", { method: "POST", body: { token } })).then((r) => r && setWabas(r.wabas))}>
               Continue
             </Button>

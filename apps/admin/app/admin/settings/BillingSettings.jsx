@@ -248,7 +248,8 @@ export function BillingSettings() {
             <>
               <Line label={b.next.kind === "intro" ? `${sub.plan?.name} — first month` : `${sub.plan?.name} plan`} value={inr(b.next.planAmount)} />
               <Line label={`Checkout fees so far (${b.next.feeOrders} order${b.next.feeOrders === 1 ? "" : "s"})`} value={inr(b.next.fees)} />
-              {b.next.apps > 0 && <Line label="Apps" value={inr(b.next.apps)} />}
+              {b.next.apps - (b.smsUsage?.amount || 0) > 0 && <Line label="Apps" value={inr(b.next.apps - (b.smsUsage?.amount || 0))} />}
+              {b.smsUsage?.codes > 0 && <Line label={`SMS sign-in codes (${b.smsUsage.codes} × ${inr(b.smsUsage.price)})`} value={inr(b.smsUsage.amount)} />}
               <Line label={`GST (${b.next.taxRate}%)`} value={inr(b.next.tax)} />
               <Line label={`Total on ${formatDay(b.next.date)}`} value={inr(b.next.total)} strong />
               <p className="text-xs text-ink-muted mt-3 mb-0">

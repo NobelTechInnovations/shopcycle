@@ -7,7 +7,7 @@ import { PageHeader, EmptyState, StatusBadge, useHasMounted } from "@shopcycle/u
 import { apiFetch } from "@/lib/api";
 import OyklaneWhatsapp from "./OyklaneWhatsapp";
 
-const PROVIDERS = { zoho: "Zoho CPaaS", meta: "Meta WhatsApp Cloud", twilio: "Twilio", log: "Off — codes are only logged" };
+const PROVIDERS = { zoho: "Zoho CPaaS", meta: "Meta WhatsApp Cloud", oyklane: "Oyklane's WhatsApp number", apitxt: "APITXT", msg91: "MSG91", twilio: "Twilio", log: "Off — codes are only logged" };
 
 /** What a provider's error usually means, in plain words. */
 function explain(error) {
@@ -62,6 +62,8 @@ export default function MessagingPage() {
   const [saving, setSaving] = useState(false);
   const [testTo, setTestTo] = useState("");
   const [testing, setTesting] = useState(false);
+  const [smsTo, setSmsTo] = useState("");
+  const [smsTesting, setSmsTesting] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/super-admin/messaging")
@@ -100,6 +102,20 @@ export default function MessagingPage() {
     }
   }
 
+  async function sendSmsTest() {
+    setSmsTesting(true);
+    try {
+      const r = await apiFetch("/api/super-admin/messaging/test", { method: "POST", body: { to: smsTo, channel: "sms" } });
+      setData((d) => ({ ...d, recent: r.recent }));
+      if (r.status === "sent") message.success(`Test SMS code sent to ${r.to}`);
+      else message.error(r.error ? `APITXT refused it: ${r.error}` : "The code wasn't sent");
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setSmsTesting(false);
+    }
+  }
+
   if (!mounted || !data) return <Skeleton active paragraph={{ rows: 8 }} />;
   const { status, types, recent } = data;
   const otp = types.otp;
@@ -107,8 +123,22 @@ export default function MessagingPage() {
 
   return (
     <div>
-      <PageHeader title="Messaging" subtitle="WhatsApp messages every store sends to its shoppers" />
+      <PageHeader title="Messaging" subtitle="SMS and WhatsApp messages every store sends to its shoppers" />
       <div className="flex flex-col gap-5">
+        <Section
+          title="SMS sign-in codes"
+          note={`Sent by Oyklane for every store with Phone Login or One-Click checkout. Each SMS is billed to the store whose shopper asked for it — ₹${Number(status.smsPrice ?? 0.5).toFixed(2)} per SMS, on its next bill.`}
+        >
+          <Row label="Codes go out through" ok value={status.sms !== "log" ? <Tag color="green" className="!m-0">{PROVIDERS[status.sms] || status.sms}</Tag> : <Tag className="!m-0">Off — set APITXT_AUTH_KEY on Railway</Tag>} />
+          <div className="flex items-center gap-2 mt-3">
+            <Input value={smsTo} onChange={(e) => setSmsTo(e.target.value)} placeholder="+91 98765 43210" inputMode="tel" className="!w-[200px]" aria-label="Send a test SMS code to" onPressEnter={() => smsTo && sendSmsTest()} />
+            <Button icon={<Send size={14} aria-hidden="true" />} onClick={sendSmsTest} loading={smsTesting} disabled={!smsTo || status.sms === "log"}>
+              Send test SMS
+            </Button>
+          </div>
+          <p className="text-[12px] text-ink-muted mt-2 mb-0">A test isn&apos;t billed to any store (APITXT charges your wallet as usual).</p>
+        </Section>
+
         <Section title="WhatsApp connection" note="The account and the sending number live on the server (Railway variables), not here.">
           <Row label="Zoho account" ok={status.zohoAccount} value="Connected" missing="Missing — set ZOHO_CPAAS_TOKEN" />
           <Row label="Sending number" ok={Boolean(status.from)} value={status.from} missing="Missing — set ZOHO_WHATSAPP_FROM" />
@@ -185,7 +215,7 @@ export default function MessagingPage() {
 
         <OyklaneWhatsapp />
 
-        <Section title="Recent WhatsApp messages" note="The last ten, from every store. Numbers are masked.">
+        <Section title="Recent messages" note="The last ten SMS and WhatsApp codes, from every store. Numbers are masked.">
           <Table
             rowKey="id"
             size="small"
@@ -194,6 +224,7 @@ export default function MessagingPage() {
             dataSource={recent}
             columns={[
               { title: "To", dataIndex: "to", render: (v) => <span className="tabular-nums">{v}</span> },
+              { title: "By", dataIndex: "channel", render: (v) => <Tag className="!m-0">{v === "sms" ? "SMS" : "WhatsApp"}</Tag> },
               { title: "Status", render: (_, r) => <span title={r.error || undefined}><StatusBadge status={r.status} /></span> },
               { title: "Through", dataIndex: "provider", responsive: ["md"], render: (v) => PROVIDERS[v]?.split(" —")[0] || v },
               {

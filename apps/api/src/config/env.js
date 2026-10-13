@@ -171,7 +171,15 @@ const envSchema = z.object({
 
   // One-time codes by SMS / WhatsApp (lib/messaging). Unset providers keep
   // every message in the message log instead of sending (development).
-  SMS_PROVIDER: z.enum(["twilio", "msg91", "log"]).optional(),
+  SMS_PROVIDER: z.enum(["apitxt", "twilio", "msg91", "log"]).optional(),
+  // APITXT OTP API (apitxt.com ▸ Dashboard ▸ API Keys) — Oyklane's SMS
+  // sign-in codes for every store. Only its sendOTP endpoint is used.
+  APITXT_AUTH_KEY: z.string().optional(),
+  APITXT_API_URL: z.string().default("https://apitxt.com/api/sendOTP"),
+  // Optional: your own SMS template id in APITXT (else its default OTP template).
+  APITXT_TEMPLATE_ID: z.string().optional(),
+  // What a store is billed per sign-in SMS (₹), added to its next bill.
+  SMS_OTP_PRICE: z.coerce.number().min(0).default(0.5),
   WHATSAPP_PROVIDER: z.enum(["zoho", "twilio", "meta", "log"]).optional(),
   // Zoho CPaaS WhatsApp: the agent's API key, the WhatsApp number (as shown
   // under the agent ▸ WhatsApp), an approved template's key, and the name
@@ -427,7 +435,7 @@ if (parsed.data.BILLING_SANDBOX && parsed.data.NODE_ENV === "production") {
       console.warn("WHATSAPP_PROVIDER is zoho but ZOHO_CPAAS_TOKEN or ZOHO_WHATSAPP_FROM is missing — WhatsApp codes are off.");
     }
     // The code template itself is set in Super admin ▸ Messaging (or ZOHO_WHATSAPP_TEMPLATE_KEY).
-    const anySms = d.SMS_PROVIDER || d.MSG91_AUTH_KEY || d.TWILIO_ACCOUNT_SID;
+    const anySms = d.SMS_PROVIDER || d.APITXT_AUTH_KEY || d.MSG91_AUTH_KEY || d.TWILIO_ACCOUNT_SID;
     const anyWhatsapp = d.WHATSAPP_PROVIDER || d.ZOHO_WHATSAPP_TEMPLATE_KEY || d.META_WHATSAPP_TOKEN || d.TWILIO_WHATSAPP_FROM;
     if (!anySms && !anyWhatsapp) console.warn("No SMS or WhatsApp provider set — Phone Login and One-Click Checkout can't send codes.");
   }

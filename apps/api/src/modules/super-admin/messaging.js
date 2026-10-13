@@ -19,16 +19,16 @@ const template = z.object({
   vars: z.record(z.string(), z.string().trim().min(1).max(60)).default({}),
 });
 const saveSchema = z.object({ otp: template });
-const testSchema = z.object({ to: z.string().trim().min(6).max(24) });
+const testSchema = z.object({ to: z.string().trim().min(6).max(24), channel: z.enum(["whatsapp", "sms"]).optional() });
 
 const masked = (to) => (to && to.length > 4 ? `+${to.slice(0, -4).replace(/\d/g, "•")}${to.slice(-4)}` : to);
 
 async function recent(prisma) {
   const rows = await prisma.messageLog.findMany({
-    where: { channel: "whatsapp" },
+    where: { channel: { in: ["whatsapp", "sms"] } },
     orderBy: { createdAt: "desc" },
     take: 10,
-    select: { id: true, to: true, template: true, provider: true, status: true, error: true, createdAt: true },
+    select: { id: true, to: true, template: true, provider: true, status: true, error: true, createdAt: true, channel: true, storeId: true },
   });
   return rows.map((r) => ({ ...r, to: masked(r.to) }));
 }
@@ -102,9 +102,16 @@ async function messagingRoutes(fastify) {
   // Sends a real code to the number given — the only way to know the
   // template, the sending number and the account all line up.
   fastify.post("/test", async (request, reply) => {
-    const { to } = testSchema.parse(request.body || {});
+    const { to, channel } = testSchema.parse(request.body || {});
     const phone = toE164(to);
     if (!phone) return reply.code(400).send({ error: "Enter the number with its country code, e.g. +91 98765 43210." });
+    // A test SMS code (APITXT) — not billed to any store.
+    if (channel === "sms") {
+      if (messaging.smsProvider() === "log") return reply.code(400).send({ error: "No SMS provider on the server — set APITXT_AUTH_KEY on Railway." });
+      const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+      const result = await messaging.sendOtp(prisma, { to: phone, code, channel: "sms", log: request.log });
+      return { ...result, to: masked(phone), recent: await recent(prisma) };
+    }
     await templates.load(prisma);
     if (messaging.whatsappProvider() === "log") {
       return reply.code(400).send({ error: "WhatsApp isn't set up yet — add the template key above and make sure the Zoho account and sending number are on the server." });

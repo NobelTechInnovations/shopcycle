@@ -7,12 +7,13 @@ const templates = require("./whatsapp-templates");
  * in MessageLog; with no provider configured the message is only logged,
  * body included, so development and tests need no account.
  *
- *   SMS:      Twilio, MSG91 (India, DLT template)
+ *   SMS:      APITXT OTP API (default), Twilio, MSG91 (India, DLT template)
  *   WhatsApp: Zoho CPaaS, Twilio, Meta WhatsApp Cloud API (approved template)
  */
 
 function smsProvider() {
-  const p = env.SMS_PROVIDER || (env.MSG91_AUTH_KEY ? "msg91" : env.TWILIO_ACCOUNT_SID ? "twilio" : "log");
+  const p = env.SMS_PROVIDER || (env.APITXT_AUTH_KEY ? "apitxt" : env.MSG91_AUTH_KEY ? "msg91" : env.TWILIO_ACCOUNT_SID ? "twilio" : "log");
+  if (p === "apitxt" && !env.APITXT_AUTH_KEY) return "log";
   if (p === "twilio" && !(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && (env.TWILIO_MESSAGING_SERVICE_SID || env.TWILIO_SMS_FROM))) return "log";
   if (p === "msg91" && !(env.MSG91_AUTH_KEY && env.MSG91_OTP_TEMPLATE_ID)) return "log";
   return p;
@@ -70,6 +71,7 @@ function whatsappStatus() {
     testNumber: /^1555\d{7}$/.test(String(env.ZOHO_WHATSAPP_FROM || "").replace(/\D/g, "")),
     otpTemplateFrom: t?.templateKey ? "super_admin" : env.ZOHO_WHATSAPP_TEMPLATE_KEY ? "env" : null,
     sms: smsProvider(),
+    smsPrice: env.SMS_OTP_PRICE,
   };
 }
 
@@ -95,8 +97,41 @@ async function request(url, { headers = {}, body, form = false }) {
 const twilioAuth = () => `Basic ${Buffer.from(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`).toString("base64")}`;
 const twilioUrl = () => `${env.TWILIO_API_URL}/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`;
 
+/** APITXT's country code for a number (E.164 digits): India and
+ * US/Canada are unambiguous; anything else goes with its full number. */
+function apitxtCountry(to) {
+  if (/^91\d{10}$/.test(to)) return "91";
+  if (/^1\d{10}$/.test(to)) return "1";
+  return null;
+}
+
 const SENDERS = {
   sms: {
+    // APITXT unified OTP API — we generate the code, it delivers it with
+    // its (DLT-registered) OTP template. Failed deliveries are refunded by APITXT.
+    async apitxt({ to, code }) {
+      const body = new URLSearchParams({ authkey: env.APITXT_AUTH_KEY, mobile: to, otp: code, channel: "sms" });
+      const country = apitxtCountry(to);
+      if (country) body.set("country", country);
+      if (env.APITXT_TEMPLATE_ID) body.set("template_id", env.APITXT_TEMPLATE_ID);
+      const res = await fetch(env.APITXT_API_URL, {
+        method: "POST",
+        headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
+        body,
+        signal: AbortSignal.timeout(15000),
+      });
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {}
+      if (!res.ok || String(data?.status || "").toLowerCase() !== "success") {
+        // Never echo the request (it carries the key) — only APITXT's answer.
+        const detail = [data?.code || data?.error_code, data?.message || data?.error || text.slice(0, 160)].filter(Boolean).join(" ");
+        throw new Error(`APITXT ${res.status}: ${detail || "no response"}`);
+      }
+      return data?.data?.request_id || null;
+    },
     async twilio({ to, text }) {
       const body = { To: `+${to}`, Body: text };
       if (env.TWILIO_MESSAGING_SERVICE_SID) body.MessagingServiceSid = env.TWILIO_MESSAGING_SERVICE_SID;
@@ -185,6 +220,13 @@ async function sendOtp(prisma, { to, code, channel = "sms", storeId = null, stor
       error = err.message || String(err);
       log?.warn({ err, channel, provider }, "messaging: send failed");
     }
+  }
+
+  // Each SMS code a store's shopper receives is billed to that store.
+  if (status === "sent" && channel === "sms" && storeId) {
+    await require("../modules/billing/usage")
+      .chargeSmsCode(prisma, storeId, { log })
+      .catch((err) => log?.error({ err, storeId }, "billing: couldn't record an SMS code charge"));
   }
 
   await prisma.messageLog

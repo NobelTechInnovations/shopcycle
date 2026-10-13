@@ -69,7 +69,9 @@ async function collect(tx, store, sub, cycleId, boundary) {
  * and the period it opened never happens, so that period's charges go. */
 async function release(tx, cycle) {
   if (APP_PERIOD_KINDS.includes(cycle.kind)) {
-    await tx.appCharge.deleteMany({ where: { storeId: cycle.storeId, status: "pending", periodStart: boundaryOf(cycle) } });
+    // Pay-per-use lines (SMS codes, billing/usage.js) were really used —
+    // they stay owed; only the period's subscription-style app charges go.
+    await tx.appCharge.deleteMany({ where: { storeId: cycle.storeId, status: "pending", periodStart: boundaryOf(cycle), appId: { not: { startsWith: "usage-" } } } });
   }
   await tx.appCharge.updateMany({ where: { cycleId: cycle.id, status: "billed" }, data: { status: "pending", cycleId: null } });
 }

@@ -396,6 +396,13 @@ Local `.env` points at the **production** Supabase database, so every local writ
 - New: table google_ads_accounts; columns meta_connections.instagramAccountId/instagramUsername, whatsapp_conversations.viaPlatform, platform on ad_drafts/ad_media/ad_activities/ad_rules (pushed).
 - Railway: `GOOGLE_ADS_DEVELOPER_TOKEN` (and `GOOGLE_ADS_API_VERSION` if v24 isn't current). Google Cloud OAuth consent screen: add the `.../auth/adwords` scope.
 
+### Done 13 Oct, SMS codes (NOT committed yet)
+
+- **SMS sign-in codes through APITXT** (only its OTP API, `POST https://apitxt.com/api/sendOTP`): Oyklane generates the 6-digit code, APITXT delivers it (its default DLT OTP template, or `APITXT_TEMPLATE_ID`). Used automatically for every store with **Phone Login** (shopper sign-in) or **One-Click checkout** — APITXT is the first choice for SMS whenever `APITXT_AUTH_KEY` is set. APITXT's error (e.g. 301 insufficient balance) shows in Super admin ▸ Messaging ▸ Recent messages; the key is never logged.
+- **Billing**: each SMS code sent for a store's shopper adds ₹0.50 (`SMS_OTP_PRICE`) to that store's bill — one running line per billing period, "SMS sign-in codes (N × ₹0.50)", collected with the store's next billing cycle (in arrears, like paid apps; GST added like everything else; a voided cycle never drops it). Sellers see it in Settings ▸ Billing ▸ Your next payment. Failed sends aren't charged; super admin test sends aren't billed to any store.
+- Super admin ▸ Messaging: *SMS sign-in codes* card (provider, price, "Send test SMS"); recent messages now include SMS.
+- Railway: set `APITXT_AUTH_KEY` (rotate the one pasted in chat on 13 Oct first). Optional `APITXT_TEMPLATE_ID`, `SMS_OTP_PRICE`.
+
 ### Left to do
 
 0a. **Security — urgent**: production `JWT_SECRET` is the placeholder from `.env.example` (anyone can sign seller, super-admin and shopper sessions with it). Steps that keep encrypted data (2FA, payment keys, webhooks, Meta/Google tokens) readable: (1) set `DATA_ENCRYPTION_KEY` on Railway to `sha256("<current JWT_SECRET>:data-encryption")` in hex, (2) then set a new random `JWT_SECRET` (everyone signs in again), (3) later re-encrypt with a fresh key. Also rotate the Supabase database password and the Redis password (they were pasted in chat on 4 Oct) and set `TRUST_PROXY=true` on Railway (behind its proxy every visitor otherwise shares one rate-limit).
