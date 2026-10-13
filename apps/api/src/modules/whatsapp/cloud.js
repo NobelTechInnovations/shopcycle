@@ -14,10 +14,25 @@ const repository = require("../meta/repository");
  * the seller used it, the Facebook login otherwise. */
 const waToken = (conn) => conn.waAccessToken || conn.accessToken;
 
+const PLATFORM_OWNED =
+  "That's Oyklane's shared WhatsApp number — Oyklane manages it and its templates. Connect your own WhatsApp number to create templates and send your own messages.";
+
+/** The store's own WhatsApp connection. Oyklane's shared number never
+ * counts as a store's own, even if the store picked it. */
 async function connectionOrThrow(prisma, storeId, { needNumber = true } = {}) {
   const conn = await repository.findByStore(prisma, storeId);
   if (!conn) throw new HttpError(400, "Connect WhatsApp first (Apps ▸ WhatsApp ▸ Connect).", { reason: "not_connected" });
+  if (await require("./platform").isPlatformAccount(prisma, conn)) throw new HttpError(400, PLATFORM_OWNED, { reason: "platform_number" });
   if (needNumber && !conn.phoneNumberId) throw new HttpError(400, "Choose your WhatsApp number first (Apps ▸ WhatsApp).", { reason: "no_number" });
+  return conn;
+}
+
+/** The store's own number, ready to send from — or null (none connected,
+ * or the one picked is Oyklane's shared number). */
+async function ownConnection(prisma, storeId) {
+  const conn = await repository.findByStore(prisma, storeId);
+  if (!conn?.phoneNumberId || !conn.wabaId) return null;
+  if (await require("./platform").isPlatformAccount(prisma, conn)) return null;
   return conn;
 }
 
@@ -82,15 +97,20 @@ async function health(prisma, store) {
 /** Registers the number on the Cloud API with the seller's 6-digit
  * two-step verification PIN (setting it if there wasn't one), then
  * subscribes Oyklane to the account's webhooks. Both are safe to repeat. */
-async function activate(prisma, store, { pin }) {
+async function activate(prisma, store, { pin } = {}) {
   const conn = await connectionOrThrow(prisma, store.id);
-  if (!/^\d{6}$/.test(String(pin || ""))) throw new HttpError(400, "Enter the 6-digit PIN.");
   const token = waToken(conn);
-  await meta.graphRequest(`/${conn.phoneNumberId}/register`, { method: "POST", token, body: { messaging_product: "whatsapp", pin: String(pin) } }).catch((err) => {
-    if (/two-step|pin/i.test(err.message)) throw new HttpError(400, "Meta didn't accept that PIN. Use the two-step verification PIN set for this number (WhatsApp Manager ▸ Phone numbers ▸ Settings ▸ Two-step verification), or reset it there.", err.details);
-    throw err;
-  });
-  const data = { waActivatedAt: new Date() };
+  const data = {};
+  // A number already live on the Cloud API only needs the subscription below.
+  const n = meta.shapeNumber(await meta.graphRequest(`/${conn.phoneNumberId}`, { token, params: { fields: meta.WABA_NUMBER_FIELDS } }));
+  if (!n.ready && n.action === "activate") {
+    if (!/^\d{6}$/.test(String(pin || ""))) throw new HttpError(400, "Enter the 6-digit PIN.", { reason: "pin_required" });
+    await meta.graphRequest(`/${conn.phoneNumberId}/register`, { method: "POST", token, body: { messaging_product: "whatsapp", pin: String(pin) } }).catch((err) => {
+      if (/two-step|pin/i.test(err.message)) throw new HttpError(400, "Meta didn't accept that PIN. Use the two-step verification PIN set for this number (WhatsApp Manager ▸ Phone numbers ▸ Settings ▸ Two-step verification), or reset it there.", err.details);
+      throw err;
+    });
+    data.waActivatedAt = new Date();
+  }
   if (conn.wabaId) {
     await meta.graphRequest(`/${conn.wabaId}/subscribed_apps`, { method: "POST", token });
     data.waSubscribedAt = new Date();
@@ -237,6 +257,8 @@ async function uploadMedia(conn, { buffer, mime, name }) {
 }
 
 module.exports = {
+  ownConnection,
+  PLATFORM_OWNED,
   waToken,
   connectionOrThrow,
   health,

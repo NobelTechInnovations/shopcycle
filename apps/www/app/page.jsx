@@ -234,10 +234,10 @@ export default async function HomePage() {
               </div>
             </article>
             <article className="tile">
-              <span className="tile__tag">₹299/mo app</span>
+              <span className="tile__tag">₹0.50 per SMS</span>
               <span className="tile__icon"><Icon d={I.phone} /></span>
               <h3 className="h3">Phone login</h3>
-              <p>Shoppers sign in with a one-time code — no passwords. WhatsApp order updates are coming, included.</p>
+              <p>Shoppers sign in with a one-time code by SMS or WhatsApp — no passwords. Free to install; pay only for the codes sent.</p>
             </article>
             <article className="tile">
               <span className="tile__icon"><Icon d={I.receipt} /></span>

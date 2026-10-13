@@ -4,6 +4,12 @@ const entitlements = require("../billing/entitlements");
 const subscriptions = require("../billing/subscriptions");
 const appCharges = require("../billing/app-charges");
 const { num } = require("../billing/money");
+const { env } = require("../../config/env");
+
+/** Pay-as-you-go apps: free to install, each use billed to the store
+ * (billing/usage.js) — shown instead of a monthly price. */
+const USAGE_PRICES = { "phone-login": () => ({ amount: env.SMS_OTP_PRICE, unit: "SMS code" }) };
+const usagePrice = (key) => USAGE_PRICES[key]?.() || null;
 
 /** Catalog apps a plan has to include, keyed by App.key → the feature
  * (billing/catalog.js) that unlocks them. Their API modules are gated too
@@ -40,6 +46,7 @@ async function listForStore(prisma, store) {
     premium: Boolean(PLAN_APPS[app.key]),
     locked: lockedFor(ent, app.key),
     priceMonthly: num(app.priceMonthly) > 0 ? num(app.priceMonthly) : null,
+    usagePrice: usagePrice(app.key),
   }));
 }
 
@@ -62,7 +69,7 @@ async function installApp(prisma, store, key, settings, { role } = {}) {
     const sub = await subscriptions.forStore(prisma, store);
     chargedFrom = await appCharges.onInstall(prisma, store, sub, app);
   }
-  return { ...app, priceMonthly: paid ? num(app.priceMonthly) : null, installed: true, settings, chargedFrom };
+  return { ...app, priceMonthly: paid ? num(app.priceMonthly) : null, usagePrice: usagePrice(app.key), installed: true, settings, chargedFrom };
 }
 
 async function uninstallApp(prisma, storeId, key) {
@@ -101,4 +108,5 @@ async function assertInstalled(prisma, storeId, key) {
   }
 }
 
-module.exports = { listForStore, installApp, uninstallApp, getInstalledAppsContext, assertInstalled };
+module.exports = {
+  usagePrice, listForStore, installApp, uninstallApp, getInstalledAppsContext, assertInstalled };

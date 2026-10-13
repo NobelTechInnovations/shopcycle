@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button, Form, Skeleton, Tag } from "antd";
 import { Check, Crown, ExternalLink, LifeBuoy, Lock, Trash2 } from "lucide-react";
 import { PageHeader, EmptyState } from "@shopcycle/ui";
-import { useApps, appHref, APP_PANELS, APP_CATEGORIES, rupees } from "@/lib/apps";
+import { useApps, appHref, APP_PANELS, APP_CATEGORIES, rupees, usageLabel } from "@/lib/apps";
 import { useAppActions } from "@/components/apps/useAppActions";
 import { AppSettingsFields } from "@/components/apps/AppSettingsForm";
 import { AppTile } from "@/components/apps/AppTile";
@@ -27,9 +27,10 @@ const HIGHLIGHTS = {
   ],
   "phone-login": [
     "Shoppers sign in with their mobile number and a code — no passwords",
-    "Codes by SMS or WhatsApp",
+    "Codes by SMS — built into Oyklane, nothing to set up",
+    "Or by WhatsApp, from Oyklane's number; if WhatsApp can't deliver, the code goes by SMS",
     "Orders placed with the same number show up in their account",
-    "Coming soon: order and delivery updates on WhatsApp, included",
+    "Pay as you go: you're billed only for the SMS codes sent",
   ],
   "product-reviews": ["Star ratings on product pages and cards", "Verified-buyer badges", "Reply, hide or feature reviews", "Import reviews from a CSV"],
   "facebook-pixel": ["Continue with Facebook and pick your pixel", "Page views, add to cart, checkout and purchase sent automatically", "Better ads from real sales data"],
@@ -101,7 +102,7 @@ export default function AppDetailsPage({ params }) {
         backHref="/admin/apps"
         title={app.name}
         meta={app.installed ? <Tag color="success" className="!m-0">Installed</Tag> : null}
-        subtitle={`${APP_CATEGORIES[app.category] || "App"} · ${app.priceMonthly ? `${rupees(app.priceMonthly)}/month + GST` : "Free"}`}
+        subtitle={`${APP_CATEGORIES[app.category] || "App"} · ${app.usagePrice ? `${usageLabel(app)} + GST` : app.priceMonthly ? `${rupees(app.priceMonthly)}/month + GST` : "Free"}`}
         actions={actions}
       />
 
@@ -154,13 +155,27 @@ export default function AppDetailsPage({ params }) {
 
         <div className="flex flex-col gap-5">
           <Panel title="Pricing">
-            <p className="text-[22px] font-semibold text-ink m-0" style={{ letterSpacing: "-0.02em" }}>
-              {app.priceMonthly ? rupees(app.priceMonthly) : "Free"}
-              {app.priceMonthly && <span className="text-[13px] font-normal text-ink-muted"> /month + GST</span>}
-            </p>
-            <p className="text-[13px] text-ink-muted mt-1.5 mb-0">
-              {app.priceMonthly ? "Added to your plan's bill for each billing period it's installed. Uninstall anytime to stop future charges." : "No charge to install or use."}
-            </p>
+            {app.usagePrice ? (
+              <>
+                <p className="text-[22px] font-semibold text-ink m-0" style={{ letterSpacing: "-0.02em" }}>
+                  ₹{Number(app.usagePrice.amount).toFixed(2)}
+                  <span className="text-[13px] font-normal text-ink-muted"> per {app.usagePrice.unit} + GST</span>
+                </p>
+                <p className="text-[13px] text-ink-muted mt-1.5 mb-0">
+                  Free to install, no monthly fee. Each {app.usagePrice.unit} a shopper gets is added to your next bill (see Settings ▸ Plan &amp; billing). WhatsApp codes are free.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-[22px] font-semibold text-ink m-0" style={{ letterSpacing: "-0.02em" }}>
+                  {app.priceMonthly ? rupees(app.priceMonthly) : "Free"}
+                  {app.priceMonthly && <span className="text-[13px] font-normal text-ink-muted"> /month + GST</span>}
+                </p>
+                <p className="text-[13px] text-ink-muted mt-1.5 mb-0">
+                  {app.priceMonthly ? "Added to your plan's bill for each billing period it's installed. Uninstall anytime to stop future charges." : "No charge to install or use."}
+                </p>
+              </>
+            )}
             {app.premium && (
               <p className="text-[13px] text-accent mt-3 mb-0 inline-flex items-center gap-1.5">
                 <Crown size={13} aria-hidden="true" /> Included with Growth and Pro

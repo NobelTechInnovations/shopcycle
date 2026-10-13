@@ -193,8 +193,13 @@ async function processWebhook(prisma, payload, { log, onReceived, onTemplate } =
       if (change.field === "messages") {
         const phoneNumberId = value.metadata?.phone_number_id;
         if (!phoneNumberId) continue;
-        let conns = await prisma.metaConnection.findMany({ where: { phoneNumberId: String(phoneNumberId) } });
-        if (!conns.length) conns = await platformTargets(prisma, String(phoneNumberId), value, log);
+        // Oyklane's shared number first: a store that picked it as its own
+        // must not receive every store's customers' replies.
+        const pconn = await require("./platform").connection(prisma);
+        const conns =
+          pconn && String(pconn.phoneNumberId) === String(phoneNumberId)
+            ? await platformTargets(prisma, String(phoneNumberId), value, log)
+            : await prisma.metaConnection.findMany({ where: { phoneNumberId: String(phoneNumberId) } });
         for (const conn of conns) {
           if (!conn.statusesOnly) {
             for (const m of value.messages || []) {
@@ -210,7 +215,9 @@ async function processWebhook(prisma, payload, { log, onReceived, onTemplate } =
           }
         }
       } else if (change.field === "message_template_status_update" || change.field === "template_category_update") {
-        const conns = await prisma.metaConnection.findMany({ where: { wabaId: String(entry.id) }, select: { storeId: true } });
+        // Oyklane's own account's templates are Super admin's, not a store's.
+        const mine = await require("./platform").isPlatformAccount(prisma, { wabaId: String(entry.id) });
+        const conns = mine ? [] : await prisma.metaConnection.findMany({ where: { wabaId: String(entry.id) }, select: { storeId: true } });
         for (const c of conns) if (onTemplate) await onTemplate({ storeId: c.storeId, field: change.field, value }).catch(() => {});
         handled += 1;
       } else {

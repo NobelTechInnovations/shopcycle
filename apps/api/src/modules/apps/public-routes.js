@@ -20,6 +20,7 @@ async function publicAppsRoutes(fastify) {
         category: a.category,
         iconKey: a.iconKey,
         priceMonthly: num(a.priceMonthly) > 0 ? num(a.priceMonthly) : null,
+        usagePrice: require("./service").usagePrice(a.key),
         premium: PLAN_APPS.has(a.key),
       })),
     };

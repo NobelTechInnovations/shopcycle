@@ -30,7 +30,7 @@ export function AppsBrowser({ apps, appUrl }) {
             <article className="card" key={a.key}>
               <div className="card__top">
                 <Logo {...logo} size={48} />
-                {a.priceMonthly ? <span className="badge badge--paid">{price(a.priceMonthly)}</span> : <span className="badge badge--built">Free</span>}
+                {a.usagePrice ? <span className="badge badge--paid">₹{Number(a.usagePrice.amount).toFixed(2)} per {a.usagePrice.unit}</span> : a.priceMonthly ? <span className="badge badge--paid">{price(a.priceMonthly)}</span> : <span className="badge badge--built">Free</span>}
               </div>
               <h3>{a.name}</h3>
               <p>{a.description}</p>

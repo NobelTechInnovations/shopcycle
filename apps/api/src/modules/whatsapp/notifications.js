@@ -4,7 +4,6 @@ const webhooks = require("../developer/webhooks");
 const { PROVIDER_KEYS } = require("../orders/placed");
 const { addOrderEvent } = require("../orders/events");
 const notify = require("../orders/notify");
-const repository = require("../meta/repository");
 const standard = require("./standard-templates");
 const platform = require("./platform");
 const service = require("./service");
@@ -42,8 +41,8 @@ async function decide(prisma, store, kind) {
 async function pickSender(prisma, store, kind, sender) {
   const name = standard.KINDS[kind].name;
   if (sender !== "platform") {
-    const conn = await repository.findByStore(prisma, store.id);
-    if (conn?.phoneNumberId && conn.wabaId) {
+    const conn = await require("./cloud").ownConnection(prisma, store.id);
+    if (conn) {
       const tpl = (await service.templates(prisma, store, { conn }).catch(() => [])).find((t) => t.name === name && t.status === "APPROVED");
       if (tpl) return { conn, tpl, linkMode: "store" };
       if (sender === "own") return { reason: `Your WhatsApp account has no approved "${name}" template yet` };

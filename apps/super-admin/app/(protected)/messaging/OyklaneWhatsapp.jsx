@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { App, Alert, Button, Input, Modal, Select, Skeleton, Switch, Tag, Checkbox, Table } from "antd";
-import { CheckCircle2, AlertTriangle, Send, KeyRound } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { App, Alert, Button, Input, Modal, Select, Skeleton, Switch, Tag, Checkbox } from "antd";
+import { CheckCircle2, AlertTriangle, Send, KeyRound, Phone } from "lucide-react";
+import { WaTemplates } from "@shopcycle/ui";
+import { apiFetch, API_URL } from "@/lib/api";
 
 const STATUS_COLOR = { APPROVED: "green", PENDING: "blue", REJECTED: "red", PAUSED: "orange", DISABLED: "default" };
 
@@ -129,6 +130,25 @@ export default function OyklaneWhatsapp() {
     load();
   }, [load]);
 
+  // The key is saved but no number chosen: list what it can use.
+  const chooseNumber = async () => {
+    const r = await run("wabas", () => apiFetch("/api/super-admin/messaging/platform/wabas"));
+    if (!r) return;
+    setWabas(r.wabas);
+    setPick({});
+    setTokenOpen(true);
+  };
+  // A live number only needs Oyklane's app subscribed (no PIN); one that
+  // isn't on the Cloud API yet needs its two-step PIN.
+  const activate = (withPin) =>
+    run("pin", () => apiFetch("/api/super-admin/messaging/platform/activate", { method: "POST", body: withPin ? { pin } : {} }), withPin ? "Activated" : "Replies turned on").then((s) => {
+      if (s) {
+        setSt(s);
+        setPinOpen(false);
+        setPin("");
+      }
+    });
+
   const run = async (key, fn, ok) => {
     setBusy(key);
     try {
@@ -178,6 +198,18 @@ export default function OyklaneWhatsapp() {
             </p>
             <TokenGuide />
           </div>
+        ) : st.needsNumber ? (
+          <div className="flex flex-col gap-3 text-[13px]">
+            <p className="m-0 flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-status-success" aria-hidden="true" /> Key saved.
+            </p>
+            <p className="m-0">
+              <b>Now choose which WhatsApp number Oyklane sends from.</b> Then you&apos;ll see whether it needs activating.
+            </p>
+            <Button className="self-start" type="primary" icon={<Phone size={14} aria-hidden="true" />} loading={busy === "wabas"} onClick={chooseNumber}>
+              Choose the number
+            </Button>
+          </div>
         ) : (
           <div className="flex flex-col gap-2 text-[13px]">
             <div className="flex flex-wrap items-center gap-2">
@@ -192,38 +224,47 @@ export default function OyklaneWhatsapp() {
             ))}
             {n?.test && <p className="m-0 text-ink-muted">Test numbers only reach the few phones listed in the Meta app ▸ WhatsApp ▸ API Setup. Connect Oyklane&apos;s real number for real customers.</p>}
             {st.numberError && <p className="m-0 text-status-danger">{st.numberError}</p>}
-            {(n?.action === "activate" || st.subscribed === false) && (
+            {st.subscribed === false && n?.action !== "activate" && <p className="m-0 text-status-warning">Customers&apos; replies and delivery updates don&apos;t reach Oyklane yet.</p>}
+            {n?.action === "activate" ? (
               <Button className="self-start" type="primary" onClick={() => setPinOpen(true)}>
                 Activate number
               </Button>
+            ) : (
+              st.subscribed === false && (
+                <Button className="self-start" type="primary" loading={busy === "pin"} onClick={() => activate(false)}>
+                  Turn on replies
+                </Button>
+              )
             )}
           </div>
         )}
       </Card>
 
-      {st.phoneNumberId && (
+      {st.phoneNumberId && !st.needsNumber && (
         <Card
-          title="Standard templates on Oyklane's account"
-          note="Order confirmed, shipped and delivered (Utility) and the login code (Authentication). Meta reviews each — usually minutes, up to a day."
+          title="Oyklane's templates"
+          note="The messages stores on Oyklane's number send: order confirmed, shipped and delivered (Utility) and the login code (Authentication) — plus any you add. Stores see them read-only; only you can create, edit or delete them. Meta reviews each one, usually within minutes."
           extra={
+            tpl &&
             !allInstalled && (
               <Button type="primary" loading={busy === "install"} onClick={() => run("install", () => apiFetch("/api/super-admin/messaging/platform/templates/install", { method: "POST" }), "Sent to Meta for review").then(load)}>
-                Install them
+                Install the standard ones
               </Button>
             )
           }
         >
-          <Table
-            size="small"
-            rowKey="name"
-            pagination={false}
-            dataSource={[...Object.values(kinds).map((k) => ({ name: k.name, label: k.label })), { name: tpl?.otp, label: "Login code" }].filter((r) => r.name)}
-            columns={[
-              { title: "Template", render: (_, r) => <span><b>{r.label}</b> <span className="text-ink-muted text-[12px]">{r.name}</span></span> },
-              { title: "Status", render: (_, r) => (byName[r.name] ? <Tag color={STATUS_COLOR[byName[r.name].status]}>{byName[r.name].status.toLowerCase()}</Tag> : <Tag>not installed</Tag>) },
-              { title: "", render: (_, r) => (byName[r.name]?.fix ? <span className="text-[12px] text-status-danger">{byName[r.name].fix}</span> : null) },
-            ]}
-          />
+          {tpl && (
+            <div className="flex flex-wrap gap-2 mb-4 text-[12px]">
+              {[...Object.values(kinds).map((k) => ({ name: k.name, label: k.label })), { name: tpl.otp, label: "Login code" }]
+                .filter((r) => r.name)
+                .map((r) => (
+                  <Tag key={r.name} color={byName[r.name] ? STATUS_COLOR[byName[r.name].status] : "default"}>
+                    {r.label}: {byName[r.name] ? byName[r.name].status.toLowerCase() : "not installed"}
+                  </Tag>
+                ))}
+            </div>
+          )}
+          <WaTemplates apiFetch={apiFetch} apiUrl={API_URL} base="/api/super-admin/messaging/platform" canEdit starters={[]} emptyText="No templates on Oyklane's account yet — install the standard ones above." />
         </Card>
       )}
 
@@ -286,8 +327,16 @@ export default function OyklaneWhatsapp() {
               Continue
             </Button>
           </div>
+        ) : !wabas.length ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="This key can't see any WhatsApp account"
+            description="In Meta's System users page, select the Oyklane WhatsApp system user ▸ Assign assets ▸ WhatsApp accounts ▸ tick Oyklane's account ▸ Full control ▸ Assign (step 4). Then click “Choose the number” again — no new key needed."
+          />
         ) : (
           <div className="flex flex-col gap-3">
+            <p className="text-[13px] m-0">Choose Oyklane&apos;s WhatsApp account, then its number.</p>
             <Select
               placeholder="WhatsApp Business account"
               value={pick.wabaId}
@@ -332,15 +381,7 @@ export default function OyklaneWhatsapp() {
         okText="Activate"
         confirmLoading={busy === "pin"}
         okButtonProps={{ disabled: !/^\d{6}$/.test(pin) }}
-        onOk={() =>
-          run("pin", () => apiFetch("/api/super-admin/messaging/platform/activate", { method: "POST", body: { pin } }), "Activated").then((s) => {
-            if (s) {
-              setSt(s);
-              setPinOpen(false);
-              setPin("");
-            }
-          })
-        }
+        onOk={() => activate(true)}
       >
         <p className="text-[13px]">The number&apos;s 6-digit two-step verification PIN (WhatsApp Manager ▸ Phone numbers ▸ Settings ▸ Two-step verification). If it has none yet, this sets it.</p>
         <Input.OTP length={6} value={pin} onChange={setPin} mask />

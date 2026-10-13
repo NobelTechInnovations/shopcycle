@@ -80,7 +80,9 @@ async function requestCode(prisma, store, { phone: rawPhone, channel }, log, { c
     await prisma.shopperPhoneOtp.update({ where: { id: otp.id }, data: { consumedAt: new Date() } });
     throw new HttpError(502, "We couldn't send the code. Try again, or sign in with your email.");
   }
-  return { phone: display(phone), channel: ch };
+  // WhatsApp didn't take it, so it went by SMS — tell the shopper where to look.
+  if (sent.channel !== ch) await prisma.shopperPhoneOtp.update({ where: { id: otp.id }, data: { channel: sent.channel } });
+  return { phone: display(phone), channel: sent.channel };
 }
 
 /** Checks the code. Returns { customer } for a known verified number, or

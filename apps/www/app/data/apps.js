@@ -4,7 +4,7 @@ import { API_URL } from "../components/site";
 const FALLBACK = [
   { key: "flow", name: "Flow", category: "automation", priceMonthly: null, description: "Automate emails to your customers: thank first-time buyers, ask for reviews after delivery, win back quiet customers, follow up abandoned checkouts." },
   { key: "one-click-checkout", name: "One-Click Checkout", category: "checkout", priceMonthly: null, description: "Shoppers check out from the cart in a quick popup — mobile number, a one-time code, then their saved addresses and your payment options." },
-  { key: "phone-login", name: "Phone Login", category: "customers", priceMonthly: 299, description: "Shoppers sign in with their mobile number and a one-time code by SMS or WhatsApp — no password or email needed." },
+  { key: "phone-login", name: "Phone Login", category: "customers", priceMonthly: null, usagePrice: { amount: 0.5, unit: "SMS code" }, description: "Shoppers sign in with their mobile number and a one-time code by SMS or WhatsApp — no password or email needed." },
   { key: "product-reviews", name: "Product Reviews", category: "marketing", priceMonthly: null, description: "Star ratings on product pages and cards, a review form for shoppers, verified-buyer badges, moderation and CSV import." },
   { key: "facebook-pixel", name: "Facebook Pixel", category: "analytics", priceMonthly: null, description: "Meta Pixel on every page, checkout included." },
   { key: "google-analytics", name: "Google Analytics", category: "analytics", priceMonthly: null, description: "Google Analytics 4 on every page, checkout included." },

@@ -25,7 +25,7 @@ const RETURN_TO_KEY = "meta-connect-return-to";
  * — every screen that uses this can assume its own API calls will work
  * rather than re-checking connection state itself.
  */
-export function MetaConnectPanel({ focus, children }) {
+export function MetaConnectPanel({ focus, children, onChange }) {
   const { message } = App.useApp();
   const [status, setStatus] = useState(null); // { configured, connection }
   const [assets, setAssets] = useState(null);
@@ -80,6 +80,7 @@ export function MetaConnectPanel({ focus, children }) {
       setStatus((s) => ({ ...s, connection }));
       setChanging(false);
       message.success("Saved");
+      onChange?.();
     } catch (err) {
       message.error(err.message);
     } finally {
@@ -92,6 +93,7 @@ export function MetaConnectPanel({ focus, children }) {
     setAssets(null);
     setSelection({});
     load();
+    onChange?.();
   }
 
   if (!status) return null;
@@ -146,6 +148,15 @@ export function MetaConnectPanel({ focus, children }) {
 
       {!ready ? (
         <Card size="small" title={focus === "whatsapp" ? "Select your WhatsApp number" : "Select ad account & Page"} loading={loadingAssets}>
+          {focus === "whatsapp" && status.connection.platformNumber && (
+            <Alert
+              className="mb-3"
+              type="warning"
+              showIcon
+              message="That's Oyklane's shared number, not your store's"
+              description="Every store already sends order updates and sign-in codes from Oyklane's number, and Oyklane manages its templates. Pick your own WhatsApp number here to send your own messages and create your own templates."
+            />
+          )}
           {assets && (
             <div className="flex flex-col gap-3 max-w-sm">
               {focus === "ads" && (
@@ -184,7 +195,13 @@ export function MetaConnectPanel({ focus, children }) {
                     value={selection.wabaId}
                     options={assets.wabas.map((w) => ({
                       value: w.id,
-                      label: (
+                      disabled: Boolean(w.platform),
+                      label: w.platform ? (
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate">{w.name}</span>
+                          <Tag className="!m-0">Oyklane&apos;s shared number</Tag>
+                        </span>
+                      ) : (
                         <span className="flex items-center justify-between gap-2">
                           <span className="truncate">
                             {w.name}
@@ -324,6 +341,6 @@ export function MetaConnectPanel({ focus, children }) {
 
 function assetsReady(connection, focus) {
   if (focus === "ads") return Boolean(connection.adAccountId && connection.pageId);
-  if (focus === "whatsapp") return Boolean(connection.phoneNumberId);
+  if (focus === "whatsapp") return Boolean(connection.phoneNumberId) && !connection.platformNumber;
   return false;
 }

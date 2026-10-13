@@ -6,12 +6,19 @@ import { useRouter } from "next/navigation";
 import { Button, Input, Tag, Skeleton } from "antd";
 import { Search, Crown, Lock, Check, ArrowRight, Sparkles } from "lucide-react";
 import { PageHeader, EmptyState } from "@shopcycle/ui";
-import { useApps, appHref, detailsHref, APP_CATEGORIES, rupees } from "@/lib/apps";
+import { useApps, appHref, detailsHref, APP_CATEGORIES, rupees, usageLabel } from "@/lib/apps";
 import { useAppActions } from "@/components/apps/useAppActions";
 import { AppTile } from "@/components/apps/AppTile";
 import { apiFetch } from "@/lib/api";
 
 function PriceTag({ app }) {
+  if (app.usagePrice) {
+    return (
+      <span className="text-[12px] text-ink-muted" title="Free to install. Plus GST, billed with your plan">
+        {usageLabel(app)}
+      </span>
+    );
+  }
   if (app.priceMonthly) {
     return (
       <span className="text-[12px] text-ink-muted" title="Plus GST, billed with your plan">

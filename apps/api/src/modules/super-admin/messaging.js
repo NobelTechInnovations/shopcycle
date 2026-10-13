@@ -3,6 +3,7 @@ const { z } = require("zod");
 const templates = require("../../lib/whatsapp-templates");
 const messaging = require("../../lib/messaging");
 const { toE164 } = require("../../lib/phone");
+const { HttpError } = require("@shopcycle/utils");
 const platform = require("../whatsapp/platform");
 const cloud = require("../whatsapp/cloud");
 const waService = require("../whatsapp/service");
@@ -49,13 +50,15 @@ async function messagingRoutes(fastify) {
     const { token } = z.object({ token: z.string().min(20).max(2000) }).parse(request.body || {});
     return platform.useToken(prisma, token, request.currentUser.id);
   });
+  // The token is saved but no number picked yet: what it can use.
+  fastify.get("/platform/wabas", async () => ({ wabas: await platform.wabas(prisma) }));
   fastify.post("/platform/number", async (request) => {
     const body = z.object({ wabaId: z.string().min(1), phoneNumberId: z.string().min(1) }).parse(request.body || {});
     await platform.choose(prisma, body, request.currentUser.id);
     return platform.status(prisma);
   });
   fastify.post("/platform/activate", async (request) => {
-    const { pin } = z.object({ pin: z.string().regex(/^\d{6}$/) }).parse(request.body || {});
+    const { pin } = z.object({ pin: z.string().regex(/^\d{6}$/).optional() }).parse(request.body || {});
     await platform.activate(prisma, pin, request.currentUser.id);
     return platform.status(prisma);
   });
@@ -67,6 +70,35 @@ async function messagingRoutes(fastify) {
     const conn = await platform.connection(prisma);
     if (!conn) return { templates: [], standard: standard.KINDS };
     return { templates: (await cloud.listTemplates(conn, { fresh: true })).map(waService.shapeTemplate), standard: standard.KINDS, otp: standard.OTP_TEMPLATE };
+  });
+  // Oyklane's own templates — only Super admin creates, edits or deletes
+  // them; stores on the shared number see them read-only.
+  const platformConn = async () => {
+    const conn = await platform.connection(prisma);
+    if (!conn?.wabaId) throw new HttpError(400, "Choose Oyklane's WhatsApp number first.");
+    return conn;
+  };
+  fastify.post("/platform/templates/validate", async (request) => ({ ok: true, spec: waService.buildTemplate(request.body || {}) }));
+  fastify.post("/platform/templates", async (request, reply) => {
+    const spec = waService.buildTemplate(request.body || {});
+    const out = await cloud.createTemplate(await platformConn(), spec);
+    reply.code(201).send({ id: out.id, status: out.status, category: out.category });
+  });
+  fastify.post("/platform/templates/sample", async (request) => {
+    const file = await request.file({ limits: { fileSize: 16 * 1024 * 1024 } });
+    if (!file) throw new HttpError(400, "Choose a file.");
+    const buffer = await file.toBuffer();
+    if (buffer.length > 16 * 1024 * 1024) throw new HttpError(400, "The sample must be under 16 MB.");
+    return { handle: await cloud.uploadTemplateSample(await platformConn(), { buffer, mime: file.mimetype, name: file.filename }) };
+  });
+  fastify.post("/platform/templates/:id", async (request) => {
+    const spec = waService.buildTemplate(request.body || {});
+    await cloud.editTemplate(await platformConn(), request.params.id, { components: spec.components, ...(request.body?.categoryChange ? { category: spec.category } : {}) });
+    return { ok: true };
+  });
+  fastify.delete("/platform/templates/:name", async (request) => {
+    await cloud.deleteTemplate(await platformConn(), { name: request.params.name, id: request.query.id });
+    return { ok: true };
   });
   fastify.post("/platform/templates/install", async () => {
     const conn = await platform.connection(prisma);
@@ -117,7 +149,7 @@ async function messagingRoutes(fastify) {
       return reply.code(400).send({ error: "WhatsApp isn't set up yet — add the template key above and make sure the Zoho account and sending number are on the server." });
     }
     const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
-    const result = await messaging.sendOtp(prisma, { to: phone, code, channel: "whatsapp", log: request.log });
+    const result = await messaging.sendOtp(prisma, { to: phone, code, channel: "whatsapp", log: request.log, fallback: false });
     return { ...result, to: masked(phone), recent: await recent(prisma) };
   });
 }

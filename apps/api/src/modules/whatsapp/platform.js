@@ -44,6 +44,27 @@ async function connection(prisma) {
   return null;
 }
 
+/**
+ * Is this (a store's) WhatsApp account or number Oyklane's own? Oyklane's
+ * number is shared by every store and only Super admin manages it — a
+ * store that picks it (its owner may also be an Oyklane admin) doesn't
+ * "own" it: no templates, broadcasts or replies of its own through it.
+ */
+async function isPlatformAccount(prisma, { wabaId, phoneNumberId } = {}) {
+  if (!wabaId && !phoneNumberId) return false;
+  const v = await load(prisma);
+  const wabas = [v.wabaId, env.META_WHATSAPP_WABA_ID].filter(Boolean).map(String);
+  const phones = [v.phoneNumberId, env.META_WHATSAPP_PHONE_NUMBER_ID].filter(Boolean).map(String);
+  return Boolean((wabaId && wabas.includes(String(wabaId))) || (phoneNumberId && phones.includes(String(phoneNumberId))));
+}
+
+/** The WhatsApp accounts (and their numbers) the saved token can use. */
+async function wabas(prisma) {
+  const v = await load(prisma, { fresh: true });
+  if (!v.token) throw new HttpError(400, "Add the key first.");
+  return meta.listWabas(decryptSecret(v.token), []);
+}
+
 /** Super admin pasted a System User token: check it, list what it can use. */
 async function useToken(prisma, token, actor) {
   const t = String(token || "").trim();
@@ -71,13 +92,26 @@ async function choose(prisma, { wabaId, phoneNumberId }, actor) {
   return save(prisma, { wabaId, wabaName: waba.name || null, phoneNumberId, phoneNumberLabel: shaped.label }, actor);
 }
 
+/** Registers the number with its two-step PIN when it isn't on the Cloud
+ * API yet (a live number skips that — no PIN needed), then subscribes
+ * Oyklane's app to the account so replies and delivery updates arrive. */
 async function activate(prisma, pin, actor) {
   const conn = await connection(prisma);
-  if (!conn) throw new HttpError(400, "Connect Oyklane's number first.");
-  if (!/^\d{6}$/.test(String(pin || ""))) throw new HttpError(400, "Enter the 6-digit PIN.");
-  await meta.graphRequest(`/${conn.phoneNumberId}/register`, { method: "POST", token: conn.accessToken, body: { messaging_product: "whatsapp", pin: String(pin) } });
-  if (conn.wabaId) await meta.graphRequest(`/${conn.wabaId}/subscribed_apps`, { method: "POST", token: conn.accessToken });
-  return save(prisma, { activatedAt: new Date().toISOString(), subscribedAt: new Date().toISOString() }, actor);
+  if (!conn) throw new HttpError(400, "Choose Oyklane's number first.");
+  const n = meta.shapeNumber(await meta.graphRequest(`/${conn.phoneNumberId}`, { token: conn.accessToken, params: { fields: meta.WABA_NUMBER_FIELDS } }));
+  const patch = {};
+  if (!n.ready && n.action === "activate") {
+    if (!/^\d{6}$/.test(String(pin || ""))) throw new HttpError(400, "Enter the number's 6-digit PIN.", { reason: "pin_required" });
+    await meta.graphRequest(`/${conn.phoneNumberId}/register`, { method: "POST", token: conn.accessToken, body: { messaging_product: "whatsapp", pin: String(pin) } }).catch((err) => {
+      if (/two-step|pin/i.test(err.message)) throw new HttpError(400, "Meta didn't accept that PIN. Use the number's two-step verification PIN (WhatsApp Manager ▸ Phone numbers ▸ Settings ▸ Two-step verification), or reset it there.");
+      throw err;
+    });
+    patch.activatedAt = new Date().toISOString();
+  }
+  if (!conn.wabaId) throw new HttpError(400, "Choose the WhatsApp account again (Change) — its id is missing.");
+  await meta.graphRequest(`/${conn.wabaId}/subscribed_apps`, { method: "POST", token: conn.accessToken });
+  patch.subscribedAt = new Date().toISOString();
+  return save(prisma, patch, actor);
 }
 
 /**
@@ -95,6 +129,8 @@ async function status(prisma) {
     phoneNumberId: conn?.phoneNumberId || null,
     number: null,
     subscribed: null,
+    // The key is saved but no number picked yet.
+    needsNumber: Boolean(v.token && !v.phoneNumberId),
     notifications: v.notifications || { enabled: false, events: { orderConfirmed: true, shipped: true, delivered: true } },
     setup: [],
   };
@@ -165,4 +201,4 @@ async function installStandard(conn, { linkBase, withOtp = false } = {}) {
   return results;
 }
 
-module.exports = { KEY, load, save, connection, useToken, choose, activate, status, installStandard };
+module.exports = { KEY, load, save, connection, isPlatformAccount, wabas, useToken, choose, activate, status, installStandard };

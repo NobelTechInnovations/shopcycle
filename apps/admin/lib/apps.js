@@ -39,6 +39,9 @@ export const APP_CATEGORIES = {
 };
 
 /** "₹299", not "₹299.00" — app prices are whole rupees. */
+/** "₹0.50 per SMS code" — a pay-as-you-go app's price (null otherwise). */
+export const usageLabel = (app) => (app?.usagePrice ? `₹${Number(app.usagePrice.amount).toFixed(2)} per ${app.usagePrice.unit}` : null);
+
 export const rupees = (n) => `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
 const EVENT = "oy:apps-changed";

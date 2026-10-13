@@ -65,7 +65,7 @@ export function Detail({ item: raw, preview }) {
           <div className="buybox__price">
             <Price item={item} />
           </div>
-          {!item.free && <p className="small muted">{theme ? "One-time, for one store. + GST. Updates included." : "A month, billed with your Oyklane plan. + GST. Cancel any time."}</p>}
+          {!item.free && <p className="small muted">{item.usagePrice ? "Free to install. Billed per use with your Oyklane plan. + GST." : theme ? "One-time, for one store. + GST. Updates included." : "A month, billed with your Oyklane plan. + GST. Cancel any time."}</p>}
           <div className="stack">
             <a className="btn btn--accent btn--lg btn--block" href={getUrl(item.kind, item.slug)}>
               {item.free ? `Add to my store` : theme ? `Buy for ${inr(item.price)}` : `Install`}

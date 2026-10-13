@@ -2,6 +2,15 @@ import Link from "next/link";
 import { inr, CATEGORY_LABELS, withShots } from "@/lib/config";
 
 export function Price({ item, suffix = true }) {
+  // Pay as you go (Phone Login: per SMS code).
+  if (item.usagePrice) {
+    return (
+      <span className="price">
+        ₹{Number(item.usagePrice.amount).toFixed(2)}
+        {suffix ? <span className="subtle"> per {item.usagePrice.unit}</span> : null}
+      </span>
+    );
+  }
   if (item.free) return <span className="price price--free">Free</span>;
   return (
     <span className="price">

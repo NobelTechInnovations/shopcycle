@@ -7,7 +7,7 @@
  * Metadata is scrubbed of anything that looks like a secret before it's
  * stored, since callers often pass request bodies straight through.
  */
-const SECRET_KEYS = /pass(word)?|secret|token|code|otp|key|authorization|cookie/i;
+const SECRET_KEYS = /pass(word)?|secret|token|code|otp|key|authorization|cookie|^pin$/i;
 
 function scrub(value, depth = 0) {
   if (depth > 4 || value == null) return value;

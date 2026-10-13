@@ -36,16 +36,16 @@ const ONE_CLICK = {
   settingsSchema: [],
 };
 
-// A paid app: the price is billed for every billing period it's installed
-// in (billing/app-charges.js). Created once; the super admin edits the price.
+// Pay as you go: free to install; every SMS code a shopper gets is billed
+// to the store (SMS_OTP_PRICE, billing/usage.js). Codes go through
+// Oyklane's own SMS (APITXT) and WhatsApp numbers — nothing to set up.
 const PHONE_LOGIN = {
   key: "phone-login",
   name: "Phone Login",
   description:
-    "Shoppers sign in with their mobile number and a one-time code by SMS or WhatsApp — no password or email needed. ₹299/month (+GST), added to your next bill.",
+    "Shoppers sign in with their mobile number and a one-time code by SMS or WhatsApp — no password or email needed. Free to install; you pay only for the codes: ₹0.50 (+GST) per SMS, added to your next bill.",
   category: "customers",
   iconKey: "smartphone",
-  priceMonthly: 299,
   settingsSchema: [
     {
       id: "channel",
@@ -208,6 +208,7 @@ async function seedCatalog(prisma, { log } = {}) {
   await prisma.platformSetting.upsert({ where: { key: "billing" }, update: {}, create: { key: "billing", value: DEFAULTS } });
   await prisma.app.upsert({ where: { key: ONE_CLICK.key }, update: {}, create: ONE_CLICK });
   await prisma.app.upsert({ where: { key: PHONE_LOGIN.key }, update: {}, create: PHONE_LOGIN });
+  await phoneLoginPayAsYouGo(prisma, { log });
   await prisma.app.upsert({ where: { key: FLOW.key }, update: {}, create: FLOW });
   // Local dev shares production's database: a local start would list these
   // in production's app store before production can run them.
@@ -222,6 +223,22 @@ async function seedCatalog(prisma, { log } = {}) {
   }
   await require("../support/articles").seedArticles(prisma, { log });
   await require("../support/articles").addNewArticles(prisma, { log, enabled: env.NODE_ENV === "production" || env.SEED_PREVIEW_APPS === "1" });
+}
+
+/**
+ * Phone Login moved from ₹299 a month to pay-per-SMS (Oct 2026). Runs once:
+ * only while the app still has the old ₹299 price — a price the super admin
+ * sets later is left alone. The unbilled ₹299 charges go with it (stores
+ * pay per code now); ones already billed stay.
+ */
+async function phoneLoginPayAsYouGo(prisma, { log } = {}) {
+  const app = await prisma.app.findUnique({ where: { key: PHONE_LOGIN.key }, select: { id: true, priceMonthly: true } });
+  if (!app || Number(app.priceMonthly) !== 299) return;
+  const [, dropped] = await prisma.$transaction([
+    prisma.app.update({ where: { id: app.id }, data: { priceMonthly: null, description: PHONE_LOGIN.description } }),
+    prisma.appCharge.deleteMany({ where: { appId: app.id, status: "pending" } }),
+  ]);
+  log?.info({ droppedCharges: dropped.count }, "billing: Phone Login is now pay-per-SMS");
 }
 
 /** A trial for every store that has no subscription yet. A store already

@@ -25,11 +25,23 @@ async function whatsappRoutes(fastify) {
   const audit = (request, action, metadata) => recordAudit(request, { scope: "store", actor: who(request), action, storeId: request.store.id, metadata });
 
   // ── Connection ──
+  // Own number, or Oyklane's shared one (order updates and sign-in codes
+  // only; Oyklane manages its templates).
+  fastify.get("/mode", async (request) => {
+    const own = await cloud.ownConnection(db, request.store.id);
+    const conn = own ? null : await require("../meta/repository").findByStore(db, request.store.id);
+    const platform = require("./platform");
+    return {
+      own: Boolean(own),
+      pickedPlatform: Boolean(conn && (await platform.isPlatformAccount(db, conn))),
+      platform: { ready: Boolean(await platform.connection(db)), number: (await platform.load(db)).phoneNumberLabel || null },
+    };
+  });
   fastify.get("/health", async (request) => cloud.health(db, request.store));
   fastify.get("/signup-config", async () => cloud.signupConfig());
   fastify.post("/activate", async (request) => {
     ownerOnly(request, "activate the WhatsApp number");
-    const { pin } = z.object({ pin: z.string().regex(/^\d{6}$/, "Enter the 6-digit PIN.") }).parse(request.body || {});
+    const { pin } = z.object({ pin: z.string().regex(/^\d{6}$/, "Enter the 6-digit PIN.").optional() }).parse(request.body || {});
     const out = await cloud.activate(db, request.store, { pin });
     audit(request, "whatsapp.number_activated", { phoneNumberId: out.phoneNumberId });
     return out;
@@ -110,8 +122,12 @@ async function whatsappRoutes(fastify) {
 
   // ── Templates ──
   fastify.get("/templates", async (request) => {
-    const all = await service.templates(db, request.store);
-    return { templates: request.query.status === "approved" ? all.filter((t) => t.status === "APPROVED") : all };
+    const pick = (all) => (request.query.status === "approved" ? all.filter((t) => t.status === "APPROVED") : all);
+    const own = await cloud.ownConnection(db, request.store.id);
+    if (own) return { templates: pick(await service.templates(db, request.store, { conn: own })) };
+    // On Oyklane's shared number: Oyklane's templates, read-only.
+    const conn = await require("./platform").connection(db);
+    return { templates: conn ? pick(await service.templates(db, request.store, { conn })) : [], managed: true };
   });
   fastify.post("/templates/validate", async (request) => ({ ok: true, spec: service.buildTemplate(request.body || {}) }));
   fastify.post("/templates", async (request, reply) => {
@@ -198,9 +214,9 @@ async function whatsappRoutes(fastify) {
     const platform = require("./platform");
     const def = (await platform.load(db)).notifications || { enabled: false, events: {} };
     const settings = notifications.storeSettings(request.store);
-    const conn = await require("../meta/repository").findByStore(db, request.store.id);
-    let own = { connected: Boolean(conn?.phoneNumberId), templates: {} };
-    if (conn?.wabaId) {
+    const conn = await cloud.ownConnection(db, request.store.id);
+    let own = { connected: Boolean(conn), templates: {} };
+    if (conn) {
       const all = await service.templates(db, request.store, { conn }).catch(() => []);
       for (const k of Object.values(standard.KINDS)) own.templates[k.name] = all.find((t) => t.name === k.name)?.status || null;
     }

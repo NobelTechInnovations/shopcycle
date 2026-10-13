@@ -43,6 +43,9 @@ function refreshPlatformOtp(prisma) {
 }
 
 function whatsappProvider() {
+  // Oyklane's own number is the built-in sender once its code template is
+  // approved — unless Railway forces another provider.
+  if (!env.WHATSAPP_PROVIDER && platformOtp.ready) return "oyklane";
   // Zoho's code template is set in Super admin ▸ Messaging (whatsapp-templates.js).
   const zohoReady = zohoToken() && env.ZOHO_WHATSAPP_FROM && templates.otpTemplate();
   const p = env.WHATSAPP_PROVIDER || (zohoReady ? "zoho" : env.META_WHATSAPP_TOKEN ? "meta" : env.TWILIO_WHATSAPP_FROM ? "twilio" : "log");
@@ -200,11 +203,24 @@ const SENDERS = {
 
 /**
  * Sends a one-time code. `to` is E.164 digits without "+" (lib/phone.js).
- * @returns {{ status: "sent"|"logged"|"failed", provider: string, error?: string }}
+ * A WhatsApp code that doesn't go through (provider down, number not on
+ * WhatsApp…) goes by SMS instead, unless `fallback` is false — `channel`
+ * in the result is the one that carried it.
+ * @returns {{ status: "sent"|"logged"|"failed", provider: string, channel: "sms"|"whatsapp", fellBack?: true, error?: string }}
  */
-async function sendOtp(prisma, { to, code, channel = "sms", storeId = null, storeName = "Oyklane", log }) {
+async function sendOtp(prisma, { to, code, channel = "sms", storeId = null, storeName = "Oyklane", log, fallback = true }) {
   templates.cached(prisma); // keeps Super admin's templates fresh (background, once a minute)
   refreshPlatformOtp(prisma);
+  const first = await attempt(prisma, { to, code, channel, storeId, storeName, log });
+  if (first.status === "failed" && channel === "whatsapp" && fallback && smsProvider() !== "log") {
+    const sms = await attempt(prisma, { to, code, channel: "sms", storeId, storeName, log });
+    if (sms.status === "sent") return { ...sms, channel: "sms", fellBack: true };
+  }
+  return { ...first, channel };
+}
+
+/** One send on one channel: delivered (or logged), billed, recorded. */
+async function attempt(prisma, { to, code, channel, storeId, storeName, log }) {
   const provider = channel === "whatsapp" ? whatsappProvider() : smsProvider();
   const text = `${code} is your ${storeName} sign-in code. It expires in 10 minutes. Don't share it with anyone.`;
   let status = "logged";
