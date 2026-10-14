@@ -25,47 +25,137 @@ function filterQuery(filter) {
 
 const displayName = (c) => c.customer?.name || c.profileName || `+${c.phone}`;
 
-/** Sends one approved template — the only way to message outside the 24-hour window. */
-function TemplateComposer({ open, onClose, onSend, templates, customerName }) {
+/** Values a template can be filled with (names from the API's composeContext). */
+const FILLS = [
+  ["customer.first_name", "First name"],
+  ["customer.name", "Full name"],
+  ["order.number", "Order no."],
+  ["order.total", "Total"],
+  ["order.courier", "Courier"],
+  ["order.tracking", "Tracking no."],
+  ["store.name", "Store"],
+];
+
+/** Fills each {{n}}: Oyklane's standard templates say exactly what goes
+ * where; for the store's own, the words just before {{n}} are the clue. */
+function guessValues(tpl, ctx) {
+  const v = ctx?.values || {};
+  const known = ctx?.standard?.[tpl.name];
+  if (known) return known.map((key) => v[key] || "");
+  return Array.from({ length: tpl.bodyVariables || 0 }, (_, i) => {
+    const before = String(tpl.body || "").split(`{{${i + 1}}}`)[0].slice(-28).toLowerCase();
+    if (/(hi|hello|hey|dear|namaste)[\s,]*$/.test(before)) return v["customer.first_name"] || "";
+    if (/(order|order no\.?|#)\s*$/.test(before)) return v["order.number"] || "";
+    if (/(₹|rs\.?|inr|total|amount)( is| of)?\s*:?\s*$/.test(before)) return v["order.total"] || "";
+    if (/(tracking|awb|track)( number| no\.?| id)?\s*:?\s*$/.test(before)) return v["order.tracking"] || "";
+    if (/(with|via|courier)\s*$/.test(before)) return v["order.courier"] || "";
+    if (/(from|at|team)\s*$/.test(before)) return v["store.name"] || "";
+    return i === 0 ? v["customer.first_name"] || "" : "";
+  });
+}
+
+/**
+ * Sends one approved template — the only way to message outside the
+ * 24-hour window. `query` ("customerId=…" or "phone=…") loads the
+ * customer's orders: the latest is picked, and the template's values are
+ * filled in from it (all still editable).
+ */
+function TemplateComposer({ open, onClose, onSend, templates, query, title = "Send a template" }) {
   const [form] = Form.useForm();
   const [picked, setPicked] = useState(null);
+  const [ctx, setCtx] = useState(null);
+  const [orderId, setOrderId] = useState(null);
+  const [busy, setBusy] = useState(false);
   const values = Form.useWatch("body", form) || [];
   useEffect(() => {
     if (!open) {
       setPicked(null);
+      setCtx(null);
+      setOrderId(null);
       form.resetFields();
     }
   }, [open, form]);
+  useEffect(() => {
+    if (!open || !query) return;
+    apiFetch(`/api/whatsapp/compose?${query}${orderId ? `&orderId=${orderId}` : ""}`)
+      .then(setCtx)
+      .catch(() => setCtx(null));
+  }, [open, query, orderId]);
   const tpl = templates.find((t) => `${t.name}|${t.language}` === picked);
+  // A new order or template: fill everything in again.
+  useEffect(() => {
+    if (!tpl) return;
+    form.setFieldValue("body", guessValues(tpl, ctx));
+    if (tpl.urlButtonVariable >= 0) form.setFieldValue("buttonUrl", ctx?.buttonValue || "");
+  }, [tpl, ctx, form]);
+  const fills = FILLS.filter(([key]) => ctx?.values?.[key]);
+
   return (
     <Modal
-      title="Send a template"
+      title={title}
       open={open}
       onCancel={onClose}
       okText="Send"
+      confirmLoading={busy}
       okButtonProps={{ disabled: !tpl }}
-      onOk={() => form.validateFields().then((v) => onSend({ templateName: tpl.name, language: tpl.language, body: v.body || [], headerMediaUrl: v.headerMediaUrl, buttonUrl: v.buttonUrl, confirmConsent: v.confirmConsent }))}
-      width={720}
+      onOk={() =>
+        form.validateFields().then(async (v) => {
+          setBusy(true);
+          try {
+            await onSend({ templateName: tpl.name, language: tpl.language, body: v.body || [], headerMediaUrl: v.headerMediaUrl, buttonUrl: v.buttonUrl, confirmConsent: v.confirmConsent });
+          } finally {
+            setBusy(false);
+          }
+        })
+      }
+      width={760}
     >
       <div className="grid md:grid-cols-2 gap-4">
         <Form form={form} layout="vertical" requiredMark={false}>
+          {ctx?.orders?.length > 0 && (
+            <Form.Item label="About which order" extra="The latest is picked; the message is filled in from it.">
+              <Select
+                value={ctx.orderId}
+                onChange={setOrderId}
+                options={ctx.orders.map((o) => ({ value: o.id, label: `${o.number} · ${o.total} · ${String(o.status || "").replace(/_/g, " ")} · ${new Date(o.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` }))}
+              />
+            </Form.Item>
+          )}
           <Form.Item label="Template">
             <Select
               showSearch
               placeholder="Choose an approved template"
               value={picked}
-              onChange={(v) => {
-                setPicked(v);
-                const t = templates.find((x) => `${x.name}|${x.language}` === v);
-                form.setFieldValue("body", Array.from({ length: t?.bodyVariables || 0 }, (_, i) => (i === 0 && customerName ? customerName.split(" ")[0] : "")));
-              }}
+              onChange={setPicked}
+              optionFilterProp="label"
               options={templates.map((t) => ({ value: `${t.name}|${t.language}`, label: `${t.name} · ${t.language} · ${t.category.toLowerCase()}` }))}
-              notFoundContent="No approved templates yet — create one in the Templates tab."
+              notFoundContent="No approved templates yet."
             />
           </Form.Item>
           {tpl &&
             Array.from({ length: tpl.bodyVariables }, (_, i) => (
-              <Form.Item key={i} name={["body", i]} label={`Value for {{${i + 1}}}`} rules={[{ required: true, message: "Required" }]}>
+              <Form.Item
+                key={i}
+                name={["body", i]}
+                label={`Value for {{${i + 1}}}`}
+                rules={[{ required: true, whitespace: true, message: "Fill this in — WhatsApp won't send an empty value" }]}
+                extra={
+                  fills.length > 0 && (
+                    <span className="flex flex-wrap gap-1 mt-1">
+                      {fills.map(([key, label]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          className="text-[11px] px-1.5 py-0.5 rounded border border-app-border bg-app-surface hover:border-accent hover:text-accent"
+                          onClick={() => form.setFieldValue(["body", i], ctx.values[key])}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </span>
+                  )
+                }
+              >
                 <Input maxLength={300} />
               </Form.Item>
             ))}
@@ -75,7 +165,7 @@ function TemplateComposer({ open, onClose, onSend, templates, customerName }) {
             </Form.Item>
           )}
           {tpl?.urlButtonVariable >= 0 && (
-            <Form.Item name="buttonUrl" label="End of the button's link" rules={[{ required: true, message: "Required" }]}>
+            <Form.Item name="buttonUrl" label="End of the button's link" extra={ctx?.buttonValue ? "Filled with the order's page." : null} rules={[{ required: true, message: "Required" }]}>
               <Input placeholder="for example ORDER-1042" />
             </Form.Item>
           )}
@@ -91,29 +181,207 @@ function TemplateComposer({ open, onClose, onSend, templates, customerName }) {
   );
 }
 
-function NewConversation({ open, onClose, templates, onStarted }) {
+const COUNTRIES = [
+  ["91", "India +91"],
+  ["971", "UAE +971"],
+  ["1", "US/Canada +1"],
+  ["44", "UK +44"],
+  ["65", "Singapore +65"],
+  ["61", "Australia +61"],
+  ["966", "Saudi +966"],
+  ["977", "Nepal +977"],
+];
+
+/** A typed number → { e164 } or { error } in plain words (null while empty). */
+function checkNumber(cc, raw) {
+  let d = String(raw || "").replace(/\D/g, "");
+  if (!d) return { error: null, e164: null };
+  if (d.startsWith(cc) && d.length > (cc === "91" ? 10 : 9)) d = d.slice(cc.length);
+  d = d.replace(/^0+/, "");
+  if (cc === "91") {
+    if (d.length < 10) return { error: `Enter all 10 digits — ${d.length} so far.` };
+    if (d.length > 10) return { error: "That's more than 10 digits. Leave out +91 and any 0 in front." };
+    if (!/^[6-9]/.test(d)) return { error: "Indian mobile numbers start with 6, 7, 8 or 9." };
+    return { e164: `91${d}` };
+  }
+  if (d.length < 6 || d.length > 13) return { error: "Enter the number without the country code (6–13 digits)." };
+  return { e164: `${cc}${d}` };
+}
+
+/**
+ * Messaging someone new: pick a customer (their number and orders come
+ * with them) or type a number — checked as it's typed. Then a template,
+ * filled in from the chosen order. An existing chat opens instead.
+ */
+function NewConversation({ open, onClose, templates, onStarted, preset }) {
   const { message } = App.useApp();
-  const [phone, setPhone] = useState("");
-  const [step, setStep] = useState("phone");
+  const [step, setStep] = useState("who");
+  const [mode, setMode] = useState("customer");
+  const [options, setOptions] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [customerId, setCustomerId] = useState(null);
+  const [ctx, setCtx] = useState(null);
+  const [cc, setCc] = useState("91");
+  const [num, setNum] = useState("");
+  const [touched, setTouched] = useState(false);
+  const searchTimer = useRef(null);
+
+  const search = useCallback((q) => {
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const d = await apiFetch(`/api/whatsapp/customers?q=${encodeURIComponent(q || "")}`);
+        setOptions(d.customers);
+      } catch {
+        setOptions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, q ? 250 : 0);
+  }, []);
+
   useEffect(() => {
     if (!open) {
-      setStep("phone");
-      setPhone("");
+      setStep("who");
+      setMode("customer");
+      setCustomerId(null);
+      setCtx(null);
+      setNum("");
+      setTouched(false);
+      return;
     }
-  }, [open]);
+    search("");
+    if (preset?.customerId) {
+      setMode("customer");
+      setCustomerId(preset.customerId);
+    } else if (preset?.phone) {
+      setMode("number");
+      setNum(String(preset.phone).replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""));
+    }
+  }, [open, preset, search]);
+
+  const typed = mode === "number" ? checkNumber(cc, num) : null;
+  const phone = mode === "customer" ? ctx?.phone : typed?.e164;
+  // The chosen customer, or the typed number: its context (and any chat already open with it).
+  useEffect(() => {
+    const q = mode === "customer" ? (customerId ? `customerId=${customerId}` : null) : phone ? `phone=${phone}` : null;
+    if (!open || !q) return setCtx(null);
+    let live = true;
+    apiFetch(`/api/whatsapp/compose?${q}`)
+      .then((d) => live && setCtx(d))
+      .catch(() => live && setCtx(null));
+    return () => {
+      live = false;
+    };
+  }, [open, mode, customerId, phone]);
+
+  const picked = options.find((o) => o.id === customerId) || (ctx?.customer?.id === customerId ? ctx.customer : null);
+  const noPhone = mode === "customer" && customerId && ctx && !ctx.phone;
+  const query = mode === "customer" ? (customerId ? `customerId=${customerId}` : "") : phone ? `phone=${phone}` : "";
+
   return (
     <>
-      <Modal title="Message a customer" open={open && step === "phone"} onCancel={onClose} okText="Next" okButtonProps={{ disabled: phone.replace(/\D/g, "").length < 10 }} onOk={() => setStep("template")}>
-        <p className="text-sm text-ink-muted">New conversations always start with an approved template — WhatsApp&apos;s rule for business-started chats.</p>
-        <Input placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} autoFocus />
+      <Modal
+        title="Message a customer"
+        open={open && step === "who"}
+        onCancel={onClose}
+        okText="Next: choose the message"
+        okButtonProps={{ disabled: !phone }}
+        onOk={() => setStep("template")}
+        width={560}
+      >
+        <p className="text-sm text-ink-muted mt-0">New chats start with an approved template — WhatsApp&apos;s rule for messages a business starts.</p>
+        <Segmented
+          block
+          value={mode}
+          onChange={(m) => {
+            setMode(m);
+            setCtx(null);
+          }}
+          options={[
+            { value: "customer", label: "A customer" },
+            { value: "number", label: "A new number" },
+          ]}
+          className="mb-3"
+        />
+        {mode === "customer" ? (
+          <div className="flex flex-col gap-2">
+            <Select
+              showSearch
+              autoFocus
+              placeholder="Search by name, phone or email"
+              filterOption={false}
+              onSearch={search}
+              loading={searching}
+              value={customerId}
+              onChange={setCustomerId}
+              notFoundContent={searching ? <Spin size="small" /> : "No customer found — use “A new number”."}
+              options={[
+                ...(picked && !options.some((o) => o.id === picked.id) ? [picked] : []),
+                ...options,
+              ].map((c) => ({
+                value: c.id,
+                label: (
+                  <span className="flex justify-between gap-2">
+                    <span className="truncate">{c.name || c.email || c.phone}</span>
+                    <span className="text-ink-muted text-xs shrink-0">{c.phone || "no phone"}</span>
+                  </span>
+                ),
+              }))}
+            />
+            {noPhone && <Alert type="warning" showIcon message="This customer has no valid mobile number" description="Add one on their customer page, or choose “A new number”." />}
+            {ctx?.phone && (
+              <p className="text-xs text-ink-muted m-0">
+                Sends to <b>+{ctx.phone}</b>
+                {ctx.orders.length ? ` · ${ctx.orders.length} order${ctx.orders.length === 1 ? "" : "s"} — you'll pick which one next` : " · no orders yet"}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <div className="flex gap-2">
+              <Select value={cc} onChange={setCc} options={COUNTRIES.map(([value, label]) => ({ value, label }))} className="!w-[150px] shrink-0" />
+              <Input
+                autoFocus
+                inputMode="tel"
+                placeholder={cc === "91" ? "98765 43210" : "Mobile number"}
+                value={num}
+                status={touched && typed?.error ? "error" : undefined}
+                onChange={(e) => setNum(e.target.value)}
+                onBlur={() => setTouched(true)}
+              />
+            </div>
+            {typed?.error && (touched || String(num).replace(/\D/g, "").length >= 10) ? (
+              <p className="text-xs text-status-danger m-0">{typed.error}</p>
+            ) : typed?.e164 ? (
+              <p className="text-xs text-ink-muted m-0">Sends to +{typed.e164}{ctx?.customer ? ` — that's ${ctx.customer.name}` : ""}</p>
+            ) : null}
+          </div>
+        )}
+        {ctx?.conversationId && (
+          <Alert
+            className="mt-3"
+            type="info"
+            showIcon
+            message="You already have a chat with this number"
+            action={
+              <Button size="small" onClick={() => onStarted(ctx.conversationId)}>
+                Open it
+              </Button>
+            }
+          />
+        )}
       </Modal>
       <TemplateComposer
         open={open && step === "template"}
+        title={`Message ${picked?.name || (phone ? `+${phone}` : "")}`}
         onClose={onClose}
         templates={templates}
+        query={query}
         onSend={async (body) => {
           try {
-            const out = await apiFetch("/api/whatsapp/conversations", { method: "POST", body: { ...body, phone } });
+            const out = await apiFetch("/api/whatsapp/conversations", { method: "POST", body: { ...body, phone: `+${phone}`, ...(mode === "customer" && customerId && { customerId }) } });
             message.success("Sent");
             onStarted(out.conversation?.id || out.message?.conversationId);
           } catch (err) {
@@ -297,6 +565,7 @@ export default function Inbox() {
   const [templates, setTemplates] = useState([]);
   const [tplOpen, setTplOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+  const [newPreset, setNewPreset] = useState(null);
   const [team, setTeam] = useState([]);
   const [suggesting, setSuggesting] = useState(false);
   const [aiNote, setAiNote] = useState(null);
@@ -333,6 +602,26 @@ export default function Inbox() {
   useEffect(() => {
     apiFetch("/api/whatsapp/templates?status=approved").then((d) => setTemplates(d.templates)).catch(() => {});
     apiFetch("/api/whatsapp/settings").then((d) => setTeam(d.team)).catch(() => {});
+  }, []);
+  // From a customer's page (WhatsApp button): their chat, or a new one with them.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const customerId = p.get("customer");
+    const phone = p.get("to");
+    if (!customerId && !phone) return;
+    apiFetch(`/api/whatsapp/compose?${customerId ? `customerId=${encodeURIComponent(customerId)}` : `phone=${encodeURIComponent(phone)}`}`)
+      .then((d) => {
+        if (d.conversationId) open(d.conversationId);
+        else {
+          setNewPreset(customerId ? { customerId } : { phone });
+          setNewOpen(true);
+        }
+      })
+      .catch(() => {
+        setNewPreset(customerId ? { customerId } : { phone });
+        setNewOpen(true);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // New messages arrive by webhook — poll while the screen is open.
   useEffect(() => {
@@ -571,17 +860,22 @@ export default function Inbox() {
         open={tplOpen}
         onClose={() => setTplOpen(false)}
         templates={templates}
-        customerName={c ? displayName(c) : ""}
+        query={c ? (c.customerId ? `customerId=${c.customerId}` : `phone=${c.phone}`) : ""}
         onSend={async (body) => {
           if (await send({ kind: "template", ...body })) setTplOpen(false);
         }}
       />
       <NewConversation
         open={newOpen}
-        onClose={() => setNewOpen(false)}
+        preset={newPreset}
+        onClose={() => {
+          setNewOpen(false);
+          setNewPreset(null);
+        }}
         templates={templates}
         onStarted={(id) => {
           setNewOpen(false);
+          setNewPreset(null);
           loadList();
           if (id) open(id);
         }}

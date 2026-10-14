@@ -148,6 +148,8 @@ function htmlToText(html) {
  * @returns {{ status: "queued"|"logged"|"failed", id: string|null }}
  */
 async function sendEmail(prisma, { to, subject, html, template, storeId = null, fromName, replyTo, refType, refId, logSubject, log }) {
+  // A phone-only shopper has no email yet (lib/placeholder-email.js).
+  if (require("./placeholder-email").isPlaceholderEmail(to)) return { status: "skipped" };
   const provider = emailProvider();
   const base = { storeId, to, subject: logSubject || subject, template: template || "other", refType: refType || null, refId: refId || null, provider };
   try {

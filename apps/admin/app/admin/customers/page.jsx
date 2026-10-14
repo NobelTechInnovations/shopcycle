@@ -1,5 +1,6 @@
 "use client";
 
+import { isPhoneOnlyEmail } from "@/lib/customers";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -72,7 +73,7 @@ export default function CustomersPage() {
             >
               {name}
             </Link>
-            <span className="text-xs text-ink-muted block truncate">{row.email}</span>
+            <span className="text-xs text-ink-muted block truncate">{isPhoneOnlyEmail(row.email) ? row.phone || "Phone sign-in" : row.email}</span>
           </div>
         </div>
       ),

@@ -57,6 +57,7 @@ const CHECKOUT_COUNTRIES = [
  * without this a crafted link like ?checkoutError=<script>… would run
  * script on the store's own domain.
  */
+const { realEmail } = require("../../lib/placeholder-email");
 const safe = (value) => (value === null || value === undefined || value === "" ? value || null : esc(value));
 
 // Store copies vs. the master theme: themes/pristine.js.
@@ -69,7 +70,7 @@ function serializeCustomer(customer) {
     id: customer.id,
     name: safe(customer.name),
     first_name: safe(String(customer.name || "").split(" ")[0]),
-    email: safe(customer.email),
+    email: safe(realEmail(customer.email)),
     phone: safe(customer.phone),
     address1: safe(customer.address1),
     address2: safe(customer.address2),
@@ -97,7 +98,7 @@ function checkoutEnhancements(routes, customer) {
     contactUrl: `${routes.checkout_url}/contact`,
     prefill: customer
       ? {
-          email: customer.email,
+          email: realEmail(customer.email),
           phone: customer.phone,
           shippingName: customer.name,
           shippingAddress1: customer.address1,
@@ -145,7 +146,7 @@ function oneClickConfig(ctx, customer, store) {
     prefill: customer
       ? {
           phoneVerified: Boolean(customer.phoneVerifiedAt || customer.phone_verified),
-          email: customer.email || "",
+          email: realEmail(customer.email),
           phone: customer.phone || "",
           shippingName: customer.name || "",
           shippingAddress1: customer.address1 || "",

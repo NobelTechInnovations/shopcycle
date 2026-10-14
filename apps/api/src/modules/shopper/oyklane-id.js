@@ -1,3 +1,4 @@
+const { placeholderEmail, realEmail } = require("../../lib/placeholder-email");
 const customersRepository = require("../customers/repository");
 const { toE164 } = require("../../lib/phone");
 const service = require("./service");
@@ -37,7 +38,7 @@ function issue(fastify, customer) {
       ...(p && { p }),
       // With only the phone proven, the email they gave — used for a new
       // account elsewhere only if no account there has it already.
-      ...(!e && customer.email && { ue: service.normalizeEmail(customer.email) }),
+      ...(!e && realEmail(customer.email) && { ue: service.normalizeEmail(customer.email) }),
       n: String(customer.name || "").slice(0, 120),
     },
     { expiresIn: ID_TTL }
@@ -73,12 +74,12 @@ async function signIn(fastify, store, idToken, { create = false } = {}) {
   let created = false;
   if (!customer) {
     if (!create) return { none: true };
-    const email = id.e || id.ue;
+    const email = id.e || id.ue || (id.p ? placeholderEmail(id.p) : null);
     if (!email) return { none: true };
     // Only the phone is proven: the email can't be one this store already
     // has (that account's orders need the email proven).
     if (!id.e && (await customersRepository.findByEmail(prisma, store.id, email))) return { none: true };
-    customer = await customersRepository.create(prisma, store.id, { email, name: id.n || email.split("@")[0] });
+    customer = await customersRepository.create(prisma, store.id, { email, name: id.n || (id.ue || id.e ? email.split("@")[0] : display(id.p)) });
     created = true;
   }
 

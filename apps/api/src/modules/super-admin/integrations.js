@@ -28,6 +28,7 @@ async function integrationsRoutes(fastify) {
   fastify.get("/", async () => {
     const admin = env.ADMIN_ORIGIN.replace(/\/$/, "");
     const registration = await prisma.platformSetting.findUnique({ where: { key: SETTING } });
+    const adsManager = await require("../google-ads/manager").platformManager(prisma);
     // Stores whose Google account can do the registration (the owner's own).
     const rows = await prisma.appConnection.findMany({
       where: { appKey: googleAccount.KEY },
@@ -53,6 +54,10 @@ async function integrationsRoutes(fastify) {
       },
       instagram: { configured: Boolean(env.INSTAGRAM_APP_ID && env.INSTAGRAM_APP_SECRET), redirectUri: `${admin}/admin/apps/instagram` },
       merchant: registration?.value || null,
+      ads: { developerToken: Boolean(env.GOOGLE_ADS_DEVELOPER_TOKEN), manager: adsManager },
+      adsStores: rows
+        .filter((r) => (r.credentials?.scopes || []).includes(googleAccount.ACCESS.ads))
+        .map((r) => ({ storeId: r.storeId, store: r.store.name, handle: r.store.handle, email: r.profile?.email || null })),
       googleStores: rows
         .filter((r) => (r.credentials?.scopes || []).includes(googleAccount.ACCESS.merchant))
         .map((r) => ({ storeId: r.storeId, store: r.store.name, handle: r.store.handle, email: r.profile?.email || null })),
@@ -87,6 +92,28 @@ async function integrationsRoutes(fastify) {
    * Google sign-in of a store that has that account. Until this is done,
    * Merchant API refuses every call ("GCP project … is not registered").
    */
+  /**
+   * Oyklane's Google Ads manager account: sellers without a Google Ads
+   * account get one made under it (and are invited as its admin). Reached
+   * through the Google sign-in of one of Oyklane's own stores, like the
+   * Merchant registration above.
+   */
+  fastify.post("/google-ads/manager", async (request) => {
+    const body = z.object({ storeId: z.string().min(5).max(40), managerId: z.string().trim().regex(/^[\d-]{10,12}$/, "The manager account ID looks like 123-456-7890.") }).parse(request.body || {});
+    const ads = require("../google-ads/client");
+    const managerId = ads.digits(body.managerId);
+    let row;
+    try {
+      [row] = await ads.search(prisma, body.storeId, { customerId: managerId, loginCustomerId: managerId }, "SELECT customer.id, customer.descriptive_name, customer.manager FROM customer LIMIT 1");
+    } catch (err) {
+      throw new HttpError(400, `Google Ads: ${err.message}`);
+    }
+    if (!row?.customer?.manager) throw new HttpError(400, "That's not a manager account. Create one at ads.google.com/home/tools/manager-accounts and use its ID.");
+    const value = { managerId, name: row.customer.descriptiveName || null, storeId: body.storeId, at: new Date().toISOString(), by: request.currentUser?.email || null };
+    await prisma.platformSetting.upsert({ where: { key: "google-ads-manager" }, update: { value }, create: { key: "google-ads-manager", value } });
+    return { manager: value };
+  });
+
   fastify.post("/google-merchant/register", async (request) => {
     const body = registerSchema.parse(request.body || {});
     const token = await googleAccount.accessToken(prisma, body.storeId, "merchant");

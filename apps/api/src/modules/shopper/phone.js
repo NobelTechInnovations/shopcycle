@@ -5,14 +5,15 @@ const { toE164 } = require("../../lib/phone");
 const { safeEqual } = require("../../lib/crypto");
 const messaging = require("../../lib/messaging");
 const customersRepository = require("../customers/repository");
+const { placeholderEmail } = require("../../lib/placeholder-email");
 const service = require("./service");
 
 /**
- * Shopper sign-in by phone (the paid "Phone Login" app): a 6-digit code by
- * SMS or WhatsApp. Only a customer whose phone was verified this way can
- * be signed into — a number typed at checkout proves nothing. A new number
- * finishes sign-up with a name and email; taking over an account that
- * already has history needs that email's code too.
+ * Shopper sign-in by phone (the "Phone Login" app): a 6-digit code by SMS
+ * or WhatsApp. Only a customer whose phone was verified this way can be
+ * signed into — a number typed at checkout proves nothing. A new number
+ * gets an account straight away, with no name or email asked: checkout
+ * asks for those when an order needs them (lib/placeholder-email.js).
  */
 const APP_KEY = "phone-login";
 const CODE_TTL_MS = 10 * 60 * 1000;
@@ -85,14 +86,23 @@ async function requestCode(prisma, store, { phone: rawPhone, channel }, log, { c
   return { phone: display(phone), channel: sent.channel };
 }
 
-/** Checks the code. Returns { customer } for a known verified number, or
- * { phone } when the number is new and sign-up must be finished. */
+/** Checks the code and signs the number in: its verified account, or a
+ * new phone-only one. Returns { customer }. */
 async function verifyCode(prisma, store, { phone: rawPhone, code: rawCode }) {
   const phone = parsePhone(rawPhone);
   await checkCode(prisma, store, phone, rawCode);
   const customer = await verifiedCustomer(prisma, store, phone);
   if (customer) return { customer: await prisma.customer.update({ where: { id: customer.id }, data: { lastSignInAt: new Date() } }) };
-  return { phone };
+  return { customer: await phoneOnlyAccount(prisma, store, phone) };
+}
+
+/** A new number's account: just the verified phone (an earlier phone-only
+ * account for it is reused). */
+async function phoneOnlyAccount(prisma, store, phone) {
+  const email = placeholderEmail(phone);
+  const existing = await customersRepository.findByEmail(prisma, store.id, email);
+  const customer = existing || (await customersRepository.create(prisma, store.id, { email, name: display(phone) }));
+  return link(prisma, store, customer, phone);
 }
 
 /** Uses up the latest code for `phone` if `rawCode` matches it; throws otherwise. */

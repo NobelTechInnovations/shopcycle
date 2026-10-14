@@ -1,3 +1,4 @@
+const { realEmail } = require("../../lib/placeholder-email");
 const phoneAuth = require("./phone");
 const { PROVIDER_KEYS } = require("../orders/placed");
 
@@ -66,7 +67,7 @@ async function mine(prisma, store, customer) {
     phone: customer.phone || "",
     verified: Boolean(customer.phoneVerifiedAt),
     name: customer.name || details.name || "",
-    email: customer.email || details.email || "",
+    email: realEmail(customer.email) || details.email || "",
     addresses: details.addresses.slice(0, MAX_ADDRESSES),
   };
 }
@@ -104,7 +105,7 @@ async function savedDetails(prisma, store, phone) {
     add({ name: o.shippingName, address1: o.shippingAddress1, address2: o.shippingAddress2, city: o.shippingCity, province: o.shippingProvince, zip: o.shippingZip, country: o.shippingCountry || "IN" });
   }
   if (addresses.length || customer) {
-    return { name: customer?.name || orders[0]?.shippingName || "", email: customer?.email || orders[0]?.email || "", addresses };
+    return { name: customer?.name || orders[0]?.shippingName || "", email: realEmail(customer?.email) || orders[0]?.email || "", addresses };
   }
 
   // New to this store: the addresses this number has used on other stores

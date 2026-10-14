@@ -39,7 +39,7 @@ async function accessible(prisma, store) {
         out.push({ customerId: String(c.id), name: c.descriptiveName || String(c.id), currency: c.currencyCode, status: c.status, test: Boolean(c.testAccount), loginCustomerId: null, via: null });
       }
     } catch (err) {
-      out.push({ customerId: id, name: id, error: err.message });
+      out.push({ customerId: id, name: id, error: err.message, errorCode: err.details?.reason || null });
     }
   }
   const seen = new Set();
@@ -446,4 +446,32 @@ async function actOnGoogleRecommendation(prisma, store, { resourceName, action }
   return { ok: true };
 }
 
-module.exports = { account, accessible, choose, disconnect, capabilities, setupConversions, campaigns, children, ads, searchTerms, update, remove, searchLocations, languages, keywordIdeas, uploadImage, library, googleRecommendations, actOnGoogleRecommendation, log, shape, dateClause, METRICS };
+// ── A new Google Ads account, made from Oyklane (like Shopify does) ──
+// Oyklane's own Google Ads manager account (Super admin ▸ Integrations)
+// creates it under itself and invites the seller's email as its admin.
+const MANAGER_SETTING = "google-ads-manager";
+
+async function platformManager(prisma) {
+  return (await prisma.platformSetting.findUnique({ where: { key: MANAGER_SETTING } }).catch(() => null))?.value || null;
+}
+
+async function createAccount(prisma, store, { name, email }) {
+  const mgr = await platformManager(prisma);
+  if (!mgr?.managerId || !mgr.storeId) throw new HttpError(400, "Oyklane can't create Google Ads accounts yet — create one at ads.google.com instead.", { reason: "no_manager" });
+  const body = {
+    customerClient: { descriptiveName: String(name || store.name).slice(0, 120), currencyCode: store.currency || "INR", timeZone: store.timezone || "Asia/Kolkata" },
+    emailAddress: email,
+    accessRole: "ADMIN",
+  };
+  const r = await client.request(prisma, mgr.storeId, `customers/${client.digits(mgr.managerId)}:createCustomerClient`, { method: "POST", body, loginCustomerId: mgr.managerId });
+  const customerId = String(r.resourceName || "").split("/")[1] || null;
+  const created = { customerId, email, at: new Date().toISOString() };
+  const install = await prisma.storeApp.findFirst({ where: { storeId: store.id, app: { key: "google-ads" } }, select: { id: true, settings: true } });
+  if (install) await prisma.storeApp.update({ where: { id: install.id }, data: { settings: { ...(install.settings || {}), createdAccount: created } } });
+  return { ...created, invitationLink: r.invitationLink || null };
+}
+
+module.exports = {
+  platformManager,
+  createAccount,
+  MANAGER_SETTING, account, accessible, choose, disconnect, capabilities, setupConversions, campaigns, children, ads, searchTerms, update, remove, searchLocations, languages, keywordIdeas, uploadImage, library, googleRecommendations, actOnGoogleRecommendation, log, shape, dateClause, METRICS };

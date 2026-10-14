@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Tabs, Alert, Card, Tag, Button, App, Skeleton, Select, Popconfirm } from "antd";
+import { Tabs, Alert, Card, Tag, Button, App, Skeleton, Select, Popconfirm, Form, Input } from "antd";
 import { Megaphone, LineChart, Images, Bot, ShieldCheck, FileClock, CheckCircle2, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
@@ -16,30 +16,128 @@ import Automation from "../meta-ads/Automation";
 
 const TABS = ["campaigns", "insights", "media", "automation", "setup"];
 
+const fmtId = (id) => String(id).replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
+
+/** A Google Ads account made from Oyklane, under Oyklane's manager account
+ * (like Shopify does) — the seller accepts Google's emailed invite and adds
+ * billing, then picks it above. */
+function CreateAccount({ status, google, storeName, onDone }) {
+  const { message } = App.useApp();
+  const [busy, setBusy] = useState(false);
+  const [made, setMade] = useState(status.createdAccount);
+  if (!status.canCreate) {
+    return (
+      <Alert
+        type="info"
+        showIcon
+        message="Create a Google Ads account"
+        description={
+          <span>
+            Make one free at <a href="https://ads.google.com" target="_blank" rel="noreferrer">ads.google.com</a> with this Google login and add a payment method, then click Refresh. If your
+            account belongs to someone else, ask them to add your email (Admin ▸ Access and security).
+          </span>
+        }
+      />
+    );
+  }
+  if (made) {
+    return (
+      <Alert
+        type="success"
+        showIcon
+        message={`Google Ads account ${fmtId(made.customerId)} is ready for you`}
+        description={
+          <ol className="m-0 pl-4 text-sm">
+            <li>Open the invitation Google emailed to <b>{made.email}</b> and accept it.</li>
+            <li>In Google Ads ▸ Billing, add a payment method — Google charges your ad spend there, never Oyklane.</li>
+            <li>Come back and click Refresh, then choose the account.</li>
+          </ol>
+        }
+        action={<Button size="small" onClick={onDone}>Refresh</Button>}
+      />
+    );
+  }
+  return (
+    <Card size="small" title="No Google Ads account? Create one here">
+      <p className="text-sm text-ink-muted mt-0">Oyklane makes the account and invites you as its admin — it&apos;s yours, billed by Google to your own payment method.</p>
+      <Form
+        layout="vertical"
+        requiredMark={false}
+        initialValues={{ name: storeName, email: google?.email || "" }}
+        onFinish={async (values) => {
+          setBusy(true);
+          try {
+            setMade(await apiFetch("/api/google-ads/accounts/create", { method: "POST", body: values }));
+            message.success("Account created — check your email for Google's invitation");
+          } catch (err) {
+            message.error(err.message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <div className="grid sm:grid-cols-2 gap-x-3">
+          <Form.Item name="name" label="Account name" rules={[{ required: true, min: 2, message: "Enter a name" }]}>
+            <Input maxLength={120} />
+          </Form.Item>
+          <Form.Item name="email" label="Your email (Google sends the invitation here)" rules={[{ required: true, type: "email", message: "Enter a valid email" }]}>
+            <Input />
+          </Form.Item>
+        </div>
+        <Button type="primary" htmlType="submit" loading={busy}>
+          Create my Google Ads account
+        </Button>
+        <p className="text-xs text-ink-muted mt-2 mb-0">Currency and time zone follow your store&apos;s settings — Google doesn&apos;t let you change them later.</p>
+      </Form>
+    </Card>
+  );
+}
+
 /** Pick which Google Ads account this store manages. */
-function ChooseAccount({ onChosen }) {
+function ChooseAccount({ onChosen, status, google, storeName }) {
   const { message } = App.useApp();
   const [list, setList] = useState(null);
   const [error, setError] = useState(null);
   const [pick, setPick] = useState(null);
+  const [n, setN] = useState(0);
   useEffect(() => {
+    setList(null);
     apiFetch("/api/google-ads/accounts")
       .then((d) => setList(d.accounts))
       .catch((err) => setError(err.message));
-  }, []);
+  }, [n]);
   if (error) return <Alert type="error" showIcon message="Couldn't list your Google Ads accounts" description={error} />;
   if (!list) return <Card><Skeleton active /></Card>;
+  const usable = list.filter((a) => !a.error);
+  const blocked = list.filter((a) => a.error);
   return (
-    <Card title="Choose your Google Ads account">
-      {!list.length ? (
-        <Alert type="info" showIcon message="No Google Ads account on this Google login" description={<span>Create one at <a href="https://ads.google.com" target="_blank" rel="noreferrer">ads.google.com</a> (add billing), then reload this page. If your account belongs to someone else, ask them to add your email (Admin ▸ Access and security).</span>} />
+    <Card title="Choose your Google Ads account" extra={<Button size="small" onClick={() => setN((x) => x + 1)}>Refresh</Button>}>
+      {blocked.length > 0 && (
+        <Alert
+          className="!mb-3"
+          type="warning"
+          showIcon
+          message={blocked.length === 1 ? `Account ${fmtId(blocked[0].customerId)} can't be used yet` : `${blocked.length} accounts can't be used yet`}
+          description={
+            <ul className="m-0 pl-4 text-sm">
+              {blocked.map((a) => (
+                <li key={a.customerId}>
+                  <b>{fmtId(a.customerId)}</b>: {a.error}
+                </li>
+              ))}
+            </ul>
+          }
+        />
+      )}
+      {!usable.length ? (
+        <CreateAccount status={status} google={google} storeName={storeName} onDone={() => setN((x) => x + 1)} />
       ) : (
         <div className="flex flex-col gap-3 max-w-md">
           <Select
             placeholder="Google Ads account"
             value={pick?.customerId}
             onChange={(v) => setPick(list.find((a) => a.customerId === v))}
-            options={list.map((a) => ({ value: a.customerId, disabled: Boolean(a.error), label: `${a.name} · ${a.customerId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}${a.via ? ` · via ${a.via}` : ""}${a.test ? " · TEST" : ""}${a.error ? " · no access" : ""}` }))}
+            options={usable.map((a) => ({ value: a.customerId, label: `${a.name} · ${fmtId(a.customerId)}${a.via ? ` · via ${a.via}` : ""}${a.test ? " · TEST" : ""}` }))}
           />
           <Button
             type="primary"
@@ -243,7 +341,7 @@ export default function GoogleAdsPage() {
       ) : !status.account ? (
         <div className="flex flex-col gap-3">
           <AccountLine kind="google" account={google} />
-          <ChooseAccount onChosen={load} />
+          <ChooseAccount onChosen={load} status={status} google={google} storeName={storeInfo.store?.name} />
         </div>
       ) : (
         <div className="flex flex-col gap-3">

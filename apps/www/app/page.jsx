@@ -48,52 +48,41 @@ export default async function HomePage() {
       {/* ── Hero ── */}
       <section className="hero">
         <div className="wrap">
-          <Link href="/#flow" className="pill">
-            <b>New</b> Flow — customer emails that send themselves
-            <span className="pill__go"><Icon d={I.arrow} /></span>
-          </Link>
-          <h1 className="h1">
-            Build the store. <span className="grad">Grow the brand.</span>
-          </h1>
-          <p className="lead">
-            A storefront you design without code, a checkout that takes seconds, UPI and cash on delivery, GST invoices — and apps that bring customers back. Built for Indian brands.
-          </p>
-          <div className="hero__ctas">
-            <a href={`${APP_URL}/register`} className="btn btn--primary btn--lg">
-              Start your free trial <Icon d={I.arrow} />
-            </a>
-            <Link href="/pricing" className="btn btn--ghost btn--lg">
-              See pricing
-            </Link>
-          </div>
-          <p className="hero__alt">
-            {pricing.trialDays}-day free trial · no card needed to start
-            {DEMO_URL && (
-              <>
-                {" · "}
-                <a href={DEMO_URL} target="_blank" rel="noopener">see a live store</a>
-              </>
-            )}
-          </p>
-          <div className="features-row">
-            Inside:
-            <span className="chip"><Icon d={I.store} /> Store builder</span>
-            <span className="chip"><Icon d={I.bolt} /> One-Click Checkout</span>
-            <span className="chip"><Icon d={I.flow} /> Flow automations</span>
-            <span className="chip"><Icon d={I.receipt} /> GST invoices</span>
+          <div className="hero__copy">
+            <h1 className="h1">Your own online store, made for selling in India.</h1>
+            <p className="lead">
+              Design your store without code. Take UPI, cards and cash on delivery, send GST invoices, and keep customers updated on WhatsApp — all from one dashboard.
+            </p>
+            <div className="hero__ctas">
+              <a href={`${APP_URL}/register`} className="btn btn--primary btn--lg">
+                Start free trial
+              </a>
+              <Link href="/pricing" className="btn btn--ghost btn--lg">
+                See pricing
+              </Link>
+            </div>
+            <p className="hero__alt">
+              {pricing.trialDays}-day free trial. No card needed to start.
+              {DEMO_URL && (
+                <>
+                  {" "}
+                  <a href={DEMO_URL} target="_blank" rel="noopener">See a live store</a>
+                </>
+              )}
+            </p>
           </div>
           <HeroShowcase />
-        </div>
 
-        <div className="marquee" aria-label="Works with">
-          <p className="marquee__label">Works with the tools Indian brands use</p>
-          <div className="marquee__track">
-            {[...MARQUEE, ...MARQUEE].map(([name, logo], i) => (
-              <span className="marquee__item" key={i} aria-hidden={i >= MARQUEE.length ? "true" : undefined}>
-                <Logo {...logo} size={30} />
-                {name}
-              </span>
-            ))}
+          <div className="marquee" aria-label="Works with">
+            <p className="marquee__label">Works with the payment, shipping and marketing tools you already use</p>
+            <div className="marquee__track">
+              {MARQUEE.map(([name, logo]) => (
+                <span className="marquee__item" key={name}>
+                  <Logo {...logo} size={28} />
+                  {name}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -101,27 +90,21 @@ export default async function HomePage() {
       {/* ── Everything you need ── */}
       <section className="section" id="features">
         <div className="wrap">
-          <h2 className="h2 big-title" data-reveal>
-            Everything you need to <span className="grad">sell online</span>
-          </h2>
+          <h2 className="h2 big-title">Everything you need to sell online</h2>
 
-          <div className="feature" id="builder" data-reveal>
+          <div className="feature" id="builder">
             <div className="feature__copy">
-              <span className="eyebrow">
-                <span className="eyebrow__icon"><Icon d={I.store} /></span>
-                Store builder
-              </span>
+              <span className="eyebrow">Store builder</span>
               <h3 className="h2">A store that looks like your brand</h3>
               <p className="lead">Start from a theme made for what you sell, then change colours, fonts, photos and every section. Drag the blocks on your product page into the order that sells.</p>
               <ul className="includes">
-                <li className="includes__label">Includes</li>
                 <li className="chip">4 themes</li>
                 <li className="chip">Drag &amp; drop sections</li>
                 <li className="chip">Your domain + SSL</li>
                 <li className="chip">Mobile first</li>
               </ul>
               <p className="feature__more">
-                <Link href="/#themes" className="link-arrow">See the themes <Icon d={I.arrow} /></Link>
+                <Link href="/#themes" className="link-arrow">See the themes </Link>
               </p>
             </div>
             <div className="feature__visual">
@@ -129,23 +112,19 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="feature feature--flip" id="checkout" data-reveal>
+          <div className="feature feature--flip" id="checkout">
             <div className="feature__copy">
-              <span className="eyebrow">
-                <span className="eyebrow__icon"><Icon d={I.bolt} /></span>
-                One-Click Checkout
-              </span>
+              <span className="eyebrow">One-Click Checkout</span>
               <h3 className="h2">Checkout in seconds, not forms</h3>
               <p className="lead">Mobile number, a one-time code, a saved address, pay — in a popup, without leaving the page. Buyers who&rsquo;ve shopped on any Oyklane store find their address already there.</p>
               <ul className="includes">
-                <li className="includes__label">Includes</li>
-                <li className="chip">UPI · cards · COD</li>
+                <li className="chip">UPI, cards and cash on delivery</li>
                 <li className="chip">OTP by SMS or WhatsApp</li>
                 <li className="chip">Saved addresses</li>
-                <li className="chip">Back to the popup if payment fails</li>
+                <li className="chip">Back to the popup if a payment fails</li>
               </ul>
               <p className="feature__more">
-                <Link href="/apps" className="link-arrow">Explore the app <Icon d={I.arrow} /></Link>
+                <Link href="/apps" className="link-arrow">Explore the app </Link>
               </p>
             </div>
             <div className="feature__visual">
@@ -153,23 +132,19 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="feature" id="flow" data-reveal>
+          <div className="feature" id="flow">
             <div className="feature__copy">
-              <span className="eyebrow">
-                <span className="eyebrow__icon"><Icon d={I.flow} /></span>
-                Flow automations
-              </span>
+              <span className="eyebrow">Flow automations</span>
               <h3 className="h2">Emails that send themselves</h3>
               <p className="lead">Pick a trigger, add waits and conditions, write the email once. Flow thanks first-time buyers, asks for reviews after delivery, and brings back customers who went quiet — every day, without you.</p>
               <ul className="includes">
-                <li className="includes__label">Includes</li>
                 <li className="chip">8 ready recipes</li>
                 <li className="chip">Waits &amp; conditions</li>
                 <li className="chip">Their name, their order</li>
                 <li className="chip">Run history</li>
               </ul>
               <p className="feature__more">
-                <Link href="/apps" className="link-arrow">Free in the app store <Icon d={I.arrow} /></Link>
+                <Link href="/apps" className="link-arrow">Free in the app store </Link>
               </p>
             </div>
             <div className="feature__visual">
@@ -177,16 +152,12 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="feature feature--flip" id="help" data-reveal>
+          <div className="feature feature--flip" id="help">
             <div className="feature__copy">
-              <span className="eyebrow">
-                <span className="eyebrow__icon"><Icon d={I.life} /></span>
-                Help that knows your store
-              </span>
+              <span className="eyebrow">Help that knows your store</span>
               <h3 className="h2">Stuck? Answers in seconds</h3>
               <p className="lead">Ask in your own words — even in Hinglish. The assistant answers from our guides and your store&rsquo;s setup. Still stuck? One click sends the whole conversation to our team, and the reply lands in your inbox.</p>
               <ul className="includes">
-                <li className="includes__label">Includes</li>
                 <li className="chip">AI assistant</li>
                 <li className="chip">Help centre</li>
                 <li className="chip">Tickets answered by email</li>
@@ -200,16 +171,13 @@ export default async function HomePage() {
       </section>
 
       {/* ── And more ── */}
-      <section className="section" id="more">
+      <section className="section section--alt" id="more">
         <div className="wrap">
-          <div className="head head--center" data-reveal>
-            <span className="eyebrow eyebrow--center">
-              <span className="eyebrow__icon"><Icon d={I.spark} /></span>
-              And more
-            </span>
-            <h2 className="h2">Run a bigger business with less effort</h2>
+          <div className="head">
+            <h2 className="h2">Also built in</h2>
+            <p className="lead">The everyday parts of running an online shop in India, ready on day one.</p>
           </div>
-          <div className="bento" data-reveal>
+          <div className="bento">
             <article className="tile tile--wide">
               <span className="tile__icon"><Icon d={I.card} /></span>
               <h3 className="h3">Get paid your way</h3>
@@ -275,39 +243,31 @@ export default async function HomePage() {
       {/* ── Integrations ── */}
       <section className="section section--tight" id="integrations">
         <div className="wrap">
-          <div className="head head--center" data-reveal>
-            <span className="eyebrow eyebrow--center">
-              <span className="eyebrow__icon"><Icon d={I.puzzle} /></span>
-              Integrations
-            </span>
+          <div className="head">
             <h2 className="h2">Plugged into the tools you already use</h2>
             <p className="lead">Payments, couriers, pixels, WhatsApp and your own code through our API — connected in a few clicks, no plugins to hunt for.</p>
           </div>
-          <div className="int-cloud" data-reveal aria-hidden="true">
+          <div className="int-cloud" aria-hidden="true">
             {cloud.map((x) => (
               <Logo key={x.name} {...x.logo} size={84} title={x.name} className="float-tile" />
             ))}
           </div>
-          <p style={{ textAlign: "center" }}>
+          <p>
             <Link href="/integrations" className="link-arrow">
-              Explore the integrations library <Icon d={I.arrow} />
+              Explore the integrations library
             </Link>
           </p>
         </div>
       </section>
 
       {/* ── Themes ── */}
-      <section className="section" id="themes">
+      <section className="section section--alt" id="themes">
         <div className="wrap">
-          <div className="head" data-reveal>
-            <span className="eyebrow">
-              <span className="eyebrow__icon"><Icon d={I.layers} /></span>
-              Themes
-            </span>
+          <div className="head">
             <h2 className="h2">Four themes. Your brand in every one.</h2>
             <p className="lead">Start from a design made for what you sell, then make it yours — colours, fonts, photos and sections, all without code.</p>
           </div>
-          <div data-reveal>
+          <div>
             <ThemeShowcase demoUrl={DEMO_URL} appUrl={APP_URL} />
           </div>
         </div>
@@ -316,11 +276,7 @@ export default async function HomePage() {
       {/* ── Pricing ── */}
       <section className="section" id="pricing">
         <div className="wrap">
-          <div className="head head--center" data-reveal>
-            <span className="eyebrow eyebrow--center">
-              <span className="eyebrow__icon"><Icon d={I.tag} /></span>
-              Pricing
-            </span>
+          <div className="head head--center">
             <h2 className="h2">Simple plans. Try free for {pricing.trialDays} days.</h2>
             <p className="lead">{pricing.introEnabled ? `Then ${inr(pricing.introPrice)} for your first month on any plan. ` : ""}No setup fees, no product limits, change plans whenever you like.</p>
           </div>
@@ -331,8 +287,8 @@ export default async function HomePage() {
       {/* ── FAQ ── */}
       <section className="section section--tight" id="faq">
         <div className="wrap">
-          <div className="head head--center" data-reveal>
-            <h2 className="h2">Good to know</h2>
+          <div className="head head--center">
+            <h2 className="h2">Questions sellers ask</h2>
           </div>
           <div className="faq">
             {faq(pricing).map(([q, a]) => (
@@ -348,14 +304,12 @@ export default async function HomePage() {
       {/* ── CTA ── */}
       <section className="section section--tight">
         <div className="wrap">
-          <div className="cta" data-reveal>
-            <h2 className="h2">
-              Open your store <span className="grad">this week.</span>
-            </h2>
+          <div className="cta">
+            <h2 className="h2">Open your store this week.</h2>
             <p className="lead">Pick a theme, add a few products, switch on payments and share your link.</p>
             <div className="hero__ctas">
-              <a href={`${APP_URL}/register`} className="btn btn--light btn--lg">
-                Start your free trial <Icon d={I.arrow} />
+              <a href={`${APP_URL}/register`} className="btn btn--primary btn--lg">
+                Start free trial
               </a>
               <Link href="/apps" className="btn btn--ghost btn--lg">
                 Browse apps

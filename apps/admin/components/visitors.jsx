@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api";
+import { isPhoneOnlyEmail } from "@/lib/customers";
 import { Tag, Tooltip } from "antd";
 import { Monitor, Smartphone, Tablet, Phone, MessageCircle, Mail, ChevronDown, ChevronUp, ShoppingBag, ShoppingCart, CreditCard, Package, LayoutGrid, Home, Search, User, FileText } from "lucide-react";
 
@@ -31,8 +33,27 @@ function waNumber(phone) {
   return d.length === 10 ? `91${d}` : d;
 }
 
-/** Call / WhatsApp / email buttons for a shopper we know. */
-export function ContactButtons({ phone, email, compact = false }) {
+// Is the WhatsApp app installed? Asked once per page load.
+let waInstalled = null;
+function useInternalWhatsapp() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    waInstalled = waInstalled || apiFetch("/api/apps").then((d) => Boolean(d.apps?.find((a) => a.key === "whatsapp")?.installed)).catch(() => false);
+    let live = true;
+    waInstalled.then((v) => live && setOn(v));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return on;
+}
+
+/** Call / WhatsApp / email buttons for a shopper we know. With the
+ * WhatsApp app installed, WhatsApp opens the chat in the admin's inbox
+ * (or starts one) instead of WhatsApp on this device. */
+export function ContactButtons({ phone, email, customerId, compact = false }) {
+  const internal = useInternalWhatsapp();
+  if (isPhoneOnlyEmail(email)) email = null;
   const cls = `inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-app-border bg-app-surface text-[12.5px] text-ink no-underline hover:border-accent hover:text-accent transition-colors`;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -41,11 +62,16 @@ export function ContactButtons({ phone, email, compact = false }) {
           <Phone size={13} aria-hidden="true" /> {compact ? "Call" : phone}
         </a>
       )}
-      {phone && (
-        <a href={`https://wa.me/${waNumber(phone)}`} target="_blank" rel="noopener noreferrer" className={cls}>
-          <MessageCircle size={13} aria-hidden="true" /> WhatsApp
-        </a>
-      )}
+      {phone &&
+        (internal ? (
+          <Link href={`/admin/apps/whatsapp?tab=inbox&${customerId ? `customer=${encodeURIComponent(customerId)}` : `to=${waNumber(phone)}`}`} className={cls}>
+            <MessageCircle size={13} aria-hidden="true" /> WhatsApp
+          </Link>
+        ) : (
+          <a href={`https://wa.me/${waNumber(phone)}`} target="_blank" rel="noopener noreferrer" className={cls}>
+            <MessageCircle size={13} aria-hidden="true" /> WhatsApp
+          </a>
+        ))}
       {email && !compact && (
         <a href={`mailto:${email}`} className={cls}>
           <Mail size={13} aria-hidden="true" /> Email
@@ -122,7 +148,7 @@ export function VisitRow({ visit, showCustomer = true }) {
         </div>
         <div className="flex flex-col items-end gap-1.5">
           {outcome && <Tag color={outcome.color} className="m-0">{outcome.text}</Tag>}
-          {showCustomer && visit.customer && <ContactButtons phone={visit.customer.phone} email={visit.customer.email} compact />}
+          {showCustomer && visit.customer && <ContactButtons phone={visit.customer.phone} email={visit.customer.email} customerId={visit.customer.id} compact />}
         </div>
       </div>
       {visit.views.length > 0 && (

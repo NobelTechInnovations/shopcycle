@@ -20,7 +20,7 @@ export default async function PricingPage() {
     ["Is there a free trial?", `Yes — ${pricing.trialDays} days on any plan${pricing.introEnabled ? `, then ${inr(pricing.introPrice)} for your first month` : ""}. You choose autopay (UPI or card) to carry on; nothing is charged during the trial.`],
     ["What's the fee per order?", `A small percentage of each paid order — ${plans.map((p) => `${p.name} ${p.commissionPercent}%`).join(", ")}. It's billed with your plan, never taken from your payments.`],
     ["Can I change plans later?", "Anytime. Upgrades apply straight away; downgrades at the end of the period you've paid for."],
-    ["Do apps cost extra?", "Most apps are free, including Flow and One-Click Checkout (which adds a small fee on orders paid through it). Paid apps, like Phone Login, show their monthly price before you install."],
+    ["Do apps cost extra?", "Most apps are free, including Flow and One-Click Checkout (which adds a small fee on orders paid through it). Paid apps show their price before you install; Phone Login is free to install and costs ₹0.50 for each SMS code sent."],
     ["Is GST included?", "No — prices are before 18% GST, and every bill comes with a GST invoice."],
   ];
 

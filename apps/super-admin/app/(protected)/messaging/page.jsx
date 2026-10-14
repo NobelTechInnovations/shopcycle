@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { App, Button, Form, Input, Skeleton, Switch, Table, Tag } from "antd";
+import { App, Button, Form, Input, Select, Skeleton, Switch, Table, Tag } from "antd";
 import { MessageCircle, Send } from "lucide-react";
 import { PageHeader, EmptyState, StatusBadge, useHasMounted } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
@@ -15,7 +15,7 @@ function explain(error) {
   if (/429|resource limit|limit exhausted|rate limit/i.test(e)) return "Zoho's limit is used up: top up WhatsApp credits in Zoho CPaaS, and send from your real business number — Meta's +1 555 test number only reaches allow-listed phones.";
   if (/placeholder/i.test(e)) return "The template's placeholder name doesn't match — check it in Zoho ▸ Templates.";
   if (/template/i.test(e)) return "Zoho doesn't know that template key — copy it again from Zoho ▸ Templates (it must be approved).";
-  if (/401|403|auth|token|unauthori/i.test(e)) return "Zoho refused the account key — check ZOHO_CPAAS_TOKEN on Railway.";
+  if (/401|403|auth|token|unauthori/i.test(e)) return "Zoho refused the API key — paste a Zoho CPaaS key under WhatsApp connection (a ZeptoMail email key doesn't work for WhatsApp).";
   if (/number|recipient|invalid.*to/i.test(e)) return "Zoho refused the number — it must include the country code.";
   return null;
 }
@@ -64,15 +64,32 @@ export default function MessagingPage() {
   const [testing, setTesting] = useState(false);
   const [smsTo, setSmsTo] = useState("");
   const [smsTesting, setSmsTesting] = useState(false);
+  const [zohoForm] = Form.useForm();
+  const [zohoSaving, setZohoSaving] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/super-admin/messaging")
       .then((d) => {
         setData(d);
         form.setFieldsValue(d.templates);
+        zohoForm.setFieldsValue({ enabled: d.zoho.enabled, from: d.zoho.from || "", region: d.zoho.region || "in", token: "" });
       })
       .catch((err) => message.error(err.message));
-  }, [form, message]);
+  }, [form, zohoForm, message]);
+
+  async function saveZoho(values) {
+    setZohoSaving(true);
+    try {
+      const r = await apiFetch("/api/super-admin/messaging/zoho", { method: "PUT", body: values });
+      setData((d) => ({ ...d, zoho: r.zoho, status: r.status }));
+      zohoForm.setFieldValue("token", "");
+      message.success("Saved — every store uses it within a minute");
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setZohoSaving(false);
+    }
+  }
 
   async function save(values) {
     setSaving(true);
@@ -139,9 +156,44 @@ export default function MessagingPage() {
           <p className="text-[12px] text-ink-muted mt-2 mb-0">A test isn&apos;t billed to any store (APITXT charges your wallet as usual).</p>
         </Section>
 
-        <Section title="WhatsApp connection" note="The account and the sending number live on the server (Railway variables), not here.">
-          <Row label="Zoho account" ok={status.zohoAccount} value="Connected" missing="Missing — set ZOHO_CPAAS_TOKEN" />
-          <Row label="Sending number" ok={Boolean(status.from)} value={status.from} missing="Missing — set ZOHO_WHATSAPP_FROM" />
+        <Section
+          title="WhatsApp connection (Zoho CPaaS)"
+          note="One Zoho account for every store's WhatsApp sign-in codes. When Oyklane's own WhatsApp number (below) has its login-code template approved, codes go from it instead, and Zoho is the backup. Any code WhatsApp can't deliver goes by SMS."
+        >
+          <Form form={zohoForm} layout="vertical" requiredMark={false} onFinish={saveZoho}>
+            <div className="grid gap-x-5 md:grid-cols-3">
+              <Form.Item
+                name="token"
+                label="Zoho CPaaS API key"
+                extra={data.zoho.keySaved ? "Saved (encrypted). Leave empty to keep it." : data.zoho.envFallback.key ? "Empty here — the server's Railway key is used." : "Zoho CPaaS ▸ Settings ▸ API keys."}
+              >
+                <Input.Password placeholder={data.zoho.keySaved ? "•••••••• saved" : "Paste the key"} autoComplete="new-password" spellCheck={false} />
+              </Form.Item>
+              <Form.Item name="from" label="Sending number" extra={!data.zoho.from && data.zoho.envFallback.from ? `Empty here — ${data.zoho.envFallback.from} from Railway is used.` : "Your WhatsApp number in Zoho, with country code."}>
+                <Input placeholder="+91 98765 43210" inputMode="tel" autoComplete="off" />
+              </Form.Item>
+              <Form.Item name="region" label="Zoho data centre">
+                <Select options={[{ value: "in", label: "India (zoho.in)" }, { value: "com", label: "Global (zoho.com)" }, { value: "eu", label: "Europe (zoho.eu)" }]} />
+              </Form.Item>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Form.Item name="enabled" valuePropName="checked" className="!mb-0">
+                <Switch checkedChildren="Zoho on" unCheckedChildren="Zoho off" />
+              </Form.Item>
+              <span className="flex gap-2">
+                {data.zoho.keySaved && (
+                  <Button onClick={() => saveZoho({ ...zohoForm.getFieldsValue(), token: "", clearKey: true })} disabled={zohoSaving}>
+                    Remove saved key
+                  </Button>
+                )}
+                <Button type="primary" htmlType="submit" loading={zohoSaving}>
+                  Save
+                </Button>
+              </span>
+            </div>
+          </Form>
+          <Row label="Zoho key" ok={status.zohoAccount} value={status.zohoKeyFrom === "env" ? "From Railway" : "Saved here"} missing={status.zohoOff ? "Zoho is off" : "Missing — paste the API key"} />
+          <Row label="Sending number" ok={Boolean(status.from)} value={status.from} missing="Missing — add the sending number" />
           <Row
             label="Codes go out through"
             ok
@@ -149,7 +201,7 @@ export default function MessagingPage() {
           />
           {status.testNumber && (
             <div className="mt-3 rounded-lg border border-[#F5D9A8] bg-[#FFF8EC] px-3 py-2.5 text-[12.5px] text-ink">
-              <strong>{status.from} is Meta&rsquo;s test number.</strong> It can only message a few phones you&rsquo;ve allow-listed, with tight daily limits — shoppers won&rsquo;t get codes. In Zoho CPaaS ▸ WhatsApp ▸ Configuration choose <strong>Add number</strong>, verify your business number, then set <code>ZOHO_WHATSAPP_FROM</code> on Railway to it.
+              <strong>{status.from} is Meta&rsquo;s test number.</strong> It can only message a few phones you&rsquo;ve allow-listed, with tight daily limits — shoppers won&rsquo;t get codes. In Zoho CPaaS ▸ WhatsApp ▸ Configuration choose <strong>Add number</strong>, verify your business number, then put it in Sending number above.
             </div>
           )}
           {status.forced === "log" && (

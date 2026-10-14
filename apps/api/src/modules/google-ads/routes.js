@@ -28,7 +28,19 @@ async function googleAdsRoutes(fastify) {
   // ── Account ──
   fastify.get("/status", async (request) => {
     const acct = await db.googleAdsAccount.findUnique({ where: { storeId: request.store.id } });
-    return { configured: client.configured(), account: acct ? { customerId: acct.customerId, name: acct.customerName, currency: acct.currency, via: acct.loginCustomerId, purchaseTracking: Boolean(acct.conversionLabel), merchantId: acct.merchantId } : null };
+    const install = await db.storeApp.findFirst({ where: { storeId: request.store.id, app: { key: "google-ads" } }, select: { settings: true } });
+    return {
+      configured: client.configured(),
+      account: acct ? { customerId: acct.customerId, name: acct.customerName, currency: acct.currency, via: acct.loginCustomerId, purchaseTracking: Boolean(acct.conversionLabel), merchantId: acct.merchantId } : null,
+      // No Google Ads account yet: Oyklane can make one (Super admin set its manager account up).
+      canCreate: Boolean((await manager.platformManager(db))?.managerId),
+      createdAccount: install?.settings?.createdAccount || null,
+    };
+  });
+  fastify.post("/accounts/create", async (request) => {
+    ownerOnly(request, "create a Google Ads account");
+    const body = z.object({ name: z.string().trim().min(2).max(120), email: z.string().trim().email("Enter the email that should own the account.") }).parse(request.body || {});
+    return manager.createAccount(db, request.store, body);
   });
   fastify.get("/accounts", async (request) => ({ accounts: await manager.accessible(db, request.store) }));
   fastify.post("/accounts/select", async (request) => {

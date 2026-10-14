@@ -55,7 +55,26 @@ async function isPlatformAccount(prisma, { wabaId, phoneNumberId } = {}) {
   const v = await load(prisma);
   const wabas = [v.wabaId, env.META_WHATSAPP_WABA_ID].filter(Boolean).map(String);
   const phones = [v.phoneNumberId, env.META_WHATSAPP_PHONE_NUMBER_ID].filter(Boolean).map(String);
+  // Key saved but no number chosen yet: every account the key can see is
+  // Oyklane's (the system user only has Oyklane's assigned).
+  if (v.token && !v.wabaId) {
+    const seen = await visibleToKey(v);
+    wabas.push(...seen.wabas);
+    phones.push(...seen.phones);
+  }
   return Boolean((wabaId && wabas.includes(String(wabaId))) || (phoneNumberId && phones.includes(String(phoneNumberId))));
+}
+
+let visible = { at: 0, token: null, wabas: [], phones: [] };
+async function visibleToKey(v) {
+  if (visible.token === v.token && Date.now() - visible.at < 10 * 60 * 1000) return visible;
+  try {
+    const list = await meta.listWabas(decryptSecret(v.token), []);
+    visible = { at: Date.now(), token: v.token, wabas: list.map((w) => String(w.id)), phones: list.flatMap((w) => (w.phoneNumbers || []).map((n) => String(n.id))) };
+  } catch {
+    visible = { ...visible, at: Date.now(), token: v.token };
+  }
+  return visible;
 }
 
 /** The WhatsApp accounts (and their numbers) the saved token can use. */

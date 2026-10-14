@@ -30,7 +30,7 @@ export function CustomerVisitsCard({ customerId, phone }) {
         <>
           {phone && (
             <div className="mb-1">
-              <ContactButtons phone={phone} compact />
+              <ContactButtons phone={phone} customerId={customerId} compact />
             </div>
           )}
           {data.sessions.slice(0, 5).map((s) => (

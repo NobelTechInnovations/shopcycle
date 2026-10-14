@@ -120,6 +120,19 @@ async function whatsappRoutes(fastify) {
   });
   fastify.post("/conversations/:id/suggest", async (request) => service.suggestReply(db, request.store, request.params.id));
 
+  // ── Messaging one customer: who, which order, values for the template ──
+  fastify.get("/customers", async (request) => {
+    const q = String(request.query.q || "").trim().slice(0, 80);
+    const digits = q.replace(/\D/g, "");
+    const or = q
+      ? [{ name: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }, ...(digits.length >= 4 ? [{ phone: { contains: digits.slice(-10) } }] : [])]
+      : undefined;
+    const rows = await db.customer.findMany({ where: { storeId: request.store.id, ...(or && { OR: or }) }, orderBy: { updatedAt: "desc" }, take: 12, select: { id: true, name: true, phone: true, email: true } });
+    const { realEmail } = require("../../lib/placeholder-email");
+    return { customers: rows.map((c) => ({ ...c, email: realEmail(c.email) })) };
+  });
+  fastify.get("/compose", async (request) => service.composeContext(db, request.store, request.query || {}));
+
   // ── Templates ──
   fastify.get("/templates", async (request) => {
     const pick = (all) => (request.query.status === "approved" ? all.filter((t) => t.status === "APPROVED") : all);

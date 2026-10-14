@@ -1,5 +1,6 @@
 "use client";
 
+import { isPhoneOnlyEmail } from "@/lib/customers";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -94,10 +95,13 @@ export function CustomerDetailView({ customer }) {
 
   const location = [customer.city, customer.province].filter(Boolean).join(", ");
 
+  const phoneOnly = isPhoneOnlyEmail(customer.email);
   async function handleSave(values) {
     setSaving(true);
     try {
-      await apiFetch(`/api/customers/${customer.id}`, { method: "PATCH", body: values });
+      // Signed up by phone only: no email until one is typed here.
+      const body = phoneOnly && !values.email ? { ...values, email: undefined } : values;
+      await apiFetch(`/api/customers/${customer.id}`, { method: "PATCH", body });
       message.success("Customer saved");
       setDirty(false);
       router.refresh();
@@ -152,7 +156,7 @@ export function CustomerDetailView({ customer }) {
         layout="vertical"
         initialValues={{
           name: customer.name,
-          email: customer.email,
+          email: phoneOnly ? "" : customer.email,
           phone: customer.phone,
           address1: customer.address1,
           address2: customer.address2,
@@ -225,11 +229,12 @@ export function CustomerDetailView({ customer }) {
                 name="email"
                 label="Email"
                 rules={[
-                  { required: true, message: "Email is required" },
+                  { required: !phoneOnly, message: "Email is required" },
                   { type: "email", message: "Enter a valid email" },
                 ]}
+                extra={phoneOnly ? "Signed up with their phone only — no email yet." : null}
               >
-                <Input autoComplete="off" prefix={<Mail size={14} className="text-ink-subtle" aria-hidden="true" />} />
+                <Input autoComplete="off" placeholder={phoneOnly ? "No email yet" : undefined} prefix={<Mail size={14} className="text-ink-subtle" aria-hidden="true" />} />
               </Form.Item>
               <Form.Item name="phone" label="Phone" className="mb-0">
                 <Input autoComplete="off" inputMode="tel" prefix={<Phone size={14} className="text-ink-subtle" aria-hidden="true" />} />

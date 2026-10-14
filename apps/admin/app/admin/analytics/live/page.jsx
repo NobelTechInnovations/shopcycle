@@ -47,7 +47,7 @@ function LiveRow({ v }) {
           <CountryTag country={v.country} />
           <span className="text-xs text-ink-muted w-16 text-right">{timeAgo(v.updatedAt)}</span>
         </div>
-        {known && <ContactButtons phone={v.phone} email={v.email} compact />}
+        {known && <ContactButtons phone={v.phone} email={v.email} customerId={v.customerId} compact />}
       </div>
     </div>
   );

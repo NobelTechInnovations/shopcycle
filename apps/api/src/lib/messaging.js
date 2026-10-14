@@ -19,7 +19,8 @@ function smsProvider() {
   return p;
 }
 
-const zohoToken = () => String(env.ZOHO_CPAAS_TOKEN || env.ZEPTOMAIL_TOKEN || "").replace(/^Zoho-enczapikey\s+/i, "").trim();
+// Zoho CPaaS account: Super admin ▸ Messaging (whatsapp-templates.js), else Railway.
+const zoho = () => templates.zohoAccount();
 
 /**
  * Oyklane's own WhatsApp number (Super admin ▸ Messaging ▸ Oyklane
@@ -47,7 +48,8 @@ function whatsappProvider() {
   // approved — unless Railway forces another provider.
   if (!env.WHATSAPP_PROVIDER && platformOtp.ready) return "oyklane";
   // Zoho's code template is set in Super admin ▸ Messaging (whatsapp-templates.js).
-  const zohoReady = zohoToken() && env.ZOHO_WHATSAPP_FROM && templates.otpTemplate();
+  const z = zoho();
+  const zohoReady = z?.token && z.from && templates.otpTemplate();
   const p = env.WHATSAPP_PROVIDER || (zohoReady ? "zoho" : env.META_WHATSAPP_TOKEN ? "meta" : env.TWILIO_WHATSAPP_FROM ? "twilio" : "log");
   if (p === "zoho" && !zohoReady) return "log";
   if (p === "twilio" && !(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_WHATSAPP_FROM)) return "log";
@@ -64,14 +66,17 @@ function channels() {
 /** What Super admin ▸ Messaging shows about the WhatsApp setup — never the token. */
 function whatsappStatus() {
   const t = templates.cached().otp;
+  const z = zoho();
   return {
     provider: whatsappProvider(),
     forced: env.WHATSAPP_PROVIDER || null,
-    zohoAccount: Boolean(zohoToken()),
-    from: env.ZOHO_WHATSAPP_FROM || null,
+    zohoAccount: Boolean(z?.token),
+    zohoKeyFrom: z?.keyFrom || null,
+    zohoOff: !z,
+    from: z?.from || null,
     // Meta's free test numbers are +1 555 …: they only reach a few
     // allow-listed phones and have tight limits — not for real shoppers.
-    testNumber: /^1555\d{7}$/.test(String(env.ZOHO_WHATSAPP_FROM || "").replace(/\D/g, "")),
+    testNumber: /^1555\d{7}$/.test(String(z?.from || "").replace(/\D/g, "")),
     otpTemplateFrom: t?.templateKey ? "super_admin" : env.ZOHO_WHATSAPP_TEMPLATE_KEY ? "env" : null,
     sms: smsProvider(),
     smsPrice: env.SMS_OTP_PRICE,
@@ -152,11 +157,11 @@ const SENDERS = {
   },
   whatsapp: {
     async zoho({ to, code }) {
-      const from = env.ZOHO_WHATSAPP_FROM.startsWith("+") ? env.ZOHO_WHATSAPP_FROM : `+${env.ZOHO_WHATSAPP_FROM}`;
+      const z = zoho();
       const t = templates.otpTemplate();
-      const data = await request(`${env.ZOHO_CPAAS_API_URL.replace(/\/$/, "")}/whatsapp`, {
-        headers: { authorization: `Zoho-enczapikey ${zohoToken()}` },
-        body: { from, to: `+${to}`, template_key: t.templateKey, merge_info: { [t.vars.code || "code"]: code } },
+      const data = await request(`${z.apiUrl.replace(/\/$/, "")}/whatsapp`, {
+        headers: { authorization: `Zoho-enczapikey ${z.token}` },
+        body: { from: z.from, to: `+${to}`, template_key: t.templateKey, merge_info: { [t.vars.code || "code"]: code } },
       });
       return data.request_id || data.data?.[0]?.message_id || data.message_id || null;
     },

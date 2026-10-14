@@ -40,6 +40,7 @@ async function messagingRoutes(fastify) {
   fastify.get("/", async () => ({
     types: templates.TYPES,
     templates: await templates.load(prisma),
+    zoho: templates.accountSummary(),
     status: messaging.whatsappStatus(),
     recent: await recent(prisma),
   }));
@@ -123,6 +124,15 @@ async function messagingRoutes(fastify) {
     const body = tpl.bodyVariables ? standard.KINDS.orderConfirmed.examples : [];
     const sent = await cloud.send(conn, { to: phone, type: "template", template: { name: tpl.name, language: { code: tpl.language }, components: waService.templateComponents(tpl, { body, buttonUrl: "test" }) } });
     return { ok: true, id: sent.id, template: tpl.name, to: masked(phone) };
+  });
+
+  // The Zoho CPaaS account WhatsApp codes go through (shared by every store).
+  fastify.put("/zoho", async (request) => {
+    const body = z
+      .object({ token: z.string().max(500).optional(), from: z.string().max(30).optional(), region: z.enum(["in", "com", "eu"]).optional(), enabled: z.boolean().optional(), clearKey: z.boolean().optional() })
+      .parse(request.body || {});
+    const zoho = await templates.saveAccount(prisma, body, request.currentUser.id);
+    return { zoho, status: messaging.whatsappStatus() };
   });
 
   fastify.put("/templates", async (request) => {

@@ -246,14 +246,76 @@ async function deliver(prisma, store, { phone, payload, record, dedupeKey, conn 
 const userName = (user) => user?.name || user?.email || null;
 
 
+/**
+ * Everything "Message a customer" fills in for one customer: their recent
+ * orders (the chosen one, or the latest), and the values templates use —
+ * the same names as Oyklane's standard templates (standard-templates.js).
+ * With only a `phone` (a new number), just whether a chat already exists.
+ */
+async function composeContext(prisma, store, { customerId, orderId, phone: rawPhone } = {}) {
+  const { formatCurrency } = require("@shopcycle/utils");
+  const { realEmail } = require("../../lib/placeholder-email");
+  const standard = require("./standard-templates");
+  const customer = customerId ? await prisma.customer.findFirst({ where: { id: String(customerId), storeId: store.id } }) : null;
+  if (customerId && !customer) throw new HttpError(404, "Customer not found");
+  const phone = toE164(customer?.phone || rawPhone);
+  const money = (n, cur) => formatCurrency(Number(n || 0), cur || store.currency || "INR");
+  const orders = customer
+    ? await prisma.order.findMany({
+        where: { storeId: store.id, customerId: customer.id },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        include: { fulfillments: { orderBy: { createdAt: "desc" } } },
+      })
+    : [];
+  const order = (orderId && orders.find((o) => o.id === orderId)) || orders[0] || null;
+  const shipment = order?.fulfillments.find((f) => f.status !== "cancelled");
+  let link = null;
+  if (order) link = await require("../orders/notify").statusUrlFor(prisma, store, order).catch(() => null);
+  const name = String(order?.shippingName || customer?.name || "").trim();
+  const values = {
+    "customer.first_name": name.split(/\s+/)[0] || "",
+    "customer.name": name,
+    "store.name": store.name,
+    ...(order && {
+      "order.number": `#${order.orderNumber}`,
+      "order.total": money(order.total, order.currency),
+      "order.status": String(order.fulfillmentStatus || order.paymentStatus || "").replace(/_/g, " "),
+      "order.courier": shipment?.courier || "",
+      "order.tracking": shipment?.trackingNumber || "",
+      "order.link": link || "",
+    }),
+  };
+  const convo = phone ? await prisma.whatsappConversation.findFirst({ where: { storeId: store.id, phone }, select: { id: true } }) : null;
+  return {
+    customer: customer && { id: customer.id, name: customer.name, phone: customer.phone, email: realEmail(customer.email), acceptsWhatsappMarketing: customer.acceptsWhatsappMarketing },
+    phone,
+    orders: orders.map((o) => ({ id: o.id, number: `#${o.orderNumber}`, total: money(o.total, o.currency), status: o.fulfillmentStatus || o.paymentStatus, createdAt: o.createdAt })),
+    orderId: order?.id || null,
+    values,
+    // The end of the order-page button (…/orders/<code>) for templates whose button link ends in {{1}}.
+    buttonValue: link ? link.split("/orders/").pop() : "",
+    // Oyklane's standard templates: which value goes in each {{n}}.
+    standard: Object.fromEntries(Object.values(standard.KINDS).map((k) => [k.name, k.vars])),
+    conversationId: convo?.id || null,
+  };
+}
+
 /** From the inbox: a reply (text or media) inside the window, or a template. */
 async function sendFromInbox(prisma, store, conversationId, input, user) {
   const convo = await prisma.whatsappConversation.findFirst({ where: { id: conversationId, storeId: store.id }, include: { customer: true } });
   if (!convo) throw new HttpError(404, "Conversation not found");
   const who = { sentById: user?.id || null, sentByName: userName(user), source: "inbox" };
+  const platform = require("./platform");
   // The customer is talking to Oyklane's shared number (order updates sent
-  // for this store): replies must come from that number.
-  const conn = convo.viaPlatform ? await require("./platform").connection(prisma) : undefined;
+  // for this store): replies must come from that number. A store with no
+  // number of its own starts chats from it too — Oyklane's templates only.
+  let conn;
+  if (convo.viaPlatform) conn = await platform.connection(prisma);
+  else if (!(await cloud.ownConnection(prisma, store.id))) {
+    conn = await platform.connection(prisma);
+    if (!conn) throw new HttpError(400, "Connect your WhatsApp number first (Apps ▸ WhatsApp).", { reason: "not_connected" });
+  }
   if (convo.viaPlatform && !conn) throw new HttpError(400, "This customer wrote to Oyklane's shared number, which isn't available right now.");
   if (input.kind === "text" || input.kind === "media") {
     if (!windowOpen(convo)) throw new HttpError(400, "It's been more than 24 hours since this customer's last message, so WhatsApp only allows an approved template. Choose \"Template\".", { reason: "window_closed" });
@@ -271,6 +333,9 @@ async function sendFromInbox(prisma, store, conversationId, input, user) {
   const all = await templates(prisma, store, { conn });
   const tpl = all.find((t) => t.name === input.templateName && t.language === input.language && t.status === "APPROVED");
   if (!tpl) throw new HttpError(400, "Choose an approved template.");
+  if (conn?.platform && tpl.category !== "UTILITY") {
+    throw new HttpError(400, "From Oyklane's shared number you can send order updates (Utility templates) only. Connect your own WhatsApp number to send offers and other messages.");
+  }
   if (tpl.category === "MARKETING") {
     const allowed = await marketingAllowed(prisma, store.id, convo.phone, convo.customer);
     if (!allowed.ok && !input.confirmConsent) throw new HttpError(400, `${allowed.reason}. Marketing templates need the customer's consent.`, { reason: "no_consent" });
@@ -464,6 +529,7 @@ function listMessages(prisma, storeId, { customerId, page = 1, pageSize = 50 } =
 }
 
 module.exports = {
+  composeContext,
   WINDOW_MS,
   windowOpen,
   varsIn,

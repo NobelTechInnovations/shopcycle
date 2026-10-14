@@ -1,3 +1,4 @@
+const { isPlaceholderEmail } = require("../../lib/placeholder-email");
 const { HttpError } = require("@shopcycle/utils");
 const { syncOrderCommission, feeSnapshot } = require("../billing/commission");
 const cartService = require("../cart/service");
@@ -139,7 +140,11 @@ async function placeOrder(prisma, storeId, cartId, handle, input, { store, shopp
   // Signed in and checking out with the account's own email: the order
   // belongs to the account. A guest using an account's email still gets
   // the order recorded, but can't change what the account has saved.
-  const signedIn = Boolean(shopper && shopper.email.toLowerCase() === input.email);
+  // A phone-only account (Phone Login, no email yet) is signed in with
+  // whatever email is typed, and takes it — unless another account here has it.
+  const phoneOnly = Boolean(shopper && isPlaceholderEmail(shopper.email));
+  const signedIn = Boolean(shopper && (phoneOnly || shopper.email.toLowerCase() === input.email));
+  if (phoneOnly && !(await customersRepository.findByEmail(prisma, storeId, input.email))) customerFields.email = input.email;
   const existingCustomer = signedIn ? shopper : await customersRepository.findByEmail(prisma, storeId, input.email);
   // A verified sign-in phone (Phone Login) is never replaced by the
   // delivery phone typed here — the order keeps its own copy.

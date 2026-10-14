@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Oyklane — Google Ads API Tool Design Document</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1d21; font-size: 10.5pt; line-height: 1.5; margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 4pt; letter-spacing: -0.01em; }
+  h2 { font-size: 13.5pt; margin: 20pt 0 6pt; padding-bottom: 4pt; border-bottom: 1px solid #e3e6ea; }
+  h3 { font-size: 11pt; margin: 12pt 0 4pt; }
+  h2, h3 { break-after: avoid; page-break-after: avoid; }
+  tr { break-inside: avoid; }
+  p { margin: 0 0 7pt; }
+  ul, ol { margin: 0 0 8pt; padding-left: 16pt; }
+  li { margin-bottom: 3pt; }
+  .sub { color: #5b636e; font-size: 11pt; margin-bottom: 14pt; }
+  .meta { display: grid; grid-template-columns: 150px 1fr; gap: 3pt 12pt; font-size: 10pt; background: #f6f7f9; border: 1px solid #e3e6ea; border-radius: 6px; padding: 10pt 12pt; }
+  .meta b { color: #5b636e; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: 4pt 0 10pt; }
+  th, td { text-align: left; vertical-align: top; padding: 5pt 7pt; border: 1px solid #e3e6ea; }
+  th { background: #f6f7f9; font-weight: 600; }
+  code { font-family: Menlo, Consolas, monospace; font-size: 8.8pt; background: #f1f3f5; padding: 0 3px; border-radius: 3px; }
+  .page-break { page-break-before: always; }
+  .note { font-size: 9.5pt; color: #5b636e; }
+  /* Wireframes */
+  .frame { border: 1px solid #c9ced4; border-radius: 8px; overflow: hidden; margin: 6pt 0 4pt; page-break-inside: avoid; }
+  .frame .bar { background: #f1f3f5; border-bottom: 1px solid #e3e6ea; padding: 5pt 9pt; font-size: 8.5pt; color: #5b636e; }
+  .frame .body { padding: 10pt 12pt; font-size: 9pt; }
+  .caption { font-size: 9pt; color: #5b636e; margin-bottom: 12pt; }
+  .row { display: flex; gap: 8pt; align-items: center; }
+  .grow { flex: 1; }
+  .btn { display: inline-block; border: 1px solid #c9ced4; border-radius: 5px; padding: 2pt 8pt; font-size: 8.5pt; }
+  .btn.primary { background: #1a1d21; color: #fff; border-color: #1a1d21; }
+  .tabs { display: flex; gap: 14pt; border-bottom: 1px solid #e3e6ea; padding-bottom: 5pt; margin-bottom: 8pt; font-size: 8.8pt; color: #5b636e; }
+  .tabs .on { color: #1a1d21; font-weight: 600; border-bottom: 2px solid #1a1d21; padding-bottom: 4pt; margin-bottom: -6pt; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6pt; margin-bottom: 8pt; }
+  .kpi { border: 1px solid #e3e6ea; border-radius: 5px; padding: 5pt 7pt; }
+  .kpi small { display: block; color: #5b636e; font-size: 7.8pt; }
+  .kpi b { font-size: 11pt; }
+  .wt td, .wt th { font-size: 8.3pt; padding: 3pt 5pt; }
+  .steps { display: flex; gap: 4pt; margin-bottom: 8pt; font-size: 8pt; }
+  .steps span { flex: 1; text-align: center; padding: 3pt; border-radius: 4px; background: #f1f3f5; color: #5b636e; }
+  .steps span.on { background: #1a1d21; color: #fff; }
+  .field { border: 1px solid #c9ced4; border-radius: 4px; padding: 3pt 6pt; color: #8a929c; margin: 2pt 0 6pt; font-size: 8.5pt; }
+  .lbl { font-size: 8.3pt; font-weight: 600; }
+  .pill { display: inline-block; font-size: 7.8pt; padding: 0 5pt; border-radius: 8px; background: #e8f5ec; color: #1f7a3d; }
+  .pill.warn { background: #fff4e0; color: #8a5a00; }
+  .card { border: 1px solid #e3e6ea; border-radius: 6px; padding: 7pt 9pt; margin-bottom: 6pt; }
+</style>
+</head>
+<body>
+
+<h1>Oyklane Google Ads Manager</h1>
+<p class="sub">Google Ads API tool design document — Basic access application</p>
+
+<div class="meta">
+  <b>Company</b><span>Oyklane</span>
+  <b>Website</b><span>https://oyklane.com</span>
+  <b>Product</b><span>Oyklane — an e-commerce platform for small businesses in India (similar to Shopify)</span>
+  <b>Tool</b><span>"Google Ads" app inside the Oyklane merchant dashboard (https://store.oyklane.com)</span>
+  <b>Tool type</b><span>Internally developed web application; server-side calls to the Google Ads API (REST)</span>
+  <b>Who uses it</b><span>Oyklane merchants (external) for their own Google Ads accounts; Oyklane staff (internal) for setup and support</span>
+</div>
+
+<h2>1. Business overview</h2>
+<p>Oyklane lets small and medium businesses build an online store, sell products, take payments, and ship orders. Merchants pay Oyklane a monthly subscription. Many of them have never advertised online, and Google Ads is too complex for them to set up alone.</p>
+<p>The Oyklane Google Ads Manager lets a merchant run Google Ads campaigns for their own store from the dashboard they already use. Every merchant uses their <b>own</b> Google Ads account, billed by Google to their <b>own</b> payment method. Oyklane does not buy media, resell ads, mark up spend, or handle ad payments. The tool is free for merchants.</p>
+
+<h2>2. How merchants connect</h2>
+<ol>
+  <li>The merchant opens <b>Apps ▸ Google Ads</b> and signs in with Google (OAuth 2.0, scope <code>https://www.googleapis.com/auth/adwords</code>). Access can be removed at any time from the dashboard or from their Google account.</li>
+  <li>Oyklane lists the Google Ads accounts that login can reach (<code>CustomerService.ListAccessibleCustomers</code>, plus client accounts of any manager account they own), and the merchant picks the one for their store.</li>
+  <li><b>No Google Ads account yet:</b> the merchant can create one from Oyklane. Oyklane's manager (MCC) account creates a client account (<code>CustomerService.CreateCustomerClient</code>) in the store's currency and time zone, and invites the merchant's email as its <b>Admin</b>. The merchant accepts Google's invitation and adds their own billing in Google Ads.</li>
+  <li>Oyklane checks the account: purchase conversion tracking, linked Merchant Center, currency and time zone. It then offers one-click setup of a "Purchase" conversion action, whose tag Oyklane places on the store's order-confirmation page.</li>
+</ol>
+
+<h2>3. Features</h2>
+<table>
+  <tr><th style="width:24%">Feature</th><th>What the merchant does</th><th style="width:30%">Google Ads API</th></tr>
+  <tr><td>Campaign list and editing</td><td>See campaigns, ad groups and ads with spend, clicks, conversions and ROAS for a chosen date range. Pause, enable, rename, change daily budgets, remove.</td><td>GoogleAdsService.Search (GAQL); GoogleAdsService.Mutate</td></tr>
+  <tr><td>Guided campaign creation</td><td>A step-by-step wizard for <b>Search</b>, <b>Performance Max</b>, <b>Shopping</b> and <b>Display</b> campaigns: goal, budget, bidding, locations, languages, keywords, ad text, images. Prefilled from the store's own products and URL.</td><td>GoogleAdsService.Mutate (one atomic request with temporary resource names: budget, campaign, criteria, ad groups, keywords, ads, asset groups, assets)</td></tr>
+  <tr><td>Checks before publishing</td><td>Every campaign is first sent with <code>validateOnly</code>. Errors are shown in plain language before anything is created. Campaigns are created <b>paused</b> unless the merchant chooses to launch.</td><td>GoogleAdsService.Mutate (validate_only = true)</td></tr>
+  <tr><td>Keyword ideas</td><td>Keyword suggestions with search volumes, built from the store's URL and product names.</td><td>KeywordPlanIdeaService.GenerateKeywordIdeas</td></tr>
+  <tr><td>Location targeting</td><td>Search for cities, states or countries.</td><td>GeoTargetConstantService.SuggestGeoTargetConstants</td></tr>
+  <tr><td>Images</td><td>Upload logos and images, or use product photos, for Display and Performance Max.</td><td>AssetService (via GoogleAdsService.Mutate)</td></tr>
+  <tr><td>Purchase tracking</td><td>One click creates a Purchase conversion action; Oyklane installs its tag on the order-confirmation page.</td><td>ConversionActionService (via Mutate); GAQL on conversion_action, including tag_snippets</td></tr>
+  <tr><td>Insights</td><td>Plain-language reports: what Google reports next to the orders the store actually recorded from Google ads, search terms, and the best and worst campaigns.</td><td>GoogleAdsService.Search (campaign, ad_group, search_term_view metrics)</td></tr>
+  <tr><td>Suggestions</td><td>Oyklane's suggestions (pause a campaign with spend and no sales, raise a budget, add a negative keyword) and Google's own recommendations. <b>Nothing is applied without the merchant's approval.</b></td><td>RecommendationService.ApplyRecommendation / DismissRecommendation; GoogleAdsService.Mutate</td></tr>
+  <tr><td>Optional automated rules</td><td>A merchant may switch on rules such as "pause a campaign that spent ₹X with no purchase in 7 days". Rules are off by default, checked at most hourly, change at most a few campaigns per run, and log every change.</td><td>GoogleAdsService.Search; GoogleAdsService.Mutate</td></tr>
+</table>
+
+<h2>4. Users and access</h2>
+<ul>
+  <li><b>External users (merchants).</b> Each merchant reaches only the Google Ads account(s) their own Google login can access, for their own store. Merchants never see other merchants' data.</li>
+  <li><b>Internal users (Oyklane staff).</b> Platform setup (developer token, manager account) and support. Staff do not run campaigns on merchants' behalf.</li>
+  <li><b>Store roles.</b> Within a store, only the owner or an admin can create, change or remove campaigns. Staff accounts can only view reports.</li>
+</ul>
+
+<h2>5. Technical design</h2>
+<ul>
+  <li><b>Architecture.</b> Next.js merchant dashboard → Oyklane API (Node.js) → Google Ads API REST (current supported version). All Google Ads calls are made server-side; the developer token and OAuth tokens never reach the browser.</li>
+  <li><b>Authentication.</b> OAuth 2.0 web flow per merchant. Refresh tokens are stored encrypted (AES-256-GCM) and are deleted when the merchant disconnects. The <code>login-customer-id</code> header is used when an account is reached through a manager account.</li>
+  <li><b>Mutations.</b> Campaign creation is a single atomic <code>googleAds:mutate</code> request, so a campaign is either fully created or not created. Each change is recorded in the store's activity log (who, what, when, before and after).</li>
+  <li><b>Errors.</b> Google Ads failures are translated into plain language for the merchant, for example "This account isn't active yet — finish billing in Google Ads".</li>
+  <li><b>Rate limits and volume.</b> Reports are cached for several minutes and refreshed on request. Expected volume at launch is under 100 linked accounts and under 10,000 operations a day, growing with the merchant base and well inside Basic access limits.</li>
+  <li><b>Data use.</b> Google Ads data is used only to show the merchant their own results and to make suggestions to them. It is not sold, shared with third parties, or combined across merchants.</li>
+</ul>
+
+
+<h2>6. Screen mockups</h2>
+
+<h3>6.1 Campaigns</h3>
+<div class="frame"><div class="bar">store.oyklane.com/admin/apps/google-ads — Campaigns</div><div class="body">
+  <div class="row" style="margin-bottom:6pt"><b class="grow" style="font-size:11pt">Google Ads</b><span class="btn">Meta Ads</span><span class="btn">Merchant Center</span></div>
+  <div class="row" style="margin-bottom:8pt"><span class="btn">Sonchiri Sweets · 123-456-7890</span><span class="pill">Purchase tracking on</span></div>
+  <div class="tabs"><span class="on">Campaigns</span><span>Insights</span><span>Images</span><span>Automation &amp; activity</span><span>Account check</span></div>
+  <div class="row" style="margin-bottom:6pt"><span class="btn">Last 7 days ▾</span><span class="grow"></span><span class="btn primary">+ Create campaign</span></div>
+  <table class="wt">
+    <tr><th>Campaign</th><th>Type</th><th>Status</th><th>Budget/day</th><th>Spent</th><th>Clicks</th><th>Purchases</th><th>ROAS</th><th></th></tr>
+    <tr><td>Diwali sweets — Search</td><td>Search</td><td>Enabled</td><td>₹500</td><td>₹3,240</td><td>412</td><td>18</td><td>4.1×</td><td>Pause · Edit</td></tr>
+    <tr><td>All products — PMax</td><td>Performance Max</td><td>Enabled</td><td>₹800</td><td>₹5,110</td><td>1,036</td><td>27</td><td>3.6×</td><td>Pause · Edit</td></tr>
+    <tr><td>Gift boxes — Display</td><td>Display</td><td>Paused</td><td>₹300</td><td>₹0</td><td>0</td><td>0</td><td>—</td><td>Enable · Edit</td></tr>
+  </table>
+</div></div>
+<p class="caption">Merchants see their own campaigns, with Google's numbers alongside orders the store recorded.</p>
+
+<h3>6.2 Create a campaign (wizard)</h3>
+<div class="frame"><div class="bar">Create campaign — step 3 of 6</div><div class="body">
+  <div class="steps"><span>Goal &amp; type</span><span>Budget &amp; bidding</span><span class="on">Who sees it</span><span>Keywords</span><span>Ads</span><span>Review</span></div>
+  <div class="row" style="align-items:flex-start;gap:14pt">
+    <div class="grow">
+      <div class="lbl">Locations</div><div class="field">Delhi ×  Mumbai ×  Search a city, state or country…</div>
+      <div class="lbl">Languages</div><div class="field">English ×  Hindi ×</div>
+      <div class="lbl">Ad schedule</div><div class="field">All day, every day</div>
+    </div>
+    <div style="width:42%" class="card"><b>Estimate</b><br>Daily budget ₹500 · Maximise conversions<br><span class="note">Campaign is created paused. Nothing is spent until you launch it.</span></div>
+  </div>
+  <div class="row"><span class="btn">Back</span><span class="grow"></span><span class="btn">Save draft</span><span class="btn primary">Next</span></div>
+</div></div>
+<p class="caption">Before "Create", the whole campaign is checked with validate_only, and any Google error is shown on the step it belongs to.</p>
+
+<h3>6.3 Insights and suggestions</h3>
+<div class="frame"><div class="bar">Insights</div><div class="body">
+  <div class="kpis"><div class="kpi"><small>Spent</small><b>₹8,350</b></div><div class="kpi"><small>Purchases (Google)</small><b>45</b></div><div class="kpi"><small>Orders recorded by store</small><b>41</b></div><div class="kpi"><small>Store ROAS</small><b>3.8×</b></div></div>
+  <div class="card"><b>What happened</b> — Performance Max brought most purchases. "Gift boxes" spent ₹1,200 with no purchase.</div>
+  <div class="card"><div class="row"><span class="grow"><b>Pause "Gift boxes — Display"</b><br><span class="note">₹1,200 spent in 7 days, 0 purchases · Medium confidence</span></span><span class="btn primary">Approve</span></div></div>
+  <div class="card"><div class="row"><span class="grow"><b>Google's suggestion:</b> Add responsive search ad assets <span class="note">· +40 clicks/week</span></span><span class="btn">Apply</span><span class="btn">Dismiss</span></div></div>
+</div></div>
+<p class="caption">Suggestions are applied only when the merchant clicks Approve or Apply.</p>
+
+<h3>6.4 Account check and account creation</h3>
+<div class="frame"><div class="bar">Account check</div><div class="body">
+  <div class="row" style="align-items:flex-start;gap:12pt">
+    <div class="grow card"><b>Account check</b><br><span class="pill warn">!</span> No purchase conversion action <span class="btn primary">Set up purchase tracking</span><br><span class="pill">✓</span> Merchant Center linked<br><span class="pill">✓</span> Billing active</div>
+    <div class="grow card"><b>No Google Ads account? Create one here</b><br><div class="lbl">Account name</div><div class="field">Sonchiri Sweets</div><div class="lbl">Your email (Google sends the invitation here)</div><div class="field">owner@example.com</div><span class="btn primary">Create my Google Ads account</span></div>
+  </div>
+</div></div>
+<p class="caption">New accounts are created under Oyklane's manager account in the store's currency and time zone. The merchant is invited as Admin and adds their own billing.</p>
+
+<h2>7. Google Ads API services used</h2>
+<p>CustomerService (ListAccessibleCustomers, CreateCustomerClient) · GoogleAdsService (Search, Mutate) · CampaignBudgetService, CampaignService, CampaignCriterionService, AdGroupService, AdGroupCriterionService, AdGroupAdService, AssetService, AssetGroupService, AssetGroupAssetService, ConversionActionService (all through GoogleAdsService.Mutate) · KeywordPlanIdeaService (GenerateKeywordIdeas) · GeoTargetConstantService (SuggestGeoTargetConstants) · RecommendationService (ApplyRecommendation, DismissRecommendation).</p>
+<p class="note">Oyklane does not use the App Conversion Tracking and Remarketing API. This application is for the Google Ads API only.</p>
+
+</body>
+</html>
