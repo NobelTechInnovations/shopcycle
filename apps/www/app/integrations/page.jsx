@@ -1,19 +1,25 @@
 import Link from "next/link";
 import { Icon, I } from "../components/Icon";
 import { APP_URL } from "../components/site";
-import { CATEGORIES, INTEGRATIONS, STATUS_LABEL } from "../data/integrations";
+import { CATEGORIES, INTEGRATIONS, GUIDES, STATUS_LABEL } from "../data/integrations";
 import { Logo } from "../components/Logo";
 
 export const metadata = {
   title: "Integrations",
-  description: "Payments, couriers, pixels, WhatsApp, email and an open API — everything Oyklane connects to, and what's coming next.",
+  description: "How Oyklane connects to payments, couriers, ads, WhatsApp, email and your own tools — step by step, and what's coming next.",
 };
+
+const OVERVIEW = [
+  { icon: I.grid, title: "Find it in your dashboard", text: "Most connections live in Settings; the rest are apps you install in one click." },
+  { icon: I.lock, title: "Sign in or paste a key", text: "Continue with Facebook or Google, or paste your gateway's keys. You can disconnect any time." },
+  { icon: I.check, title: "It works on your store", text: "Checkout, tracking, messages and reports update by themselves — no plugins, no code." },
+];
 
 function Card({ x }) {
   return (
     <article className="card">
       <div className="card__top">
-        <Logo {...x.logo} size={48} title={x.name} />
+        <Logo {...x.logo} size={44} title={x.name} />
         <span className={`badge badge--${x.status}`}>{STATUS_LABEL[x.status]}</span>
       </div>
       <h3>{x.name}</h3>
@@ -22,98 +28,104 @@ function Card({ x }) {
   );
 }
 
+/** Everything Oyklane connects to, as a guide: how each kind connects, step by step. */
 export default function IntegrationsPage() {
-  const featured = INTEGRATIONS.find((x) => x.featured);
-  const popular = INTEGRATIONS.filter((x) => x.popular && !x.featured);
-  // The hero shows real brands first.
-  const hero = [...INTEGRATIONS.filter((x) => x.logo.brand || x.logo.word), ...INTEGRATIONS.filter((x) => x.logo.icon)].filter((x) => x.status !== "soon").slice(0, 15);
+  // Real brands, each mark once.
+  const seen = new Set();
+  const hero = INTEGRATIONS.filter((x) => {
+    const mark = x.logo.brand || x.logo.word;
+    if (!mark || x.status === "soon" || seen.has(mark)) return false;
+    seen.add(mark);
+    return true;
+  }).slice(0, 15);
 
   return (
     <>
-      <section className="wrap page-hero">
-        <div>
-          <span className="eyebrow">
-            <span className="eyebrow__icon"><Icon d={I.puzzle} /></span>
-            Integrations
-          </span>
-          <h1 className="h1">
-            Our <span className="grad">integrations</span>
-          </h1>
-          <p className="lead">Connect your store to the payment gateways, couriers, pixels and messaging your customers already use. Most are built in — no plugins to find, no extra bills.</p>
-          <div className="hero__ctas" style={{ justifyContent: "flex-start" }}>
-            <a href={`${APP_URL}/register`} className="btn btn--primary">
-              Start free <Icon d={I.arrow} />
-            </a>
-            <Link href="#developer" className="btn btn--ghost">
-              Build your own with our API
-            </Link>
+      <section className="hero hero--page">
+        <div className="wrap page-hero">
+          <div>
+            <h1 className="h1">How Oyklane connects to your tools</h1>
+            <p className="lead">
+              Payments, couriers, ads, WhatsApp, email and your own software — what each connection does, how to switch it on, and what&apos;s coming next.
+            </p>
+            <div className="hero__ctas">
+              <a href={`${APP_URL}/register`} className="btn btn--primary btn--lg">Start free trial</a>
+              <Link href="/developers" className="btn btn--ghost btn--lg">API docs</Link>
+            </div>
+          </div>
+          <div className="hex" aria-hidden="true">
+            {hero.map((x) => (
+              <Logo key={x.name} {...x.logo} size={68} title={x.name} />
+            ))}
           </div>
         </div>
-        <div className="hex" aria-hidden="true">
-          {hero.map((x) => (
-            <Logo key={x.name} {...x.logo} size={72} title={x.name} className="float-tile" />
-          ))}
-        </div>
+      </section>
+
+      <section className="wrap overview">
+        {OVERVIEW.map((o, n) => (
+          <div key={o.title} className="overview__step">
+            <span className="icon-tile"><Icon d={o.icon} /></span>
+            <span>
+              <b>{n + 1}. {o.title}</b>
+              <small>{o.text}</small>
+            </span>
+          </div>
+        ))}
       </section>
 
       <section className="wrap" style={{ paddingBottom: 110 }}>
         <div className="lib">
           <nav className="lib__nav" aria-label="Integration categories">
-            <a href="#popular">Most popular</a>
             {CATEGORIES.map((c) => (
               <a key={c.key} href={`#${c.key}`}>
                 {c.label} <span>{INTEGRATIONS.filter((x) => x.category === c.key).length}</span>
               </a>
             ))}
+            <Link href="/developers">API docs</Link>
           </nav>
 
           <div>
-            {featured && (
-              <div className="featured-card" data-reveal>
-                <div>
-                  <span className="badge badge--app">Featured</span>
-                  <h2 className="h3">{featured.name}</h2>
-                  <p className="muted" style={{ margin: 0 }}>{featured.text} Shoppers who&rsquo;ve bought on any Oyklane store find their address already filled in.</p>
-                  <p style={{ marginTop: 22 }}>
-                    <Link href="/#checkout" className="link-arrow">See how it works <Icon d={I.arrow} /></Link>
-                  </p>
+            {CATEGORIES.map((c) => {
+              const g = GUIDES[c.key];
+              return (
+                <div className="lib__group guide" id={c.key} key={c.key}>
+                  <div className="guide__head">
+                    <span className="icon-tile"><Icon d={I[c.icon]} /></span>
+                    <div>
+                      <h2 className="h2">{c.label}</h2>
+                      {g && <p className="lead">{g.intro}</p>}
+                    </div>
+                  </div>
+                  {g && (
+                    <div className="guide__how">
+                      <p className="guide__label">How it works</p>
+                      <ol className="guide__steps">
+                        {g.steps.map((step) => (
+                          <li key={step}>{step}</li>
+                        ))}
+                      </ol>
+                      {g.link && (
+                        <p style={{ margin: "16px 0 0" }}>
+                          <Link href={g.link.href} className="link-arrow">{g.link.label}</Link>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <div className="cards">
+                    {INTEGRATIONS.filter((x) => x.category === c.key).map((x) => (
+                      <Card key={x.name} x={x} />
+                    ))}
+                  </div>
                 </div>
-                <ul className="includes" style={{ margin: 0, alignContent: "center" }}>
-                  <li className="chip">Mobile + one-time code</li>
-                  <li className="chip">Saved addresses</li>
-                  <li className="chip">UPI, cards, COD</li>
-                  <li className="chip">Payment brand icons</li>
-                  <li className="chip">Works from any page</li>
-                </ul>
-              </div>
-            )}
+              );
+            })}
 
-            <div className="lib__group" id="popular">
-              <h2 className="lib__title"><Icon d={I.star} /> Most popular</h2>
-              <div className="cards">
-                {popular.map((x) => (
-                  <Card key={x.name} x={x} />
-                ))}
-              </div>
-            </div>
-
-            {CATEGORIES.map((c) => (
-              <div className="lib__group" id={c.key} key={c.key}>
-                <h2 className="lib__title"><Icon d={I[c.icon]} /> {c.label}</h2>
-                <div className="cards">
-                  {INTEGRATIONS.filter((x) => x.category === c.key).map((x) => (
-                    <Card key={x.name} x={x} />
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            <div className="cta" style={{ marginTop: 72, padding: "48px 24px" }} data-reveal>
-              <h2 className="h2" style={{ maxWidth: "18ch" }}>Missing an integration?</h2>
-              <p className="lead">Build it yourself with our REST API and webhooks, or tell us from your dashboard&rsquo;s Help — we build the most-asked ones first.</p>
+            <div className="guide-cta">
+              <h2 className="h2">Missing an integration?</h2>
+              <p className="lead">Connect anything with our REST API and webhooks, or tell us from your dashboard&apos;s Help — we build the most-asked ones first.</p>
               <div className="hero__ctas">
-                <a href={`${APP_URL}/register`} className="btn btn--light">Start free</a>
-                <Link href="/apps" className="btn btn--ghost">See the app store</Link>
+                <Link href="/developers" className="btn btn--primary btn--lg">Read the API docs</Link>
+                <Link href="/apps" className="btn btn--ghost btn--lg">See the apps</Link>
               </div>
             </div>
           </div>

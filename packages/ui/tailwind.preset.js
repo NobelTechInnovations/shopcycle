@@ -25,13 +25,15 @@ module.exports = {
         brand: {
           DEFAULT: "#111114",
         },
-        // Oyklane brand gradient endpoints — logo mark, focus, progress,
-        // active states. Sparingly; the chrome stays neutral.
+        // Oyklane Blue and Sky (docs/brand-guidelines.md) — primary
+        // actions, links, focus, active states; navy for dark surfaces.
         accent: {
-          DEFAULT: "#7C5CFF",
-          soft: "#F1EEFF",
-          2: "#2DD4BF",
+          DEFAULT: "#0067B8",
+          hover: "#005A9E",
+          soft: "#EAF3FC",
+          2: "#2B9FE6",
         },
+        navy: "#0F2A4A",
         status: {
           success: "#16A34A",
           warning: "#D97706",
@@ -54,7 +56,7 @@ module.exports = {
         raised: "0 4px 16px -4px rgba(17, 17, 20, 0.10), 0 2px 4px -2px rgba(17, 17, 20, 0.06)",
       },
       backgroundImage: {
-        "brand-gradient": "linear-gradient(135deg, #7C5CFF 0%, #2DD4BF 100%)",
+        "brand-gradient": "linear-gradient(135deg, #0067B8 0%, #2B9FE6 100%)",
       },
     },
   },

@@ -192,7 +192,7 @@ function buildApp() {
   app.register(require("./modules/upi/routes"), { prefix: "/api/upi-qr" });
   // …and the seller's phone forwarding bank "credited" SMS to it.
   app.register(require("./modules/upi/sms-routes"), { prefix: "/api/public/upi-sms" });
-  // Oyklane Store (oyklanestore.com): themes and apps by developers.
+  // Oyklane Store (market.oyklane.com): themes and apps by developers.
   {
     const market = require("./modules/market/routes");
     app.register(market.publicRoutes, { prefix: "/api/market/public" });

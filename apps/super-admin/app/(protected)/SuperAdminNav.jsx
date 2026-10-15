@@ -99,7 +99,7 @@ export function SuperAdminNav({ userName }) {
   }
 
   return (
-    <aside className="w-60 shrink-0 h-screen sticky top-0 flex flex-col" style={{ background: "#0B0B0F" }}>
+    <aside className="w-60 shrink-0 h-screen sticky top-0 flex flex-col" style={{ background: "#0F2A4A" }}>
       <Link href="/overview" className="h-14 flex items-center px-5 shrink-0" aria-label="Platform home">
         <BrandMark size={24} tone="dark" label="Platform" />
       </Link>
@@ -111,7 +111,7 @@ export function SuperAdminNav({ userName }) {
               darkItemColor: "rgba(245,245,244,0.62)",
               darkItemHoverBg: "rgba(255,255,255,0.06)",
               darkItemHoverColor: "#F5F5F4",
-              darkItemSelectedBg: "rgba(124,92,255,0.22)",
+              darkItemSelectedBg: "rgba(0,103,184,0.22)",
               darkItemSelectedColor: "#FFFFFF",
             },
           },

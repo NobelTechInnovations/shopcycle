@@ -12,11 +12,13 @@ export const tokens = {
     // use so the store's own content (product photos, theme colors) is what
     // carries color, not the chrome around it.
     brand: "#111114",
-    // Oyklane's brand gradient (see apps/www's logo mark) — used sparingly:
-    // the logo mark, focus rings, active nav, progress. Never for body text.
-    accent: "#7C5CFF",
-    accentSoft: "#F1EEFF",
-    accent2: "#2DD4BF",
+    // Oyklane Blue (docs/brand-guidelines.md) — primary buttons, links,
+    // focus rings, active nav. Sky is the logo gradient's second colour.
+    accent: "#0067B8",
+    accentHover: "#005A9E",
+    accentSoft: "#EAF3FC",
+    accent2: "#2B9FE6",
+    navy: "#0F2A4A",
     success: "#16A34A",
     warning: "#D97706",
     danger: "#DC2626",

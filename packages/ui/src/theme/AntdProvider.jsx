@@ -24,9 +24,10 @@ export function AntdProvider({ children }) {
         theme={{
           algorithm: antdTheme.compactAlgorithm,
           token: {
-            colorPrimary: c.brand,
+            // Oyklane Blue for primary buttons, links and selections.
+            colorPrimary: c.accent,
             colorLink: c.accent,
-            colorLinkHover: "#6A48F5",
+            colorLinkHover: c.accentHover,
             colorSuccess: c.success,
             colorWarning: c.warning,
             colorError: c.danger,
@@ -36,10 +37,8 @@ export function AntdProvider({ children }) {
             colorBorderSecondary: "#EEEEF1",
             colorText: c.textPrimary,
             colorTextSecondary: c.textMuted,
-            // Violet focus ring on every input/select — the one place the
-            // brand accent shows up on every screen, quietly.
-            controlOutline: "rgba(124, 92, 255, 0.18)",
-            colorPrimaryHover: "#2A2A30",
+            controlOutline: "rgba(0, 103, 184, 0.18)",
+            colorPrimaryHover: c.accentHover,
             borderRadius: tokens.radius.sm,
             borderRadiusLG: tokens.radius.md,
             fontFamily: tokens.fontFamily,
@@ -54,7 +53,7 @@ export function AntdProvider({ children }) {
             Select: { activeBorderColor: c.accent, hoverBorderColor: "#C9C9D2" },
             Menu: {
               itemSelectedBg: c.accentSoft,
-              itemSelectedColor: c.textPrimary,
+              itemSelectedColor: c.accentHover,
               itemHoverBg: "#F3F3F5",
               itemBorderRadius: tokens.radius.sm,
               itemHeight: 34,

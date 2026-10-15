@@ -38,7 +38,7 @@ export default async function ListingPage({ params, searchParams }) {
         </div>
         {listing.status === "approved" && (
           <p className="small muted" style={{ marginTop: 6 }}>
-            Live at <Link href={`/${listing.kind}s/${listing.slug}`}>oyklanestore.com/{listing.kind}s/{listing.slug}</Link>
+            Live at <Link href={`/${listing.kind}s/${listing.slug}`}>market.oyklane.com/{listing.kind}s/{listing.slug}</Link>
           </p>
         )}
       </div>

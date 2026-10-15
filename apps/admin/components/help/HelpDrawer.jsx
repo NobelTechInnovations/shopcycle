@@ -209,7 +209,7 @@ function HelpPanel({ user, open, onClose, request, clearRequest }) {
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5" aria-live="polite">
         {messages.length === 0 && feedback !== "ticket" && (
           <div>
-            <div className="rounded-[16px] p-5 text-white mb-5" style={{ background: "radial-gradient(130% 150% at 0% 0%, #7C5CFF 0%, #5B3FE0 45%, #1D1B2E 100%)" }}>
+            <div className="rounded-[16px] p-5 text-white mb-5" style={{ background: "radial-gradient(130% 150% at 0% 0%, #0067B8 0%, #005A9E 45%, #0F2A4A 100%)" }}>
               <Sparkles size={20} aria-hidden="true" />
               <p className="text-[17px] font-semibold mt-2 mb-1" style={{ letterSpacing: "-0.01em" }}>
                 Hi{firstName ? ` ${firstName}` : ""}, how can we help?

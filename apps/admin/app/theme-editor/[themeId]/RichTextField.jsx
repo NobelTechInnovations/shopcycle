@@ -199,7 +199,7 @@ export function RichTextField({ value, onChange, rows = 3, placeholder }) {
   );
 
   return (
-    <div className="oy-rte rounded-md border border-app-border bg-white focus-within:border-[#7C5CFF] focus-within:shadow-[0_0_0_2px_rgba(124,92,255,0.18)]">
+    <div className="oy-rte rounded-md border border-app-border bg-white focus-within:border-[#0067B8] focus-within:shadow-[0_0_0_2px_rgba(0,103,184,0.18)]">
       <div className="flex items-center gap-0.5 px-1 py-0.5 border-b border-app-border" role="toolbar" aria-label="Text formatting">
         {tool("Bold", <Bold size={14} aria-hidden="true" />, () => exec("bold"))}
         {tool("Italic", <Italic size={14} aria-hidden="true" />, () => exec("italic"))}

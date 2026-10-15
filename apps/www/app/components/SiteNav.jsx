@@ -81,6 +81,11 @@ export function SiteNav() {
                 Themes
               </Link>
             </li>
+            <li>
+              <Link href="/developers" className="nav__link" aria-current={cur("/developers")}>
+                Developers
+              </Link>
+            </li>
           </ul>
         </nav>
         <div className="nav__actions">
@@ -104,6 +109,7 @@ export function SiteNav() {
         <Link href="/integrations">Integrations</Link>
         <Link href="/apps">Apps</Link>
         <Link href="/pricing">Pricing</Link>
+        <Link href="/developers">Developers</Link>
         <a href={`${APP_URL}/login`}>Log in</a>
         <a href={`${APP_URL}/register`} className="btn btn--primary btn--lg">
           Start your free trial

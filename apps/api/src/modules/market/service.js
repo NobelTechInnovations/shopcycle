@@ -10,7 +10,7 @@ const apiKeys = require("../developer/api-keys");
 const { parseThemeZip, settingsDataOf } = require("./theme-package");
 
 /**
- * Oyklane Store (oyklanestore.com): themes and apps — Oyklane's own and
+ * Oyklane Store (market.oyklane.com): themes and apps — Oyklane's own and
  * developers' — free or paid.
  *
  *   Developers list them (draft → in review → approved), upload theme

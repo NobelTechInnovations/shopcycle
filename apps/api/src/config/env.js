@@ -34,7 +34,7 @@ const envSchema = z.object({
   // production, not just a different subdomain.
   SUPER_ADMIN_ORIGIN: z.string().default("http://localhost:3003"),
   API_PUBLIC_URL: z.string().default("http://localhost:4000"),
-  // Oyklane Store (oyklanestore.com, apps/market): themes and apps by
+  // Oyklane Store (market.oyklane.com, apps/market): themes and apps by
   // developers. Its demo store shows every theme's preview; developers
   // get MARKET_PARTNER_SHARE of each sale.
   MARKET_ORIGIN: z.string().default("http://localhost:3005"),

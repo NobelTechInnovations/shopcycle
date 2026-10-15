@@ -266,13 +266,13 @@ export default async function HomePage() {
           <div className="market__copy">
             <span className="icon-tile"><Icon d={I.grid} /></span>
             <h2 className="h2">The Oyklane Store: themes and apps for your shop</h2>
-            <p className="lead">Add reviews, phone login, rentals, Instagram feeds and more — made by Oyklane and independent developers. Install in one click; paid ones are billed with your plan.</p>
+            <p className="lead">Add reviews, phone login, rentals, Instagram feeds and more — made by Oyklane and independent developers. Install in one click; paid ones are billed with your plan. Developers can sell their own themes and apps.</p>
             <div className="hero__ctas">
               <a href={MARKET_URL} className="btn btn--primary btn--lg" target="_blank" rel="noopener">
                 Visit the Oyklane Store
               </a>
-              <a href={`${MARKET_URL}/partners`} className="btn btn--ghost btn--lg" target="_blank" rel="noopener">
-                Sell your themes and apps
+              <a href={`${MARKET_URL}/partners/dashboard`} className="btn btn--ghost btn--lg" target="_blank" rel="noopener">
+                Developer dashboard
               </a>
             </div>
           </div>

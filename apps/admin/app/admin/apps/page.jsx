@@ -123,8 +123,8 @@ function FeaturedFlow({ app }) {
   const [busy, setBusy] = useState(false);
   if (!app) return null;
   return (
-    <section className="relative overflow-clip rounded-[16px] mb-6 p-6 sm:p-7 text-white" style={{ background: "radial-gradient(120% 140% at 0% 0%, #7C5CFF 0%, #4C33C9 45%, #111114 100%)" }}>
-      <div className="absolute -right-10 -top-10 w-56 h-56 rounded-full opacity-30" style={{ background: "radial-gradient(circle, #2DD4BF 0%, transparent 70%)" }} aria-hidden="true" />
+    <section className="relative overflow-clip rounded-[16px] mb-6 p-6 sm:p-7 text-white" style={{ background: "radial-gradient(120% 140% at 0% 0%, #0067B8 0%, #4C33C9 45%, #111114 100%)" }}>
+      <div className="absolute -right-10 -top-10 w-56 h-56 rounded-full opacity-30" style={{ background: "radial-gradient(circle, #2B9FE6 0%, transparent 70%)" }} aria-hidden="true" />
       <div className="relative flex flex-col md:flex-row md:items-center gap-5">
         <div className="flex-1 min-w-0">
           <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] bg-white/15 rounded-full px-2.5 py-1">
@@ -212,7 +212,7 @@ export default function AppsPage() {
         title="Apps"
         subtitle="Add features to your store. Installed apps are pinned in your sidebar."
         actions={
-          <a href={`${process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://oyklanestore.com"}/apps`} target="_blank" rel="noopener noreferrer">
+          <a href={`${process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://market.oyklane.com"}/apps`} target="_blank" rel="noopener noreferrer">
             <Button icon={<Sparkles size={15} aria-hidden="true" />}>More apps — Oyklane Store</Button>
           </a>
         }

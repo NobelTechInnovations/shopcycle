@@ -28,11 +28,11 @@ export function SiteFooter() {
           <div>
             <h4>Platform</h4>
             <ul>
-              <li><Link href="/integrations">Integrations</Link></li>
+              <li><Link href="/integrations">Integrations guide</Link></li>
               <li><Link href="/apps">Apps</Link></li>
               <li><a href={MARKET_URL}>Oyklane Store</a></li>
               <li><Link href="/pricing">Pricing</Link></li>
-              <li><Link href="/integrations#developer">API &amp; webhooks</Link></li>
+              <li><Link href="/developers">API docs</Link></li>
             </ul>
           </div>
           <div>

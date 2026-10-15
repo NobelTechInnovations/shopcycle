@@ -1,3 +1,4 @@
+const { realEmail } = require("../../lib/placeholder-email");
 /**
  * What the public API and webhooks return — stable, documented shapes in
  * snake_case, never raw database rows (no internal fields, no secrets).
@@ -42,7 +43,7 @@ function customer(c) {
   return {
     id: c.id,
     name: c.name,
-    email: c.email,
+    email: realEmail(c.email) || null,
     phone: c.phone || null,
     city: c.city || null,
     province: c.province || null,
@@ -78,7 +79,7 @@ function order(o) {
     fulfillment_status: o.fulfillmentStatus,
     cancelled_at: iso(o.cancelledAt),
     cancel_reason: o.cancelReason || null,
-    customer: o.customer ? { id: o.customer.id, name: o.customer.name, email: o.customer.email } : o.customerId ? { id: o.customerId } : null,
+    customer: o.customer ? { id: o.customer.id, name: o.customer.name, email: realEmail(o.customer.email) || null } : o.customerId ? { id: o.customerId } : null,
     shipping_address: {
       name: o.shippingName || null,
       address1: o.shippingAddress1 || null,

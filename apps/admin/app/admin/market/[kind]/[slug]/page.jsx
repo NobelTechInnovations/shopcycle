@@ -10,11 +10,11 @@ import { PageHeader } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 import { openCheckout } from "@/lib/billing";
 
-const MARKET = process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://oyklanestore.com";
+const MARKET = process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://market.oyklane.com";
 const inr = (n) => formatCurrency(Number(n || 0), "INR");
 
 /**
- * Get something from the Oyklane Store (oyklanestore.com sends sellers
+ * Get something from the Oyklane Store (market.oyklane.com sends sellers
  * here — they're signed in to their store here). Free: install. Paid
  * theme: pay with Razorpay (the API checks the payment with Razorpay
  * before the licence exists), then install. Apps install from here too.

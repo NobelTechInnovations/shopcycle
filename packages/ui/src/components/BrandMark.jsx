@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The Oyklane logo — the same violet→teal gradient mark apps/www uses in
+ * The Oyklane logo — the same blue→sky gradient mark apps/www uses in
  * its nav and footer, so the marketing site, seller admin, and platform
  * admin all read as one product. `tone="dark"` is for placement on a dark
  * surface (auth brand panel, super-admin); `label` adds a small product
@@ -19,7 +19,7 @@ export function BrandMark({ size = 26, tone = "light", label, showWordmark = tru
           width: size,
           height: size,
           borderRadius: Math.round(size * 0.3),
-          background: "linear-gradient(135deg, #7C5CFF 0%, #2DD4BF 100%)",
+          background: "linear-gradient(135deg, #0067B8 0%, #2B9FE6 100%)",
           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25)",
         }}
       >

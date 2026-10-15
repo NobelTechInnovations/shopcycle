@@ -22,7 +22,7 @@ export function Price({ item, suffix = true }) {
 
 /** A theme without screenshots, drawn in its own colours. */
 export function ThemeMock({ swatch }) {
-  const s = swatch || { bg: "#fff", surface: "#f2f2f5", text: "#111", accent: "#6d4dff" };
+  const s = swatch || { bg: "#fff", surface: "#f2f2f5", text: "#111", accent: "#0067b8" };
   return (
     <div className="mock" style={{ background: s.bg }} aria-hidden="true">
       <div className="mock__bar" style={{ background: s.text, width: "38%" }} />
@@ -76,5 +76,34 @@ export function AppCard({ item }) {
         </span>
       </span>
     </Link>
+  );
+}
+
+/** Courier apps being built — one-click connection to the courier's API
+ * (rates, label booking, tracking). Shown as "Coming soon", never installable. */
+export const COMING_SOON_APPS = [
+  { slug: "delhivery", name: "Delhivery", color: "#E1251B", text: "Book Delhivery pickups, print labels and track every shipment from your orders page." },
+  { slug: "shiprocket", name: "Shiprocket", color: "#7B3FE4", text: "Compare 25+ couriers' rates through Shiprocket, book in one click and sync tracking." },
+  { slug: "shipmozo", name: "Shipmozo", color: "#0B6BCB", text: "Ship with Shipmozo's courier partners — rates at checkout, labels and tracking built in." },
+];
+
+export function ComingSoonCard({ item }) {
+  return (
+    <div className="card acard acard--soon" aria-label={`${item.name} — coming soon`}>
+      <span className="acard__icon" aria-hidden="true" style={{ background: item.color }}>
+        <b>{item.name.slice(0, 1)}</b>
+      </span>
+      <span className="acard__body">
+        <span className="spread" style={{ gap: 8 }}>
+          <h3 style={{ fontSize: 16 }}>{item.name}</h3>
+          <span className="badge badge--amber">Coming soon</span>
+        </span>
+        <span className="small muted clamp2">{item.text}</span>
+        <span className="row" style={{ gap: 6, marginTop: 4 }}>
+          <span className="badge badge--accent">By Oyklane</span>
+          <span className="badge">{CATEGORY_LABELS.shipping}</span>
+        </span>
+      </span>
+    </div>
   );
 }

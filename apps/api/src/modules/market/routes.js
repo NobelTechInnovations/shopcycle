@@ -4,7 +4,7 @@ const service = require("./service");
 const partners = require("./partners");
 const storeSide = require("./store");
 
-/** /api/market/public — what oyklanestore.com shows to anyone. */
+/** /api/market/public — what market.oyklane.com shows to anyone. */
 async function publicRoutes(fastify) {
   const db = fastify.prisma;
   fastify.get("/browse", async (request) => service.browse(db, request.query));

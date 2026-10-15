@@ -21,7 +21,7 @@ function Kpi({ icon: Icon, label, value, sub, delta, tone }) {
         <p className="text-[13px] text-ink-muted m-0">{label}</p>
         <span
           className="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
-          style={tone === "danger" ? { background: "#FDECEC", color: "#DC2626" } : tone === "accent" ? { background: "#F1EEFF", color: "#7C5CFF" } : { background: "#F7F7F8", color: "#6B6B76" }}
+          style={tone === "danger" ? { background: "#FDECEC", color: "#DC2626" } : tone === "accent" ? { background: "#EAF3FC", color: "#0067B8" } : { background: "#F7F7F8", color: "#6B6B76" }}
         >
           <Icon size={16} aria-hidden="true" />
         </span>
@@ -60,7 +60,7 @@ function Signups({ days }) {
         {days.map((d, i) => {
           const h = d.count ? Math.max(4, (d.count / max) * H) : 2;
           return (
-            <rect key={d.date} x={i * (bw + gap)} y={H - h} width={bw} height={h} rx={2} fill={d.count ? "#7C5CFF" : "#E6E6EA"}>
+            <rect key={d.date} x={i * (bw + gap)} y={H - h} width={bw} height={h} rx={2} fill={d.count ? "#0067B8" : "#E6E6EA"}>
               <title>{`${dateLabel(d.date)}: ${d.count}`}</title>
             </rect>
           );

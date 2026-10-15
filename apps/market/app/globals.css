@@ -1,17 +1,17 @@
 /* Oyklane Store — themes and apps for Oyklane stores. Tokens first. */
 :root {
   --bg: #ffffff;
-  --bg-2: #f6f5fb;
+  --bg-2: #eef6fd;
   --surface: #ffffff;
-  --surface-2: #f4f3f9;
+  --surface-2: #f4f8fc;
   --line: rgba(17, 17, 24, 0.09);
   --line-2: rgba(17, 17, 24, 0.16);
   --text: #111118;
   --muted: #5a5a6e;
   --subtle: #8a8a9c;
-  --accent: #6d4dff;
+  --accent: #0067b8;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(109, 77, 255, 0.1);
+  --accent-soft: rgba(0, 103, 184, 0.1);
   --teal: #0f8b7a;
   --teal-soft: rgba(15, 139, 122, 0.1);
   --amber: #b45309;
@@ -20,14 +20,14 @@
   --red-soft: rgba(185, 28, 28, 0.08);
   --green: #047857;
   --green-soft: rgba(4, 120, 87, 0.1);
-  --grad: linear-gradient(120deg, #7c5cff 0%, #4f7cf7 55%, #2dd4bf 100%);
-  --hero: radial-gradient(1200px 400px at 15% -10%, rgba(124, 92, 255, 0.16), transparent 60%), radial-gradient(900px 380px at 95% 0%, rgba(45, 212, 191, 0.14), transparent 60%);
+  --grad: linear-gradient(120deg, #0067b8 0%, #2b9fe6 100%);
+  --hero: linear-gradient(180deg, #e3f0fb 0%, rgba(227, 240, 251, 0) 100%);
   --shadow: 0 1px 2px rgba(17, 17, 24, 0.05), 0 8px 24px -12px rgba(17, 17, 24, 0.12);
-  --shadow-lg: 0 24px 60px -28px rgba(40, 24, 120, 0.35);
+  --shadow-lg: 0 24px 60px -28px rgba(15, 42, 74, 0.35);
   --radius: 16px;
   --radius-sm: 10px;
-  --font-display: "Bricolage Grotesque", "Inter", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
 }
 
@@ -42,8 +42,8 @@
     --text: #f3f3f7;
     --muted: #a7a7b8;
     --subtle: #75758a;
-    --accent: #8b6cff;
-    --accent-soft: rgba(139, 108, 255, 0.16);
+    --accent: #4cb2f5;
+    --accent-soft: rgba(76, 178, 245, 0.16);
     --teal: #2dd4bf;
     --teal-soft: rgba(45, 212, 191, 0.12);
     --amber: #f5b454;
@@ -52,7 +52,7 @@
     --red-soft: rgba(248, 113, 113, 0.12);
     --green: #34d399;
     --green-soft: rgba(52, 211, 153, 0.12);
-    --hero: radial-gradient(1200px 400px at 15% -10%, rgba(124, 92, 255, 0.22), transparent 60%), radial-gradient(900px 380px at 95% 0%, rgba(45, 212, 191, 0.12), transparent 60%);
+    --hero: linear-gradient(180deg, rgba(0, 103, 184, 0.22) 0%, rgba(0, 103, 184, 0) 100%);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -14px rgba(0, 0, 0, 0.6);
     --shadow-lg: 0 30px 70px -30px rgba(0, 0, 0, 0.8);
     color-scheme: dark;
@@ -84,7 +84,7 @@ p { margin: 0; }
 .nav { position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: saturate(160%) blur(14px); border-bottom: 1px solid var(--line); }
 .nav__in { height: 64px; display: flex; align-items: center; gap: 24px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.02em; white-space: nowrap; }
-.brand__mark { width: 30px; height: 30px; border-radius: 9px; background: var(--grad); display: grid; place-items: center; color: #fff; }
+.brand__mark { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, #0067b8 0%, #2b9fe6 100%); display: grid; place-items: center; color: #fff; }
 .brand__mark span { width: 11px; height: 11px; border: 2.5px solid #fff; border-radius: 50%; }
 .brand small { font: 600 11px/1 var(--font-body); color: var(--accent); background: var(--accent-soft); padding: 4px 7px; border-radius: 999px; letter-spacing: 0; }
 .nav__links { display: flex; gap: 4px; }
@@ -147,6 +147,8 @@ p { margin: 0; }
 .price--free { color: var(--green); }
 .acard { text-decoration: none; display: flex; gap: 14px; padding: 18px; transition: transform 0.15s ease, box-shadow 0.15s ease; }
 .acard:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.acard--soon { cursor: default; }
+.acard--soon:hover { transform: none; box-shadow: none; }
 .acard__icon { width: 52px; height: 52px; flex-shrink: 0; border-radius: 13px; background: var(--grad); display: grid; place-items: center; color: #fff; overflow: hidden; }
 .acard__icon img { width: 100%; height: 100%; object-fit: cover; }
 .acard__icon b { font: 700 20px var(--font-display); }

@@ -4,7 +4,7 @@ const { HttpError } = require("@shopcycle/utils");
 const loginGuard = require("../../lib/login-guard");
 
 /**
- * Developer ("partner") accounts on oyklanestore.com. Separate from
+ * Developer ("partner") accounts on market.oyklane.com. Separate from
  * sellers and platform staff: their own table, their own token audience
  * ("partner"), sent by the Oyklane Store's server as a Bearer token — a
  * seller or super admin session can never act as a partner, or the

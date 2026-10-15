@@ -39,18 +39,18 @@ export function AuthShell({ variant = "seller", title, subtitle, children, foote
     <div className="min-h-screen flex bg-app-surface">
       <aside
         className="hidden lg:flex lg:w-[46%] xl:w-[42%] relative overflow-hidden flex-col justify-between p-12"
-        style={{ background: "#07070A" }}
+        style={{ background: "#0F2A4A" }}
       >
         {/* Brand glow — the two gradient endpoints as soft light sources. */}
         <div
           aria-hidden="true"
           className="absolute -top-40 -left-32 w-[520px] h-[520px] rounded-full"
-          style={{ background: "radial-gradient(closest-side, rgba(124,92,255,0.38), transparent)" }}
+          style={{ background: "radial-gradient(closest-side, rgba(43,159,230,0.40), transparent)" }}
         />
         <div
           aria-hidden="true"
           className="absolute -bottom-48 -right-40 w-[560px] h-[560px] rounded-full"
-          style={{ background: "radial-gradient(closest-side, rgba(45,212,191,0.22), transparent)" }}
+          style={{ background: "radial-gradient(closest-side, rgba(0,103,184,0.45), transparent)" }}
         />
         <div
           aria-hidden="true"
@@ -86,7 +86,7 @@ export function AuthShell({ variant = "seller", title, subtitle, children, foote
               <li key={point} className="flex items-start gap-3 text-[15px]" style={{ color: "rgba(245,245,244,0.72)" }}>
                 <span
                   className="mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full shrink-0"
-                  style={{ background: "rgba(124,92,255,0.18)", color: "#B7A6FF" }}
+                  style={{ background: "rgba(43,159,230,0.2)", color: "#9FD3FF" }}
                 >
                   <Check size={12} strokeWidth={3} aria-hidden="true" />
                 </span>

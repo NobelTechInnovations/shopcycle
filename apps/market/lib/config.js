@@ -2,7 +2,7 @@
  * developer's token never reaches the browser). */
 export const API_URL = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 export const ADMIN_ORIGIN = (process.env.NEXT_PUBLIC_ADMIN_ORIGIN || "http://localhost:3000").replace(/\/$/, "");
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://oyklanestore.com").replace(/\/$/, "");
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://market.oyklane.com").replace(/\/$/, "");
 export const MAIN_SITE = "https://oyklane.com";
 export const PARTNER_COOKIE = "oy_partner";
 

@@ -35,7 +35,7 @@ function LivePreview({ src, title }) {
 /** A small mock of the theme — its palette and heading font — for themes
  * not installed yet (installed ones show a live render instead). */
 function ThemeSwatch({ handle, meta }) {
-  const c = meta.swatch || { bg: "#FFFFFF", surface: "#F6F3EE", text: "#1A1A1A", accent: "#7C5CFF", font: "Inter" };
+  const c = meta.swatch || { bg: "#FFFFFF", surface: "#F6F3EE", text: "#1A1A1A", accent: "#0067B8", font: "Inter" };
   const fontUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(c.font).replace(/%20/g, "+")}:wght@500;600&display=swap`;
   return (
     <div className="aspect-[16/10] rounded-[10px] border border-app-border overflow-hidden flex flex-col" style={{ background: c.bg, color: c.text }} aria-hidden="true">
@@ -133,7 +133,7 @@ export default function ThemesPage() {
         title="Themes"
         subtitle="Your theme designs the home page, header and footer, and sets the fonts and colours for your whole store."
         actions={
-          <a href={`${process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://oyklanestore.com"}/themes`} target="_blank" rel="noopener noreferrer">
+          <a href={`${process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://market.oyklane.com"}/themes`} target="_blank" rel="noopener noreferrer">
             <Button icon={<Sparkles size={15} aria-hidden="true" />}>More themes — Oyklane Store</Button>
           </a>
         }

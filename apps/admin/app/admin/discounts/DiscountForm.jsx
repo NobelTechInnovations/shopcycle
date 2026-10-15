@@ -328,7 +328,7 @@ export function DiscountForm({ discount, kind: kindParam }) {
             <Card size="small" title="Summary">
               {v.method === "automatic" ? (
                 <p className="m-0 mb-3 inline-flex items-center gap-1.5 text-[14px] font-semibold text-ink">
-                  <Zap size={14} className="text-[#7C5CFF]" aria-hidden="true" /> {v.title || "Untitled"}
+                  <Zap size={14} className="text-[#0067B8]" aria-hidden="true" /> {v.title || "Untitled"}
                 </p>
               ) : (
                 <p className="m-0 mb-3">

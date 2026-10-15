@@ -11,7 +11,7 @@ function Tile({ icon: Icon, label, value, sub, tone }) {
     <div className="bg-app-surface border border-app-border rounded-[14px] shadow-card p-[18px] flex flex-col gap-1.5 min-w-0">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[13px] text-ink-muted m-0">{label}</p>
-        <span className="w-8 h-8 rounded-md flex items-center justify-center shrink-0" style={tone === "danger" ? { background: "#FDECEC", color: "#DC2626" } : { background: "#F1EEFF", color: "#7C5CFF" }}>
+        <span className="w-8 h-8 rounded-md flex items-center justify-center shrink-0" style={tone === "danger" ? { background: "#FDECEC", color: "#DC2626" } : { background: "#EAF3FC", color: "#0067B8" }}>
           <Icon size={16} aria-hidden="true" />
         </span>
       </div>

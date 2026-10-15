@@ -10,6 +10,7 @@ const WORDMARKS = {
   shiprocket: { text: "shiprocket", color: "#7B3FE4" },
   delhivery: { text: "DELHIVERY", color: "#E1251B" },
   bluedart: { text: "Blue Dart", color: "#233B8E" },
+  shipmozo: { text: "Shipmozo", color: "#0B6BCB" },
   cod: { text: "COD", color: "#15803D" },
 };
 

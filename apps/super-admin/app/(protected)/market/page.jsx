@@ -12,7 +12,7 @@ const day = (d) => (d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric"
 const STATUS = { draft: ["Draft", "default"], in_review: ["In review", "gold"], approved: ["Listed", "green"], rejected: ["Changes needed", "red"], suspended: ["Taken down", "red"] };
 
 /**
- * Oyklane Store (oyklanestore.com): review developers' themes and apps
+ * Oyklane Store (market.oyklane.com): review developers' themes and apps
  * (click through a theme on the demo store before approving), take a
  * listing down, and record payouts to developers.
  */
@@ -156,7 +156,7 @@ export default function MarketAdminPage() {
                 render: (_, l) => (
                   <div className="flex gap-2 justify-end">
                     {l.status === "approved" && (
-                      <a href={`${process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://oyklanestore.com"}/${l.kind}s/${l.slug}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`${process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://market.oyklane.com"}/${l.kind}s/${l.slug}`} target="_blank" rel="noopener noreferrer">
                         <Button size="small" icon={<ExternalLink size={13} aria-hidden="true" />} />
                       </a>
                     )}
