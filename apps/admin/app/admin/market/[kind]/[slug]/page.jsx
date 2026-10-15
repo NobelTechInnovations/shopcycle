@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { App, Alert, Button, Card, Skeleton, Tag } from "antd";
 import { ExternalLink, ShieldCheck, Store } from "lucide-react";
 import { formatCurrency } from "@shopcycle/utils";
@@ -27,6 +27,8 @@ export default function MarketGetPage({ params }) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
   const [done, setDone] = useState(null);
+  const auto = useSearchParams().get("install") === "1";
+  const autoRan = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -55,9 +57,22 @@ export default function MarketGetPage({ params }) {
       const out = data.official
         ? (await apiFetch("/api/themes/install", { method: "POST", body: { handle: slug } })).theme
         : await apiFetch(`/api/market/store/themes/${encodeURIComponent(slug)}/install`, { method: "POST", body: {} });
-      setDone({ themeId: out.themeId || out.id });
+      const themeId = out.themeId || out.id;
+      setDone({ themeId });
       message.success(`${data.item.name} added to your themes`);
+      if (auto) router.replace(`/admin/online-store/themes?added=${encodeURIComponent(themeId)}`);
     });
+
+  // Shopify-style: "Add to my store" on the Oyklane Store lands here with
+  // ?install=1 — a free theme installs straight away.
+  useEffect(() => {
+    if (!auto || autoRan.current || !data || kind !== "theme") return;
+    const free = data.official || data.item.free || data.owned;
+    if (!free) return;
+    autoRan.current = true;
+    if (data.installed && data.official) return router.replace("/admin/online-store/themes");
+    installTheme();
+  });
 
   const buy = () =>
     run("buy", async () => {

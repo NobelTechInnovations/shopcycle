@@ -216,6 +216,19 @@ const SENDERS = {
 async function sendOtp(prisma, { to, code, channel = "sms", storeId = null, storeName = "Oyklane", log, fallback = true }) {
   templates.cached(prisma); // keeps Super admin's templates fresh (background, once a minute)
   refreshPlatformOtp(prisma);
+  // Both at once (Phone Login): WhatsApp and SMS together; each send —
+  // failed ones too — is in the message log.
+  if (channel === "both") {
+    const [wa, sms] = await Promise.all([
+      attempt(prisma, { to, code, channel: "whatsapp", storeId, storeName, log }),
+      attempt(prisma, { to, code, channel: "sms", storeId, storeName, log }),
+    ]);
+    const ok = (r) => r.status !== "failed";
+    if (ok(wa) && ok(sms)) return { ...sms, channel: "both" };
+    if (ok(wa)) return { ...wa, channel: "whatsapp" };
+    if (ok(sms)) return { ...sms, channel: "sms" };
+    return { ...sms, channel: "both" };
+  }
   const first = await attempt(prisma, { to, code, channel, storeId, storeName, log });
   if (first.status === "failed" && channel === "whatsapp" && fallback && smsProvider() !== "log") {
     const sms = await attempt(prisma, { to, code, channel: "sms", storeId, storeName, log });

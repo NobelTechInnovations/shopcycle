@@ -19,6 +19,7 @@ async function loadThemePackage(themeDir) {
   async function walk(dir, prefix) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue; // .DS_Store and friends
       const abs = path.join(dir, entry.name);
       const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {

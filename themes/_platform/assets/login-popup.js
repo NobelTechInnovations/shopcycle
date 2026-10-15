@@ -86,7 +86,7 @@
     if (st.step === "code") {
       return {
         title: "Enter your code",
-        sub: "Sent to <strong>" + esc(st.shown) + "</strong>" + (st.channel === "whatsapp" ? " on WhatsApp" : " by SMS") + ' <button type="button" class="oy-lg__link" data-go="phone">Edit</button>',
+        sub: "Sent to <strong>" + esc(st.shown) + "</strong>" + (st.channel === "both" ? " on WhatsApp and by SMS" : st.channel === "whatsapp" ? " on WhatsApp" : " by SMS") + ' <button type="button" class="oy-lg__link" data-go="phone">Edit</button>',
         body: codeBoxes() + '<p class="oy-lg__resend" data-resend></p>',
         cta: "Verify",
       };
@@ -125,20 +125,14 @@
         cta: "Confirm and sign in",
       };
     }
-    var choose = cfg.channels.length > 1
-      ? '<div class="oy-lg__channels" role="radiogroup" aria-label="Send the code by">' +
-        cfg.channels.map(function (c) {
-          return '<label class="oy-lg__chip"><input type="radio" name="channel" value="' + c + '"' + (st.channel === c ? " checked" : "") + "><span>" + (c === "whatsapp" ? "WhatsApp" : "SMS") + "</span></label>";
-        }).join("") + "</div>"
-      : "";
     return {
       title: "Sign in with your phone",
       sub: "We'll send a one-time code — no password needed.",
       body:
         '<label class="oy-lg__phone"><span class="oy-lg__cc">🇮🇳 +91</span>' +
         '<input class="oy-lg__input" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="14" placeholder="98765 43210" aria-label="Mobile number" value="' + esc(st.typed) + '"></label>' +
-        choose,
-      cta: cfg.channels.length === 1 && cfg.channels[0] === "whatsapp" ? "Send code on WhatsApp" : "Send code",
+        '<p class="oy-lg__fine" style="margin:10px 0 0">' + (cfg.channels.length > 1 ? "We'll send it on WhatsApp and by SMS." : cfg.channels[0] === "whatsapp" ? "We'll send it on WhatsApp." : "We'll send it by SMS.") + "</p>",
+      cta: "Send code",
     };
   }
 
@@ -252,8 +246,6 @@
       var d = tenDigits(st.typed);
       if (!/^[6-9]\d{9}$/.test(d)) return fail("Enter a valid 10-digit mobile number.");
       st.phone = d;
-      var ch = form.querySelector("input[name=channel]:checked");
-      if (ch) st.channel = ch.value;
       return sendCode();
     }
     if (st.step === "email") {

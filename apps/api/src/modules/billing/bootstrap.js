@@ -46,18 +46,8 @@ const PHONE_LOGIN = {
     "Shoppers sign in with their mobile number and a one-time code by SMS or WhatsApp — no password or email needed. Free to install; you pay only for the codes: ₹0.50 (+GST) per SMS, added to your next bill.",
   category: "customers",
   iconKey: "smartphone",
-  settingsSchema: [
-    {
-      id: "channel",
-      label: "Send sign-in codes by",
-      type: "select",
-      options: [
-        { value: "sms", label: "SMS" },
-        { value: "whatsapp", label: "WhatsApp" },
-        { value: "both", label: "SMS or WhatsApp (shopper chooses)" },
-      ],
-    },
-  ],
+  // Codes go on WhatsApp and SMS together — nothing to choose.
+  settingsSchema: [],
 };
 
 // Email automations (modules/flows). Free unless the super admin prices it.
@@ -232,7 +222,10 @@ async function seedCatalog(prisma, { log } = {}) {
  * pay per code now); ones already billed stay.
  */
 async function phoneLoginPayAsYouGo(prisma, { log } = {}) {
-  const app = await prisma.app.findUnique({ where: { key: PHONE_LOGIN.key }, select: { id: true, priceMonthly: true } });
+  const app = await prisma.app.findUnique({ where: { key: PHONE_LOGIN.key }, select: { id: true, priceMonthly: true, settingsSchema: true } });
+  if (app && Array.isArray(app.settingsSchema) && app.settingsSchema.length) {
+    await prisma.app.update({ where: { id: app.id }, data: { settingsSchema: [] } });
+  }
   if (!app || Number(app.priceMonthly) !== 299) return;
   const [, dropped] = await prisma.$transaction([
     prisma.app.update({ where: { id: app.id }, data: { priceMonthly: null, description: PHONE_LOGIN.description } }),
@@ -245,7 +238,8 @@ async function phoneLoginPayAsYouGo(prisma, { log } = {}) {
  * in an older (longer) trial keeps its end date. */
 async function migrateStores(prisma, { log, now = new Date() } = {}) {
   const stores = await prisma.store.findMany({
-    where: { subscription: null },
+    // The Oyklane Store's demo store is the platform's own — never billed.
+    where: { subscription: null, handle: { not: env.MARKET_DEMO_STORE } },
     select: { id: true, name: true, planId: true, subscriptionStatus: true, trialEndsAt: true },
     take: 1000,
   });

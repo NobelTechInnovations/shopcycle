@@ -10,6 +10,7 @@ import { useApps, appHref, APP_PANELS, APP_CATEGORIES, rupees, usageLabel } from
 import { useAppActions } from "@/components/apps/useAppActions";
 import { AppSettingsFields } from "@/components/apps/AppSettingsForm";
 import { AppTile } from "@/components/apps/AppTile";
+import { OneClickSettings } from "@/app/admin/apps/OneClickSettings";
 
 // What each app does, in a few lines — shown on its page.
 const HIGHLIGHTS = {
@@ -27,8 +28,8 @@ const HIGHLIGHTS = {
   ],
   "phone-login": [
     "Shoppers sign in with their mobile number and a code — no passwords",
-    "Codes by SMS — built into Oyklane, nothing to set up",
-    "Or by WhatsApp, from Oyklane's number; if WhatsApp can't deliver, the code goes by SMS",
+    "Each code goes on WhatsApp and by SMS together — built into Oyklane, nothing to set up",
+    "Any send that fails is logged, and the other channel still delivers",
     "Orders placed with the same number show up in their account",
     "Pay as you go: you're billed only for the SMS codes sent",
   ],
@@ -144,7 +145,13 @@ export default function AppDetailsPage({ params }) {
             </Panel>
           )}
 
-          {app.installed && !hasSettings && !APP_PANELS[app.key] && (
+          {app.installed && app.key === "one-click-checkout" && (
+            <Panel title="Settings">
+              <OneClickSettings app={app} onSave={save} saving={saving} />
+            </Panel>
+          )}
+
+          {app.installed && !hasSettings && !APP_PANELS[app.key] && app.key !== "one-click-checkout" && (
             <Panel title="Settings">
               <p className="text-[13px] text-ink-muted m-0">
                 Nothing to set up — {app.name} is working on your store. {app.key === "one-click-checkout" ? "Choose which fields checkout asks for in Settings ▸ Checkout." : ""}

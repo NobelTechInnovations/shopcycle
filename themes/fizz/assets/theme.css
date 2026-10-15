@@ -2497,3 +2497,8 @@ a.look__title:hover {
 .btn { letter-spacing: 0.02em; }
 .x-intro__eyebrow { color: var(--c-text); }
 .x-faqm__media { background: var(--c-surface); border-radius: 50%; }
+
+/* Optional background image behind a hero (intro / product hero) */
+.x-bgimg { position: relative; isolation: isolate; background-image: linear-gradient(rgba(0,0,0,var(--x-shade, 0.3)), rgba(0,0,0,var(--x-shade, 0.3))), var(--x-bg-img); background-size: cover; background-position: center; }
+.x-tone--light, .x-tone--light .x-intro__title, .x-tone--light .x-intro__eyebrow, .x-tone--light .x-intro__text, .x-tone--light .x-ph__title, .x-tone--light .x-ph__eyebrow { color: #fff; }
+.x-tone--dark, .x-tone--dark .x-intro__title, .x-tone--dark .x-intro__eyebrow, .x-tone--dark .x-intro__text { color: #141414; }

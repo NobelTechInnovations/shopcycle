@@ -100,6 +100,13 @@ export default function ProductsPage() {
   const [selected, setSelected] = useState([]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [filters, setFilters] = useState(NO_FILTERS);
+  // Linked from a category or brand page: /admin/products?categoryId=…
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const pre = {};
+    for (const k of ["categoryId", "brandId", "collectionId"]) if (q.get(k)) pre[k] = q.get(k);
+    if (Object.keys(pre).length) setFilters((f) => ({ ...f, ...pre }));
+  }, []);
   const [sort, setSort] = useState("updated");
   const [shown, setShown] = useState(DEFAULT_COLUMNS);
   const [options, setOptions] = useState({ categories: [], brands: [], collections: [], productTypes: [], vendors: [], sizes: [], colours: [], tags: [] });

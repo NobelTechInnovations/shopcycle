@@ -1497,6 +1497,9 @@ model Discount {
   oncePerCustomer Boolean        @default(false)
   buyQuantity     Int?
   getQuantity     Int?
+  /// Shown as an offer on the product pages it applies to (seller can hide
+  /// a private code).
+  showOnStore     Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 

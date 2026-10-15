@@ -71,8 +71,13 @@ export function Detail({ item: raw, preview }) {
               {item.free ? `Add to my store` : theme ? `Buy for ${inr(item.price)}` : `Install`}
             </a>
             {theme && preview && (
-              <Link className="btn btn--lg btn--block" href={`/themes/${item.slug}/preview`}>
-                Preview every page
+              <a className="btn btn--lg btn--block" href={`${preview.base}/?themeId=${encodeURIComponent(preview.themeId)}`} target="_blank" rel="noopener noreferrer">
+                View live demo
+              </a>
+            )}
+            {theme && preview && (
+              <Link className="small muted" style={{ textAlign: "center" }} href={`/themes/${item.slug}/preview`}>
+                Preview every page side by side
               </Link>
             )}
           </div>

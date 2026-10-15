@@ -7,7 +7,7 @@ export const MAIN_SITE = "https://oyklane.com";
 export const PARTNER_COOKIE = "oy_partner";
 
 /** The seller's admin page for getting a listing (they're signed in there). */
-export const getUrl = (kind, slug) => `${ADMIN_ORIGIN}/admin/market/${kind}/${encodeURIComponent(slug)}`;
+export const getUrl = (kind, slug) => `${ADMIN_ORIGIN}/admin/market/${kind}/${encodeURIComponent(slug)}?install=1`;
 
 export const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 

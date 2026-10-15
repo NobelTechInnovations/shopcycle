@@ -3,7 +3,7 @@
   other. Without a photo it shows the theme's illustration, so a new store
   never looks empty.
 {% endcomment %}
-<section class="x-intro{% if section.settings.flip %} x-intro--flip{% endif %}" style="--x-bg: {{ section.settings.background }}">
+<section class="x-intro{% if section.settings.flip %} x-intro--flip{% endif %}{% if section.settings.background_image != blank %} x-bgimg{% endif %}{% if section.settings.text_tone != 'auto' and section.settings.text_tone != blank %} x-tone--{{ section.settings.text_tone }}{% endif %}" style="--x-bg: {{ section.settings.background }};{% if section.settings.background_image != blank %} --x-bg-img: url('{{ section.settings.background_image | image_url }}'); --x-shade: {{ section.settings.overlay | divided_by: 100.0 }};{% endif %}">
   <div class="container x-intro__inner">
     <div class="x-intro__copy">
       {% if section.settings.eyebrow != blank %}<p class="x-intro__eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
@@ -33,7 +33,11 @@
     { "type": "text", "id": "button_label", "label": "Button", "default": "Shop now" },
     { "type": "url", "id": "button_link", "label": "Button link" },
     { "type": "image_picker", "id": "image", "label": "Picture", "info": "1400 × 1050 px works best. A product on a plain background looks great." },
-    { "type": "color", "id": "background", "label": "Background", "default": "#F6F3EE" },
+    { "type": "color", "id": "background", "label": "Background colour", "default": "#F6F3EE" },
+    { "type": "header", "content": "Background" },
+    { "type": "image_picker", "id": "background_image", "label": "Background image", "info": "Optional. Fills the whole section behind the text; 1920 × 1080 px or larger." },
+    { "type": "range", "id": "overlay", "label": "Darken background image", "min": 0, "max": 80, "step": 5, "unit": "%", "default": 30 },
+    { "type": "select", "id": "text_tone", "label": "Text colour", "default": "auto", "options": [ { "value": "auto", "label": "Theme" }, { "value": "light", "label": "Light (on dark images)" }, { "value": "dark", "label": "Dark (on light images)" } ] },
     { "type": "checkbox", "id": "flip", "label": "Picture on the left", "default": false }
   ]
 }

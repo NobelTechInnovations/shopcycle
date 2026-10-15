@@ -4,7 +4,7 @@
   the best seller; a store with no products yet sees an example.
 {% endcomment %}
 {% assign hp = all_products[section.settings.product] | default: best_sellers.first %}
-<section class="x-ph" id="buy" style="--x-bg: {{ section.settings.background }}">
+<section class="x-ph{% if section.settings.background_image != blank %} x-bgimg{% endif %}{% if section.settings.text_tone != 'auto' and section.settings.text_tone != blank %} x-tone--{{ section.settings.text_tone }}{% endif %}" id="buy" style="--x-bg: {{ section.settings.background }};{% if section.settings.background_image != blank %} --x-bg-img: url('{{ section.settings.background_image | image_url }}'); --x-shade: {{ section.settings.overlay | divided_by: 100.0 }};{% endif %}">
   <div class="container x-ph__inner">
     <div class="x-ph__gallery">
       {% if hp and hp.images.size > 0 %}
@@ -76,7 +76,11 @@
     { "type": "text", "id": "rating", "label": "Rating line", "default": "4.8 from 1,200+ happy customers", "info": "Leave empty to hide the stars." },
     { "type": "text", "id": "subtitle", "label": "One line under the title", "default": "Daily calm and focus, from 7 plant ingredients." },
     { "type": "text", "id": "example_title", "label": "Title while you have no products", "default": "Daily Calm Gummies" },
-    { "type": "color", "id": "background", "label": "Background", "default": "#F1F5EE" }
+    { "type": "color", "id": "background", "label": "Background", "default": "#F1F5EE" },
+    { "type": "header", "content": "Background" },
+    { "type": "image_picker", "id": "background_image", "label": "Background image", "info": "Optional. Fills the whole section behind the text; 1920 × 1080 px or larger." },
+    { "type": "range", "id": "overlay", "label": "Darken background image", "min": 0, "max": 80, "step": 5, "unit": "%", "default": 30 },
+    { "type": "select", "id": "text_tone", "label": "Text colour", "default": "auto", "options": [ { "value": "auto", "label": "Theme" }, { "value": "light", "label": "Light (on dark images)" }, { "value": "dark", "label": "Dark (on light images)" } ] }
   ],
   "blocks": [
     { "type": "tick", "name": "Benefit", "settings": [ { "type": "text", "id": "text", "label": "Benefit", "default": "Made with natural ingredients" } ] }

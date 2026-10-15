@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Form, Input, Button, Card } from "antd";
 import { PageHeader, SaveBar } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
+import { ImageUploadField } from "@/components/ImageUploadField";
 
 export function BrandForm({ brand }) {
   const router = useRouter();
@@ -42,8 +43,8 @@ export function BrandForm({ brand }) {
             <Form.Item name="title" label="Title" rules={[{ required: true, message: "Title is required" }]}>
               <Input size="large" />
             </Form.Item>
-            <Form.Item name="image" label="Image URL" className="mb-0">
-              <Input placeholder="https://..." />
+            <Form.Item name="image" label="Logo" className="mb-0">
+              <ImageUploadField hint="A square logo on a plain background works best." />
             </Form.Item>
           </Card>
         </div>

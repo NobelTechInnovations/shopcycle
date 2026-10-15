@@ -108,18 +108,8 @@
                   <span class="sys-label">Mobile number</span>
                   <input class="sys-input" type="tel" name="phone" autocomplete="tel" inputmode="tel" required autofocus maxlength="24" value="{{ login.phone }}" placeholder="98765 43210">
                 </label>
-                {% if login.phone_channels.size > 1 %}
-                  <fieldset class="sys-field" style="border:0;padding:0;margin:0">
-                    <legend class="sys-label">Send the code by</legend>
-                    <div class="sys-row" style="gap:16px">
-                      <label class="sys-check"><input type="radio" name="channel" value="sms" checked> <span>SMS</span></label>
-                      <label class="sys-check"><input type="radio" name="channel" value="whatsapp"> <span>WhatsApp</span></label>
-                    </div>
-                  </fieldset>
-                {% else %}
-                  <input type="hidden" name="channel" value="{{ login.phone_channels.first }}">
-                {% endif %}
-                <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Sending…">Send code{% if login.phone_channels.size == 1 and login.phone_channels.first == "whatsapp" %} on WhatsApp{% endif %}</button>
+                <p class="sys-help" style="margin:0">We'll send it {% if login.phone_channels.size > 1 %}on WhatsApp and by SMS{% elsif login.phone_channels.first == "whatsapp" %}on WhatsApp{% else %}by SMS{% endif %}.</p>
+                <button type="submit" class="sys-btn sys-btn--block sys-btn--lg" data-busy-label="Sending…">Send code</button>
               </form>
             {% endif %}
           </div>

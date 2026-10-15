@@ -1,68 +1,79 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, Button, App } from "antd";
-import { Upload as UploadIcon, X, Images } from "lucide-react";
+import { App, Button, Input, Upload } from "antd";
+import { ImagePlus, Images, Link2, Trash2 } from "lucide-react";
+import { MediaLibraryModal } from "@/components/MediaLibraryModal";
 import { IMAGE_ACCEPT, uploadImage } from "@/lib/uploads";
-import { MediaLibraryModal } from "./MediaLibraryModal";
 
-/** An image picked by uploading it to the Files library — for antd Form
- * items (value = the image URL, "" when none). `aspect` sets the preview
- * shape, e.g. "16 / 9" for a blog cover or "1200 / 630" for a share image. */
-export function ImageUploadField({ value, onChange, aspect = "16 / 9", label = "Upload image" }) {
+/** One image as a Form field (value = URL): drop or upload a file, pick
+ * from Files, or paste a link. */
+export function ImageUploadField({ value, onChange, hint = "Square images look best — 800 × 800 px or larger." }) {
   const { message } = App.useApp();
-  const [uploading, setUploading] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const library = <MediaLibraryModal open={libraryOpen} onClose={() => setLibraryOpen(false)} onSelect={(url) => onChange?.(url)} />;
+  const [busy, setBusy] = useState(false);
+  const [library, setLibrary] = useState(false);
+  const [pasting, setPasting] = useState(false);
 
-  async function handleUpload(file) {
-    setUploading(true);
+  async function upload(file) {
+    setBusy(true);
     try {
-      const uploaded = await uploadImage(file);
-      onChange?.(uploaded.url);
+      const f = await uploadImage(file);
+      onChange?.(f.url);
     } catch (err) {
       message.error(err.message);
     } finally {
-      setUploading(false);
+      setBusy(false);
     }
     return false;
   }
 
-  if (value) {
-    return (
-      <div className="relative">
-        <img src={value} alt="" className="w-full rounded-lg border border-app-border object-cover bg-app-bg" style={{ aspectRatio: aspect }} />
-        <div className="flex gap-2 mt-2">
-          <Upload accept={IMAGE_ACCEPT} showUploadList={false} beforeUpload={handleUpload} disabled={uploading}>
-            <Button size="small" loading={uploading}>
-              Replace
-            </Button>
-          </Upload>
-          <Button size="small" icon={<Images size={14} aria-hidden="true" />} onClick={() => setLibraryOpen(true)}>
-            Library
-          </Button>
-          <Button size="small" type="text" icon={<X size={14} aria-hidden="true" />} onClick={() => onChange?.("")}>
-            Remove
-          </Button>
-        </div>
-        {library}
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-2">
-    <Upload.Dragger accept={IMAGE_ACCEPT} showUploadList={false} beforeUpload={handleUpload} disabled={uploading} className="!bg-app-bg">
-      <div className="flex flex-col items-center gap-2 py-4">
-        <UploadIcon size={18} className="text-ink-muted" aria-hidden="true" />
-        <span className="text-sm font-medium text-ink">{uploading ? "Uploading…" : label}</span>
-        <span className="text-xs text-ink-muted">PNG, JPG, WebP or GIF</span>
-      </div>
-    </Upload.Dragger>
-      <Button size="small" icon={<Images size={14} aria-hidden="true" />} onClick={() => setLibraryOpen(true)}>
-        Choose from Files
-      </Button>
-      {library}
+      {value ? (
+        <div className="flex items-center gap-4">
+          <img src={value} alt="" className="h-28 w-28 rounded-xl border border-app-border bg-app-bg object-contain" />
+          <div className="flex flex-col gap-2">
+            <Upload accept={IMAGE_ACCEPT} showUploadList={false} beforeUpload={upload}>
+              <Button size="small" icon={<ImagePlus size={13} aria-hidden="true" />} loading={busy}>
+                Replace
+              </Button>
+            </Upload>
+            <Button size="small" icon={<Images size={13} aria-hidden="true" />} onClick={() => setLibrary(true)}>
+              Choose from Files
+            </Button>
+            <Button size="small" type="text" danger icon={<Trash2 size={13} aria-hidden="true" />} onClick={() => onChange?.(null)}>
+              Remove
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Upload.Dragger accept={IMAGE_ACCEPT} showUploadList={false} beforeUpload={upload} disabled={busy} style={{ padding: "8px 0" }}>
+          <div className="flex flex-col items-center gap-1.5 py-2 text-ink-muted">
+            <ImagePlus size={22} aria-hidden="true" />
+            <span className="text-[13px] text-ink">{busy ? "Uploading…" : "Drop an image here, or click to upload"}</span>
+            <span className="text-[12px]">{hint}</span>
+          </div>
+        </Upload.Dragger>
+      )}
+      {!value && (
+        <div className="flex flex-wrap gap-2">
+          <Button size="small" icon={<Images size={13} aria-hidden="true" />} onClick={() => setLibrary(true)}>
+            Choose from Files
+          </Button>
+          <Button size="small" type="text" icon={<Link2 size={13} aria-hidden="true" />} onClick={() => setPasting((v) => !v)}>
+            Paste a link
+          </Button>
+        </div>
+      )}
+      {pasting && !value && <Input placeholder="https://…" onPressEnter={(e) => e.currentTarget.value && (onChange?.(e.currentTarget.value.trim()), setPasting(false))} onBlur={(e) => e.currentTarget.value && (onChange?.(e.currentTarget.value.trim()), setPasting(false))} />}
+      <MediaLibraryModal
+        open={library}
+        onClose={() => setLibrary(false)}
+        onSelect={(urls) => {
+          if (urls?.[0]) onChange?.(urls[0]);
+          setLibrary(false);
+        }}
+      />
     </div>
   );
 }

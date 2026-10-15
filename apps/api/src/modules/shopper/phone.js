@@ -28,12 +28,8 @@ const display = (phone) => `+${phone}`;
 async function config(prisma, store) {
   const install = await prisma.storeApp.findFirst({ where: { storeId: store.id, app: { key: APP_KEY } }, select: { settings: true } });
   if (!install) return { enabled: false, channels: [] };
-  const setting = install.settings?.channel;
-  const wanted = setting === "whatsapp" ? ["whatsapp"] : setting === "both" ? ["sms", "whatsapp"] : ["sms"];
-  // The chosen channel may not be set up on the platform (SMS with only a
-  // WhatsApp provider, say): then codes go by whichever channel is.
-  const chosen = liveChannels(wanted);
-  const channels = chosen.length ? chosen : liveChannels();
+  // Codes go on every channel that's live — WhatsApp and SMS together.
+  const channels = liveChannels();
   return { enabled: channels.length > 0, channels };
 }
 
@@ -56,10 +52,11 @@ function parsePhone(raw) {
 
 /** Sends a code. `cfg` lets express checkout (One-Click app) use its own
  * channels; Phone Login's come from its app settings. */
-async function requestCode(prisma, store, { phone: rawPhone, channel }, log, { cfg: given } = {}) {
+async function requestCode(prisma, store, { phone: rawPhone }, log, { cfg: given } = {}) {
   const cfg = given || (await config(prisma, store));
   if (!cfg.enabled) throw new HttpError(404, "Phone sign-in isn't available in this store.");
-  const ch = cfg.channels.includes(channel) ? channel : cfg.channels[0];
+  // More than one channel live: send on all of them at once.
+  const ch = cfg.channels.length > 1 ? "both" : cfg.channels[0];
   const phone = parsePhone(rawPhone);
 
   const since = new Date(Date.now() - CODE_TTL_MS);

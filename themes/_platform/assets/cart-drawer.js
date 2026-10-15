@@ -63,6 +63,15 @@
     '<footer class="oy-drawer__foot"></footer>' +
     "</aside>";
   document.body.appendChild(root);
+  // One-Click Checkout's look (its app settings): colour and corners.
+  var DESIGN = (cfg.oneClick && cfg.oneClick.design) || {};
+  function applyDesign(el) {
+    if (DESIGN.accent) el.style.setProperty("--oy-primary", DESIGN.accent);
+    if (DESIGN.buttonText) el.style.setProperty("--oy-on-primary", DESIGN.buttonText);
+    var r = { rounded: "12px", square: "0px", pill: "999px" }[DESIGN.corners];
+    if (r) el.style.setProperty("--oy-radius-button", r);
+  }
+  applyDesign(root);
   var panel = root.querySelector(".oy-drawer__panel");
   var body = root.querySelector(".oy-drawer__body");
   var foot = root.querySelector(".oy-drawer__foot");
@@ -129,6 +138,7 @@
         "</li>";
     });
     html += "</ul>";
+    html += crossSellHtml(cart);
     body.innerHTML = html;
 
     var rows = '<div class="oy-sum"><span>Subtotal</span><span>' + money(cart.subtotal) + "</span></div>";
@@ -146,6 +156,38 @@
     lastCart = cart;
   }
   var lastCart = null;
+
+  // "You may also like" (One-Click Checkout ▸ Cross-sell): products not in
+  // the cart yet, as a scrolling row, a grid or a list.
+  function crossSellHtml(cart) {
+    var cs = cfg.oneClick && cfg.oneClick.crossSell;
+    if (!cs) return "";
+    var inCart = {};
+    (cart.items || []).forEach(function (i) {
+      inCart[i.productId] = true;
+    });
+    var items = cs.items.filter(function (p) {
+      return !inCart[p.id];
+    }).slice(0, cs.limit);
+    if (!items.length) return "";
+    var base = cfg.root.replace(/\/$/, "") + "/products/";
+    var out = '<section class="oy-xs oy-xs--' + esc(cs.layout) + " oy-xs--" + esc(cs.card) + '" aria-label="' + esc(cs.title) + '"><h3 class="oy-xs__title">' + esc(cs.title) + '</h3><div class="oy-xs__list">';
+    items.forEach(function (p) {
+      var href = esc(base + encodeURIComponent(p.slug));
+      out +=
+        '<div class="oy-xs__card">' +
+        '<a class="oy-xs__media" href="' + href + '" tabindex="-1" aria-hidden="true">' +
+        (p.image ? '<img src="' + esc(p.image) + '" alt="" loading="lazy">' : '<span class="oy-line__ph">' + ICON.photo + "</span>") +
+        "</a>" +
+        '<div class="oy-xs__info"><a class="oy-xs__name" href="' + href + '">' + esc(p.title) + "</a>" +
+        '<span class="oy-xs__price">' + money(p.price) + (p.compare ? " <s>" + money(p.compare) + "</s>" : "") + "</span></div>" +
+        (p.variantId
+          ? '<form method="post" action="' + esc(cfg.add) + '" data-product-title="' + esc(p.title) + '"><input type="hidden" name="variantId" value="' + esc(p.variantId) + '"><input type="hidden" name="quantity" value="1"><button type="submit" class="oy-xs__add" aria-label="Add ' + esc(p.title) + '">' + ICON.plus + "<span>Add</span></button></form>"
+          : '<a class="oy-xs__add" href="' + href + '" data-oy-quick="' + esc(p.slug) + '" aria-label="Choose options for ' + esc(p.title) + '">' + ICON.plus + "<span>Add</span></a>") +
+        "</div>";
+    });
+    return out + "</div></section>";
+  }
 
   // ── Open / close ───────────────────────────────────────
   function open() {
@@ -1016,7 +1058,7 @@
       addresses: saved.slice(),
       pick: saved.length ? 0 : "new",
       option: 0,
-      open: false,
+      open: DESIGN.summary === "open",
       error: null,
       busy: null,
     };
@@ -1041,6 +1083,7 @@
     }
     sheet = document.createElement("div");
     sheet.className = "oy-1c";
+    applyDesign(sheet);
     sheet.innerHTML = '<div class="oy-1c__scrim" data-oy-1c-close></div><form class="oy-1c__panel" role="dialog" aria-modal="true" aria-labelledby="oy-1c-title" novalidate></form>';
     document.body.appendChild(sheet);
     document.documentElement.classList.add("oy-1c-open");

@@ -129,6 +129,57 @@ if(f.elements.shippingName){f.elements.shippingName.addEventListener("change",fu
  * page, flagged `oneClick`, so the order records that the app was used (and
  * its fee) — the API checks the app really is installed before honouring it.
  */
+const HEX = /^#[0-9a-f]{6}$/i;
+/** The seller's One-Click Checkout look (Apps ▸ One-Click Checkout). */
+function oneClickDesign(app) {
+  return {
+    accent: HEX.test(app.accent || "") ? app.accent : null,
+    buttonText: HEX.test(app.buttonText || "") ? app.buttonText : null,
+    corners: ["rounded", "square", "pill"].includes(app.corners) ? app.corners : "theme",
+    summary: app.summary === "open" ? "open" : "closed",
+  };
+}
+
+/** "You may also like" in the cart drawer: best sellers, a collection, or
+ * products the seller picked. Items already in the cart are hidden there. */
+function oneClickCrossSell(ctx, app) {
+  if (app.crossSell !== "on") return null;
+  const all = Object.values(ctx.all_products || {});
+  let list;
+  if (app.crossSellSource === "products") {
+    list = String(app.crossSellProducts || "").split(",").map((id) => all.find((p) => p.id === id.trim()));
+  } else if (app.crossSellSource === "collection") {
+    list = Object.values(ctx.collections || {}).find((c) => c.id === app.crossSellCollection)?.products || [];
+  } else {
+    list = [...(ctx.best_sellers || []), ...all];
+  }
+  const seen = new Set();
+  const limit = Math.min(8, Math.max(1, Number(app.crossSellLimit) || 4));
+  const items = list
+    .filter((p) => p && p.available && !seen.has(p.id) && seen.add(p.id))
+    .slice(0, limit + 4) // spares for products already in the cart
+    .map((p) => {
+      const variants = (p.variants || []).filter((v) => v.available);
+      return {
+        id: p.id,
+        slug: p.slug,
+        title: p.title,
+        image: p.featured_image?.url || null,
+        price: p.price,
+        compare: p.on_sale ? p.compare_at_price : null,
+        variantId: (p.variants || []).length === 1 && variants[0] ? variants[0].id : null,
+      };
+    });
+  if (!items.length) return null;
+  return {
+    title: String(app.crossSellTitle || "").trim().slice(0, 60) || "You may also like",
+    layout: ["row", "grid", "list"].includes(app.crossSellLayout) ? app.crossSellLayout : "row",
+    card: ["minimal", "bordered", "filled"].includes(app.crossSellCard) ? app.crossSellCard : "bordered",
+    limit,
+    items,
+  };
+}
+
 function oneClickConfig(ctx, customer, store) {
   const app = ctx.apps?.["one-click-checkout"];
   if (!app || !ctx.payment_methods?.length) return null;
@@ -136,6 +187,8 @@ function oneClickConfig(ctx, customer, store) {
   const live = messaging.channels();
   return {
     provider: app.provider || "native",
+    design: oneClickDesign(app),
+    crossSell: oneClickCrossSell(ctx, app),
     otp: Boolean(live.sms || live.whatsapp || env.NODE_ENV !== "production"),
     storeName: store.name,
     fields: { phone: fields.phone, address2: fields.address2, company: fields.company, country: fields.country },
@@ -167,9 +220,7 @@ function oneClickConfig(ctx, customer, store) {
 function loginPopupConfig(ctx, customer, store, routes, templateName) {
   const app = ctx.apps?.["phone-login"];
   if (!app || customer || templateName === "account-login") return null;
-  const setting = app.channel;
-  const chosen = shopperPhone.liveChannels(setting === "whatsapp" ? ["whatsapp"] : setting === "both" ? ["sms", "whatsapp"] : ["sms"]);
-  const channels = chosen.length ? chosen : shopperPhone.liveChannels();
+  const channels = shopperPhone.liveChannels();
   if (!channels.length) return null;
   return {
     storeName: store.name,

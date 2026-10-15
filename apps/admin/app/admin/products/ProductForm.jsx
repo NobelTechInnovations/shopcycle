@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Form, Input, InputNumber, Select, Button, Card, Upload, App, Modal, Dropdown, Tooltip, Progress } from "antd";
+import { Form, Input, InputNumber, Select, Button, Card, App, Modal, Dropdown, Tooltip, Progress } from "antd";
 import Link from "next/link";
 import { Plus, Trash2, UploadCloud, Images, Wand2, ExternalLink, Copy, Sparkles, Undo2, ChevronDown, CheckCircle2, Circle, Tag as TagIcon, Layers } from "lucide-react";
 import { SavedPanel } from "@/components/SavedPanel";
 import { MediaLibraryModal } from "@/components/MediaLibraryModal";
+import { SortableUpload, moveByUid } from "@/components/SortableUpload";
 import { CustomDataFields, metafieldPayload } from "@/components/CustomDataFields";
 import { PageHeader, StatusBadge, SaveBar } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
@@ -237,6 +238,7 @@ export function ProductForm({ product, store, template, justCreated = false }) {
   const [seoOpen, setSeoOpen] = useState(Boolean(source?.seoTitle || source?.seoDescription));
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [categorySearch, setCategorySearch] = useState("");
   const [storeTags, setStoreTags] = useState([]);
   const [aiAvailable, setAiAvailable] = useState(false);
   const [suggestions, setSuggestions] = useState(null);
@@ -494,9 +496,13 @@ export function ProductForm({ product, store, template, justCreated = false }) {
               <DescriptionField form={form} aiAvailable={aiAvailable} getFacts={facts} onChanged={() => setDirty(true)} />
             </Card>
 
-            <Card size="small" title="Photos" extra={<span className="text-[12px] text-ink-muted">The first photo is the main one</span>}>
-              <Upload
+            <Card size="small" title="Photos" extra={<span className="text-[12px] text-ink-muted">Drag to reorder — the first photo is the main one</span>}>
+              <SortableUpload
                 listType="picture-card"
+                onReorder={(from, to) => {
+                  setImages((list) => moveByUid(list, from, to));
+                  setDirty(true);
+                }}
                 fileList={images.map((img) => ({ uid: img.uid, url: img.url, status: "done", name: "image" }))}
                 beforeUpload={handleImageUpload}
                 onRemove={(file) => removeImage(file.uid)}
@@ -508,7 +514,7 @@ export function ProductForm({ product, store, template, justCreated = false }) {
                     <span className="mt-1">{uploading ? "Uploading…" : "Add photo"}</span>
                   </div>
                 )}
-              </Upload>
+              </SortableUpload>
               <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
                 <p className="text-xs text-ink-muted m-0">JPEG, PNG, WebP or GIF — up to 8MB each, {MAX_IMAGES} photos. Square photos look best.</p>
                 {images.length < MAX_IMAGES && (
@@ -675,7 +681,38 @@ export function ProductForm({ product, store, template, justCreated = false }) {
               }
             >
               <Form.Item name="categoryId" label="Category" className={suggestedCategory || suggestions?.newCategory ? "mb-1.5" : undefined}>
-                <Select allowClear showSearch placeholder="Choose a category" optionFilterProp="label" options={categories.map((c) => ({ value: c.id, label: c.title }))} />
+                <Select
+                  allowClear
+                  showSearch
+                  placeholder="Choose or type a new category"
+                  optionFilterProp="label"
+                  options={categories.map((c) => ({ value: c.id, label: c.title }))}
+                  onSearch={setCategorySearch}
+                  onDropdownVisibleChange={(o) => !o && setCategorySearch("")}
+                  notFoundContent={null}
+                  dropdownRender={(menu) => {
+                    const typed = categorySearch.trim();
+                    const exists = categories.some((c) => c.title.toLowerCase() === typed.toLowerCase());
+                    return (
+                      <>
+                        {menu}
+                        {typed && !exists && (
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-1.5 rounded-md px-3 py-2 text-left text-[13px] text-accent hover:bg-app-bg"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              createSuggestedCategory(typed);
+                              setCategorySearch("");
+                            }}
+                          >
+                            <Plus size={13} aria-hidden="true" /> Create category “{typed}”
+                          </button>
+                        )}
+                      </>
+                    );
+                  }}
+                />
               </Form.Item>
               {suggestedCategory ? (
                 <div className="flex flex-wrap items-center gap-1.5 mb-4 text-[12px] text-ink-muted">

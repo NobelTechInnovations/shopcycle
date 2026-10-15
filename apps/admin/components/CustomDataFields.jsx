@@ -56,7 +56,7 @@ export function CustomDataFields({ ownerType = "product" }) {
   }, [ownerType]);
 
   const settingsLink = (
-    <Link href="/admin/settings/custom-data" className="text-xs font-normal">
+    <Link href="/admin/settings/custom-data" target="_blank" rel="noopener noreferrer" className="text-xs font-normal">
       Manage fields
     </Link>
   );
@@ -76,7 +76,9 @@ export function CustomDataFields({ ownerType = "product" }) {
           <SlidersHorizontal size={16} className="text-ink-subtle mt-0.5 shrink-0" aria-hidden="true" />
           <p className="m-0 text-[13px] text-ink-muted">
             Add your own fields — like <b>Fabric</b>, <b>Fit</b>, <b>Care instructions</b> or a <b>Size chart</b> — and fill them in here for every {ownerType}.{" "}
-            <Link href="/admin/settings/custom-data">Set up fields</Link>
+            <a href="/admin/settings/custom-data" target="_blank" rel="noopener noreferrer">
+              Set up fields ↗
+            </a>
           </p>
         </div>
       </Card>

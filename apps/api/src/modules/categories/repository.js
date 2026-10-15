@@ -18,7 +18,7 @@ function list(prisma, storeId, { q, page, pageSize }) {
 }
 
 function findById(prisma, storeId, id) {
-  return prisma.category.findFirst({ where: { id, storeId } });
+  return prisma.category.findFirst({ where: { id, storeId }, include: { _count: { select: { products: true } } } });
 }
 
 function findBySlug(prisma, storeId, slug, excludeId) {

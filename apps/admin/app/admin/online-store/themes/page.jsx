@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Card, Skeleton, Dropdown, App, Tooltip } from "antd";
-import { Palette, Code2, Eye, Sparkles, MoreHorizontal, Trash2, LayoutTemplate, Lock, Copy } from "lucide-react";
+import { Palette, Code2, Eye, Sparkles, MoreHorizontal, Trash2, Lock, Copy } from "lucide-react";
 import { PageHeader, StatusBadge, useConfirmDialog } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 
 const STOREFRONT_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL || "http://localhost:3002";
+const MARKET_THEMES = `${process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://market.oyklane.com"}/themes`;
 
 // Previews open on the store's own Oyklane address (never a hosting URL).
 function previewUrl(store, themeId) {
@@ -32,34 +33,6 @@ function LivePreview({ src, title }) {
   );
 }
 
-/** A small mock of the theme — its palette and heading font — for themes
- * not installed yet (installed ones show a live render instead). */
-function ThemeSwatch({ handle, meta }) {
-  const c = meta.swatch || { bg: "#FFFFFF", surface: "#F6F3EE", text: "#1A1A1A", accent: "#0078d4", font: "Inter" };
-  const fontUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(c.font).replace(/%20/g, "+")}:wght@500;600&display=swap`;
-  return (
-    <div className="aspect-[16/10] rounded-[10px] border border-app-border overflow-hidden flex flex-col" style={{ background: c.bg, color: c.text }} aria-hidden="true">
-      <link rel="stylesheet" href={fontUrl} />
-      <div className="flex items-center justify-between px-3 py-2 text-[9px] uppercase tracking-[0.14em]" style={{ borderBottom: `1px solid ${c.text}1a` }}>
-        <span>Shop</span>
-        <span style={{ fontFamily: `"${c.font}", serif`, fontSize: 12, letterSpacing: "0.08em" }}>{meta.name}</span>
-        <span>Cart</span>
-      </div>
-      <div className="flex-1 grid grid-cols-[1.2fr_1fr] gap-2 p-3">
-        <div className="rounded-sm flex flex-col justify-end p-2.5" style={{ background: c.text, color: c.bg }}>
-          <span className="block w-6 h-[3px] mb-1.5" style={{ background: c.accent }} />
-          <span style={{ fontFamily: `"${c.font}", serif`, fontSize: 17, lineHeight: 1.05, fontWeight: 600 }}>New season</span>
-        </div>
-        <div className="grid grid-cols-2 gap-1.5">
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className="rounded-sm" style={{ background: c.surface, border: `1px solid ${c.text}12` }} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function ThemesPage() {
   const { message } = App.useApp();
   const { confirmDialog } = useConfirmDialog();
@@ -80,6 +53,14 @@ export default function ThemesPage() {
   useEffect(() => {
     load();
   }, [load]);
+  const [added, setAdded] = useState(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("added");
+    if (id) {
+      setAdded(id);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   async function run(key, fn, success) {
     setBusy(key);
@@ -133,7 +114,7 @@ export default function ThemesPage() {
         title="Themes"
         subtitle="Your theme designs the home page, header and footer, and sets the fonts and colours for your whole store."
         actions={
-          <a href={`${process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://market.oyklane.com"}/themes`} target="_blank" rel="noopener noreferrer">
+          <a href={MARKET_THEMES} target="_blank" rel="noopener noreferrer">
             <Button type="primary" icon={<Sparkles size={15} aria-hidden="true" />}>View more themes</Button>
           </a>
         }
@@ -146,6 +127,17 @@ export default function ThemesPage() {
           fonts and colours automatically.
         </p>
       </div>
+
+      {added && themes.some((t) => t.id === added) && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3">
+          <p className="text-sm text-ink m-0">
+            <strong className="font-semibold">{themes.find((t) => t.id === added).name} is added.</strong> Customise it and publish when you're ready — your live store doesn't change until then.
+          </p>
+          <Link href={`/theme-editor/${added}`}>
+            <Button type="primary" icon={<Palette size={15} aria-hidden="true" />}>Customize</Button>
+          </Link>
+        </div>
+      )}
 
       {liveHasUpdate && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-accent/30 bg-accent/5 px-4 py-3">
@@ -251,25 +243,16 @@ export default function ThemesPage() {
         </section>
       )}
 
-      <section>
-        <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-[0.08em] mb-3">Theme library</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {Object.entries(available).map(([handle, meta]) => (
-            <Card key={handle} size="small" styles={{ body: { padding: 14 } }}>
-              <ThemeSwatch handle={handle} meta={meta} />
-              <div className="flex flex-wrap items-center gap-2 mt-3">
-                <h3 className="text-sm font-semibold m-0">{meta.name}</h3>
-                <span className="text-xs text-ink-muted">v{meta.version}</span>
-                {meta.bestFor && <span className="ml-auto text-[11px] font-medium text-ink-muted bg-app-bg border border-app-border rounded-full px-2 py-0.5">{meta.bestFor}</span>}
-              </div>
-              <p className="text-xs text-ink-muted mt-1 mb-3">{meta.description}</p>
-              <Button size="small" icon={<LayoutTemplate size={14} aria-hidden="true" />} loading={busy === `install-${handle}`} onClick={() => install(handle)}>
-                Add to store
-              </Button>
-            </Card>
-          ))}
-        </div>
-      </section>
+      {others.length === 0 && (
+        <Card styles={{ body: { padding: 20 } }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="m-0 text-sm text-ink-muted">Find more free and paid themes on the Oyklane Store. Pick one, click Add to my store, and it lands here ready to customise.</p>
+            <a href={MARKET_THEMES} target="_blank" rel="noopener noreferrer">
+              <Button icon={<Sparkles size={15} aria-hidden="true" />}>Browse themes</Button>
+            </a>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

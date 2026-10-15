@@ -46,10 +46,14 @@ export function PixelSetup({ form }) {
               <Alert type="info" showIcon message="No pixels found on your ad accounts" description="Create one in Meta Events Manager (Connect data sources ▸ Web), then come back — or type its ID below." />
             )}
             {pixels?.length > 0 && (
-              <Radio.Group value={pixelId} onChange={(e) => form.setFieldValue("pixelId", e.target.value)} className="flex flex-col gap-1.5">
+              <Radio.Group value={pixelId} onChange={(e) => form.setFieldValue("pixelId", e.target.value)} style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
                 {pixels.map((p) => (
-                  <Radio key={p.id} value={p.id} className="!items-start">
-                    <span className="text-[13px] text-ink">{p.name}</span>
+                  <Radio
+                    key={p.id}
+                    value={p.id}
+                    style={{ display: "flex", alignItems: "flex-start", margin: 0, width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${pixelId === p.id ? "#0078d4" : "#E5E7EB"}`, background: pixelId === p.id ? "#F0F7FD" : "#fff" }}
+                  >
+                    <span className="block text-[13.5px] font-medium text-ink">{p.name}</span>
                     <span className="block text-xs text-ink-muted">
                       {p.id} · {p.adAccount}
                       {p.lastFired ? ` · last active ${new Date(p.lastFired).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : " · no activity yet"}

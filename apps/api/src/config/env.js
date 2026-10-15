@@ -38,7 +38,7 @@ const envSchema = z.object({
   // developers. Its demo store shows every theme's preview; developers
   // get MARKET_PARTNER_SHARE of each sale.
   MARKET_ORIGIN: z.string().default("http://localhost:3005"),
-  MARKET_DEMO_STORE: z.string().default("loomwear"),
+  MARKET_DEMO_STORE: z.string().default("demo"),
   MARKET_PARTNER_SHARE: z.coerce.number().min(0).max(1).default(0.8),
   // The bare domain every store's default storefront subdomain hangs off
   // of — {handle}.<this> — e.g. "oyklane.com" in production. Used only to

@@ -420,14 +420,14 @@
       { "type": "paragraph", "content": "Free delivery, cash on delivery, returns and secure checkout — from your store's settings." }
     ] },
     { "type": "description", "name": "Description", "limit": 1, "settings": [
-      { "type": "select", "id": "display", "label": "Show as", "default": "open", "options": [
+      { "type": "select", "id": "display", "label": "Show as", "default": "closed", "options": [
         { "value": "open", "label": "Section, open" }, { "value": "closed", "label": "Section, closed" }, { "value": "plain", "label": "Plain text" }
       ] },
       { "type": "text", "id": "heading", "label": "Heading", "default": "Description" }
     ] },
     { "type": "details", "name": "Details (custom data)", "limit": 1, "settings": [
       { "type": "text", "id": "heading", "label": "Heading", "default": "Details" },
-      { "type": "checkbox", "id": "open", "label": "Open by default", "default": true },
+      { "type": "checkbox", "id": "open", "label": "Open by default", "default": false },
       { "type": "checkbox", "id": "show_basics", "label": "Also list brand, category, SKU and seller", "default": true }
     ] },
     { "type": "delivery", "name": "Delivery & returns", "limit": 1, "settings": [

@@ -1262,3 +1262,28 @@ html.oy-1c-open {
   line-height: 1.45;
   color: var(--oy-muted, #6b7280);
 }
+
+/* "You may also like" — One-Click Checkout's cross-sell */
+.oy-xs { margin: 18px 0 4px; padding-top: 16px; border-top: 1px solid var(--oy-line, #e5e5e5); }
+.oy-xs__title { margin: 0 0 12px; font: 600 14px/1.3 var(--oy-font-heading, inherit); color: var(--oy-text, #1a1a1a); }
+.oy-xs__list { display: grid; gap: 10px; }
+.oy-xs--row .oy-xs__list { grid-auto-flow: column; grid-auto-columns: 150px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; scrollbar-width: thin; }
+.oy-xs--grid .oy-xs__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.oy-xs__card { position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; scroll-snap-align: start; border-radius: var(--oy-radius, 10px); }
+.oy-xs--bordered .oy-xs__card { border: 1px solid var(--oy-line, #e5e5e5); padding: 8px; }
+.oy-xs--filled .oy-xs__card { background: var(--oy-surface, #f6f6f6); padding: 8px; }
+.oy-xs__media { display: block; aspect-ratio: 1; border-radius: calc(var(--oy-radius, 10px) - 2px); overflow: hidden; background: var(--oy-surface, #f6f6f6); }
+.oy-xs__media img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.oy-xs__media .oy-line__ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--oy-muted, #888); }
+.oy-xs__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.oy-xs__name { font-size: 13px; line-height: 1.35; color: var(--oy-text, #1a1a1a); text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.oy-xs__price { font-size: 13px; font-weight: 600; color: var(--oy-text, #1a1a1a); }
+.oy-xs__price s { font-weight: 400; color: var(--oy-muted, #888); margin-left: 4px; }
+.oy-xs__card form { margin: 0; }
+.oy-xs__add { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--oy-primary, #111); border-radius: var(--oy-radius-button, 8px); background: transparent; color: var(--oy-primary, #111); font: 600 13px/1 var(--oy-font-body, inherit); text-decoration: none; cursor: pointer; }
+.oy-xs__add:hover { background: var(--oy-primary, #111); color: var(--oy-on-primary, #fff); }
+.oy-xs__add svg { width: 14px; height: 14px; }
+.oy-xs--list .oy-xs__card { flex-direction: row; align-items: center; }
+.oy-xs--list .oy-xs__media { width: 64px; flex-shrink: 0; }
+.oy-xs--list .oy-xs__info { flex: 1; }
+.oy-xs--list .oy-xs__add { width: auto; }
