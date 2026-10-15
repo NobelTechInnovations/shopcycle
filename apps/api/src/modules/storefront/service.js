@@ -684,6 +684,47 @@ function relatedProducts(ctx, product, collection) {
   return picked.slice(0, 8);
 }
 
+/** Offers on a product page: the store's live discounts that apply to it
+ * (whole order, this product, or one of its collections) — unless the
+ * seller hid the code. Best first. */
+async function productOffers(prisma, store, ctx, product) {
+  const now = new Date();
+  const rows = await prisma.discount
+    .findMany({
+      where: {
+        storeId: store.id,
+        status: "active",
+        showOnStore: true,
+        AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: now } }] }, { OR: [{ endsAt: null }, { endsAt: { gt: now } }] }],
+      },
+      orderBy: { value: "desc" },
+      take: 20,
+    })
+    .catch(() => []);
+  const inCollections = Object.values(ctx.collections || {})
+    .filter((c) => c.id !== "all" && (c.products || []).some((p) => p.id === product.id))
+    .map((c) => c.id);
+  const num = (v) => (v == null ? null : Number(v));
+  return rows
+    .filter((d) => d.usageLimit == null || d.usageCount < d.usageLimit)
+    .filter((d) => d.appliesTo === "order" || (d.appliesTo === "products" ? d.targetIds.includes(product.id) : d.targetIds.some((id) => inCollections.includes(id))))
+    .slice(0, 4)
+    .map((d) => {
+      const value = num(d.value);
+      const min = num(d.minSubtotal);
+      const headline =
+        d.type === "percentage"
+          ? `${value}% off`
+          : d.type === "fixed_amount"
+            ? `₹${value.toLocaleString("en-IN")} off`
+            : d.type === "free_shipping"
+              ? "Free delivery"
+              : `Buy ${d.buyQuantity || 1}, get ${d.getQuantity || 1} ${value >= 100 ? "free" : `at ${value}% off`}`;
+      const terms = [min ? `on orders over ₹${min.toLocaleString("en-IN")}` : null, d.minQuantity ? `when you buy ${d.minQuantity}+` : null, d.maxDiscount ? `up to ₹${num(d.maxDiscount).toLocaleString("en-IN")}` : null].filter(Boolean).join(", ");
+      return { code: d.method === "automatic" ? null : d.code, automatic: d.method === "automatic", title: d.title || headline, headline, terms };
+    });
+}
+
 /** The first real collection a product is in — its breadcrumb and
  * "you may also like" source. */
 function primaryCollection(ctx, product) {
@@ -810,7 +851,7 @@ async function renderPage(
     if (!found) throw new HttpError(404, `Product not found: ${slug}`);
     const collection = primaryCollection(globalContext, found);
     const selected = found.variants.find((v) => v.id === variant) || found.variants.find((v) => v.available) || found.variants[0] || null;
-    const fieldDefs = await metafieldService.list(prisma, store.id, "product");
+    const [fieldDefs, offers] = await Promise.all([metafieldService.list(prisma, store.id, "product"), productOffers(prisma, store, globalContext, found)]);
     const reviewData = globalContext.reviews_app ? await reviewsService.forProduct(prisma, store.id, found.id) : null;
     // Rentals app: the booking calendar's rules and booked days.
     const rental = found.rental
@@ -831,6 +872,7 @@ async function renderPage(
       selected_variant: selected,
       options: variantOptions(found, selected),
       related: relatedProducts(globalContext, found, collection),
+      offers,
       client_json: JSON.stringify({
         currency: store.currency,
         lowStock: globalContext.shop.low_stock,

@@ -38,6 +38,7 @@ function toBody(v, kind) {
     minQuantity: v.minimum === "quantity" ? v.minQuantity : null,
     usageLimit: v.limitOn ? v.usageLimit : null,
     oncePerCustomer: Boolean(v.oncePerCustomer),
+    showOnStore: v.showOnStore !== false,
     startsAt: fromLocal(v.startsAt),
     endsAt: v.endOn ? fromLocal(v.endsAt) : null,
     status: v.active ? "active" : "disabled",
@@ -60,6 +61,7 @@ function initialValues(d, kind) {
       minSubtotal: kind === "shipping" ? 999 : undefined,
       limitOn: false,
       oncePerCustomer: false,
+      showOnStore: true,
       startsAt: toLocal(new Date().toISOString()),
       endOn: false,
       active: true,
@@ -84,6 +86,7 @@ function initialValues(d, kind) {
     limitOn: Boolean(d.usageLimit),
     usageLimit: d.usageLimit || undefined,
     oncePerCustomer: Boolean(d.oncePerCustomer),
+    showOnStore: d.showOnStore !== false,
     startsAt: toLocal(d.startsAt || d.createdAt),
     endOn: Boolean(d.endsAt),
     endsAt: toLocal(d.endsAt),
@@ -302,6 +305,9 @@ export function DiscountForm({ discount, kind: kindParam }) {
               </div>
               <Form.Item name="oncePerCustomer" valuePropName="checked" className="mb-0 mt-3">
                 <Checkbox>Once per customer (by email)</Checkbox>
+              </Form.Item>
+              <Form.Item name="showOnStore" valuePropName="checked" className="mb-0 mt-2" extra="Shoppers see it as an offer, with the code to copy, on the product pages it applies to. Untick for a private code.">
+                <Checkbox>Show on product pages</Checkbox>
               </Form.Item>
             </Card>
 

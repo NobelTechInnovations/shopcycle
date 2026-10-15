@@ -208,7 +208,9 @@ function contrast(a, b) {
 }
 
 /** Black or white — whichever reads better on `bg`. */
-const onColor = (bg) => (contrast(bg, [255, 255, 255]) >= contrast(bg, [17, 17, 20]) ? "#ffffff" : "#111114");
+// White on any colour dark or saturated enough to carry it (a brand red,
+// say — dark text on red looks wrong); dark text only on light colours.
+const onColor = (bg) => (contrast(bg, [255, 255, 255]) >= 3.4 || contrast(bg, [255, 255, 255]) >= contrast(bg, [17, 17, 20]) ? "#ffffff" : "#111114");
 
 /** `color` darkened/lightened toward `text` until it's readable as text on `bg`. */
 function readableOn(color, bg, text) {

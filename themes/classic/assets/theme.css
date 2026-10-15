@@ -1712,3 +1712,22 @@ main:focus {
 .card-rating {
   align-self: flex-start;
 }
+
+/* ── Product cards: refined defaults (sellers can still restyle them in
+   Theme settings ▸ Product cards) ─────────────────────────────────── */
+.card { gap: 12px; }
+.card__media { border-radius: var(--r-card); background: var(--c-surface); isolation: isolate; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-text) 6%, transparent); transition: box-shadow .3s ease; }
+.card:hover .card__media { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-text) 14%, transparent), 0 14px 30px -18px rgba(0,0,0,.28); }
+.card__media img { object-fit: var(--card-fit, contain); padding: var(--card-pad, 7%); box-sizing: border-box; mix-blend-mode: multiply; }
+.card__badges > * { font-size: 11.5px; font-weight: 600; letter-spacing: .02em; padding: 5px 10px; border-radius: 999px; }
+.card__body { display: flex; flex-direction: column; gap: 5px; padding: 0 2px; }
+.card__brand { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; opacity: .6; }
+.card__title { margin: 0; font-size: 15px; line-height: 1.35; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card__body .price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 2px 0 0; font-size: 15px; }
+.card__body .price__now { font-weight: 650; }
+.card__body .price__was { font-size: 13px; opacity: .5; }
+.card__quick-btn { border-radius: 999px; font-weight: 600; box-shadow: 0 8px 20px -10px rgba(0,0,0,.35); }
+@media (max-width: 749px) {
+  .card__title { font-size: 14px; }
+  .card__body .price { font-size: 14px; }
+}

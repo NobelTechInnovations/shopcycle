@@ -96,6 +96,22 @@
                     <p class="sys-pinfo__taxnote">{% if shop.taxes_included %}Inclusive of all taxes{% else %}Taxes calculated at checkout{% endif %}{% if shop.free_shipping_above %} · Free delivery over {{ shop.free_shipping_above | money }}{% endif %}</p>
                   {% endif %}
                 </div>
+                {% if b.show_offers != false and product.offers.size > 0 %}
+                  <div class="sys-pblock sys-offers" aria-label="Offers">
+                    {% for o in product.offers %}
+                      <div class="sys-offer">
+                        <span class="sys-offer__icon" aria-hidden="true">{% render 'snippets/sys-icon', icon: 'tag' %}</span>
+                        <span class="sys-offer__text">
+                          <strong>{{ o.title }}</strong>{% if o.terms != blank %} <span>{{ o.terms }}</span>{% endif %}
+                          <small>{% if o.automatic %}Applied automatically at checkout{% else %}Use code at checkout{% endif %}</small>
+                        </span>
+                        {% if o.code %}
+                          <button type="button" class="sys-offer__code" data-sys-copy="{{ o.code | escape }}" aria-label="Copy code {{ o.code | escape }}">{{ o.code }}</button>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
                 {% endif %}
 
               {% when 'rental_price' %}
@@ -360,7 +376,7 @@
       { "value": "thumbs_below", "label": "Large photo, thumbnails below" },
       { "value": "stacked", "label": "All photos, one under another" }
     ] },
-    { "type": "select", "id": "image_fit", "label": "Photo fit", "default": "cover", "options": [
+    { "type": "select", "id": "image_fit", "label": "Photo fit", "default": "contain", "options": [
       { "value": "cover", "label": "Fill the frame (crop)" },
       { "value": "contain", "label": "Show the whole photo" }
     ] },
@@ -389,7 +405,8 @@
         { "value": "small", "label": "Small" }, { "value": "medium", "label": "Medium" }, { "value": "large", "label": "Large" }
       ] },
       { "type": "checkbox", "id": "show_save", "label": "Show “Save x%” on sale items", "default": true },
-      { "type": "checkbox", "id": "show_tax_note", "label": "Show “Inclusive of all taxes”", "default": true }
+      { "type": "checkbox", "id": "show_tax_note", "label": "Show “Inclusive of all taxes”", "default": true },
+      { "type": "checkbox", "id": "show_offers", "label": "Show offers (your discount codes)", "default": true, "info": "Hide a private code in Discounts ▸ the code ▸ Show on product pages." }
     ] },
     { "type": "rental_price", "name": "Rent per day (Rentals app)", "limit": 1, "settings": [
       { "type": "paragraph", "content": "The daily rent, cheaper rates for longer rentals, and the deposit — for products you rent out." },

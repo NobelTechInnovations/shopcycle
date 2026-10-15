@@ -22,6 +22,7 @@ const baseDiscountSchema = z.object({
   maxDiscount: z.coerce.number().positive().optional().nullable(),
   usageLimit: z.coerce.number().int().positive().optional().nullable(),
   oncePerCustomer: z.boolean(),
+  showOnStore: z.boolean().optional(),
   buyQuantity: z.coerce.number().int().positive().max(100).optional().nullable(),
   getQuantity: z.coerce.number().int().positive().max(100).optional().nullable(),
   startsAt: z.coerce.date().optional().nullable(),

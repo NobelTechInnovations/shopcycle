@@ -549,3 +549,22 @@
   loadBooked();
   sync();
 })();
+
+(function () {
+  // Offers: tap a code to copy it.
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest && e.target.closest("[data-sys-copy]");
+    if (!btn) return;
+    var code = btn.getAttribute("data-sys-copy");
+    var done = function () {
+      var label = btn.textContent;
+      btn.textContent = "Copied";
+      btn.classList.add("is-copied");
+      setTimeout(function () {
+        btn.textContent = label;
+        btn.classList.remove("is-copied");
+      }, 1600);
+    };
+    if (navigator.clipboard) navigator.clipboard.writeText(code).then(done, function () {});
+  });
+})();
