@@ -19,7 +19,7 @@ export function BrandMark({ size = 26, tone = "light", label, showWordmark = tru
           width: size,
           height: size,
           borderRadius: Math.round(size * 0.3),
-          background: "linear-gradient(135deg, #0067B8 0%, #2B9FE6 100%)",
+          background: "linear-gradient(135deg, #0078d4 0%, #2B9FE6 100%)",
           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25)",
         }}
       >

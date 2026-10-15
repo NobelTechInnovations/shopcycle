@@ -14,7 +14,7 @@ export const tokens = {
     brand: "#111114",
     // Oyklane Blue (docs/brand-guidelines.md) — primary buttons, links,
     // focus rings, active nav. Sky is the logo gradient's second colour.
-    accent: "#0067B8",
+    accent: "#0078d4",
     accentHover: "#005A9E",
     accentSoft: "#EAF3FC",
     accent2: "#2B9FE6",

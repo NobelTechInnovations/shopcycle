@@ -138,7 +138,7 @@ export default function DiscountsPage() {
         <div className="min-w-[220px] max-w-[420px]">
           {row.method === "automatic" ? (
             <span className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-ink">
-              <Zap size={13} className="text-[#0067B8]" aria-hidden="true" /> {row.title}
+              <Zap size={13} className="text-[#0078d4]" aria-hidden="true" /> {row.title}
               <span className="text-[11px] font-medium text-ink-muted bg-app-bg rounded px-1.5 py-0.5">Automatic</span>
             </span>
           ) : (

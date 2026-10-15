@@ -123,7 +123,7 @@ function FeaturedFlow({ app }) {
   const [busy, setBusy] = useState(false);
   if (!app) return null;
   return (
-    <section className="relative overflow-clip rounded-[16px] mb-6 p-6 sm:p-7 text-white" style={{ background: "radial-gradient(120% 140% at 0% 0%, #0067B8 0%, #4C33C9 45%, #111114 100%)" }}>
+    <section className="relative overflow-clip rounded-[16px] mb-6 p-6 sm:p-7 text-white" style={{ background: "radial-gradient(120% 140% at 0% 0%, #0078d4 0%, #4C33C9 45%, #111114 100%)" }}>
       <div className="absolute -right-10 -top-10 w-56 h-56 rounded-full opacity-30" style={{ background: "radial-gradient(circle, #2B9FE6 0%, transparent 70%)" }} aria-hidden="true" />
       <div className="relative flex flex-col md:flex-row md:items-center gap-5">
         <div className="flex-1 min-w-0">

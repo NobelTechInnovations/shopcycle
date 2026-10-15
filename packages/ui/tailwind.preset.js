@@ -28,7 +28,7 @@ module.exports = {
         // Oyklane Blue and Sky (docs/brand-guidelines.md) — primary
         // actions, links, focus, active states; navy for dark surfaces.
         accent: {
-          DEFAULT: "#0067B8",
+          DEFAULT: "#0078d4",
           hover: "#005A9E",
           soft: "#EAF3FC",
           2: "#2B9FE6",
@@ -56,7 +56,7 @@ module.exports = {
         raised: "0 4px 16px -4px rgba(17, 17, 20, 0.10), 0 2px 4px -2px rgba(17, 17, 20, 0.06)",
       },
       backgroundImage: {
-        "brand-gradient": "linear-gradient(135deg, #0067B8 0%, #2B9FE6 100%)",
+        "brand-gradient": "linear-gradient(135deg, #0078d4 0%, #2B9FE6 100%)",
       },
     },
   },

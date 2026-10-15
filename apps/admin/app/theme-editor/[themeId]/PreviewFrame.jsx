@@ -19,9 +19,9 @@ const LOADING_HTML =
 // name, clicking selects it in the editor; links don't navigate away.
 const PICKER = `<style>
 [data-section-id]{position:relative}
-[data-section-id].oy-hover{outline:2px dashed #0067b8;outline-offset:-2px;cursor:pointer}
-[data-section-id].oy-selected{outline:2px solid #0067b8;outline-offset:-2px}
-.oy-tag{position:absolute;top:8px;left:8px;z-index:9999;background:#0067b8;color:#fff;font:600 11px/1 system-ui,sans-serif;padding:5px 8px;border-radius:4px;pointer-events:none}
+[data-section-id].oy-hover{outline:2px dashed #0078d4;outline-offset:-2px;cursor:pointer}
+[data-section-id].oy-selected{outline:2px solid #0078d4;outline-offset:-2px}
+.oy-tag{position:absolute;top:8px;left:8px;z-index:9999;background:#0078d4;color:#fff;font:600 11px/1 system-ui,sans-serif;padding:5px 8px;border-radius:4px;pointer-events:none}
 </style><script>(function(){
 var cur=null;
 function sec(t){return t&&t.closest?t.closest('[data-section-id]'):null}

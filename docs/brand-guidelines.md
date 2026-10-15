@@ -33,7 +33,7 @@ sections, navy for the dark surfaces.
 
 | Name | Hex | Use |
 |---|---|---|
-| Oyklane Blue | `#0067B8` | Primary buttons, links, icons, focus — the one accent |
+| Oyklane Blue | `#0078d4` | Primary buttons, links, icons, focus — the one accent |
 | Blue Deep | `#005A9E` | Hover / pressed, link text on tints |
 | Sky Mist | `#E5F1FB` | Icon tiles, selected rows, highlighted cards |
 | Sky Wash | `#EEF6FD` → `#E3F0FB` | Alternate sections and the hero background |

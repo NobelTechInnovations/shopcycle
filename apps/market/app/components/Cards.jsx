@@ -22,7 +22,7 @@ export function Price({ item, suffix = true }) {
 
 /** A theme without screenshots, drawn in its own colours. */
 export function ThemeMock({ swatch }) {
-  const s = swatch || { bg: "#fff", surface: "#f2f2f5", text: "#111", accent: "#0067b8" };
+  const s = swatch || { bg: "#fff", surface: "#f2f2f5", text: "#111", accent: "#0078d4" };
   return (
     <div className="mock" style={{ background: s.bg }} aria-hidden="true">
       <div className="mock__bar" style={{ background: s.text, width: "38%" }} />
