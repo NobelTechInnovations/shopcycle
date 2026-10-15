@@ -69,7 +69,7 @@ let visible = { at: 0, token: null, wabas: [], phones: [] };
 async function visibleToKey(v) {
   if (visible.token === v.token && Date.now() - visible.at < 10 * 60 * 1000) return visible;
   try {
-    const list = await meta.listWabas(decryptSecret(v.token), []);
+    const list = await meta.listWabas(decryptSecret(v.token), [], { assigned: true });
     visible = { at: Date.now(), token: v.token, wabas: list.map((w) => String(w.id)), phones: list.flatMap((w) => (w.phoneNumbers || []).map((n) => String(n.id))) };
   } catch {
     visible = { ...visible, at: Date.now(), token: v.token };
@@ -81,7 +81,22 @@ async function visibleToKey(v) {
 async function wabas(prisma) {
   const v = await load(prisma, { fresh: true });
   if (!v.token) throw new HttpError(400, "Add the key first.");
-  return meta.listWabas(decryptSecret(v.token), []);
+  return meta.listWabas(decryptSecret(v.token), [], { assigned: true });
+}
+
+/** One WhatsApp account by its ID (Business settings ▸ WhatsApp accounts),
+ * when Meta doesn't list it for the key. */
+async function lookupWaba(prisma, wabaId) {
+  const v = await load(prisma, { fresh: true });
+  if (!v.token) throw new HttpError(400, "Add the key first.");
+  const id = String(wabaId || "").replace(/\D/g, "");
+  if (id.length < 8) throw new HttpError(400, "The WhatsApp Business Account ID is a long number.");
+  const token = decryptSecret(v.token);
+  const waba = await meta.graphRequest(`/${id}`, { token, params: { fields: "id,name" } }).catch((err) => {
+    throw new HttpError(400, `Meta says this key can't open account ${id}: ${err.message}. Check the system user has it under Assigned assets ▸ WhatsApp accounts.`);
+  });
+  const numbers = await meta.graphRequest(`/${id}/phone_numbers`, { token, params: { fields: meta.WABA_NUMBER_FIELDS, limit: 50 } }).catch(() => ({ data: [] }));
+  return [{ id: waba.id, name: waba.name || "WhatsApp Business account", phoneNumbers: (numbers.data || []).map(meta.shapeNumber), problem: (numbers.data || []).length ? null : "This account has no phone number yet." }];
 }
 
 /** Super admin pasted a System User token: check it, list what it can use. */
@@ -96,7 +111,7 @@ async function useToken(prisma, token, actor) {
       throw new HttpError(400, "The token needs the whatsapp_business_management and whatsapp_business_messaging permissions. Generate it again with both ticked.");
     }
   }
-  const wabas = await meta.listWabas(t, []);
+  const wabas = await meta.listWabas(t, [], { assigned: true });
   await save(prisma, { token: encryptSecret(t), connectedAt: new Date().toISOString() }, actor);
   return { wabas };
 }
@@ -220,4 +235,4 @@ async function installStandard(conn, { linkBase, withOtp = false } = {}) {
   return results;
 }
 
-module.exports = { KEY, load, save, connection, isPlatformAccount, wabas, useToken, choose, activate, status, installStandard };
+module.exports = { KEY, load, save, connection, isPlatformAccount, wabas, lookupWaba, useToken, choose, activate, status, installStandard };

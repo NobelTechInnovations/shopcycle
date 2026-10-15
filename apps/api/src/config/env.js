@@ -298,10 +298,9 @@ const envSchema = z.object({
   // Tests point Google's API hosts at a mock: https://<host>/… becomes
   // <GOOGLE_API_BASE>/<host>/…. Unset in real use.
   GOOGLE_API_BASE: z.string().optional(),
-  // Google Ads Manager app: the developer token from Oyklane's Google Ads
-  // manager account (Tools ▸ API Center). "Test account" access only works
-  // on test accounts — apply for Basic access for real sellers.
-  GOOGLE_ADS_DEVELOPER_TOKEN: z.string().optional(),
+  // Google Ads Manager app: no developer token (retired Sep 2026) — API
+  // access belongs to the Google Cloud project of GOOGLE_CLIENT_ID (Google
+  // Cloud ▸ Google Ads API ▸ Overview: Test → Explorer → Basic).
   // Google Ads API version — keep on a supported one (developers.google.com/google-ads/api/docs/sunset-dates).
   GOOGLE_ADS_API_VERSION: z.string().default("v24"),
   GOOGLE_PLACES_API_KEY: z.string().optional(),

@@ -208,7 +208,7 @@ async function grantedWhatsappIds(token) {
  * the case (no number yet, not ticked when connecting, Meta refused) —
  * the seller sees the reason instead of an empty list.
  */
-async function listWabas(token, pages) {
+async function listWabas(token, pages, { assigned = false } = {}) {
   const found = new Map();
   const grant = await grantedWhatsappIds(token);
   const hasWaScope = grant.scopes.includes("whatsapp_business_management");
@@ -247,6 +247,13 @@ async function listWabas(token, pages) {
       const waba = await graphRequest(`/${id}`, { token, params: { fields: "id,name" } }).catch(() => ({ id }));
       await add(waba);
     }
+  }
+
+  // 2a. A system user's assigned accounts (Super admin's permanent key):
+  // its token has no business_management, so step 2 finds nothing.
+  if (assigned) {
+    const list = await graphRequest("/me/assigned_whatsapp_business_accounts", { token, params: { fields: "id,name", limit: 50 } }).catch(() => ({ data: [] }));
+    for (const waba of list.data || []) await add(waba);
   }
 
   // 2. Their businesses' own and client WABAs.

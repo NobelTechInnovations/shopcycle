@@ -28,9 +28,10 @@ const PANELS = {
  * gradient-glow language as apps/www, so signing in feels like the same
  * product the marketing site promised. Right: the form itself, on a
  * clean surface. The brand panel is hidden below `lg` — on a phone the
- * form is all anyone needs.
+ * form is all anyone needs. `homeHref`: where the logo goes (the
+ * marketing site, for sellers).
  */
-export function AuthShell({ variant = "seller", title, subtitle, children, footer }) {
+export function AuthShell({ variant = "seller", title, subtitle, children, footer, homeHref }) {
   const panel = PANELS[variant] || PANELS.seller;
   const isPlatform = variant === "platform";
 
@@ -64,7 +65,13 @@ export function AuthShell({ variant = "seller", title, subtitle, children, foote
         />
 
         <div className="relative">
-          <BrandMark size={30} tone="dark" label={isPlatform ? "Platform" : undefined} />
+          {homeHref ? (
+            <a href={homeHref} aria-label="Oyklane home" className="inline-block">
+              <BrandMark size={30} tone="dark" label={isPlatform ? "Platform" : undefined} />
+            </a>
+          ) : (
+            <BrandMark size={30} tone="dark" label={isPlatform ? "Platform" : undefined} />
+          )}
         </div>
 
         <div className="relative max-w-md">
@@ -97,7 +104,13 @@ export function AuthShell({ variant = "seller", title, subtitle, children, foote
       <main className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-[380px]">
           <div className="lg:hidden mb-10">
-            <BrandMark size={28} label={isPlatform ? "Platform" : undefined} />
+            {homeHref ? (
+              <a href={homeHref} aria-label="Oyklane home" className="inline-block">
+                <BrandMark size={28} label={isPlatform ? "Platform" : undefined} />
+              </a>
+            ) : (
+              <BrandMark size={28} label={isPlatform ? "Platform" : undefined} />
+            )}
           </div>
           <h1 className="text-[26px] font-semibold text-ink m-0" style={{ letterSpacing: "-0.02em" }}>
             {title}

@@ -5,3 +5,5 @@ export const DEMO_URL = process.env.NEXT_PUBLIC_DEMO_STORE_URL || "";
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://api.oyklane.com").replace(/\/$/, "");
 
 export const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+// The Oyklane Store — themes and apps from developers (apps/market).
+export const MARKET_URL = (process.env.NEXT_PUBLIC_MARKET_URL || "https://oyklanestore.com").replace(/\/$/, "");

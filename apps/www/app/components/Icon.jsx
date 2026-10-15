@@ -36,6 +36,13 @@ export const I = {
   lock: "M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4",
   eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
   home: "M3 11l9-7 9 7M5 10v10h14V10",
+  megaphone: "M3 10v4h3l7 5V5L6 10zM16 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11",
+  rupee: "M7 4h11M7 9h11M10 4c4 0 5 2.5 5 5s-1 5-5 5H7l8 7",
+  grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  trend: "M3 17l6-6 4 4 8-8M15 7h6v6",
+  cart: "M3 4h2l2.4 11h11L21 7H6.2M9 20a1 1 0 1 0 0-.01M18 20a1 1 0 1 0 0-.01",
+  search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5",
+  refresh: "M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7",
 };
 
 export function Icon({ d, className }) {

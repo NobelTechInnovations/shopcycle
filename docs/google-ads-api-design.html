@@ -53,7 +53,7 @@
 <body>
 
 <h1>Oyklane Google Ads Manager</h1>
-<p class="sub">Google Ads API tool design document — Basic access application</p>
+<p class="sub">Google Ads API tool design document</p>
 
 <div class="meta">
   <b>Company</b><span>Oyklane</span>
@@ -94,13 +94,13 @@
 <h2>4. Users and access</h2>
 <ul>
   <li><b>External users (merchants).</b> Each merchant reaches only the Google Ads account(s) their own Google login can access, for their own store. Merchants never see other merchants' data.</li>
-  <li><b>Internal users (Oyklane staff).</b> Platform setup (developer token, manager account) and support. Staff do not run campaigns on merchants' behalf.</li>
+  <li><b>Internal users (Oyklane staff).</b> Platform setup (Google Cloud project, manager account) and support. Staff do not run campaigns on merchants' behalf.</li>
   <li><b>Store roles.</b> Within a store, only the owner or an admin can create, change or remove campaigns. Staff accounts can only view reports.</li>
 </ul>
 
 <h2>5. Technical design</h2>
 <ul>
-  <li><b>Architecture.</b> Next.js merchant dashboard → Oyklane API (Node.js) → Google Ads API REST (current supported version). All Google Ads calls are made server-side; the developer token and OAuth tokens never reach the browser.</li>
+  <li><b>Architecture.</b> Next.js merchant dashboard → Oyklane API (Node.js) → Google Ads API REST (current supported version). All Google Ads calls are made server-side; OAuth tokens never reach the browser. API access is set on the Google Cloud project of Oyklane's OAuth client (no developer token since September 2026).</li>
   <li><b>Authentication.</b> OAuth 2.0 web flow per merchant. Refresh tokens are stored encrypted (AES-256-GCM) and are deleted when the merchant disconnects. The <code>login-customer-id</code> header is used when an account is reached through a manager account.</li>
   <li><b>Mutations.</b> Campaign creation is a single atomic <code>googleAds:mutate</code> request, so a campaign is either fully created or not created. Each change is recorded in the store's activity log (who, what, when, before and after).</li>
   <li><b>Errors.</b> Google Ads failures are translated into plain language for the merchant, for example "This account isn't active yet — finish billing in Google Ads".</li>

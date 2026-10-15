@@ -394,7 +394,7 @@ Local `.env` points at the **production** Supabase database, so every local writ
   - *Insights*: Google's numbers vs store orders from Google clicks, plain-language summary with confidence/caveats, suggestions to approve (pause, budget step, **negative keywords from search terms that cost money without sales**) and Google's own recommendations (apply / dismiss).
   - *Automation & activity*: the same opt-in rules as Meta, per campaign, with limits and log.
 - New: table google_ads_accounts; columns meta_connections.instagramAccountId/instagramUsername, whatsapp_conversations.viaPlatform, platform on ad_drafts/ad_media/ad_activities/ad_rules (pushed).
-- Railway: `GOOGLE_ADS_DEVELOPER_TOKEN` (and `GOOGLE_ADS_API_VERSION` if v24 isn't current). Google Cloud OAuth consent screen: add the `.../auth/adwords` scope.
+- Google Ads API access (no developer token since Google retired them on 9 Sep 2026): Google Cloud ▸ the OAuth client's project ▸ Google Ads API ▸ Overview — Test → Explorer → (brand verification) → Basic. `GOOGLE_ADS_API_VERSION` if v24 isn't current. Google Cloud OAuth consent screen: add the `.../auth/adwords` scope.
 
 ### Done 13 Oct, SMS codes (NOT committed yet)
 

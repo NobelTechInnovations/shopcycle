@@ -54,7 +54,12 @@ async function integrationsRoutes(fastify) {
       },
       instagram: { configured: Boolean(env.INSTAGRAM_APP_ID && env.INSTAGRAM_APP_SECRET), redirectUri: `${admin}/admin/apps/instagram` },
       merchant: registration?.value || null,
-      ads: { developerToken: Boolean(env.GOOGLE_ADS_DEVELOPER_TOKEN), manager: adsManager },
+      // API access is set on the Google Cloud project of the OAuth client
+      // (its number starts the client ID) — no developer token since Sep 2026.
+      ads: {
+        manager: adsManager,
+        accessUrl: `https://console.cloud.google.com/google/ads-apis/overview${/^\d+-/.test(env.GOOGLE_CLIENT_ID || "") ? `?project=${env.GOOGLE_CLIENT_ID.split("-")[0]}` : ""}`,
+      },
       adsStores: rows
         .filter((r) => (r.credentials?.scopes || []).includes(googleAccount.ACCESS.ads))
         .map((r) => ({ storeId: r.storeId, store: r.store.name, handle: r.store.handle, email: r.profile?.email || null })),

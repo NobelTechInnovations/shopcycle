@@ -53,6 +53,7 @@ async function messagingRoutes(fastify) {
   });
   // The token is saved but no number picked yet: what it can use.
   fastify.get("/platform/wabas", async () => ({ wabas: await platform.wabas(prisma) }));
+  fastify.get("/platform/wabas/:id", async (request) => ({ wabas: await platform.lookupWaba(prisma, request.params.id) }));
   fastify.post("/platform/number", async (request) => {
     const body = z.object({ wabaId: z.string().min(1), phoneNumberId: z.string().min(1) }).parse(request.body || {});
     await platform.choose(prisma, body, request.currentUser.id);

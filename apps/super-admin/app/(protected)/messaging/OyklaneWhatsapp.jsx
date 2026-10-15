@@ -116,6 +116,7 @@ export default function OyklaneWhatsapp() {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(null);
   const [testTo, setTestTo] = useState("");
+  const [wabaId, setWabaId] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -328,12 +329,32 @@ export default function OyklaneWhatsapp() {
             </Button>
           </div>
         ) : !wabas.length ? (
-          <Alert
-            type="warning"
-            showIcon
-            message="This key can't see any WhatsApp account"
-            description="In Meta's System users page, select the Oyklane WhatsApp system user ▸ Assign assets ▸ WhatsApp accounts ▸ tick Oyklane's account ▸ Full control ▸ Assign (step 4). Then click “Choose the number” again — no new key needed."
-          />
+          <div className="flex flex-col gap-3">
+            <Alert
+              type="info"
+              showIcon
+              message="Meta didn't list a WhatsApp account for this key"
+              description="Enter the account's ID instead — no new key needed. Find it in Meta Business settings ▸ Accounts ▸ WhatsApp accounts ▸ Oyklane (the number under its name). The system user must have that account under Assigned assets."
+            />
+            <div className="flex gap-2">
+              <Input value={wabaId} onChange={(e) => setWabaId(e.target.value)} placeholder="WhatsApp Business Account ID, e.g. 1081865831373482" inputMode="numeric" />
+              <Button
+                type="primary"
+                loading={busy === "lookup"}
+                disabled={wabaId.replace(/\D/g, "").length < 8}
+                onClick={() =>
+                  run("lookup", () => apiFetch(`/api/super-admin/messaging/platform/wabas/${wabaId.replace(/\D/g, "")}`)).then((r) => {
+                    if (r?.wabas?.length) {
+                      setWabas(r.wabas);
+                      setPick({ wabaId: r.wabas[0].id, phoneNumberId: r.wabas[0].phoneNumbers.length === 1 ? r.wabas[0].phoneNumbers[0].id : undefined });
+                    }
+                  })
+                }
+              >
+                Find
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
             <p className="text-[13px] m-0">Choose Oyklane&apos;s WhatsApp account, then its number.</p>

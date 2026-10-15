@@ -47,10 +47,8 @@ export const APP_LOGO = {
 
 /** What's being built next — shown as "coming soon", never as available. */
 export const ROADMAP = [
-  { name: "WhatsApp order updates", text: "Order confirmed, shipped and delivered messages on WhatsApp — included with Phone Login.", tag: "Phone Login" },
   { name: "Shipping labels & rates", text: "Book couriers and print labels from the order page, with live rates at checkout." },
   { name: "COD verification", text: "Confirm cash-on-delivery orders before they ship, to cut refused deliveries." },
   { name: "Email marketing sync", text: "Send subscribers and buyers to your email tool automatically." },
   { name: "Loyalty & referrals", text: "Points on every order and rewards for bringing friends." },
-  { name: "Google Shopping", text: "List your products on Google for free, synced with your catalog." },
 ];

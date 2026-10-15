@@ -34,3 +34,10 @@ body {
   color: inherit;
   text-decoration: underline;
 }
+
+/* Sidebar: a group's heading is a link (Orders, Products, Customers) —
+   it takes the menu's text colour, not the link accent. */
+.ant-menu-submenu-title a,
+.ant-menu-submenu-title a:hover {
+  color: inherit;
+}

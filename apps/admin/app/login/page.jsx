@@ -7,6 +7,9 @@ import { AuthShell } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 import { GoogleSignIn } from "@/components/GoogleSignIn";
 
+// The marketing site — where the logo goes.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://oyklane.com";
+
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState(null);
@@ -37,6 +40,7 @@ export default function LoginPage() {
 
   return (
     <AuthShell
+      homeHref={SITE_URL}
       title="Welcome back"
       subtitle="Sign in to manage your store."
       footer={

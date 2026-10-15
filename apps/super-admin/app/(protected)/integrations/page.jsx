@@ -195,11 +195,18 @@ export default function IntegrationsPage() {
 
       <Section
         title="Google Ads"
-        note="Sellers run campaigns from their own Google Ads accounts through Oyklane's developer token. With Oyklane's manager account set here, a seller with no Google Ads account can create one from Oyklane — it's made under the manager account and the seller is invited as its admin."
+        note="Sellers run campaigns from their own Google Ads accounts. With Oyklane's manager account set here, a seller with no Google Ads account can create one from Oyklane — it's made under the manager account and the seller is invited as its admin."
       >
-        <div className="flex items-center justify-between py-2 border-b border-app-border">
-          <span className="text-[13px] text-ink-muted">GOOGLE_ADS_DEVELOPER_TOKEN</span>
-          <Status ok={data.ads.developerToken} />
+        <div className="py-2 border-b border-app-border text-[13px]">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-ink-muted">API access level (Google Cloud project of the OAuth client above)</span>
+            <a href={data.ads.accessUrl} target="_blank" rel="noreferrer" className="text-accent font-medium">
+              Open Google Ads API overview
+            </a>
+          </div>
+          <p className="m-0 mt-1.5 text-[12.5px] text-ink-muted">
+            Google retired developer tokens in Sep 2026. On that page: Test → apply for <b>Explorer</b> (real accounts, 2,880 operations a day) → complete brand verification → apply for <b>Basic</b> (15,000 a day; needed for creating sellers&apos; accounts and keyword ideas).
+          </p>
         </div>
         {data.ads.manager && (
           <p className="m-0 py-2 text-[13px] text-ink border-b border-app-border">

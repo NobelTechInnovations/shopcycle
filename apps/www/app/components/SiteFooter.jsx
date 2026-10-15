@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { APP_URL, DEMO_URL } from "./site";
+import { APP_URL, DEMO_URL, MARKET_URL } from "./site";
 
 export function SiteFooter() {
   return (
@@ -12,7 +12,7 @@ export function SiteFooter() {
               Oyklane
             </Link>
             <p className="muted" style={{ marginTop: 14, maxWidth: "34ch", fontSize: 14.5 }}>
-              The commerce platform for Indian brands — store, checkout, payments, GST and growth apps in one place.
+              Your own online store, made for selling in India — store, checkout, payments, GST, WhatsApp and ads in one place.
             </p>
           </div>
           <div>
@@ -29,7 +29,8 @@ export function SiteFooter() {
             <h4>Platform</h4>
             <ul>
               <li><Link href="/integrations">Integrations</Link></li>
-              <li><Link href="/apps">App store</Link></li>
+              <li><Link href="/apps">Apps</Link></li>
+              <li><a href={MARKET_URL}>Oyklane Store</a></li>
               <li><Link href="/pricing">Pricing</Link></li>
               <li><Link href="/integrations#developer">API &amp; webhooks</Link></li>
             </ul>
