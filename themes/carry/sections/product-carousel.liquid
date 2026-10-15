@@ -1,0 +1,381 @@
+{% comment %}
+  Product carousel: one row of products that moves on its own — a card at
+  a time, a full row at a time, or a smooth non-stop flow — right to left
+  (or left to right). Arrows (sides, by the heading or below), dots or a
+  progress bar, an optional pause button, swipe on phones. It pauses while
+  the mouse is over it, while something in it has keyboard focus, when it's
+  off screen and when the tab is hidden, and stays still for shoppers who
+  ask their device for less motion.
+{% endcomment %}
+{% assign s = section.settings %}
+{% assign view_url = routes.all_products_url %}
+{% case s.source %}
+  {% when 'collection' %}
+    {% assign chosen = collections[s.collection] | default: collections.all %}
+    {% assign items = chosen.products %}{% assign view_url = chosen.url | default: routes.all_products_url %}
+  {% when 'best_sellers' %}{% assign items = best_sellers %}{% assign view_url = routes.all_products_url | append: '?sort=best-selling' %}
+  {% when 'newest' %}{% assign items = collections.all.products | sort: 'created_at' | reverse %}{% assign view_url = routes.all_products_url | append: '?sort=newest' %}
+  {% when 'on_sale' %}{% assign items = collections.all.products | where: 'on_sale', true %}
+  {% when 'picked' %}{% assign items = s.products %}{% assign view_url = '' %}
+  {% else %}{% assign items = collections.all.products %}
+{% endcase %}
+{% if s.source != 'best_sellers' and s.source != 'newest' and s.source != 'picked' %}
+  {% case s.sort %}
+    {% when 'price_asc' %}{% assign items = items | sort: 'price' %}
+    {% when 'price_desc' %}{% assign items = items | sort: 'price' | reverse %}
+    {% when 'newest' %}{% assign items = items | sort: 'created_at' | reverse %}
+    {% when 'title' %}{% assign items = items | sort_natural: 'title' %}
+  {% endcase %}
+{% endif %}
+{% comment %} Nothing on sale / nothing picked: hidden on the store, example cards in the editor. {% endcomment %}
+{% assign hide = false %}
+{% if items.size == 0 and design_mode != true %}{% if s.source == 'on_sale' or s.source == 'picked' %}{% assign hide = true %}{% endif %}{% endif %}
+{% unless hide %}
+{% assign cid = 'pc-' | append: section.id %}
+{% assign flow = false %}{% if s.motion == 'marquee' and s.autoplay %}{% assign flow = true %}{% endif %}
+{% assign arrows = s.show_arrows %}{% if flow %}{% assign arrows = false %}{% endif %}
+{% assign spc = 3.2 %}{% if s.flow_speed == 'slow' %}{% assign spc = 5 %}{% elsif s.flow_speed == 'fast' %}{% assign spc = 2 %}{% endif %}
+{% capture prev_icon %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>{% endcapture %}
+{% capture next_icon %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>{% endcapture %}
+<section class="section{% if s.surface %} section--surface{% endif %}">
+  <div class="container">
+    <style>
+      #{{ cid }} { --pc-per: {{ s.per_view_mobile | default: '2.2' }}; --pc-gap: {{ s.gap | divided_by: 2 | plus: 6 }}px; position: relative; }
+      @media (min-width: 750px) { #{{ cid }} { --pc-per: {{ s.per_view | at_most: 3 }}; --pc-gap: {{ s.gap }}px; } }
+      @media (min-width: 1100px) { #{{ cid }} { --pc-per: {{ s.per_view }}; } }
+      .pc-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 24px; margin-bottom: clamp(24px, 3.4vw, 44px); }
+      .pc-head > :first-child:not(.pc-nav) { flex: 1; min-width: 0; margin-bottom: 0; }
+      .pc-head:empty { display: none; }
+      .pc-nav { display: flex; gap: 10px; flex: none; margin-left: auto; }
+      .pc-stage { position: relative; }
+      .pc-viewport { position: relative; container-type: inline-size; }
+      .pc-track { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - (var(--pc-per) - 1) * var(--pc-gap)) / var(--pc-per)); gap: var(--pc-gap); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 8px 4px 18px; margin: -8px -4px -18px; scroll-padding-inline: 4px; list-style: none; }
+      .pc-track::-webkit-scrollbar { display: none; }
+      .pc-item { display: flex; min-width: 0; scroll-snap-align: start; }
+      .pc-item > * { flex: 1 1 auto; min-width: 0; }
+      .pc.is-flow .pc-viewport { overflow: hidden; padding: 8px 0 18px; margin: -8px 0 -18px; }
+      .pc.is-flow .pc-track { display: flex; width: max-content; overflow: visible; scroll-snap-type: none; padding: 0; margin: 0; animation: pc-flow var(--pc-dur, 40s) linear infinite; will-change: transform; }
+      .pc.is-flow .pc-item { flex: 0 0 calc((100cqw - (var(--pc-per) - 1) * var(--pc-gap)) / var(--pc-per)); }
+      .pc.is-flow[data-dir="ltr"] .pc-track { animation-direction: reverse; }
+      .pc.is-flow.is-paused .pc-track { animation-play-state: paused; }
+      @keyframes pc-flow { to { transform: translateX(calc(-1 * var(--pc-shift, 50%))); } }
+      .pc-arrow { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid color-mix(in srgb, currentColor 16%, transparent); background: var(--c-bg, #fff); color: inherit; cursor: pointer; transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease; }
+      .pc-arrow svg { width: 20px; height: 20px; }
+      .pc-arrow:hover, .pc-arrow:focus-visible { background: var(--c-text, #111); color: var(--c-bg, #fff); border-color: var(--c-text, #111); }
+      .pc-arrow:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+      .pc--circle .pc-arrow { border-radius: 50%; }
+      .pc--square .pc-arrow { border-radius: 10px; }
+      .pc--minimal .pc-arrow { width: 36px; border-color: transparent; background: transparent; }
+      .pc--minimal .pc-arrow svg { width: 26px; height: 26px; }
+      .pc--minimal .pc-arrow:hover, .pc--minimal .pc-arrow:focus-visible { background: transparent; color: inherit; opacity: 0.6; }
+      .pc-arrow--side { position: absolute; z-index: 3; top: var(--pc-arrow-top, 38%); transform: translateY(-50%); box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.4); }
+      .pc--minimal .pc-arrow--side { box-shadow: none; }
+      .pc-arrow--side.pc-arrow--prev { left: 8px; }
+      .pc-arrow--side.pc-arrow--next { right: 8px; }
+      @media (min-width: 1240px) { .pc-arrow--side.pc-arrow--prev { left: -22px; } .pc-arrow--side.pc-arrow--next { right: -22px; } }
+      @media (max-width: 749px) { .pc-arrow--side { width: 38px; height: 38px; } .pc:not(.pc--phone-arrows) .pc-arrow--side { display: none; } }
+      .pc-foot { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: clamp(18px, 2.6vw, 30px); }
+      .pc-foot:empty { display: none; }
+      .pc-dots { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; }
+      .pc-dot { display: grid; place-items: center; min-width: 20px; height: 24px; padding: 0 2px; border: 0; background: none; color: inherit; cursor: pointer; }
+      .pc-dot::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: color-mix(in srgb, currentColor 24%, transparent); transition: width 0.3s ease, background 0.3s ease; }
+      .pc-dot[aria-current="true"]::before { width: 24px; background: currentColor; }
+      .pc-progress { flex: 1; max-width: 360px; height: 3px; border-radius: 3px; background: color-mix(in srgb, currentColor 14%, transparent); overflow: hidden; }
+      .pc-progress > i { display: block; height: 100%; width: 0; border-radius: inherit; background: currentColor; transition: width 0.35s ease; }
+      .pc-pause { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+      .pc-pause svg { width: 14px; height: 14px; }
+      .pc-pause .pc-play, .pc.is-stopped .pc-pause .pc-stop { display: none; }
+      .pc.is-stopped .pc-pause .pc-play { display: block; }
+      .pc.is-static .pc-arrow, .pc.is-static .pc-dots, .pc.is-static .pc-progress, .pc.is-static .pc-pause { display: none; }
+    </style>
+    <div class="pc pc--{{ s.arrow_style | default: 'circle' }}{% if s.arrows_mobile %} pc--phone-arrows{% endif %}" id="{{ cid }}"
+      role="region" aria-roledescription="carousel" aria-label="{{ s.heading | default: 'Products' | escape }}"
+      data-motion="{{ s.motion | default: 'step' }}" data-dir="{{ s.direction | default: 'rtl' }}" data-speed="{{ s.speed | default: 4 }}" data-spc="{{ spc }}"
+      {% if s.autoplay %}data-autoplay{% endif %} {% if s.pause_on_hover %}data-pause{% endif %} {% if s.loop %}data-loop{% endif %}>
+      <div class="pc-head">
+        {%- render 'snippets/section-head', eyebrow: s.eyebrow, title: s.heading, subtitle: s.subheading, align: s.align, link_url: view_url, link_text: s.link_text -%}
+        {%- if arrows and s.arrow_position == 'top' -%}
+          <div class="pc-nav">
+            <button type="button" class="pc-arrow pc-arrow--prev" data-pc-prev aria-label="Previous products">{{ prev_icon }}</button>
+            <button type="button" class="pc-arrow pc-arrow--next" data-pc-next aria-label="Next products">{{ next_icon }}</button>
+          </div>
+        {%- endif -%}
+      </div>
+      <div class="pc-stage">
+        <div class="pc-viewport">
+          <div class="pc-track" role="list">
+            {% if items.size > 0 %}
+              {% for entry in items limit: s.limit %}
+                {% if s.source == 'picked' %}{% assign product = all_products[entry] %}{% else %}{% assign product = entry %}{% endif %}
+                {% if product %}
+                  <div class="pc-item" role="listitem">{% render 'snippets/product-card', product: product, eager: false %}</div>
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              {% assign ph = s.per_view | plus: 2 %}
+              {% for i in (1..ph) %}
+                <div class="pc-item" role="listitem">{% render 'snippets/product-card-placeholder', index: i %}</div>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
+        {% if arrows and s.arrow_position == 'sides' %}
+          <button type="button" class="pc-arrow pc-arrow--side pc-arrow--prev" data-pc-prev aria-label="Previous products">{{ prev_icon }}</button>
+          <button type="button" class="pc-arrow pc-arrow--side pc-arrow--next" data-pc-next aria-label="Next products">{{ next_icon }}</button>
+        {% endif %}
+      </div>
+      <div class="pc-foot">
+        {%- if arrows and s.arrow_position == 'bottom' -%}<button type="button" class="pc-arrow pc-arrow--prev" data-pc-prev aria-label="Previous products">{{ prev_icon }}</button>{%- endif -%}
+        {%- unless flow -%}
+          {%- if s.indicator == 'dots' -%}<div class="pc-dots" role="group" aria-label="Choose a set of products"></div><div class="pc-progress" hidden><i></i></div>{%- endif -%}
+          {%- if s.indicator == 'progress' -%}<div class="pc-progress" aria-hidden="true"><i></i></div>{%- endif -%}
+        {%- endunless -%}
+        {%- if s.autoplay and s.show_pause -%}
+          <button type="button" class="pc-pause" data-pc-pause aria-label="Pause the carousel"><svg class="pc-stop" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg><svg class="pc-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
+        {%- endif -%}
+        {%- if arrows and s.arrow_position == 'bottom' -%}<button type="button" class="pc-arrow pc-arrow--next" data-pc-next aria-label="Next products">{{ next_icon }}</button>{%- endif -%}
+      </div>
+    </div>
+    <script>
+      (function () {
+        var root = document.getElementById({{ cid | json }});
+        if (!root || root.getAttribute('data-ready')) return;
+        root.setAttribute('data-ready', '1');
+        var track = root.querySelector('.pc-track');
+        var viewport = root.querySelector('.pc-viewport');
+        var stage = root.querySelector('.pc-stage');
+        var items = Array.prototype.slice.call(track.children);
+        if (!items.length) return;
+        var prevs = root.querySelectorAll('[data-pc-prev]');
+        var nexts = root.querySelectorAll('[data-pc-next]');
+        var dotsBox = root.querySelector('.pc-dots');
+        var progress = root.querySelector('.pc-progress');
+        var bar = progress && progress.firstElementChild;
+        var pauseBtn = root.querySelector('[data-pc-pause]');
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var auto = root.hasAttribute('data-autoplay') && !reduce;
+        var loop = root.hasAttribute('data-loop');
+        var motion = root.getAttribute('data-motion');
+        // "rtl": the products travel right to left — the row moves forward.
+        var forward = root.getAttribute('data-dir') === 'ltr' ? -1 : 1;
+        var delay = Math.max(2, parseFloat(root.getAttribute('data-speed')) || 4) * 1000;
+        var flow = auto && motion === 'marquee';
+        var holds = {};
+        function paused() { for (var k in holds) if (holds[k]) return true; return false; }
+        function hold(reason, on) {
+          holds[reason] = on;
+          root.classList.toggle('is-paused', paused());
+        }
+        function stepWidth() {
+          return items.length > 1 ? items[1].offsetLeft - items[0].offsetLeft : items[0].offsetWidth;
+        }
+
+        // Pauses: mouse over, keyboard focus inside, off screen, tab hidden, a finger on it.
+        if (root.hasAttribute('data-pause')) {
+          root.addEventListener('mouseenter', function () { hold('hover', true); });
+          root.addEventListener('mouseleave', function () { hold('hover', false); });
+        }
+        root.addEventListener('focusin', function () { hold('focus', true); });
+        root.addEventListener('focusout', function (e) { if (!root.contains(e.relatedTarget)) hold('focus', false); });
+        document.addEventListener('visibilitychange', function () { hold('hidden', document.hidden); });
+        if ('IntersectionObserver' in window) {
+          new IntersectionObserver(function (entries) { hold('offscreen', !entries[0].isIntersecting); }).observe(root);
+        }
+        var touchTimer;
+        track.addEventListener('pointerdown', function () { clearTimeout(touchTimer); hold('touch', true); }, { passive: true });
+        track.addEventListener('pointerup', function () { touchTimer = setTimeout(function () { hold('touch', false); }, 4000); }, { passive: true });
+        if (pauseBtn) {
+          pauseBtn.addEventListener('click', function () {
+            var stop = !holds.button;
+            hold('button', stop);
+            root.classList.toggle('is-stopped', stop);
+            pauseBtn.setAttribute('aria-label', stop ? 'Play the carousel' : 'Pause the carousel');
+          });
+        }
+
+        if (flow) {
+          // Smooth non-stop flow: copies of the row follow it, and the
+          // whole strip slides by exactly one row's width, then repeats.
+          root.classList.add('is-flow');
+          var n = items.length;
+          var spc = parseFloat(root.getAttribute('data-spc')) || 3.2;
+          var fill = function () {
+            var setWidth = n * stepWidth();
+            var copies = 0;
+            while (track.scrollWidth < setWidth + viewport.clientWidth + 2 && copies < 12) {
+              for (var i = 0; i < n; i++) {
+                var copy = items[i].cloneNode(true);
+                copy.setAttribute('aria-hidden', 'true');
+                copy.querySelectorAll('a, button, input, select, textarea').forEach(function (el) { el.setAttribute('tabindex', '-1'); });
+                track.appendChild(copy);
+              }
+              copies++;
+            }
+            root.style.setProperty('--pc-shift', setWidth + 'px');
+            root.style.setProperty('--pc-dur', (n * spc).toFixed(1) + 's');
+          };
+          fill();
+          var resized;
+          window.addEventListener('resize', function () { clearTimeout(resized); resized = setTimeout(fill, 150); });
+          return;
+        }
+
+        function maxScroll() { return track.scrollWidth - track.clientWidth; }
+        function atStart() { return track.scrollLeft <= 2; }
+        function atEnd() { return track.scrollLeft >= maxScroll() - 2; }
+        function pageWidth() {
+          var step = stepWidth();
+          return Math.max(step, Math.floor((track.clientWidth + 4) / step) * step);
+        }
+        function go(dir) {
+          if (dir > 0 && atEnd()) { if (loop) track.scrollTo({ left: 0, behavior: 'smooth' }); return; }
+          if (dir < 0 && atStart()) { if (loop) track.scrollTo({ left: maxScroll(), behavior: 'smooth' }); return; }
+          track.scrollBy({ left: dir * (motion === 'page' ? pageWidth() : stepWidth()), behavior: 'smooth' });
+        }
+
+        var timer;
+        function schedule() {
+          clearTimeout(timer);
+          if (!auto) return;
+          timer = setTimeout(function () {
+            if (!root.isConnected) return;
+            if (!paused() && maxScroll() > 2) go(forward);
+            schedule();
+          }, delay);
+        }
+        prevs.forEach(function (b) { b.addEventListener('click', function () { go(-1); schedule(); }); });
+        nexts.forEach(function (b) { b.addEventListener('click', function () { go(1); schedule(); }); });
+
+        var pages = 0;
+        function buildDots(count) {
+          if (!dotsBox || count === pages) return;
+          pages = count;
+          dotsBox.innerHTML = '';
+          for (var i = 0; i < count; i++) {
+            var dot = document.createElement('button');
+            dot.type = 'button';
+            dot.className = 'pc-dot';
+            dot.setAttribute('aria-label', 'Show set ' + (i + 1) + ' of ' + count);
+            dot.addEventListener('click', (function (index) {
+              return function () { track.scrollTo({ left: Math.min(index * pageWidth(), maxScroll()), behavior: 'smooth' }); schedule(); };
+            })(i));
+            dotsBox.appendChild(dot);
+          }
+        }
+        var queued = false;
+        function sync() {
+          queued = false;
+          var max = maxScroll();
+          root.classList.toggle('is-static', max <= 2);
+          prevs.forEach(function (b) { b.disabled = !loop && atStart(); });
+          nexts.forEach(function (b) { b.disabled = !loop && atEnd(); });
+          if (dotsBox) {
+            var count = max <= 2 ? 0 : Math.ceil(max / pageWidth() - 0.05) + 1;
+            // Too many dots to read: a progress bar instead.
+            var useBar = count > 10;
+            dotsBox.hidden = useBar;
+            if (progress) progress.hidden = !useBar;
+            buildDots(useBar ? 0 : count);
+            var active = atEnd() ? pages - 1 : Math.round(track.scrollLeft / pageWidth());
+            Array.prototype.forEach.call(dotsBox.children, function (d, i) { d.setAttribute('aria-current', i === active ? 'true' : 'false'); });
+          }
+          if (bar && !(progress && progress.hidden)) bar.style.width = (max <= 2 ? 100 : ((track.scrollLeft + track.clientWidth) / track.scrollWidth) * 100) + '%';
+          // Side arrows sit level with the middle of the photos.
+          var media = stage && track.querySelector('[data-oy-card-media]');
+          if (media) root.style.setProperty('--pc-arrow-top', Math.round(media.getBoundingClientRect().top - stage.getBoundingClientRect().top + media.offsetHeight / 2) + 'px');
+        }
+        function later() { if (!queued) { queued = true; requestAnimationFrame(sync); } }
+        track.addEventListener('scroll', later, { passive: true });
+        window.addEventListener('resize', later);
+        window.addEventListener('load', later);
+        // Left to right: start from the far end so there's room to travel.
+        if (auto && forward < 0) track.scrollLeft = maxScroll();
+        sync();
+        schedule();
+      })();
+    </script>
+  </div>
+</section>
+{% endunless %}
+
+{% schema %}
+{
+  "name": "Product carousel",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Trending now" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "" },
+    { "type": "select", "id": "align", "label": "Heading alignment", "default": "left", "options": [{ "value": "left", "label": "Left" }, { "value": "center", "label": "Centre" }] },
+    { "type": "text", "id": "link_text", "label": "\"View all\" link text", "default": "View all" },
+    { "type": "header", "content": "Products" },
+    { "type": "select", "id": "source", "label": "Show", "default": "all", "options": [
+      { "value": "all", "label": "All products" },
+      { "value": "collection", "label": "A collection" },
+      { "value": "best_sellers", "label": "Best sellers" },
+      { "value": "newest", "label": "Newest products" },
+      { "value": "on_sale", "label": "Products on sale" },
+      { "value": "picked", "label": "Products I pick" }
+    ] },
+    { "type": "collection", "id": "collection", "label": "Collection (for \"A collection\")" },
+    { "type": "product_list", "id": "products", "label": "Products (for \"Products I pick\")", "default": [] },
+    { "type": "select", "id": "sort", "label": "Order", "default": "default", "options": [
+      { "value": "default", "label": "Featured" },
+      { "value": "newest", "label": "Newest first" },
+      { "value": "price_asc", "label": "Price, low to high" },
+      { "value": "price_desc", "label": "Price, high to low" },
+      { "value": "title", "label": "Name, A–Z" }
+    ] },
+    { "type": "range", "id": "limit", "label": "Products in the row (at most)", "min": 3, "max": 24, "step": 1, "default": 12 },
+    { "type": "header", "content": "Layout" },
+    { "type": "range", "id": "per_view", "label": "Cards in view on computers", "min": 2, "max": 6, "step": 1, "default": 4 },
+    { "type": "select", "id": "per_view_mobile", "label": "Cards in view on phones", "default": "2.2", "options": [
+      { "value": "1", "label": "1" },
+      { "value": "1.2", "label": "1, with a peek of the next" },
+      { "value": "1.5", "label": "1½" },
+      { "value": "2", "label": "2" },
+      { "value": "2.2", "label": "2, with a peek of the next" },
+      { "value": "2.5", "label": "2½" }
+    ] },
+    { "type": "range", "id": "gap", "label": "Space between cards", "min": 8, "max": 40, "step": 4, "default": 20, "unit": "px" },
+    { "type": "header", "content": "Movement" },
+    { "type": "checkbox", "id": "autoplay", "label": "Move on its own", "default": true },
+    { "type": "select", "id": "motion", "label": "How it moves", "default": "step", "options": [
+      { "value": "step", "label": "One card at a time" },
+      { "value": "page", "label": "A full row at a time" },
+      { "value": "marquee", "label": "Smooth non-stop flow" }
+    ] },
+    { "type": "select", "id": "direction", "label": "Direction", "default": "rtl", "options": [
+      { "value": "rtl", "label": "Right to left ←" },
+      { "value": "ltr", "label": "Left to right →" }
+    ] },
+    { "type": "range", "id": "speed", "label": "Seconds between moves", "min": 2, "max": 10, "step": 1, "default": 4, "unit": "s" },
+    { "type": "select", "id": "flow_speed", "label": "Speed of the non-stop flow", "default": "medium", "options": [
+      { "value": "slow", "label": "Slow" },
+      { "value": "medium", "label": "Medium" },
+      { "value": "fast", "label": "Fast" }
+    ] },
+    { "type": "checkbox", "id": "pause_on_hover", "label": "Pause while the mouse is over it", "default": true },
+    { "type": "checkbox", "id": "loop", "label": "Go back to the start after the last card", "default": true },
+    { "type": "header", "content": "Controls" },
+    { "type": "checkbox", "id": "show_arrows", "label": "Show arrows", "default": true, "info": "Not shown with the non-stop flow." },
+    { "type": "select", "id": "arrow_position", "label": "Arrow position", "default": "sides", "options": [
+      { "value": "sides", "label": "On the sides" },
+      { "value": "top", "label": "Top right, by the heading" },
+      { "value": "bottom", "label": "Below the products" }
+    ] },
+    { "type": "select", "id": "arrow_style", "label": "Arrow style", "default": "circle", "options": [
+      { "value": "circle", "label": "Round" },
+      { "value": "square", "label": "Square" },
+      { "value": "minimal", "label": "Just the arrow" }
+    ] },
+    { "type": "checkbox", "id": "arrows_mobile", "label": "Show side arrows on phones too", "default": false },
+    { "type": "select", "id": "indicator", "label": "Where am I", "default": "dots", "options": [
+      { "value": "dots", "label": "Dots" },
+      { "value": "progress", "label": "Progress bar" },
+      { "value": "none", "label": "Nothing" }
+    ] },
+    { "type": "checkbox", "id": "show_pause", "label": "Show a pause / play button", "default": false },
+    { "type": "checkbox", "id": "surface", "label": "Use alternate background", "default": false }
+  ]
+}
+{% endschema %}

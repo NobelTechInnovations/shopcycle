@@ -51,12 +51,48 @@ async function assertFits(prisma, store, plan) {
 }
 
 /** What a change would do, without doing it. */
+/**
+ * What a store loses by moving to `toPlan`: each feature its current plan
+ * has and the new one doesn't, with what it means for this store right
+ * now (API keys that stop working, apps that switch off, staff over the
+ * limit). The admin shows these before the switch is confirmed.
+ */
+async function losses(prisma, store, fromPlanId, toPlan) {
+  if (!fromPlanId || fromPlanId === toPlan.id) return [];
+  const { FEATURES } = require("./catalog");
+  const rows = await prisma.planFeature.findMany({ where: { planId: { in: [fromPlanId, toPlan.id] } } });
+  const has = (planId, key) => rows.some((r) => r.planId === planId && r.featureKey === key && r.enabled);
+  const lost = FEATURES.filter((f) => f.kind !== "limit" && has(fromPlanId, f.key) && !has(toPlan.id, f.key));
+  const out = [];
+  for (const f of lost) {
+    const item = { key: f.key, name: f.name, detail: null };
+    if (f.key === "api_access") {
+      const [keys, hooks] = await Promise.all([
+        prisma.apiKey.count({ where: { storeId: store.id, revokedAt: null } }),
+        prisma.webhookEndpoint.count({ where: { storeId: store.id, enabled: true } }),
+      ]);
+      if (keys || hooks) item.detail = `Your ${keys} API key${keys === 1 ? "" : "s"} and ${hooks} webhook${hooks === 1 ? "" : "s"} stop working — anything connected through them (a CRM, ERP or app) stops syncing.`;
+    }
+    if (f.key === "marketing_tools") {
+      const apps = await prisma.storeApp.findMany({ where: { storeId: store.id, app: { key: { in: ["whatsapp", "meta-ads", "google-ads"] } } }, select: { app: { select: { name: true } } } });
+      if (apps.length) item.detail = `${apps.map((a) => a.app.name).join(", ")} stop${apps.length === 1 ? "s" : ""} working. Running ads keep running in your ad accounts, but you can't manage them from Oyklane.`;
+    }
+    out.push(item);
+  }
+  // Staff over the new plan's limit.
+  const staff = await prisma.storeUser.count({ where: { storeId: store.id, role: { not: "owner" } } }).catch(() => 0);
+  if (toPlan.staffLimit != null && staff > toPlan.staffLimit) {
+    out.push({ key: "staff", name: "Staff accounts", detail: `You have ${staff} staff members; ${toPlan.name} allows ${toPlan.staffLimit}. Remove ${staff - toPlan.staffLimit} before the switch, or the newest lose access.` });
+  }
+  return out;
+}
+
 async function preview(prisma, store, sub, { planId, interval, now = new Date() }) {
   const settings = await getSettings(prisma);
   const toPlan = await loadPlan(prisma, planId || sub.planId);
   const toInterval = INTERVALS.includes(interval) ? interval : sub.interval;
   const fromPlan = sub.plan || (await prisma.plan.findUnique({ where: { id: sub.planId } }));
-  const base = { planId: toPlan.id, planName: toPlan.name, interval: toInterval, price: periodPrice(toPlan, toInterval, settings) };
+  const base = { planId: toPlan.id, planName: toPlan.name, interval: toInterval, price: periodPrice(toPlan, toInterval, settings), losses: await losses(prisma, store, sub.planId, toPlan).catch(() => []) };
 
   if (toPlan.id === sub.planId && toInterval === sub.interval) {
     return { ...base, type: "same", appliesAt: sub.pendingPlanId || sub.pendingInterval ? "cancel_pending" : "none", charge: null };
@@ -198,4 +234,4 @@ async function change(prisma, store, sub, { planId, interval, now = new Date(), 
   return { ...p, cycleId: cycle?.id || null };
 }
 
-module.exports = { preview, change, loadPlan, assertFits, inIntroMonth };
+module.exports = { preview, change, loadPlan, assertFits, inIntroMonth, losses };

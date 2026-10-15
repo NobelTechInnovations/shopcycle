@@ -1,0 +1,111 @@
+{
+  "color_background": "#FFFFFF",
+  "color_text": "#1E2A22",
+  "color_primary": "#2F5D3A",
+  "color_accent": "#E3A33B",
+  "color_surface": "#F1F5EE",
+  "color_dark": "#1E2A22",
+  "heading_font": "Fraunces",
+  "body_font": "Inter",
+  "heading_weight": "600",
+  "heading_case": "none",
+  "heading_tracking": "tight",
+  "base_size": 16,
+  "container_width": 1240,
+  "section_spacing": "comfortable",
+  "button_radius": 999,
+  "card_radius": 18,
+  "card_image_ratio": "square",
+  "card_hover_image": true,
+  "card_show_brand": false,
+  "card_quick_add": true,
+  "card_align": "left",
+  "cart_type": "drawer",
+  "social_instagram": "",
+  "social_facebook": "",
+  "social_youtube": "",
+  "social_x": "",
+  "social_pinterest": "",
+  "social_whatsapp": "",
+  "sections": {
+    "announcement-bar": {
+      "settings": {
+        "show": true,
+        "style": "marquee",
+        "background": "#2F5D3A",
+        "text_color": "#FFFFFF"
+      },
+      "blocks": {
+        "m1": {
+          "type": "message",
+          "settings": {
+            "text": "Free shipping across India"
+          }
+        },
+        "m2": {
+          "type": "message",
+          "settings": {
+            "text": "30-day money-back promise"
+          }
+        },
+        "m3": {
+          "type": "message",
+          "settings": {
+            "text": "Cash on delivery available"
+          }
+        }
+      },
+      "block_order": [
+        "m1",
+        "m2",
+        "m3"
+      ]
+    },
+    "header": {
+      "settings": {
+        "menu": "main-menu",
+        "layout": "left",
+        "sticky": true,
+        "transparent": true,
+        "logo_width": 110
+      }
+    },
+    "footer": {
+      "settings": {
+        "about": "Modern essentials, made with care and shipped across India.",
+        "show_payments": true,
+        "show_wordmark": true,
+        "copyright": "All rights reserved."
+      },
+      "blocks": {
+        "f1": {
+          "type": "links",
+          "settings": {
+            "heading": "Shop",
+            "menu": "main-menu"
+          }
+        },
+        "f2": {
+          "type": "links",
+          "settings": {
+            "heading": "Help",
+            "menu": "footer-menu"
+          }
+        },
+        "f3": {
+          "type": "newsletter",
+          "settings": {
+            "heading": "Stay in the loop",
+            "text": "Early access to drops and members-only offers."
+          }
+        }
+      },
+      "block_order": [
+        "f1",
+        "f2",
+        "f3"
+      ]
+    }
+  },
+  "placeholder_art": "bottle"
+}

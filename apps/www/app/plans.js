@@ -4,7 +4,7 @@ const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://api.oyklane.com").r
 const FALLBACK = {
   trialDays: 3,
   introEnabled: true,
-  introPrice: 99,
+  introPrice: 49,
   annualDiscountPercent: 20,
   plans: [
     { key: "starter", name: "Starter", tagline: "Everything to open your store.", priceMonthly: 599, priceYearly: 5750.4, commissionPercent: 2, staffLimit: 2, features: [] },

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Card, Button, Form, Input, InputNumber, Select, Table, Modal, App, Skeleton, Segmented, Radio } from "antd";
+import { Card, Button, Form, Input, InputNumber, Select, Table, Modal, App, Skeleton, Segmented, Radio, Alert } from "antd";
 import { AlertTriangle, ArrowRight, CalendarClock, Check, CreditCard, Receipt, Users } from "lucide-react";
 import { StatusBadge, EmptyState } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
@@ -528,12 +528,31 @@ export function BillingSettings() {
         title={preview ? `Switch to ${preview.planName} (${preview.interval === "year" ? "yearly" : "monthly"})?` : ""}
         onCancel={() => setPreview(null)}
         onOk={confirmChange}
-        okText={preview?.type === "upgrade" ? `Upgrade and pay ${inr(preview?.charge?.total)}` : preview?.type === "downgrade" ? "Schedule the switch" : "Switch now"}
+        okText={preview?.type === "upgrade" ? `Upgrade and pay ${inr(preview?.charge?.total)}` : preview?.type === "downgrade" ? (preview?.losses?.length ? "I understand, schedule the switch" : "Schedule the switch") : preview?.losses?.length ? "I understand, switch now" : "Switch now"}
+        okButtonProps={{ danger: Boolean(preview?.losses?.length) }}
         confirmLoading={busy === "change"}
         destroyOnHidden
       >
         {preview && (
           <div className="mt-3 text-sm text-ink">
+            {preview.losses?.length > 0 && (
+              <Alert
+                className="!mb-3"
+                type="warning"
+                showIcon
+                message={`On ${preview.planName} you lose`}
+                description={
+                  <ul className="m-0 pl-4">
+                    {preview.losses.map((l) => (
+                      <li key={l.key}>
+                        <b>{l.name}</b>
+                        {l.detail ? ` — ${l.detail}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                }
+              />
+            )}
             {preview.type === "free" && <p className="m-0">This switch is free and happens right away — the new price applies from your next payment.</p>}
             {preview.type === "downgrade" && (
               <p className="m-0">

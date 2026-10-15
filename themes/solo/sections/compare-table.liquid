@@ -1,0 +1,48 @@
+{% comment %} Us versus the usual: a row per point, a tick or a cross in each column. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, align: 'center' %}
+    <div class="x-compare">
+      <table>
+        <thead><tr><th scope="col"><span class="sr-only">Point</span></th><th scope="col" class="x-compare__us">{{ section.settings.us_label | default: shop.name }}</th><th scope="col">{{ section.settings.them_label }}</th></tr></thead>
+        <tbody>
+          {% for block in section.blocks %}
+            <tr>
+              <th scope="row">{{ block.settings.point }}</th>
+              <td class="x-compare__us">{% if block.settings.us %}<span class="x-yes" aria-label="Yes">{% render 'snippets/icon', icon: 'check', class: 'icon icon--sm' %}</span>{% else %}<span class="x-no" aria-label="No">—</span>{% endif %}</td>
+              <td>{% if block.settings.them %}<span class="x-yes" aria-label="Yes">{% render 'snippets/icon', icon: 'check', class: 'icon icon--sm' %}</span>{% else %}<span class="x-no" aria-label="No">—</span>{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Comparison",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Why us" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Not all are made the same" },
+    { "type": "text", "id": "us_label", "label": "Your column", "info": "Leave empty to use your store's name." },
+    { "type": "text", "id": "them_label", "label": "Other column", "default": "Others" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "row", "name": "Point", "settings": [
+      { "type": "text", "id": "point", "label": "Point", "default": "Natural ingredients" },
+      { "type": "checkbox", "id": "us", "label": "You", "default": true },
+      { "type": "checkbox", "id": "them", "label": "Others", "default": false }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "row", "settings": { "point": "Plant-based ingredients", "us": true, "them": false } },
+    { "type": "row", "settings": { "point": "No added sugar", "us": true, "them": false } },
+    { "type": "row", "settings": { "point": "Third-party lab tested", "us": true, "them": false } },
+    { "type": "row", "settings": { "point": "Made in India", "us": true, "them": true } },
+    { "type": "row", "settings": { "point": "30-day money-back promise", "us": true, "them": false } }
+  ],
+  "max_blocks": 10
+}
+{% endschema %}

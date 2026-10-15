@@ -64,9 +64,80 @@ const JEWELS = {
 
 const IMAGE = `<rect x="150" y="190" width="500" height="420" rx="28" ${LINE}/><circle cx="300" cy="330" r="42" ${DETAIL}/><path d="M170 560l150-140 110 100 90-70 110 110" ${STROKE}/>`;
 
-function lookup(name) {
+
+// ── Colour art sets ─────────────────────────────────────────────────
+// A theme can pick a set with the `placeholder_art` setting ("drink",
+// "bag", "bottle"): product / collection / lifestyle placeholders become
+// full-colour illustrations of that kind of product on soft backgrounds,
+// so a demo store looks designed rather than empty.
+const CAN_COLOURS = [
+  { body: "#9FD8C3", band: "#2F8F6E", bg: "#EAF7F1", fruit: "#7BC86C" },
+  { body: "#F7B9A5", band: "#D9534F", bg: "#FDEDE7", fruit: "#E8574A" },
+  { body: "#F5D76E", band: "#D99A00", bg: "#FFF7DA", fruit: "#F2B705" },
+  { body: "#C9A3DB", band: "#7B3F9E", bg: "#F5ECFA", fruit: "#8E44AD" },
+  { body: "#9CC9F0", band: "#2F6DB5", bg: "#EAF3FC", fruit: "#3B82C4" },
+  { body: "#BFE08A", band: "#4E8F1E", bg: "#F1F9E4", fruit: "#5FA82E" },
+];
+const BAG_COLOURS = [
+  { body: "#C8946A", dark: "#7A4A2A", bg: "#F4F1EC" },
+  { body: "#B5653A", dark: "#6B3519", bg: "#F3EEE8" },
+  { body: "#6F7A55", dark: "#3E4630", bg: "#EEF0E8" },
+  { body: "#2E3E63", dark: "#1B2540", bg: "#ECEFF5" },
+  { body: "#D9A3A0", dark: "#8C5653", bg: "#F8EFEE" },
+  { body: "#3A3A3A", dark: "#151515", bg: "#F1F1EF" },
+];
+const BOTTLE_COLOURS = [
+  { body: "#B86B2A", cap: "#2B2B2B", label: "#F6EFE3", leaf: "#4F7A3A", bg: "#F3EEE4" },
+  { body: "#7FA37A", cap: "#2F3B2C", label: "#FBF8F1", leaf: "#2F5D2A", bg: "#EEF3EA" },
+  { body: "#E9E2D4", cap: "#B08D57", label: "#FFFFFF", leaf: "#8A6A3A", bg: "#F6F2EA" },
+  { body: "#3D5A80", cap: "#E0B35A", label: "#F4F7FB", leaf: "#3D5A80", bg: "#EAF0F7" },
+];
+
+const canBody = (c) =>
+  `<rect x="270" y="250" width="260" height="600" rx="42" fill="${c.body}"/><rect x="284" y="224" width="232" height="46" rx="18" fill="#D8DCE1"/><rect x="300" y="214" width="200" height="16" rx="8" fill="#C4C9D0"/><rect x="270" y="268" width="260" height="18" fill="#000" fill-opacity=".06"/><rect x="270" y="812" width="260" height="20" fill="#000" fill-opacity=".08"/><rect x="270" y="470" width="260" height="196" fill="${c.band}"/><circle cx="400" cy="568" r="60" fill="#fff" fill-opacity=".92"/><circle cx="400" cy="578" r="28" fill="${c.fruit}"/><path d="M400 550c10-16 26-22 40-20-6 16-22 24-40 20z" fill="#3E8E41"/><rect x="298" y="296" width="34" height="500" rx="17" fill="#fff" fill-opacity=".3"/><path d="M300 720h200M300 750h150" stroke="#fff" stroke-opacity=".55" stroke-width="10" stroke-linecap="round"/>`;
+const bagBody = (c) =>
+  `<path d="M318 432c0-150 164-150 164 0" fill="none" stroke="${c.dark}" stroke-width="24" stroke-linecap="round"/><path d="M216 420h368l40 408c2 14-8 24-22 24H198c-14 0-24-10-22-24z" fill="${c.body}"/><path d="M216 420h368l9 96H207z" fill="${c.dark}" fill-opacity=".22"/><rect x="370" y="498" width="60" height="44" rx="9" fill="#D8B56A"/><rect x="386" y="510" width="28" height="20" rx="5" fill="${c.body}"/><path d="M236 804h328" stroke="#fff" stroke-opacity=".28" stroke-width="5" stroke-dasharray="14 10"/><path d="M228 460l-8 300" stroke="#fff" stroke-opacity=".14" stroke-width="20" stroke-linecap="round"/>`;
+const bottleBody = (c) =>
+  `<rect x="300" y="300" width="200" height="560" rx="48" fill="${c.body}"/><rect x="330" y="214" width="140" height="100" rx="20" fill="${c.cap}"/><rect x="340" y="226" width="120" height="8" rx="4" fill="#fff" fill-opacity=".18"/><rect x="300" y="472" width="200" height="236" fill="${c.label}"/><path d="M400 640c34-30 34-68 0-90-34 22-34 60 0 90z" fill="${c.leaf}"/><path d="M400 640v-80" stroke="${c.label}" stroke-width="4"/><rect x="340" y="506" width="120" height="14" rx="7" fill="${c.leaf}" fill-opacity=".55"/><rect x="360" y="664" width="80" height="10" rx="5" fill="${c.leaf}" fill-opacity=".35"/><rect x="318" y="330" width="26" height="480" rx="13" fill="#fff" fill-opacity=".24"/>`;
+
+const shadow = (cx, cy, rx) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="24" fill="#000" fill-opacity=".08"/>`;
+const BODY = { drink: canBody, bag: bagBody, bottle: bottleBody };
+const COLOURS = { drink: CAN_COLOURS, bag: BAG_COLOURS, bottle: BOTTLE_COLOURS };
+
+/** Scenes for heroes and banners: two of the product on a soft colour field. */
+function scene(set, n) {
+  const cs = COLOURS[set];
+  const a = cs[(n - 1) % cs.length];
+  const b = cs[n % cs.length];
+  const body = BODY[set];
+  const field = set === "drink" ? ["#FBE4E1", "#F6CFCB"] : set === "bag" ? ["#EFEAE3", "#E3DACD"] : ["#EDF2E8", "#DCE7D4"];
+  const leaves =
+    set === "drink"
+      ? `<circle cx="830" cy="700" r="70" fill="${a.fruit}" fill-opacity=".85"/><circle cx="830" cy="700" r="48" fill="#fff" fill-opacity=".45"/><circle cx="1480" cy="250" r="44" fill="${b.fruit}" fill-opacity=".8"/>`
+      : set === "bottle"
+        ? `<path d="M820 760c90-130 220-170 320-140-60 110-190 170-320 140z" fill="${a.leaf}" fill-opacity=".55"/><path d="M1460 300c-90 20-150 90-160 180 90-10 150-80 160-180z" fill="${b.leaf}" fill-opacity=".5"/>`
+        : `<rect x="820" y="220" width="12" height="520" rx="6" fill="#000" fill-opacity=".05"/>`;
+  return `<rect width="1600" height="900" fill="${field[0]}"/><circle cx="1000" cy="460" r="360" fill="${field[1]}"/><g transform="translate(-180 0)">${leaves}</g>${shadow(880, 840, 200)}${shadow(1130, 860, 200)}<g transform="translate(520 -10) scale(.96)">${body(a)}</g><g transform="translate(760 30) scale(.96)">${body(b)}</g>`;
+}
+
+function colourArt(set, kind, n) {
+  const cs = COLOURS[set];
+  if (!cs) return null;
+  const c = cs[(n - 1) % cs.length];
+  if (kind === "product") return { viewBox: "0 0 800 1000", body: `<rect width="800" height="1000" fill="${c.bg}"/>${shadow(400, 860, 190)}${BODY[set](c)}` };
+  if (kind === "collection" || kind === "jewel") {
+    const fill = set === "drink" ? c.body : c.bg;
+    return { viewBox: "0 0 800 800", body: `<rect width="800" height="800" fill="${fill}"/><circle cx="400" cy="400" r="330" fill="#fff" fill-opacity="${set === "drink" ? ".25" : ".5"}"/><g transform="translate(24 -96) scale(.94)">${BODY[set](c)}</g>` };
+  }
+  if (kind === "lifestyle") return { viewBox: "0 0 1600 900", body: scene(set, n) };
+  return null;
+}
+
+function lookup(name, set) {
   const [kind, num] = String(name || "").split("-");
   const n = Number(num) || 1;
+  const coloured = set ? colourArt(set, kind, n) : null;
+  if (coloured) return coloured;
   if (kind === "product") return { viewBox: "0 0 800 1000", body: PRODUCTS[((n - 1) % 6) + 1] };
   if (kind === "collection") return { viewBox: "0 0 800 800", body: COLLECTIONS[((n - 1) % 4) + 1] };
   if (kind === "lifestyle") return { viewBox: "0 0 1600 900", body: LIFESTYLE[((n - 1) % 2) + 1] };
@@ -74,8 +145,8 @@ function lookup(name) {
   return { viewBox: "0 0 800 800", body: IMAGE };
 }
 
-function placeholderSvg(name, className = "") {
-  const { viewBox, body } = lookup(name);
+function placeholderSvg(name, className = "", set = null) {
+  const { viewBox, body } = lookup(name, set);
   const cls = String(className || "").replace(/[^\w\s-]/g, "");
   return `<svg class="placeholder-svg${cls ? ` ${cls}` : ""}" viewBox="${viewBox}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">${body}</svg>`;
 }

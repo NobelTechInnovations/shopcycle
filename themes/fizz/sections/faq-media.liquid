@@ -1,0 +1,44 @@
+{% comment %} Questions and answers beside a picture. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, align: 'center' %}
+    <div class="x-faqm">
+      <div class="x-faqm__media">
+        {% if section.settings.image != blank %}<img src="{{ section.settings.image | image_url }}" alt="" width="900" height="900" loading="lazy">{% else %}{{ 'collection-2' | placeholder_svg: 'x-faqm__art' }}{% endif %}
+      </div>
+      <div class="x-faqm__list">
+        {% for block in section.blocks %}
+          <details class="x-faqm__item" {% if forloop.first and section.settings.open_first %}open{% endif %}>
+            <summary>{{ block.settings.question }} {% render 'snippets/icon', icon: 'plus', class: 'icon icon--sm' %}</summary>
+            <p class="x-faqm__answer">{{ block.settings.answer }}</p>
+          </details>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "FAQ with picture",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Good to know" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Questions, answered" },
+    { "type": "image_picker", "id": "image", "label": "Picture" },
+    { "type": "checkbox", "id": "open_first", "label": "Open the first answer", "default": true },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "item", "name": "Question", "settings": [
+      { "type": "text", "id": "question", "label": "Question", "default": "How long does delivery take?" },
+      { "type": "textarea", "id": "answer", "label": "Answer", "default": "Most orders arrive in 3–6 working days across India. You'll get a tracking link as soon as it ships." }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "item", "settings": { "question": "How long does delivery take?", "answer": "Most orders arrive in 3–6 working days across India. You'll get a tracking link as soon as it ships." } },
+    { "type": "item", "settings": { "question": "Do you offer cash on delivery?", "answer": "Yes — choose Cash on delivery at checkout and pay when your order arrives." } },
+    { "type": "item", "settings": { "question": "Can I return something?", "answer": "If something isn't right, request a return from your order page within the return window." } }
+  ],
+  "max_blocks": 10
+}
+{% endschema %}

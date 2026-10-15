@@ -1,0 +1,91 @@
+{% comment %}
+  The one-product hero: photos, rating, price, a variant picker and Add to
+  cart, with the main benefits as ticks. Features the chosen product, else
+  the best seller; a store with no products yet sees an example.
+{% endcomment %}
+{% assign hp = all_products[section.settings.product] | default: best_sellers.first %}
+<section class="x-ph" id="buy" style="--x-bg: {{ section.settings.background }}">
+  <div class="container x-ph__inner">
+    <div class="x-ph__gallery">
+      {% if hp and hp.images.size > 0 %}
+        <img class="x-ph__main" src="{{ hp.images.first.url }}" alt="{{ hp.images.first.altText | default: hp.title | escape }}" width="1200" height="1200" fetchpriority="high" data-x-main>
+        {% if hp.images.size > 1 %}
+          <div class="x-ph__thumbs">
+            {% for image in hp.images limit: 5 %}<button type="button" class="x-ph__thumb" data-x-thumb="{{ image.url }}" aria-label="Show photo {{ forloop.index }}"><img src="{{ image.url }}" alt="" loading="lazy" width="160" height="160"></button>{% endfor %}
+          </div>
+        {% endif %}
+      {% else %}
+        <div class="x-ph__main x-ph__ph">{{ 'product-1' | placeholder_svg }}</div>
+        <div class="x-ph__thumbs" aria-hidden="true">
+          {% for n in (2..4) %}<span class="x-ph__thumb">{% assign art = 'product-' | append: n %}{{ art | placeholder_svg }}</span>{% endfor %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="x-ph__info">
+      {% if section.settings.eyebrow != blank %}<p class="x-ph__eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+      {% if section.settings.rating != blank %}
+        <p class="x-ph__rating"><span class="x-stars" aria-hidden="true">★★★★★</span> {{ section.settings.rating }}</p>
+      {% endif %}
+      <h1 class="x-ph__title">{% if hp %}{{ hp.title }}{% else %}{{ section.settings.example_title }}{% endif %}</h1>
+      {% if section.settings.subtitle != blank %}<p class="x-ph__sub">{{ section.settings.subtitle }}</p>{% endif %}
+      {% if section.blocks.size > 0 %}
+        <ul class="x-ph__ticks">
+          {% for block in section.blocks %}<li>{% render 'snippets/icon', icon: 'check', class: 'icon icon--sm' %} {{ block.settings.text }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+      {% if hp %}
+        {% assign pv = hp.price_variant | default: hp.variants.first %}
+        <p class="price price--lg x-ph__price">
+          {% if pv.comparePrice and pv.comparePrice > pv.price %}<span class="price__now price__now--sale">{{ pv.price | money }}</span> <s class="price__was">{{ pv.comparePrice | money }}</s> <span class="tag tag--accent">Save {{ hp.discount_percent }}%</span>{% else %}<span class="price__now">{{ pv.price | money }}</span>{% endif %}
+        </p>
+        <form method="post" action="{{ routes.cart_add_url }}" class="x-ph__form" data-product-title="{{ hp.title | escape }}">
+          {% if hp.variants.size > 1 %}
+            <label class="field"><span class="field__label">{{ hp.options.first.name | default: 'Choose' }}</span>
+              <select name="variantId">
+                {% for v in hp.variants %}<option value="{{ v.id }}" {% unless v.available %}disabled{% endunless %}>{{ v.title }} — {{ v.price | money }}{% unless v.available %} (sold out){% endunless %}</option>{% endfor %}
+              </select>
+            </label>
+          {% else %}
+            <input type="hidden" name="variantId" value="{{ pv.id }}">
+          {% endif %}
+          <div class="x-ph__buy">
+            <label class="x-qty"><span class="sr-only">Quantity</span><input type="number" name="quantity" value="1" min="1" max="20" inputmode="numeric"></label>
+            <button type="submit" class="btn btn--wide" {% unless hp.available %}disabled{% endunless %}>{% if hp.available %}Add to cart{% else %}Sold out{% endif %}</button>
+          </div>
+        </form>
+      {% else %}
+        <p class="price price--lg x-ph__price"><span class="price__now">{{ 1499 | money }}</span></p>
+        <div class="x-ph__buy"><span class="btn btn--wide is-disabled" aria-disabled="true">Add to cart</span></div>
+        <p class="x-ph__note">Add your product in Products — its photos, price and Add to cart show here.</p>
+      {% endif %}
+      <ul class="x-ph__trust">
+        <li>{% render 'snippets/icon', icon: 'truck', class: 'icon icon--sm' %} {% if shop.free_shipping_above %}Free delivery over {{ shop.free_shipping_above | money }}{% else %}Delivery across India{% endif %}</li>
+        {% if shop.cod_enabled %}<li>{% render 'snippets/icon', icon: 'cash', class: 'icon icon--sm' %} Cash on delivery</li>{% endif %}
+        <li>{% render 'snippets/icon', icon: 'shield', class: 'icon icon--sm' %} Secure checkout</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Product hero",
+  "settings": [
+    { "type": "product", "id": "product", "label": "Product", "info": "Leave empty to feature your best seller." },
+    { "type": "text", "id": "eyebrow", "label": "Small text above title", "default": "Our bestseller" },
+    { "type": "text", "id": "rating", "label": "Rating line", "default": "4.8 from 1,200+ happy customers", "info": "Leave empty to hide the stars." },
+    { "type": "text", "id": "subtitle", "label": "One line under the title", "default": "Daily calm and focus, from 7 plant ingredients." },
+    { "type": "text", "id": "example_title", "label": "Title while you have no products", "default": "Daily Calm Gummies" },
+    { "type": "color", "id": "background", "label": "Background", "default": "#F1F5EE" }
+  ],
+  "blocks": [
+    { "type": "tick", "name": "Benefit", "settings": [ { "type": "text", "id": "text", "label": "Benefit", "default": "Made with natural ingredients" } ] }
+  ],
+  "default_blocks": [
+    { "type": "tick", "settings": { "text": "Calm focus, without the crash" } },
+    { "type": "tick", "settings": { "text": "7 plant ingredients, nothing artificial" } },
+    { "type": "tick", "settings": { "text": "Third-party lab tested" } }
+  ],
+  "max_blocks": 6
+}
+{% endschema %}

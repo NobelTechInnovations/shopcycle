@@ -82,7 +82,14 @@ function createLiquidEngine(filesByPath, meta, settingsData) {
   engine.registerTag("section", SectionTag);
 
   // Illustrations for empty slots (no products/images yet) — see placeholders.js.
-  engine.registerFilter("placeholder_svg", (name, className) => placeholderSvg(name, className));
+  // A theme's `placeholder_art` setting picks a colour set (placeholders.js).
+  engine.registerFilter("placeholder_svg", function (name, className) {
+    let set = null;
+    try {
+      set = this.context.getSync(["settings", "placeholder_art"]) || null;
+    } catch {}
+    return placeholderSvg(name, className, set);
+  });
 
   engine.registerFilter("money", (value) => {
     const amount = Number(value) || 0;

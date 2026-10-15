@@ -10,7 +10,7 @@ const DEFAULTS = {
   trialDays: 3,
   // The one-time first paid month after the trial (before tax).
   introEnabled: true,
-  introPrice: 99,
+  introPrice: 49,
   // Yearly = monthly × 12 × (1 − discount).
   annualDiscountPercent: 20,
   // After a failed payment (or an expired period): full access this long.

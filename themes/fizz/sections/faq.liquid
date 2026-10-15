@@ -1,0 +1,45 @@
+{% comment %} Questions and answers — heading on the left, answers that open on the right. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container faq">
+    <div class="faq__head">
+      {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+      <h2 class="h2">{{ section.settings.heading }}</h2>
+      {% if section.settings.text != blank %}<p class="faq__sub">{{ section.settings.text }}</p>{% endif %}
+      {% if shop.support_email %}<a class="arrow-link" href="mailto:{{ shop.support_email }}"><span>{{ shop.support_email }}</span>{% render 'snippets/icon', icon: 'arrow-up-right', class: 'icon icon--sm' %}</a>{% endif %}
+    </div>
+    <div class="faq__list">
+      {% for block in section.blocks %}
+        <details class="acc"{% if forloop.first and section.settings.open_first %} open{% endif %}>
+          <summary><span>{{ block.settings.question }}</span><span class="acc__icon" aria-hidden="true"></span></summary>
+          <div class="acc__body">{{ block.settings.answer | newline_to_br }}</div>
+        </details>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "FAQ",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Help" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Questions, answered" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "Can't find what you need? Write to us — we reply within a day." },
+    { "type": "checkbox", "id": "open_first", "label": "Open the first answer", "default": true },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "question", "name": "Question", "settings": [
+      { "type": "text", "id": "question", "label": "Question", "default": "How long does delivery take?" },
+      { "type": "textarea", "id": "answer", "label": "Answer", "default": "Most orders arrive in 3–5 working days. You'll get a tracking link as soon as it ships." }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "question", "settings": { "question": "How long does delivery take?", "answer": "Most orders arrive in 3–5 working days. You'll get a tracking link by email as soon as it ships." } },
+    { "type": "question", "settings": { "question": "Do you offer cash on delivery?", "answer": "Yes — choose Cash on delivery at checkout and pay by cash or UPI when your order arrives." } },
+    { "type": "question", "settings": { "question": "What's your return policy?", "answer": "If something isn't right, request a return from your order page within the return window and we'll sort it out." } },
+    { "type": "question", "settings": { "question": "How can I track my order?", "answer": "Use the link in your confirmation email, or find your order with its number and your email from the Track order page." } }
+  ],
+  "max_blocks": 12
+}
+{% endschema %}

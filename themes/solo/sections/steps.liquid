@@ -1,0 +1,40 @@
+{% comment %} How it works: numbered steps with an icon each. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, align: 'center' %}
+    <ol class="x-steps" style="--cols: {{ section.blocks.size | at_most: 4 }}">
+      {% for block in section.blocks limit: 4 %}
+        <li class="x-step">
+          <span class="x-step__icon">{% render 'snippets/icon', icon: block.settings.icon %}</span>
+          <span class="x-step__num">Step {{ forloop.index }}</span>
+          <h3 class="x-step__title">{{ block.settings.title }}</h3>
+          <p class="x-step__text">{{ block.settings.text }}</p>
+        </li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "How it works",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Simple routine" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "How it works" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "step", "name": "Step", "settings": [
+      { "type": "select", "id": "icon", "label": "Icon", "default": "sparkle", "options": [{ "value": "truck", "label": "Delivery" }, { "value": "cash", "label": "Cash" }, { "value": "return", "label": "Returns" }, { "value": "shield", "label": "Secure" }, { "value": "leaf", "label": "Natural" }, { "value": "star", "label": "Star" }, { "value": "gift", "label": "Gift" }, { "value": "chat", "label": "Support" }, { "value": "heart", "label": "Heart" }, { "value": "sparkle", "label": "Sparkle" }, { "value": "award", "label": "Award" }, { "value": "diamond", "label": "Quality" }, { "value": "check", "label": "Tick" }] },
+      { "type": "text", "id": "title", "label": "Title", "default": "Take one a day" },
+      { "type": "textarea", "id": "text", "label": "Text", "default": "With water, any time of day." }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "step", "settings": { "icon": "sparkle", "title": "Take two a day", "text": "Chew two gummies in the morning or before bed." } },
+    { "type": "step", "settings": { "icon": "leaf", "title": "Let nature work", "text": "Plant ingredients settle in over the first week." } },
+    { "type": "step", "settings": { "icon": "heart", "title": "Feel the difference", "text": "Most people notice calmer days within 2–3 weeks." } }
+  ],
+  "max_blocks": 4
+}
+{% endschema %}

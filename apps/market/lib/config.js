@@ -35,5 +35,8 @@ const OFFICIAL_SHOTS = {
   modern: ["/showcase/modern.webp"],
   atelier: ["/showcase/atelier.webp", "/showcase/atelier-product.webp", "/showcase/atelier-mobile.webp"],
   lumiere: ["/showcase/lumiere.webp"],
+  fizz: ["/showcase/fizz.jpg"],
+  carry: ["/showcase/carry.jpg"],
+  solo: ["/showcase/solo.jpg"],
 };
 export const withShots = (item) => (item?.official && item.kind === "theme" && !item.screenshots?.length && OFFICIAL_SHOTS[item.slug] ? { ...item, screenshots: OFFICIAL_SHOTS[item.slug] } : item);

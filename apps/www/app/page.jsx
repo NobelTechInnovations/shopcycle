@@ -32,7 +32,7 @@ const STRENGTHS = [
   { icon: I.chat, title: "WhatsApp and SMS built in", text: "Order updates, an inbox for replies and sign-in codes — from your number or ours." },
   { icon: I.megaphone, title: "Ads from your dashboard", text: "Run Meta and Google campaigns, see results in plain words and approve suggestions." },
   { icon: I.wallet, title: "Your money, directly", text: "Payments land in your own gateway account. Oyklane never holds your money." },
-  { icon: I.layers, title: "No code needed", text: "Four themes, a drag-and-drop editor, your own domain with SSL — set up in an afternoon." },
+  { icon: I.layers, title: "No code needed", text: "Eight free themes, a drag-and-drop editor, your own domain with SSL — set up in an afternoon." },
   { icon: I.life, title: "Help in your language", text: "Ask in English or Hinglish. An assistant that knows your store, and real people behind it." },
   { icon: I.tag, title: "Simple pricing", text: "Monthly plans in ₹, no product limits, no setup fee. Pay-as-you-go extras like ₹0.50 per SMS." },
 ];
@@ -183,7 +183,7 @@ export default async function HomePage() {
               <h2 className="h2">A store that looks like your brand</h2>
               <p className="lead">Start from a theme made for what you sell, then change colours, fonts, photos and every section. Drag the blocks on your product page into the order that sells.</p>
               <ul className="includes">
-                <li className="chip">4 themes for fashion, jewellery, D2C and more</li>
+                <li className="chip">8 free themes — fashion, jewellery, food, drinks, bags and one-product brands</li>
                 <li className="chip">Drag-and-drop sections and product blocks</li>
                 <li className="chip">Your own domain with free SSL</li>
                 <li className="chip">Fast and mobile-first</li>
@@ -380,7 +380,7 @@ export default async function HomePage() {
       <section className="section" id="themes">
         <div className="wrap">
           <div className="head">
-            <h2 className="h2">Four themes. Your brand in every one.</h2>
+            <h2 className="h2">Eight free themes. Your brand in every one.</h2>
             <p className="lead">Start from a design made for what you sell, then make it yours — colours, fonts, photos and sections, all without code.</p>
           </div>
           <ThemeShowcase demoUrl={DEMO_URL} appUrl={APP_URL} />

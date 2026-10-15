@@ -1,0 +1,115 @@
+{
+  "sections": {
+    "hero": {
+      "type": "intro-hero",
+      "settings": {
+        "eyebrow": "New collection",
+        "heading": "Real leather, made to last",
+        "text": "Full-grain bags cut and stitched by hand — quiet designs you'll carry for years.",
+        "button_label": "Discover now",
+        "background": "#F6F3EE"
+      }
+    },
+    "features": {
+      "type": "feature-cards",
+      "settings": {}
+    },
+    "new_in": {
+      "type": "product-grid",
+      "settings": {
+        "eyebrow": "",
+        "heading": "Designed for every day",
+        "source": "newest",
+        "limit": 10,
+        "columns": 5,
+        "link_text": "View all"
+      }
+    },
+    "offers": {
+      "type": "promo-banner",
+      "settings": {},
+      "blocks": {
+        "b1": {
+          "type": "tile",
+          "settings": {
+            "eyebrow": "Up to 30% off",
+            "heading": "Save up to 20% off",
+            "button_label": "Shop now",
+            "text_color": "dark"
+          }
+        },
+        "b2": {
+          "type": "tile",
+          "settings": {
+            "eyebrow": "Latest design",
+            "heading": "New bag collection",
+            "button_label": "Shop now",
+            "text_color": "dark"
+          }
+        }
+      },
+      "block_order": [
+        "b1",
+        "b2"
+      ]
+    },
+    "promise": {
+      "type": "statement",
+      "settings": {
+        "icon": "leaf",
+        "text": "High-quality leather bags, made to equally high standards."
+      }
+    },
+    "bestsellers": {
+      "type": "product-grid",
+      "settings": {
+        "eyebrow": "",
+        "heading": "Most loved",
+        "source": "best_sellers",
+        "limit": 5,
+        "columns": 5
+      }
+    },
+    "brands": {
+      "type": "logo-list",
+      "settings": {}
+    },
+    "reviews": {
+      "type": "testimonials",
+      "settings": {
+        "eyebrow": "",
+        "heading": "Happy client reviews",
+        "surface": true
+      }
+    },
+    "gallery": {
+      "type": "instagram-gallery",
+      "settings": {
+        "eyebrow": "",
+        "heading": "Shop our Instagram",
+        "link_text": "Follow us"
+      }
+    },
+    "newsletter": {
+      "type": "newsletter",
+      "settings": {
+        "eyebrow": "",
+        "heading": "Become a member and get 15% off your next purchase",
+        "text": "",
+        "style": "light"
+      }
+    }
+  },
+  "order": [
+    "hero",
+    "features",
+    "new_in",
+    "offers",
+    "promise",
+    "bestsellers",
+    "brands",
+    "reviews",
+    "gallery",
+    "newsletter"
+  ]
+}

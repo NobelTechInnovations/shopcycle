@@ -1,0 +1,40 @@
+{% comment %} "As seen in" — press or partner logos, or their names as text. {% endcomment %}
+<section class="section section--tight{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container logos">
+    {% if section.settings.heading != blank %}<p class="logos__title">{{ section.settings.heading }}</p>{% endif %}
+    <ul class="logos__row">
+      {% for block in section.blocks %}
+        <li>
+          {% if block.settings.link != blank %}<a href="{{ block.settings.link }}">{% endif %}
+          {% if block.settings.image != blank %}<img src="{{ block.settings.image | image_url }}" alt="{{ block.settings.name | escape }}" loading="lazy" height="40">{% else %}<span class="logos__name">{{ block.settings.name }}</span>{% endif %}
+          {% if block.settings.link != blank %}</a>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Logos",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "As featured in" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "logo", "name": "Logo", "settings": [
+      { "type": "text", "id": "name", "label": "Name", "default": "Publication" },
+      { "type": "image_picker", "id": "image", "label": "Logo (optional)" },
+      { "type": "url", "id": "link", "label": "Link (optional)" }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "logo", "settings": { "name": "The Daily" } },
+    { "type": "logo", "settings": { "name": "Vogue-ish" } },
+    { "type": "logo", "settings": { "name": "Mint Weekend" } },
+    { "type": "logo", "settings": { "name": "YourStory" } },
+    { "type": "logo", "settings": { "name": "Design Digest" } }
+  ],
+  "max_blocks": 8
+}
+{% endschema %}

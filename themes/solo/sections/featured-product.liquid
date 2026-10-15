@@ -1,0 +1,119 @@
+{% comment %}
+  One product in the spotlight with add to cart. Until a product is
+  picked it features the store's best seller; a store with no products yet
+  sees an example. Variants are a plain <select>, so no JavaScript needed.
+  The seller picks the photo shape and fit, one or two photos, which side
+  they sit on and how big the title is.
+{% endcomment %}
+{% assign fp = all_products[section.settings.product] | default: best_sellers.first %}
+{% case section.settings.image_ratio %}
+  {% when 'square' %}{% assign fp_ratio = '1 / 1' %}
+  {% when 'tall' %}{% assign fp_ratio = '2 / 3' %}
+  {% when 'landscape' %}{% assign fp_ratio = '4 / 3' %}
+  {% when 'natural' %}{% assign fp_ratio = 'auto' %}
+  {% else %}{% assign fp_ratio = '4 / 5' %}
+{% endcase %}
+{% case section.settings.heading_size %}
+  {% when 'small' %}{% assign fp_title = 'clamp(22px, 2.2vw, 28px)' %}
+  {% when 'large' %}{% assign fp_title = 'clamp(30px, 4.2vw, 56px)' %}
+  {% else %}{% assign fp_title = 'clamp(25px, 3vw, 40px)' %}
+{% endcase %}
+{% assign fp_photos = 1 %}{% if section.settings.second_photo %}{% assign fp_photos = 2 %}{% endif %}
+<style>
+  .spot--fp { grid-template-columns: minmax(0, var(--fp-media)) minmax(0, 1fr); }
+  .spot--fp.spot--flip .spot__gallery { order: 2; }
+  .spot--fp .spot__gallery img, .spot--fp .spot__ph { aspect-ratio: var(--fp-ratio); object-fit: var(--fp-fit); height: auto; max-height: 82vh; }
+  .spot--fp .spot__title { font-size: var(--fp-title); line-height: 1.1; }
+  @media (max-width: 989px) {
+    .spot--fp { grid-template-columns: 1fr; }
+    .spot--fp.spot--flip .spot__gallery { order: 0; }
+  }
+</style>
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    <div class="spot spot--fp{% if section.settings.flip %} spot--flip{% endif %}" style="--fp-media: {{ section.settings.media_width | default: 55 }}%; --fp-ratio: {{ fp_ratio }}; --fp-fit: {{ section.settings.image_fit | default: 'cover' }}; --fp-title: {{ fp_title }}">
+      <div class="spot__gallery{% if fp.images.size > 1 and fp_photos == 2 %} spot__gallery--two{% endif %}">
+        {% if fp and fp.images.size > 0 %}
+          {% for image in fp.images limit: fp_photos %}
+            <img src="{{ image.url }}" alt="{{ image.altText | default: fp.title | escape }}" loading="lazy" width="1200" height="1500">
+          {% endfor %}
+        {% else %}
+          {% if fp %}{% assign art = 'image' %}{% else %}{% assign art = 'product-4' %}{% endif %}
+          <div class="spot__ph">{{ art | placeholder_svg }}</div>
+        {% endif %}
+      </div>
+      <div class="spot__info">
+        {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+        {% if fp %}
+          <h2 class="h1 spot__title">{{ fp.title }}</h2>
+          {% assign pv = fp.price_variant | default: fp.variants.first %}
+          <p class="price price--lg">
+            {% if pv.comparePrice and pv.comparePrice > pv.price %}<span class="price__now price__now--sale">{{ pv.price | money }}</span> <s class="price__was">{{ pv.comparePrice | money }}</s> <span class="tag tag--accent">−{{ fp.discount_percent }}%</span>{% else %}<span class="price__now">{{ pv.price | money }}</span>{% endif %}
+          </p>
+          {% if section.settings.show_description and fp.description != blank %}<p class="spot__desc">{{ fp.description | strip_html | truncatewords: 45 }}</p>{% endif %}
+          <form method="post" action="{{ routes.cart_add_url }}" class="spot__form" data-product-title="{{ fp.title | escape }}">
+            {% if fp.variants.size > 1 %}
+              <label class="field"><span class="field__label">{{ fp.options.first.name | default: 'Option' }}</span>
+                <select name="variantId">
+                  {% for v in fp.variants %}<option value="{{ v.id }}" {% unless v.available %}disabled{% endunless %}>{{ v.title }} — {{ v.price | money }}{% unless v.available %} (sold out){% endunless %}</option>{% endfor %}
+                </select>
+              </label>
+            {% else %}
+              <input type="hidden" name="variantId" value="{{ pv.id }}">
+            {% endif %}
+            <input type="hidden" name="quantity" value="1">
+            <div class="btn-row">
+              <button type="submit" class="btn btn--wide" {% unless fp.available %}disabled{% endunless %}>{% if fp.available %}Add to cart{% else %}Sold out{% endif %}</button>
+              <a class="arrow-link" href="{{ fp.url }}"><span>Full details</span>{% render 'snippets/icon', icon: 'arrow-up-right', class: 'icon icon--sm' %}</a>
+            </div>
+          </form>
+          {% if section.settings.show_checks %}
+            <ul class="checks">
+              <li>{% render 'snippets/icon', icon: 'check', class: 'icon icon--sm' %} {% if shop.free_shipping_above %}Free delivery over {{ shop.free_shipping_above | money }}{% else %}Delivery across India{% endif %}</li>
+              {% if shop.cod_enabled %}<li>{% render 'snippets/icon', icon: 'check', class: 'icon icon--sm' %} Cash on delivery</li>{% endif %}
+              {% if shop.return_days > 0 %}<li>{% render 'snippets/icon', icon: 'check', class: 'icon icon--sm' %} {{ shop.return_days }}-day returns</li>{% endif %}
+            </ul>
+          {% endif %}
+        {% else %}
+          <h2 class="h1 spot__title">Example product title</h2>
+          <p class="price price--lg"><span class="price__now">{{ 1999 | money }}</span></p>
+          <p class="spot__desc">Pick a product for this section in the theme editor — its photos, price and an add-to-cart button show here.</p>
+          <div class="btn-row"><span class="btn btn--wide is-disabled" aria-disabled="true">Add to cart</span></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Featured product",
+  "settings": [
+    { "type": "product", "id": "product", "label": "Product", "info": "Leave empty to feature your best seller." },
+    { "type": "text", "id": "eyebrow", "label": "Small text above title", "default": "Bestseller" },
+    { "type": "select", "id": "heading_size", "label": "Title size", "default": "medium", "options": [
+      { "value": "small", "label": "Small" },
+      { "value": "medium", "label": "Medium" },
+      { "value": "large", "label": "Large" }
+    ] },
+    { "type": "checkbox", "id": "show_description", "label": "Show the description", "default": true },
+    { "type": "checkbox", "id": "show_checks", "label": "Show delivery, cash on delivery and returns", "default": true },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": true },
+    { "type": "header", "content": "Photos" },
+    { "type": "checkbox", "id": "second_photo", "label": "Show the second photo beside the first", "default": true },
+    { "type": "select", "id": "image_ratio", "label": "Photo shape", "default": "portrait", "options": [
+      { "value": "portrait", "label": "Portrait (4:5)" },
+      { "value": "tall", "label": "Tall (2:3)" },
+      { "value": "square", "label": "Square" },
+      { "value": "landscape", "label": "Landscape (4:3)" },
+      { "value": "natural", "label": "As uploaded" }
+    ] },
+    { "type": "select", "id": "image_fit", "label": "Photo fit", "default": "cover", "options": [
+      { "value": "cover", "label": "Fill the shape (trims the edges)" },
+      { "value": "contain", "label": "Show the whole photo" }
+    ] },
+    { "type": "range", "id": "media_width", "label": "Photo area width (%)", "min": 35, "max": 70, "step": 5, "default": 55 },
+    { "type": "checkbox", "id": "flip", "label": "Photos on the right", "default": false }
+  ]
+}
+{% endschema %}

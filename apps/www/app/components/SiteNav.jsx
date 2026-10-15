@@ -7,7 +7,7 @@ import { Icon, I } from "./Icon";
 import { APP_URL } from "./site";
 
 const FEATURES = [
-  { href: "/#builder", icon: I.store, title: "Store builder", text: "Four themes, drag-and-drop sections, no code." },
+  { href: "/#builder", icon: I.store, title: "Store builder", text: "Eight free themes, drag-and-drop sections, no code." },
   { href: "/#checkout", icon: I.bolt, title: "One-Click Checkout", text: "Phone, code, saved address, pay — in a popup." },
   { href: "/#flow", icon: I.flow, title: "Flow automations", text: "Emails that send themselves after every order." },
   { href: "/#help", icon: I.life, title: "Help in seconds", text: "An assistant that knows your store, then real people." },

@@ -29,6 +29,33 @@ const THEMES = [
     colors: ["#f3f3ef", "#0e0e0e", "#d7f75b", "#ffffff"],
   },
   {
+    key: "fizz",
+    name: "Fizz",
+    for: "Drinks, snacks & D2C",
+    text: "Pastel colour fields, flavour circles, rounded product cards, a deal-of-the-day countdown and a FAQ beside a picture.",
+    url: "your-brand.oyklane.com",
+    colors: ["#ffffff", "#2a2a2a", "#e0474c", "#fdf1f0"],
+    img: "jpg",
+  },
+  {
+    key: "carry",
+    name: "Carry",
+    for: "Bags & accessories",
+    text: "Quiet and minimal — clean type, square product tiles on soft grey, feature cards, offer banners and a one-line brand promise.",
+    url: "your-brand.oyklane.com",
+    colors: ["#ffffff", "#1c1c1c", "#b5653a", "#f5f3ef"],
+    img: "jpg",
+  },
+  {
+    key: "solo",
+    name: "Solo",
+    for: "One-product brands",
+    text: "A buy box at the top, benefits, how it works, what's inside, a comparison, reviews, FAQ, a money-back promise and a sticky buy bar.",
+    url: "your-brand.oyklane.com",
+    colors: ["#ffffff", "#1e2a22", "#2f5d3a", "#f1f5ee"],
+    img: "jpg",
+  },
+  {
     key: "classic",
     name: "Classic",
     for: "Any shop",
@@ -89,7 +116,7 @@ export function ThemeShowcase({ demoUrl, appUrl }) {
             <span className="browser__url">{t.url}</span>
           </div>
           <div className="browser__screen">
-            <img key={t.key} src={`/showcase/${t.key}.webp`} alt={`A store using the ${t.name} theme`} width="1440" height="1000" />
+            <img key={t.key} src={`/showcase/${t.key}.${t.img || "webp"}`} alt={`A store using the ${t.name} theme`} width="1440" height="1000" />
           </div>
         </div>
         <div className="themes__meta">

@@ -1,0 +1,17 @@
+{% comment %} One sentence, centred, with a small icon above — the brand's promise. {% endcomment %}
+<section class="section section--tight x-statement">
+  <div class="container">
+    <span class="x-statement__icon">{% render 'snippets/icon', icon: section.settings.icon %}</span>
+    <p class="x-statement__text">{{ section.settings.text }}</p>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Statement",
+  "settings": [
+    { "type": "select", "id": "icon", "label": "Icon", "default": "leaf", "options": [{ "value": "truck", "label": "Delivery" }, { "value": "cash", "label": "Cash" }, { "value": "return", "label": "Returns" }, { "value": "shield", "label": "Secure" }, { "value": "leaf", "label": "Natural" }, { "value": "star", "label": "Star" }, { "value": "gift", "label": "Gift" }, { "value": "chat", "label": "Support" }, { "value": "heart", "label": "Heart" }, { "value": "sparkle", "label": "Sparkle" }, { "value": "award", "label": "Award" }, { "value": "diamond", "label": "Quality" }, { "value": "check", "label": "Tick" }] },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "Quality you can feel, made to the same high standard every time." }
+  ]
+}
+{% endschema %}

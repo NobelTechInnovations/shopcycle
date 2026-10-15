@@ -1,0 +1,26 @@
+{% comment %}
+  A slim bar that slides up once the shopper scrolls past the top of the
+  page: the product, its price and a button back to Add to cart.
+{% endcomment %}
+{% assign sp = all_products[section.settings.product] | default: best_sellers.first %}
+{% if section.settings.show %}
+<div class="x-sticky" data-x-sticky aria-hidden="true">
+  <div class="container x-sticky__inner">
+    <span class="x-sticky__name">{% if sp %}{{ sp.title }}{% else %}{{ section.settings.example_title }}{% endif %}</span>
+    {% if sp %}{% assign spv = sp.price_variant | default: sp.variants.first %}<span class="x-sticky__price">{{ spv.price | money }}</span>{% endif %}
+    <a class="btn" href="#buy" tabindex="-1">{{ section.settings.button_label }}</a>
+  </div>
+</div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Sticky buy bar",
+  "settings": [
+    { "type": "checkbox", "id": "show", "label": "Show the bar", "default": true },
+    { "type": "product", "id": "product", "label": "Product", "info": "Leave empty to use your best seller." },
+    { "type": "text", "id": "button_label", "label": "Button", "default": "Buy now" },
+    { "type": "text", "id": "example_title", "label": "Name while you have no products", "default": "Daily Calm Gummies" }
+  ]
+}
+{% endschema %}

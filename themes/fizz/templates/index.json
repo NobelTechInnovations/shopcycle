@@ -1,0 +1,146 @@
+{
+  "sections": {
+    "hero": {
+      "type": "intro-hero",
+      "settings": {
+        "eyebrow": "Get your energy drink",
+        "heading": "Mint Lemon Soda",
+        "text": "Real fruit, light fizz and no added sugar — chilled and delivered across India.",
+        "button_label": "Shop now",
+        "background": "#FBE4E1"
+      }
+    },
+    "flavours": {
+      "type": "category-circles",
+      "settings": {
+        "eyebrow": "The products",
+        "heading": "Pick your flavour",
+        "shape": "circle"
+      }
+    },
+    "latest": {
+      "type": "product-grid",
+      "settings": {
+        "eyebrow": "The latest",
+        "heading": "Fresh from the fridge",
+        "source": "newest",
+        "limit": 6,
+        "columns": 3,
+        "link_text": "View all"
+      }
+    },
+    "about": {
+      "type": "editorial-banner",
+      "settings": {
+        "eyebrow": "Our story",
+        "heading": "All about Fizz",
+        "text": "We started with one question: why do good drinks taste so sweet? Ours use real fruit, a little fizz and nothing you can't pronounce.",
+        "button_label": "Read more",
+        "surface": false
+      }
+    },
+    "services": {
+      "type": "usp",
+      "settings": {
+        "surface": true
+      },
+      "blocks": {
+        "b1": {
+          "type": "item",
+          "settings": {
+            "icon": "truck",
+            "title": "Free delivery",
+            "text": "On orders over ₹999."
+          }
+        },
+        "b2": {
+          "type": "item",
+          "settings": {
+            "icon": "cash",
+            "title": "Easy to buy",
+            "text": "UPI, cards or cash on delivery."
+          }
+        },
+        "b3": {
+          "type": "item",
+          "settings": {
+            "icon": "chat",
+            "title": "Personal support",
+            "text": "Real people on chat and email."
+          }
+        },
+        "b4": {
+          "type": "item",
+          "settings": {
+            "icon": "gift",
+            "title": "Gift vouchers",
+            "text": "The easiest present to get right."
+          }
+        }
+      },
+      "block_order": [
+        "b1",
+        "b2",
+        "b3",
+        "b4"
+      ]
+    },
+    "faq": {
+      "type": "faq-media",
+      "settings": {
+        "eyebrow": "Good to know",
+        "heading": "FAQ"
+      }
+    },
+    "brands": {
+      "type": "logo-list",
+      "settings": {}
+    },
+    "deal": {
+      "type": "deal-countdown",
+      "settings": {
+        "eyebrow": "Today only",
+        "heading": "Best deal of the day",
+        "text": "Our favourite six-pack at a special price — until the timer runs out.",
+        "button_label": "Shop the deal",
+        "background": "#FBF3F2"
+      }
+    },
+    "reviews": {
+      "type": "testimonials",
+      "settings": {
+        "eyebrow": "Happy customers",
+        "heading": "Customer reviews"
+      }
+    },
+    "blog": {
+      "type": "featured-blog",
+      "settings": {
+        "eyebrow": "News & events",
+        "heading": "Latest from the blog"
+      }
+    },
+    "newsletter": {
+      "type": "newsletter",
+      "settings": {
+        "eyebrow": "Stay in the loop",
+        "heading": "Join our newsletter",
+        "text": "New flavours, offers and recipes — once a week, never spam.",
+        "style": "accent"
+      }
+    }
+  },
+  "order": [
+    "hero",
+    "flavours",
+    "latest",
+    "about",
+    "services",
+    "faq",
+    "brands",
+    "deal",
+    "reviews",
+    "blog",
+    "newsletter"
+  ]
+}

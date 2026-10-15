@@ -51,7 +51,7 @@ export default function RegisterPage() {
     <AuthShell
       homeHref={process.env.NEXT_PUBLIC_SITE_URL || "https://oyklane.com"}
       title="Create your store"
-      subtitle="3-day free trial, then ₹99 for your first month."
+      subtitle="3-day free trial, then ₹49 for your first month."
       footer={
         <>
           Already selling on Oyklane?{" "}

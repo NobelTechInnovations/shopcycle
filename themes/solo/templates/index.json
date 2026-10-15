@@ -1,0 +1,184 @@
+{
+  "sections": {
+    "hero": {
+      "type": "product-hero",
+      "settings": {},
+      "blocks": {
+        "b1": {
+          "type": "tick",
+          "settings": {
+            "text": "Calm focus, without the crash"
+          }
+        },
+        "b2": {
+          "type": "tick",
+          "settings": {
+            "text": "7 plant ingredients, nothing artificial"
+          }
+        },
+        "b3": {
+          "type": "tick",
+          "settings": {
+            "text": "Third-party lab tested"
+          }
+        }
+      },
+      "block_order": [
+        "b1",
+        "b2",
+        "b3"
+      ]
+    },
+    "ticker": {
+      "type": "marquee",
+      "settings": {
+        "style": "dark",
+        "speed": 35
+      },
+      "blocks": {
+        "b1": {
+          "type": "text",
+          "settings": {
+            "text": "Plant-based"
+          }
+        },
+        "b2": {
+          "type": "text",
+          "settings": {
+            "text": "No added sugar"
+          }
+        },
+        "b3": {
+          "type": "text",
+          "settings": {
+            "text": "Made in India"
+          }
+        },
+        "b4": {
+          "type": "text",
+          "settings": {
+            "text": "Lab tested"
+          }
+        },
+        "b5": {
+          "type": "text",
+          "settings": {
+            "text": "30-day money-back promise"
+          }
+        }
+      },
+      "block_order": [
+        "b1",
+        "b2",
+        "b3",
+        "b4",
+        "b5"
+      ]
+    },
+    "benefits": {
+      "type": "usp",
+      "settings": {
+        "surface": false
+      },
+      "blocks": {
+        "b1": {
+          "type": "item",
+          "settings": {
+            "icon": "leaf",
+            "title": "Plant-powered",
+            "text": "Herbs with centuries of use behind them."
+          }
+        },
+        "b2": {
+          "type": "item",
+          "settings": {
+            "icon": "sparkle",
+            "title": "Calm focus",
+            "text": "Steady energy through the day."
+          }
+        },
+        "b3": {
+          "type": "item",
+          "settings": {
+            "icon": "heart",
+            "title": "Better sleep",
+            "text": "Wind down more easily at night."
+          }
+        },
+        "b4": {
+          "type": "item",
+          "settings": {
+            "icon": "shield",
+            "title": "Lab tested",
+            "text": "Every batch checked by an independent lab."
+          }
+        }
+      },
+      "block_order": [
+        "b1",
+        "b2",
+        "b3",
+        "b4"
+      ]
+    },
+    "how": {
+      "type": "steps",
+      "settings": {
+        "surface": true
+      }
+    },
+    "inside": {
+      "type": "ingredients",
+      "settings": {}
+    },
+    "compare": {
+      "type": "compare-table",
+      "settings": {}
+    },
+    "reviews": {
+      "type": "testimonials",
+      "settings": {
+        "eyebrow": "Real reviews",
+        "heading": "Loved by 1,200+ customers",
+        "surface": true
+      }
+    },
+    "faq": {
+      "type": "faq",
+      "settings": {
+        "eyebrow": "Questions",
+        "heading": "Everything you want to know"
+      }
+    },
+    "promise": {
+      "type": "guarantee",
+      "settings": {}
+    },
+    "newsletter": {
+      "type": "newsletter",
+      "settings": {
+        "eyebrow": "Join us",
+        "heading": "10% off your first order",
+        "text": "Wellness tips and early access to new flavours.",
+        "style": "dark"
+      }
+    },
+    "sticky": {
+      "type": "sticky-buy",
+      "settings": {}
+    }
+  },
+  "order": [
+    "hero",
+    "ticker",
+    "benefits",
+    "how",
+    "inside",
+    "compare",
+    "reviews",
+    "faq",
+    "promise",
+    "newsletter",
+    "sticky"
+  ]
+}

@@ -39,6 +39,27 @@ const MASTER_THEMES = {
     bestFor: "Grocery, food & drinks",
     swatch: { bg: "#FFFFFF", surface: "#F2F7EE", text: "#17251B", accent: "#1F7A3A", font: "Outfit" },
   },
+  fizz: {
+    name: "Fizz",
+    version: "1.0.0",
+    description: "Colourful and friendly for drinks, snacks and D2C brands — pastel colour-field hero, flavour circles, rounded product cards, a deal-of-the-day countdown, FAQ beside a picture and a newsletter band.",
+    bestFor: "Drinks, snacks & D2C",
+    swatch: { bg: "#FFFFFF", surface: "#FDF1F0", text: "#2A2A2A", accent: "#E0474C", font: "Poppins" },
+  },
+  carry: {
+    name: "Carry",
+    version: "1.0.0",
+    description: "Quiet and minimal for bags, leather and accessories — clean type, square product tiles on soft grey, feature cards, offer banners, a one-line brand promise and an Instagram row.",
+    bestFor: "Bags & accessories",
+    swatch: { bg: "#FFFFFF", surface: "#F5F3EF", text: "#1C1C1C", accent: "#B5653A", font: "Jost" },
+  },
+  solo: {
+    name: "Solo",
+    version: "1.0.0",
+    description: "For a brand with one hero product — buy box at the top, benefits, how it works, what's inside, a comparison table, reviews, FAQ, a money-back promise and a sticky buy bar.",
+    bestFor: "One-product brands",
+    swatch: { bg: "#FFFFFF", surface: "#F1F5EE", text: "#1E2A22", accent: "#2F5D3A", font: "Fraunces" },
+  },
   lumiere: {
     name: "Lumière",
     version: "1.0.0",

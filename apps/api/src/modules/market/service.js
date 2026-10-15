@@ -158,7 +158,7 @@ function officialThemes() {
     name: t.name,
     tagline: `Best for ${/^[A-Z][a-z]/.test(t.bestFor) ? t.bestFor[0].toLowerCase() + t.bestFor.slice(1) : t.bestFor}`,
     description: t.description,
-    category: { atelier: "fashion", fresh: "food", lumiere: "jewellery" }[handle] || "general",
+    category: { atelier: "fashion", fresh: "food", lumiere: "jewellery", fizz: "food", carry: "fashion", solo: "beauty" }[handle] || "general",
     price: 0,
     free: true,
     official: true,

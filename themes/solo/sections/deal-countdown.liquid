@@ -1,0 +1,43 @@
+{% comment %}
+  "Deal of the day" with a live countdown. With no end date it counts down
+  to midnight every day; with one, to that moment (then it hides itself).
+{% endcomment %}
+<section class="section x-deal" style="--x-bg: {{ section.settings.background }}">
+  <div class="container x-deal__inner">
+    <div class="x-deal__copy">
+      {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+      <h2 class="h2">{{ section.settings.heading }}</h2>
+      {% if section.settings.text != blank %}<p class="x-deal__text">{{ section.settings.text }}</p>{% endif %}
+      <div class="x-timer" data-x-countdown data-end="{{ section.settings.end_date | escape }}" role="timer" aria-label="Time left for this deal">
+        <span><b data-d>00</b><small>Days</small></span>
+        <span><b data-h>00</b><small>Hours</small></span>
+        <span><b data-m>00</b><small>Mins</small></span>
+        <span><b data-s>00</b><small>Secs</small></span>
+      </div>
+      {% if section.settings.button_label != blank %}<a class="btn" href="{{ section.settings.button_link | default: routes.all_products_url }}">{{ section.settings.button_label }}</a>{% endif %}
+    </div>
+    <div class="x-deal__media">
+      {% if section.settings.image != blank %}
+        <img src="{{ section.settings.image | image_url }}" alt="" width="1000" height="1000" loading="lazy">
+      {% else %}
+        {{ 'lifestyle-2' | placeholder_svg: 'x-deal__art' }}
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Deal countdown",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Today only" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Best deal of the day" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "Our favourite pick at a special price — until the timer runs out." },
+    { "type": "text", "id": "end_date", "label": "Ends at (optional)", "info": "For example 2026-12-31 23:59. Leave empty to count down to midnight every day." },
+    { "type": "text", "id": "button_label", "label": "Button", "default": "Shop the deal" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "image_picker", "id": "image", "label": "Picture" },
+    { "type": "color", "id": "background", "label": "Background", "default": "#FBF3F2" }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,29 @@
+{% comment %} Latest blog posts. Hidden until the store publishes its first post. {% endcomment %}
+{% if blog.articles.size > 0 %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading, align: 'left', link_url: routes.blog_url, link_text: 'All stories' %}
+    <div class="posts">
+      {% for article in blog.articles limit: 3 %}
+        <a class="post" href="{{ article.url }}">
+          <span class="post__media">{% if article.image %}<img src="{{ article.image }}" alt="" loading="lazy" width="1200" height="800">{% else %}{{ 'lifestyle-2' | placeholder_svg }}{% endif %}</span>
+          <span class="post__meta">{{ article.date }} · {{ article.reading_minutes }} min read</span>
+          <span class="post__title">{{ article.title }}</span>
+          {% if article.excerpt %}<span class="post__excerpt">{{ article.excerpt }}</span>{% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Blog posts",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "Journal" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Stories from the studio" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ]
+}
+{% endschema %}

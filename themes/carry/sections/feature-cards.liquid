@@ -1,0 +1,45 @@
+{% comment %} Two or three cards — a picture and a few words each, the whole card one link. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container">
+    {% render 'snippets/section-head', eyebrow: section.settings.eyebrow, title: section.settings.heading %}
+    <div class="x-fcards" style="--cols: {{ section.blocks.size | at_most: 3 }}">
+      {% for block in section.blocks limit: 3 %}
+        <a class="x-fcard" href="{{ block.settings.link | default: routes.all_products_url }}">
+          <span class="x-fcard__media">
+            {% if block.settings.image != blank %}<img src="{{ block.settings.image | image_url }}" alt="" width="700" height="800" loading="lazy">{% else %}{% assign art = 'product-' | append: forloop.index %}{{ art | placeholder_svg }}{% endif %}
+          </span>
+          <span class="x-fcard__body">
+            <span class="x-fcard__title">{{ block.settings.title }}</span>
+            {% if block.settings.text != blank %}<span class="x-fcard__text">{{ block.settings.text }}</span>{% endif %}
+            {% if block.settings.link_label != blank %}<span class="x-fcard__link">{{ block.settings.link_label }} {% render 'snippets/icon', icon: 'arrow-right', class: 'icon icon--sm' %}</span>{% endif %}
+          </span>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Feature cards",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text above heading", "default": "" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "" },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ],
+  "blocks": [
+    { "type": "card", "name": "Card", "settings": [
+      { "type": "image_picker", "id": "image", "label": "Picture" },
+      { "type": "text", "id": "title", "label": "Title", "default": "Minimal design" },
+      { "type": "textarea", "id": "text", "label": "Text", "default": "Clean lines, made to go with everything you own." },
+      { "type": "text", "id": "link_label", "label": "Link text", "default": "Shop now" },
+      { "type": "url", "id": "link", "label": "Link" }
+    ] }
+  ],
+  "default_blocks": [
+    { "type": "card", "settings": { "title": "Minimal design", "text": "Clean lines and quiet details that go with everything.", "link_label": "Shop now" } },
+    { "type": "card", "settings": { "title": "Full-grain leather", "text": "The strongest part of the hide — it gets better with every year.", "link_label": "Shop now" } }
+  ],
+  "max_blocks": 3
+}
+{% endschema %}

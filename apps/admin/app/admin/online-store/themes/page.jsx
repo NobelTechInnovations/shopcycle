@@ -134,7 +134,7 @@ export default function ThemesPage() {
         subtitle="Your theme designs the home page, header and footer, and sets the fonts and colours for your whole store."
         actions={
           <a href={`${process.env.NEXT_PUBLIC_MARKET_ORIGIN || "https://market.oyklane.com"}/themes`} target="_blank" rel="noopener noreferrer">
-            <Button icon={<Sparkles size={15} aria-hidden="true" />}>More themes — Oyklane Store</Button>
+            <Button type="primary" icon={<Sparkles size={15} aria-hidden="true" />}>View more themes</Button>
           </a>
         }
       />

@@ -1,0 +1,681 @@
+[
+  {
+    "name": "Colors",
+    "settings": [
+      {
+        "type": "color",
+        "id": "color_background",
+        "label": "Background",
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "id": "color_text",
+        "label": "Text",
+        "default": "#121212"
+      },
+      {
+        "type": "color",
+        "id": "color_primary",
+        "label": "Buttons",
+        "default": "#121212"
+      },
+      {
+        "type": "color",
+        "id": "color_accent",
+        "label": "Highlights and sale badges",
+        "default": "#C8102E"
+      },
+      {
+        "type": "color",
+        "id": "color_surface",
+        "label": "Light section background",
+        "default": "#F4F4F2"
+      },
+      {
+        "type": "color",
+        "id": "color_dark",
+        "label": "Dark section background",
+        "default": "#121212"
+      },
+      {
+        "type": "paragraph",
+        "content": "These colors also style your product, cart, checkout and account pages."
+      }
+    ]
+  },
+  {
+    "name": "Typography",
+    "settings": [
+      {
+        "type": "font",
+        "id": "heading_font",
+        "label": "Headings",
+        "default": "Archivo"
+      },
+      {
+        "type": "font",
+        "id": "body_font",
+        "label": "Body text",
+        "default": "Inter"
+      },
+      {
+        "type": "select",
+        "id": "heading_weight",
+        "label": "Heading weight",
+        "default": "600",
+        "options": [
+          {
+            "value": "500",
+            "label": "Medium"
+          },
+          {
+            "value": "600",
+            "label": "Semibold"
+          },
+          {
+            "value": "700",
+            "label": "Bold"
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "id": "heading_case",
+        "label": "Heading style",
+        "default": "uppercase",
+        "options": [
+          {
+            "value": "none",
+            "label": "As typed"
+          },
+          {
+            "value": "uppercase",
+            "label": "UPPERCASE"
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "id": "heading_tracking",
+        "label": "Heading letter spacing",
+        "default": "normal",
+        "options": [
+          {
+            "value": "normal",
+            "label": "Normal"
+          },
+          {
+            "value": "tight",
+            "label": "Tight"
+          },
+          {
+            "value": "tighter",
+            "label": "Tighter"
+          }
+        ]
+      },
+      {
+        "type": "range",
+        "id": "base_size",
+        "label": "Body text size (px)",
+        "min": 14,
+        "max": 18,
+        "step": 1,
+        "default": 15
+      }
+    ]
+  },
+  {
+    "name": "Layout",
+    "settings": [
+      {
+        "type": "range",
+        "id": "container_width",
+        "label": "Page width (px)",
+        "min": 1080,
+        "max": 1600,
+        "step": 20,
+        "default": 1520
+      },
+      {
+        "type": "select",
+        "id": "section_spacing",
+        "label": "Space between sections",
+        "default": "comfortable",
+        "options": [
+          {
+            "value": "compact",
+            "label": "Compact"
+          },
+          {
+            "value": "comfortable",
+            "label": "Comfortable"
+          },
+          {
+            "value": "spacious",
+            "label": "Spacious"
+          }
+        ]
+      },
+      {
+        "type": "range",
+        "id": "button_radius",
+        "label": "Button corners (px)",
+        "min": 0,
+        "max": 40,
+        "step": 2,
+        "default": 0
+      },
+      {
+        "type": "range",
+        "id": "card_radius",
+        "label": "Card and image corners (px)",
+        "min": 0,
+        "max": 24,
+        "step": 2,
+        "default": 0
+      }
+    ]
+  },
+  {
+    "name": "Product cards",
+    "settings": [
+      {
+        "type": "select",
+        "id": "card_image_ratio",
+        "label": "Image shape",
+        "default": "tall",
+        "options": [
+          {
+            "value": "portrait",
+            "label": "Portrait (4:5)"
+          },
+          {
+            "value": "tall",
+            "label": "Tall (2:3)"
+          },
+          {
+            "value": "square",
+            "label": "Square"
+          }
+        ]
+      },
+      {
+        "type": "checkbox",
+        "id": "card_hover_image",
+        "label": "Show second image on hover",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "card_show_brand",
+        "label": "Show brand",
+        "default": false
+      },
+      {
+        "type": "checkbox",
+        "id": "card_quick_add",
+        "label": "Show quick add button",
+        "default": true
+      },
+      {
+        "type": "select",
+        "id": "card_align",
+        "label": "Text alignment",
+        "default": "left",
+        "options": [
+          {
+            "value": "left",
+            "label": "Left"
+          },
+          {
+            "value": "center",
+            "label": "Centre"
+          }
+        ]
+      },
+      {
+        "type": "header",
+        "content": "Card design"
+      },
+      {
+        "type": "select",
+        "id": "card_style",
+        "label": "Card style",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "minimal",
+            "label": "Minimal (no frame)"
+          },
+          {
+            "value": "bordered",
+            "label": "Bordered"
+          },
+          {
+            "value": "shadow",
+            "label": "Soft shadow"
+          },
+          {
+            "value": "filled",
+            "label": "Filled tile"
+          }
+        ]
+      },
+      {
+        "type": "color",
+        "id": "card_bg",
+        "label": "Card background",
+        "default": "",
+        "info": "Used by the Bordered, Soft shadow and Filled styles. Leave empty for the theme's colour."
+      },
+      {
+        "type": "color",
+        "id": "card_border_color",
+        "label": "Border colour",
+        "default": ""
+      },
+      {
+        "type": "range",
+        "id": "card_border_width",
+        "label": "Border width",
+        "min": 0,
+        "max": 3,
+        "step": 1,
+        "unit": "px",
+        "default": 1
+      },
+      {
+        "type": "range",
+        "id": "card_padding",
+        "label": "Space inside the card",
+        "min": 0,
+        "max": 24,
+        "step": 2,
+        "unit": "px",
+        "default": 12
+      },
+      {
+        "type": "select",
+        "id": "card_hover_effect",
+        "label": "On hover",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "none",
+            "label": "Nothing"
+          },
+          {
+            "value": "zoom",
+            "label": "Zoom the photo"
+          },
+          {
+            "value": "lift",
+            "label": "Lift the card"
+          }
+        ]
+      },
+      {
+        "type": "header",
+        "content": "Photo box"
+      },
+      {
+        "type": "color",
+        "id": "card_image_bg",
+        "label": "Photo background",
+        "default": ""
+      },
+      {
+        "type": "select",
+        "id": "card_image_fit",
+        "label": "Photo fit",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "cover",
+            "label": "Fill the box (may crop)"
+          },
+          {
+            "value": "contain",
+            "label": "Show the whole photo"
+          }
+        ]
+      },
+      {
+        "type": "range",
+        "id": "card_image_padding",
+        "label": "Space around the photo",
+        "min": 0,
+        "max": 32,
+        "step": 2,
+        "unit": "px",
+        "default": 0
+      },
+      {
+        "type": "select",
+        "id": "card_image_radius",
+        "label": "Photo corners",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "0",
+            "label": "Square"
+          },
+          {
+            "value": "6",
+            "label": "Slightly rounded"
+          },
+          {
+            "value": "12",
+            "label": "Rounded"
+          },
+          {
+            "value": "20",
+            "label": "Very rounded"
+          }
+        ]
+      },
+      {
+        "type": "header",
+        "content": "Text and price"
+      },
+      {
+        "type": "select",
+        "id": "card_title_size",
+        "label": "Title size",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "small",
+            "label": "Small"
+          },
+          {
+            "value": "medium",
+            "label": "Medium"
+          },
+          {
+            "value": "large",
+            "label": "Large"
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "id": "card_title_lines",
+        "label": "Title length",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "1",
+            "label": "1 line"
+          },
+          {
+            "value": "2",
+            "label": "Up to 2 lines"
+          },
+          {
+            "value": "3",
+            "label": "Up to 3 lines"
+          }
+        ]
+      },
+      {
+        "type": "color",
+        "id": "card_title_color",
+        "label": "Title colour",
+        "default": ""
+      },
+      {
+        "type": "color",
+        "id": "card_price_color",
+        "label": "Price colour",
+        "default": ""
+      },
+      {
+        "type": "color",
+        "id": "card_sale_color",
+        "label": "Sale price colour",
+        "default": ""
+      },
+      {
+        "type": "checkbox",
+        "id": "card_show_compare",
+        "label": "Show the crossed-out old price",
+        "default": true
+      },
+      {
+        "type": "header",
+        "content": "Sale badge"
+      },
+      {
+        "type": "select",
+        "id": "card_badge_label",
+        "label": "Badge text",
+        "default": "percent",
+        "options": [
+          {
+            "value": "percent",
+            "label": "Percent off (−56%)"
+          },
+          {
+            "value": "save",
+            "label": "Amount saved (Save ₹310)"
+          },
+          {
+            "value": "sale",
+            "label": "Just \"Sale\""
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "id": "card_badge_style",
+        "label": "Badge shape",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "pill",
+            "label": "Pill"
+          },
+          {
+            "value": "square",
+            "label": "Square"
+          },
+          {
+            "value": "ribbon",
+            "label": "Corner ribbon"
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "id": "card_badge_position",
+        "label": "Badge position",
+        "default": "left",
+        "options": [
+          {
+            "value": "left",
+            "label": "Top left"
+          },
+          {
+            "value": "right",
+            "label": "Top right"
+          }
+        ]
+      },
+      {
+        "type": "color",
+        "id": "card_badge_bg",
+        "label": "Badge colour",
+        "default": ""
+      },
+      {
+        "type": "color",
+        "id": "card_badge_text",
+        "label": "Badge text colour",
+        "default": ""
+      },
+      {
+        "type": "header",
+        "content": "Add to cart"
+      },
+      {
+        "type": "select",
+        "id": "card_add_style",
+        "label": "Add button",
+        "default": "theme",
+        "options": [
+          {
+            "value": "theme",
+            "label": "Theme default"
+          },
+          {
+            "value": "button",
+            "label": "Full-width button under the price"
+          },
+          {
+            "value": "icon",
+            "label": "Round + on the photo"
+          }
+        ]
+      },
+      {
+        "type": "color",
+        "id": "card_add_bg",
+        "label": "Button colour",
+        "default": ""
+      },
+      {
+        "type": "color",
+        "id": "card_add_text",
+        "label": "Button text colour",
+        "default": ""
+      }
+    ]
+  },
+  {
+    "name": "Cart",
+    "settings": [
+      {
+        "type": "select",
+        "id": "cart_type",
+        "label": "Cart type",
+        "default": "drawer",
+        "options": [
+          {
+            "value": "drawer",
+            "label": "Drawer — slides in, shoppers stay on the page"
+          },
+          {
+            "value": "page",
+            "label": "Page — go to the full cart page"
+          }
+        ],
+        "info": "The cart page and checkout keep their own layout either way."
+      }
+    ]
+  },
+  {
+    "name": "Social media",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Links show as icons in the footer. Leave empty to hide."
+      },
+      {
+        "type": "text",
+        "id": "social_instagram",
+        "label": "Instagram",
+        "default": ""
+      },
+      {
+        "type": "text",
+        "id": "social_facebook",
+        "label": "Facebook",
+        "default": ""
+      },
+      {
+        "type": "text",
+        "id": "social_youtube",
+        "label": "YouTube",
+        "default": ""
+      },
+      {
+        "type": "text",
+        "id": "social_x",
+        "label": "X (Twitter)",
+        "default": ""
+      },
+      {
+        "type": "text",
+        "id": "social_pinterest",
+        "label": "Pinterest",
+        "default": ""
+      },
+      {
+        "type": "text",
+        "id": "social_whatsapp",
+        "label": "WhatsApp link",
+        "default": ""
+      }
+    ]
+  },
+  {
+    "name": "Illustrations",
+    "settings": [
+      {
+        "type": "select",
+        "id": "placeholder_art",
+        "label": "Pictures while you have no photos",
+        "default": "bag",
+        "options": [
+          {
+            "value": "drink",
+            "label": "Drinks"
+          },
+          {
+            "value": "bag",
+            "label": "Bags"
+          },
+          {
+            "value": "bottle",
+            "label": "Bottles and jars"
+          },
+          {
+            "value": "",
+            "label": "Simple line drawings"
+          }
+        ]
+      }
+    ]
+  }
+]

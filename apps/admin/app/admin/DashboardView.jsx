@@ -76,7 +76,7 @@ const SETUP_STEPS = [
     key: "hasPlan",
     icon: CreditCard,
     title: "Turn on autopay",
-    text: "Keep your store running when the free trial ends — your first month after the trial is just ₹99.",
+    text: "Keep your store running when the free trial ends — your first month after the trial is just ₹49.",
     cta: "Set up billing",
     href: "/admin/settings/billing",
   },

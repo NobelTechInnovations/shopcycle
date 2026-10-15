@@ -1,0 +1,22 @@
+{% comment %} A statement — large centred text with an optional button. {% endcomment %}
+<section class="section{% if section.settings.surface %} section--surface{% endif %}">
+  <div class="container statement statement--{{ section.settings.align }}">
+    {% if section.settings.eyebrow != blank %}<p class="eyebrow">{{ section.settings.eyebrow }}</p>{% endif %}
+    <p class="statement__text">{{ section.settings.text }}</p>
+    {% if section.settings.button_label != blank %}<a class="btn btn--ghost" href="{{ section.settings.button_link | default: routes.all_products_url }}">{{ section.settings.button_label }}</a>{% endif %}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Statement",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Small text", "default": "Our promise" },
+    { "type": "textarea", "id": "text", "label": "Text", "default": "Good design should be for everyone. We make honest products, price them fairly and stand behind every order." },
+    { "type": "text", "id": "button_label", "label": "Button", "default": "" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "select", "id": "align", "label": "Alignment", "default": "center", "options": [{ "value": "left", "label": "Left" }, { "value": "center", "label": "Centre" }] },
+    { "type": "checkbox", "id": "surface", "label": "Use light background", "default": false }
+  ]
+}
+{% endschema %}
