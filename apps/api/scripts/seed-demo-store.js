@@ -54,6 +54,12 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g
       },
     });
   }
+  // An offer, so product pages show how discount codes appear.
+  await prisma.discount.upsert({
+    where: { storeId_code: { storeId: store.id, code: "WELCOME10" } },
+    update: {},
+    create: { storeId: store.id, code: "WELCOME10", title: "10% off your first order", type: "percentage", value: 10, minSubtotal: 499, status: "active" },
+  });
   console.log(`demo store ready: ${HANDLE}`);
   await prisma.$disconnect();
 })().catch(async (e) => {

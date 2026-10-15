@@ -83,6 +83,20 @@ function createLiquidEngine(filesByPath, meta, settingsData) {
 
   // Illustrations for empty slots (no products/images yet) — see placeholders.js.
   // A theme's `placeholder_art` setting picks a colour set (placeholders.js).
+  // The text colour that reads on a background: white on dark or saturated
+  // colours (a brand red), near-black on light ones.
+  engine.registerFilter("color_on", (hex) => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+    if (!m) return "#ffffff";
+    const ch = (i) => {
+      const c = parseInt(m[1].slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const L = 0.2126 * ch(0) + 0.7152 * ch(2) + 0.0722 * ch(4);
+    const white = 1.05 / (L + 0.05);
+    const dark = (L + 0.05) / 0.0556;
+    return white >= 3.4 || white >= dark ? "#ffffff" : "#141414";
+  });
   engine.registerFilter("placeholder_svg", function (name, className) {
     let set = null;
     try {

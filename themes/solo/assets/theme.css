@@ -242,7 +242,7 @@ main:focus {
 .btn--accent {
   background: var(--c-accent);
   border-color: var(--c-accent);
-  color: #0e0e0e;
+  color: var(--c-on-accent, #0e0e0e);
 }
 .btn--accent:hover {
   background: transparent;
@@ -308,7 +308,7 @@ main:focus {
 }
 .icon-btn--accent {
   background: var(--c-accent);
-  color: #0e0e0e;
+  color: var(--c-on-accent, #0e0e0e);
 }
 .icon-btn--accent:hover {
   background: #fff;
@@ -327,7 +327,7 @@ main:focus {
 }
 .tag--accent {
   background: var(--c-accent);
-  color: #0e0e0e;
+  color: var(--c-on-accent, #0e0e0e);
 }
 .tag--muted {
   background: var(--c-text);
@@ -582,7 +582,7 @@ main:focus {
   padding: 0 5px;
   border-radius: 999px;
   background: var(--c-accent);
-  color: #0e0e0e;
+  color: var(--c-on-accent, #0e0e0e);
   font-size: 10.5px;
   font-weight: 700;
   line-height: 18px;
@@ -864,7 +864,7 @@ main:focus {
 }
 .marquee--accent {
   background: var(--c-accent);
-  color: #0e0e0e;
+  color: var(--c-on-accent, #0e0e0e);
 }
 .marquee--light {
   background: var(--c-bg);
@@ -1053,7 +1053,7 @@ main:focus {
 }
 .cat:hover .cat__go {
   background: var(--c-accent);
-  color: #0e0e0e;
+  color: var(--c-on-accent, #0e0e0e);
   transform: rotate(45deg);
 }
 
@@ -1658,7 +1658,7 @@ a.gallery__item:hover img {
 }
 .signup--accent {
   background: var(--c-accent);
-  color: #0e0e0e;
+  color: var(--c-on-accent, #0e0e0e);
 }
 .signup__text {
   display: flex;
@@ -2200,3 +2200,4 @@ a.gallery__item:hover img {
   .pcard__title { font-size: 14px; }
   .pcard__body .price { font-size: 14px; }
 }
+

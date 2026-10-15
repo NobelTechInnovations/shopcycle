@@ -38,6 +38,7 @@
       --c-text: {{ settings.color_text | default: '#121212' }};
       --c-primary: {{ settings.color_primary | default: '#121212' }};
       --c-accent: {{ settings.color_accent | default: '#C8102E' }};
+      --c-on-accent: {{ settings.color_accent | default: '#C8102E' | color_on }};
       --c-surface: {{ settings.color_surface | default: '#F4F4F2' }};
       --c-dark: {{ settings.color_dark | default: '#121212' }};
       --f-heading: '{{ settings.heading_font | default: "Archivo" }}', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

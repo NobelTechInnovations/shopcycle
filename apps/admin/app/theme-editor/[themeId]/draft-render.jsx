@@ -51,7 +51,7 @@ export async function renderDraft(themeId, body, signal) {
  * preview on screen with an error bar instead of replacing it.
  * Returns { html, error, busy, retry }.
  */
-export function useDraftRender(themeId, makeBody, deps, { delay = 400, enabled = true } = {}) {
+export function useDraftRender(themeId, makeBody, deps, { delay = 160, enabled = true } = {}) {
   const [html, setHtml] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);

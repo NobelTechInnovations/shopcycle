@@ -325,9 +325,9 @@ async function storeFacts(prisma, store) {
 
 /** Best sellers over the last 90 days (paid orders), for home page
  * sections and the empty-cart suggestions; newest products fill in. */
-async function bestSellers(prisma, store, allProducts, limit = 12) {
+async function bestSellers(prisma, store, allProducts, limit = 12, draft = false) {
   const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-  const rows = await prisma.orderItem.groupBy({
+  const rows = await memo(draft, `best:${store.id}:${limit}`, () => prisma.orderItem.groupBy({
     by: ["productId"],
     where: {
       productId: { not: null },
@@ -336,7 +336,7 @@ async function bestSellers(prisma, store, allProducts, limit = 12) {
     _sum: { quantity: true },
     orderBy: { _sum: { quantity: "desc" } },
     take: limit,
-  });
+  }));
   const byId = new Map(Object.values(allProducts).map((p) => [p.id, p]));
   const ranked = rows.map((r) => byId.get(r.productId)).filter(Boolean);
   const newest = Object.values(allProducts).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -354,16 +354,36 @@ async function bestSellers(prisma, store, allProducts, limit = 12) {
 const POWERED_BY =
   '<a href="https://oyklane.com" target="_blank" rel="noopener" data-oy-powered style="display:inline!important;visibility:visible!important;opacity:1!important;color:inherit!important;font-size:inherit!important;text-decoration:underline;text-underline-offset:3px;white-space:nowrap">Powered by Oyklane.com</a>';
 
-async function buildGlobalContext(prisma, store, { slug, cartId, discountError, checkoutError, giftCardError, rootless, customer = null, themeSettings = {} } = {}) {
+// The theme editor's live preview re-renders on every change; the store's
+// catalogue doesn't change between two keystrokes, so its reads are kept
+// for a few seconds there (live pages always read fresh).
+const DRAFT_TTL_MS = 20_000;
+const draftMemo = new Map();
+function memo(on, key, load) {
+  if (!on) return load();
+  const hit = draftMemo.get(key);
+  if (hit && hit.at > Date.now() - DRAFT_TTL_MS) return hit.value;
+  const value = Promise.resolve().then(load);
+  draftMemo.set(key, { at: Date.now(), value });
+  value.catch(() => draftMemo.delete(key));
+  if (draftMemo.size > 400) draftMemo.delete(draftMemo.keys().next().value);
+  return value;
+}
+
+async function buildGlobalContext(prisma, store, { slug, cartId, discountError, checkoutError, giftCardError, rootless, customer = null, themeSettings = {}, draft = false } = {}) {
   const routes = buildRoutes(store.handle, { rootless });
-  const [products, collections, cart, menus, apps, facts, articles] = await Promise.all([
-    repository.getAllActiveProducts(prisma, store.id),
-    repository.getAllActiveCollections(prisma, store.id),
+  const [[products, collections, menus, apps, facts, articles], cart] = await Promise.all([
+    memo(draft, `ctx:${store.id}:${rootless ? 1 : 0}`, () =>
+      Promise.all([
+        repository.getAllActiveProducts(prisma, store.id),
+        repository.getAllActiveCollections(prisma, store.id),
+        repository.getMenus(prisma, store.id),
+        appsService.getInstalledAppsContext(prisma, store.id),
+        storeFacts(prisma, store),
+        blogService.latestArticles(prisma, store, routes, 6),
+      ])
+    ),
     cartService.getCart(prisma, store.id, cartId, store.handle),
-    repository.getMenus(prisma, store.id),
-    appsService.getInstalledAppsContext(prisma, store.id),
-    storeFacts(prisma, store),
-    blogService.latestArticles(prisma, store, routes, 6),
   ]);
 
   const all_products = {};
@@ -413,11 +433,11 @@ async function buildGlobalContext(prisma, store, { slug, cartId, discountError, 
   const reviewsApp = apps[reviewsService.APP_KEY] ? { ...reviewsService.DEFAULTS, ...apps[reviewsService.APP_KEY] } : null;
   // Independent of each other — one round trip's wait instead of five.
   const [ratings, best, paymentMethods, paymentOptions, social] = await Promise.all([
-    reviewsApp ? reviewsService.summaries(prisma, store.id) : null,
-    bestSellers(prisma, store, all_products),
-    checkoutService.availablePaymentMethods(prisma, store),
-    paymentsService.checkoutOptions(prisma, store),
-    socialConnections.storefrontData(prisma, store.id, apps),
+    reviewsApp ? memo(draft, `ratings:${store.id}`, () => reviewsService.summaries(prisma, store.id)) : null,
+    bestSellers(prisma, store, all_products, 12, draft),
+    memo(draft, `pm:${store.id}`, () => checkoutService.availablePaymentMethods(prisma, store)),
+    memo(draft, `po:${store.id}`, () => paymentsService.checkoutOptions(prisma, store)),
+    memo(draft, `social:${store.id}`, () => socialConnections.storefrontData(prisma, store.id, apps)),
   ]);
   if (reviewsApp) {
     const tag = (p) => {
@@ -785,8 +805,9 @@ async function renderPage(
   // templates. Live pages ask for "product" and the item names its own.
   const parts = platform.templateParts(templateName);
   templateName = parts.base;
-  const store = await loadStoreOrThrow(prisma, handle);
-  const theme = await resolveTheme(prisma, store, themeId);
+  const draft = templateOverride != null || settingsOverride != null || filesOverride != null;
+  const store = await memo(draft, `store:${handle}`, () => loadStoreOrThrow(prisma, handle));
+  const theme = await memo(draft, `theme:${store.id}:${themeId || "live"}`, () => resolveTheme(prisma, store, themeId));
   // Storefront pages load their CSS, JS and images from the store's own
   // address (the storefront app proxies them); null = straight from the
   // API, for the admin's editor preview.
@@ -827,6 +848,7 @@ async function renderPage(
     rootless,
     customer,
     themeSettings,
+    draft,
   });
   const routes = globalContext.routes;
   // The store's published policies (Settings ▸ Policies) — linked in every
