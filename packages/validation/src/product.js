@@ -12,6 +12,8 @@ const variantSchema = z.object({
   // save can't overwrite sales made while the form was open. New variants
   // default to 0 in the repository.
   inventoryQuantity: z.coerce.number().int().optional(),
+  // Grams, for shipping.
+  weight: z.coerce.number().nonnegative().max(1000000).optional().nullable(),
   status: z.enum(["active", "draft"]).default("active"),
 });
 
@@ -51,6 +53,8 @@ const createProductSchema = z.object({
   // Sales channels the product is kept off, and its Google category.
   hiddenChannels: z.array(z.enum(["google", "facebook"])).max(5).optional(),
   googleCategory: z.string().trim().max(250).optional().nullable(),
+  // The product's id where it came from (an import) — unique per store.
+  externalId: z.string().trim().min(1).max(120).optional().nullable(),
 });
 
 const updateProductSchema = createProductSchema.partial().extend({

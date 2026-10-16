@@ -880,6 +880,9 @@ model Product {
   hiddenChannels String[]      @default([])
   /// Google product category for shopping feeds ("Apparel & Accessories > Clothing").
   googleCategory String?
+  /// The product's id in the system it was imported from (API ▸ external_id,
+  /// e.g. "shopify:123") — unique per store, so a re-run import finds it.
+  externalId     String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -895,6 +898,7 @@ model Product {
   rentalBookings     RentalBooking[]
 
   @@unique([storeId, slug])
+  @@unique([storeId, externalId])
   @@index([storeId])
   @@index([brandId])
   @@index([categoryId])
@@ -1076,6 +1080,12 @@ model Customer {
   passwordHash  String?
   passwordSetAt DateTime?
 
+  /// Comma-separated labels (API ▸ tags), e.g. from an import.
+  tags       String?
+  /// The customer's id in the system it was imported from (API ▸
+  /// external_id) — unique per store, so a re-run import finds it.
+  externalId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1087,6 +1097,7 @@ model Customer {
   whatsappConversations WhatsappConversation[]
 
   @@unique([storeId, email])
+  @@unique([storeId, externalId])
   @@index([storeId])
   @@index([storeId, phone])
   @@index([platformCustomerId])
