@@ -1,125 +1,76 @@
 "use client";
 
-import { Check } from "lucide-react";
 import { BrandMark } from "./BrandMark";
 
-const PANELS = {
-  seller: {
-    headline: "Build your store.\nSell everywhere.",
-    points: [
-      "Your own storefront live on a free oyklane.com address",
-      "Themes you can customize without touching code",
-      "Orders, customers, and payments in one place",
-    ],
-  },
-  platform: {
-    headline: "The control room\nfor Oyklane.",
-    points: [
-      "Every store, plan, and app on the platform",
-      "A separate session — never shared with seller accounts",
-      "Billing health and access control in one view",
-    ],
-  },
+// Serif for the one big heading; the form keeps the app's sans.
+const SERIF_HREF = "https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap";
+const SERIF = '"Newsreader", "Iowan Old Style", Georgia, serif';
+
+const PHOTOS = {
+  // Unsplash License — Aninge Fetzer.
+  packing: { src: "/auth/packing.webp", alt: "A seller packing orders into kraft gift bags", credit: "Aninge Fetzer / Unsplash" },
+  bags: { src: "/auth/bags.webp", alt: "Gift bags with tissue paper, ready to ship", credit: "Aninge Fetzer / Unsplash" },
 };
 
 /**
- * Split-screen sign-in layout shared by the seller admin (login/register)
- * and the platform admin. Left: a dark brand panel with the same
- * gradient-glow language as apps/www, so signing in feels like the same
- * product the marketing site promised. Right: the form itself, on a
- * clean surface. The brand panel is hidden below `lg` — on a phone the
- * form is all anyone needs. `homeHref`: where the logo goes (the
- * marketing site, for sellers).
+ * Split-screen sign-in layout shared by the seller admin (login, sign-up,
+ * password pages) and the platform admin: the form on a clean white half
+ * with the logo top-left and one serif heading, and a full-bleed photo of
+ * selling — orders being packed — on the other half (hidden on phones).
+ * `photo`: "packing" | "bags". `note`: small print at the bottom.
+ * `homeHref`: where the logo goes (the marketing site, for sellers).
  */
-export function AuthShell({ variant = "seller", title, subtitle, children, footer, homeHref }) {
-  const panel = PANELS[variant] || PANELS.seller;
+export function AuthShell({ variant = "seller", title, subtitle, children, footer, homeHref, photo = "packing", note }) {
   const isPlatform = variant === "platform";
+  const pic = PHOTOS[photo] || PHOTOS.packing;
+  const logo = <BrandMark size={28} label={isPlatform ? "Platform" : undefined} />;
 
   return (
-    <div className="min-h-screen flex bg-app-surface">
-      <aside
-        className="hidden lg:flex lg:w-[46%] xl:w-[42%] relative overflow-hidden flex-col justify-between p-12"
-        style={{ background: "#0F2A4A" }}
-      >
-        {/* Brand glow — the two gradient endpoints as soft light sources. */}
-        <div
-          aria-hidden="true"
-          className="absolute -top-40 -left-32 w-[520px] h-[520px] rounded-full"
-          style={{ background: "radial-gradient(closest-side, rgba(43,159,230,0.40), transparent)" }}
-        />
-        <div
-          aria-hidden="true"
-          className="absolute -bottom-48 -right-40 w-[560px] h-[560px] rounded-full"
-          style={{ background: "radial-gradient(closest-side, rgba(0,103,184,0.45), transparent)" }}
-        />
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-            maskImage: "radial-gradient(ellipse at 30% 40%, black, transparent 70%)",
-            WebkitMaskImage: "radial-gradient(ellipse at 30% 40%, black, transparent 70%)",
-          }}
-        />
-
-        <div className="relative">
+    <div className="oy-auth min-h-screen flex bg-white">
+      <link rel="stylesheet" href={SERIF_HREF} precedence="default" />
+      <main className="flex-1 lg:w-1/2 lg:flex-none flex flex-col min-h-screen px-5 sm:px-8 py-6">
+        <header>
           {homeHref ? (
             <a href={homeHref} aria-label="Oyklane home" className="inline-block">
-              <BrandMark size={30} tone="dark" label={isPlatform ? "Platform" : undefined} />
+              {logo}
             </a>
           ) : (
-            <BrandMark size={30} tone="dark" label={isPlatform ? "Platform" : undefined} />
+            logo
           )}
-        </div>
+        </header>
 
-        <div className="relative max-w-md">
-          <h2
-            className="text-[40px] leading-[1.08] font-semibold m-0 whitespace-pre-line"
-            style={{ color: "#F5F5F4", letterSpacing: "-0.03em" }}
-          >
-            {panel.headline}
-          </h2>
-          <ul className="list-none p-0 mt-8 mb-0 flex flex-col gap-3.5">
-            {panel.points.map((point) => (
-              <li key={point} className="flex items-start gap-3 text-[15px]" style={{ color: "rgba(245,245,244,0.72)" }}>
-                <span
-                  className="mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full shrink-0"
-                  style={{ background: "rgba(43,159,230,0.2)", color: "#9FD3FF" }}
-                >
-                  <Check size={12} strokeWidth={3} aria-hidden="true" />
-                </span>
-                {point}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <p className="relative text-xs m-0" style={{ color: "rgba(245,245,244,0.4)" }}>
-          © {new Date().getFullYear()} Oyklane
-        </p>
-      </aside>
-
-      <main className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-[380px]">
-          <div className="lg:hidden mb-10">
-            {homeHref ? (
-              <a href={homeHref} aria-label="Oyklane home" className="inline-block">
-                <BrandMark size={28} label={isPlatform ? "Platform" : undefined} />
-              </a>
-            ) : (
-              <BrandMark size={28} label={isPlatform ? "Platform" : undefined} />
-            )}
+        <div className="flex-1 flex items-center justify-center py-10">
+          <div className="w-full max-w-[440px]">
+            <h1 className="m-0 text-center text-ink" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "clamp(34px, 4.2vw, 46px)", lineHeight: 1.08, letterSpacing: "-0.02em" }}>
+              {title}
+            </h1>
+            {subtitle && <p className="text-[15px] text-ink-muted text-center mt-3 mb-0">{subtitle}</p>}
+            <div className="mt-9">{children}</div>
+            {footer && <div className="mt-7 text-[14px] text-ink-muted text-center">{footer}</div>}
           </div>
-          <h1 className="text-[26px] font-semibold text-ink m-0" style={{ letterSpacing: "-0.02em" }}>
-            {title}
-          </h1>
-          {subtitle && <p className="text-[15px] text-ink-muted mt-2 mb-0">{subtitle}</p>}
-          <div className="mt-8">{children}</div>
-          {footer && <div className="mt-8 text-sm text-ink-muted text-center">{footer}</div>}
         </div>
+
+        {note && <p className="w-full max-w-[440px] mx-auto text-[12.5px] leading-relaxed text-ink-muted m-0">{note}</p>}
       </main>
+
+      <aside className="hidden lg:block lg:w-1/2 relative overflow-hidden bg-[#EFE7DC]">
+        <img src={pic.src} alt={pic.alt} className="absolute inset-0 h-full w-full object-cover" />
+        {!isPlatform && (
+          <div className="absolute left-8 bottom-8 flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-3 shadow-[0_18px_40px_-18px_rgba(0,0,0,0.45)] backdrop-blur" aria-hidden="true">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E5F1FB] text-[#0078d4]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8z" />
+                <path d="M9 8V6.5a3 3 0 0 1 6 0V8" />
+              </svg>
+            </span>
+            <span className="flex flex-col">
+              <span className="text-[13px] font-semibold text-ink">New order #1042 · ₹1,299</span>
+              <span className="text-[12px] text-ink-muted">Paid by UPI · ships today</span>
+            </span>
+          </div>
+        )}
+        <span className="absolute right-4 bottom-3 text-[11px] text-white/70">{pic.credit}</span>
+      </aside>
     </div>
   );
 }

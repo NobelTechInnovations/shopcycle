@@ -923,18 +923,21 @@ model Brand {
 }
 
 model Category {
-  id        String   @id @default(cuid())
-  storeId   String
-  title     String
-  slug      String
-  image     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  storeId    String
+  title      String
+  slug       String
+  image      String?
+  /// Its id in the system it was imported from (API ▸ externalId).
+  externalId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
   products Product[]
 
   @@unique([storeId, slug])
+  @@unique([storeId, externalId])
   @@index([storeId])
   @@map("categories")
 }
@@ -1000,6 +1003,8 @@ model Collection {
   metafields     Json             @default("{}")
   /// templates/collection.<suffix>.json — see Product.templateSuffix.
   templateSuffix String?
+  /// Its id in the system it was imported from (API ▸ externalId).
+  externalId     String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
@@ -1007,6 +1012,7 @@ model Collection {
   products CollectionProduct[]
 
   @@unique([storeId, slug])
+  @@unique([storeId, externalId])
   @@index([storeId])
   @@map("collections")
 }
@@ -1202,6 +1208,11 @@ model Order {
   invoiceNumber String?
   invoicedAt    DateTime?
 
+  /// Imported (API ▸ POST /orders/import) from another platform: no
+  /// payment, stock, commission or messages were involved.
+  externalId String?
+  importedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1217,6 +1228,7 @@ model Order {
 
   @@unique([storeId, orderNumber])
   @@unique([storeId, invoiceSeq])
+  @@unique([storeId, externalId])
   @@index([storeId])
   // A shopper's history across stores (customers/insights.js).
   @@index([phone])
@@ -1511,12 +1523,15 @@ model Discount {
   /// Shown as an offer on the product pages it applies to (seller can hide
   /// a private code).
   showOnStore     Boolean        @default(true)
+  /// Its id in the system it was imported from (API ▸ externalId).
+  externalId      String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@unique([storeId, code])
+  @@unique([storeId, externalId])
   @@index([storeId])
   @@map("discounts")
 }

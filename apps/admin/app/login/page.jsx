@@ -41,8 +41,16 @@ export default function LoginPage() {
   return (
     <AuthShell
       homeHref={SITE_URL}
-      title="Welcome back"
-      subtitle="Sign in to manage your store."
+      title="Log in to your store"
+      subtitle="Welcome back — your orders are waiting."
+      photo="packing"
+      note={
+        <>
+          By continuing, you agree to Oyklane&apos;s{" "}
+          <a href={`${SITE_URL}/terms`} className="underline underline-offset-2 text-ink-muted hover:text-ink">Terms of service</a> and{" "}
+          <a href={`${SITE_URL}/privacy`} className="underline underline-offset-2 text-ink-muted hover:text-ink">Privacy policy</a>.
+        </>
+      }
       footer={
         <>
           New to Oyklane?{" "}
@@ -53,6 +61,7 @@ export default function LoginPage() {
       }
     >
       {error && <Alert type="error" message={error} showIcon className="mb-5" />}
+      <GoogleSignIn />
 
       <Form layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
         <Form.Item label="Email" name="email" rules={[{ required: true, type: "email", message: "Enter a valid email" }]}>
@@ -72,11 +81,10 @@ export default function LoginPage() {
         >
           <Input.Password autoComplete="current-password" placeholder="••••••••" />
         </Form.Item>
-        <Button type="primary" htmlType="submit" block loading={loading} className="!h-11 !mt-2">
-          Sign in
+        <Button type="primary" htmlType="submit" block loading={loading} size="large" className="!mt-2">
+          Continue with email
         </Button>
       </Form>
-      <GoogleSignIn />
     </AuthShell>
   );
 }

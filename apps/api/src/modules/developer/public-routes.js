@@ -7,6 +7,16 @@ const webhooks = require("./webhooks");
 const productsService = require("../products/service");
 const operations = require("../orders/operations");
 const { adjustStock, setStock } = require("../../lib/inventory");
+const { env } = require("../../config/env");
+const imports = require("./imports");
+const { toE164 } = require("../../lib/phone");
+
+// A unique externalId already used by another record.
+const clash = (err, what) => {
+  if (err?.code === "P2002") throw new HttpError(409, `Another ${what} already has that externalId`);
+  throw err;
+};
+const extQuery = z.string().trim().max(120).optional();
 
 /**
  * The public API, /api/v1 — for a seller's own integrations, authenticated
@@ -35,10 +45,15 @@ async function publicApiRoutes(fastify) {
 
   // ── Products ──
   fastify.get("/products", scope("read_products"), async (request) => {
-    const q = pageQuery.extend({ status: z.enum(["active", "draft", "archived"]).optional(), q: z.string().trim().max(120).optional() }).parse(request.query);
+    const q = pageQuery
+      .extend({ status: z.enum(["active", "draft", "archived"]).optional(), q: z.string().trim().max(120).optional(), external_id: extQuery, handle: z.string().trim().max(200).optional(), sku: z.string().trim().max(120).optional() })
+      .parse(request.query);
     const where = {
       storeId: request.store.id,
       ...(q.status && { status: q.status }),
+      ...(q.external_id && { externalId: q.external_id }),
+      ...(q.handle && { slug: q.handle }),
+      ...(q.sku && { variants: { some: { sku: { equals: q.sku, mode: "insensitive" } } } }),
       // ?q= matches the title or any variant's SKU.
       ...(q.q && { OR: [{ title: { contains: q.q, mode: "insensitive" } }, { variants: { some: { sku: { contains: q.q, mode: "insensitive" } } } }] }),
       ...since(q),
@@ -56,21 +71,72 @@ async function publicApiRoutes(fastify) {
     return { data: serialize.product(p) };
   });
 
+  // Imports: externalId makes it safe to run twice — a product that
+  // already has it comes back unchanged (created: false). `category` by
+  // name is found or made; image URLs are copied into the store's Files
+  // unless copyImages is false. snake_case names work too.
   fastify.post("/products", scope("write_products"), async (request, reply) => {
-    const body = createProductSchema.parse(request.body);
-    const store = await db.store.findUnique({ where: { id: request.store.id }, include: { plan: true } });
-    const created = await productsService.createProduct(db, store, body, { actorName: `API · ${request.apiKey.name}` });
+    const { handle, category, copyImages = true, ...rest } = imports.productBody(request.body);
+    const body = createProductSchema.parse(rest);
+    const storeId = request.store.id;
+    if (body.externalId) {
+      const found = await db.product.findUnique({ where: { storeId_externalId: { storeId, externalId: body.externalId } }, include: webhooks.PRODUCT_INCLUDE });
+      if (found) return reply.code(200).send({ data: serialize.product(found), created: false });
+    }
+    if (category && !body.categoryId) body.categoryId = await imports.categoryIdFor(db, storeId, category);
+    let warnings = [];
+    if (copyImages !== false && body.images.length) ({ images: body.images, warnings } = await imports.copyImages(db, storeId, body.images, env.API_PUBLIC_URL));
+    const store = await db.store.findUnique({ where: { id: storeId }, include: { plan: true } });
+    const created = await productsService.createProduct(db, store, body, { actorName: `API · ${request.apiKey.name}` }).catch((e) => clash(e, "product"));
+    if (handle) await db.product.update({ where: { id: created.id }, data: { slug: await productsService.uniqueSlug(db, storeId, String(handle), created.id) } });
     const p = await db.product.findUnique({ where: { id: created.id }, include: webhooks.PRODUCT_INCLUDE });
     webhooks.emit(db, store.id, "product.created", { id: p.id });
-    reply.code(201).send({ data: serialize.product(p) });
+    reply.code(201).send({ data: serialize.product(p), created: true, ...(warnings.length && { warnings }) });
   });
 
   fastify.patch("/products/:id", scope("write_products"), async (request) => {
-    const body = updateProductSchema.parse(request.body);
-    await productsService.updateProduct(db, request.store.id, request.params.id, body, { actorName: `API · ${request.apiKey.name}` });
+    const { handle, category, copyImages = true, ...rest } = imports.productBody(request.body);
+    const body = updateProductSchema.parse(rest);
+    const storeId = request.store.id;
+    if (category && !body.categoryId) body.categoryId = await imports.categoryIdFor(db, storeId, category);
+    if (copyImages !== false && body.images?.length) body.images = (await imports.copyImages(db, storeId, body.images, env.API_PUBLIC_URL)).images;
+    await productsService.updateProduct(db, storeId, request.params.id, body, { actorName: `API · ${request.apiKey.name}` }).catch((e) => clash(e, "product"));
+    if (handle) await db.product.update({ where: { id: request.params.id }, data: { slug: await productsService.uniqueSlug(db, storeId, String(handle), request.params.id) } });
     const p = await db.product.findUnique({ where: { id: request.params.id }, include: webhooks.PRODUCT_INCLUDE });
-    webhooks.emit(db, request.store.id, "product.updated", { id: p.id });
+    webhooks.emit(db, storeId, "product.updated", { id: p.id });
     return { data: serialize.product(p) };
+  });
+
+  // ── Categories & collections (the catalogue) ──
+  fastify.get("/categories", scope("read_products"), async (request) => {
+    const q = pageQuery.extend({ external_id: extQuery, name: z.string().trim().max(120).optional() }).parse(request.query);
+    const where = { storeId: request.store.id, ...(q.external_id && { externalId: q.external_id }), ...(q.name && { title: { equals: q.name, mode: "insensitive" } }), ...since(q) };
+    const [rows, total] = await Promise.all([
+      db.category.findMany({ where, include: { _count: { select: { products: true } } }, orderBy: { createdAt: "desc" }, skip: (q.page - 1) * q.limit, take: q.limit }),
+      db.category.count({ where }),
+    ]);
+    return paged(rows.map(serialize.category), q, total);
+  });
+
+  fastify.post("/categories", scope("write_products"), async (request, reply) => {
+    const { category, created, warnings } = await imports.upsertCategory(db, request.store.id, request.body, { apiBase: env.API_PUBLIC_URL });
+    reply.code(created ? 201 : 200).send({ data: serialize.category(category), created, ...(warnings.length && { warnings }) });
+  });
+
+  fastify.get("/collections", scope("read_products"), async (request) => {
+    const q = pageQuery.extend({ external_id: extQuery }).parse(request.query);
+    const where = { storeId: request.store.id, ...(q.external_id && { externalId: q.external_id }), ...since(q) };
+    const [rows, total] = await Promise.all([
+      db.collection.findMany({ where, include: { products: { select: { productId: true }, orderBy: { position: "asc" } } }, orderBy: { createdAt: "desc" }, skip: (q.page - 1) * q.limit, take: q.limit }),
+      db.collection.count({ where }),
+    ]);
+    return paged(rows.map(serialize.collection), q, total);
+  });
+
+  fastify.post("/collections", scope("write_products"), async (request, reply) => {
+    const { collection, created, warnings } = await imports.upsertCollection(db, request.store.id, request.body, { apiBase: env.API_PUBLIC_URL });
+    const c = await db.collection.findUnique({ where: { id: collection.id }, include: { products: { select: { productId: true }, orderBy: { position: "asc" } } } });
+    reply.code(created ? 201 : 200).send({ data: serialize.collection(c), created, ...(warnings.length && { warnings }) });
   });
 
   fastify.delete("/products/:id", scope("write_products"), async (request) => {
@@ -130,10 +196,12 @@ async function publicApiRoutes(fastify) {
         payment_status: z.enum(["pending", "paid", "partially_refunded", "refunded"]).optional(),
         fulfillment_status: z.string().max(40).optional(),
         created_since: z.string().datetime({ offset: true }).optional(),
+        external_id: extQuery,
       })
       .parse(request.query);
     const where = {
       storeId: request.store.id,
+      ...(q.external_id && { externalId: q.external_id }),
       ...(q.payment_status && { paymentStatus: q.payment_status }),
       ...(q.fulfillment_status && { fulfillmentStatus: q.fulfillment_status }),
       ...(q.created_since && { createdAt: { gte: new Date(q.created_since) } }),
@@ -150,6 +218,15 @@ async function publicApiRoutes(fastify) {
     const o = await db.order.findFirst({ where: { id: request.params.id, storeId: request.store.id }, include: webhooks.ORDER_INCLUDE });
     if (!o) throw new HttpError(404, "Order not found");
     return { data: serialize.order(o) };
+  });
+
+  // A past order from another platform (e.g. Shopify), recorded as it was:
+  // no payment, stock change, emails, WhatsApp, webhooks or commission.
+  // Once per externalId.
+  fastify.post("/orders/import", scope("import_orders"), async (request, reply) => {
+    const { orderId, created, warnings } = await imports.importOrder(db, request.store, request.body);
+    const o = await db.order.findUnique({ where: { id: orderId }, include: webhooks.ORDER_INCLUDE });
+    reply.code(created ? 201 : 200).send({ data: serialize.order(o), created, ...(warnings.length && { warnings }) });
   });
 
   fastify.post("/orders/:id/fulfillments", scope("write_orders"), async (request, reply) => {
@@ -182,8 +259,16 @@ async function publicApiRoutes(fastify) {
 
   // ── Customers ──
   fastify.get("/customers", scope("read_customers"), async (request) => {
-    const q = pageQuery.extend({ email: z.string().max(200).optional() }).parse(request.query);
-    const where = { storeId: request.store.id, ...(q.email && { email: { equals: q.email, mode: "insensitive" } }), ...since(q) };
+    const q = pageQuery.extend({ email: z.string().max(200).optional(), phone: z.string().max(30).optional(), external_id: extQuery }).parse(request.query);
+    const e164 = q.phone ? toE164(q.phone) : null;
+    if (q.phone && !e164) return paged([], q, 0);
+    const where = {
+      storeId: request.store.id,
+      ...(q.email && { email: { equals: q.email, mode: "insensitive" } }),
+      ...(q.external_id && { externalId: q.external_id }),
+      ...(e164 && { phone: { endsWith: e164.slice(-10) } }),
+      ...since(q),
+    };
     const [rows, total] = await Promise.all([
       db.customer.findMany({ where, orderBy: { createdAt: "desc" }, skip: (q.page - 1) * q.limit, take: q.limit }),
       db.customer.count({ where }),
@@ -195,6 +280,31 @@ async function publicApiRoutes(fastify) {
     const c = await db.customer.findFirst({ where: { id: request.params.id, storeId: request.store.id } });
     if (!c) throw new HttpError(404, "Customer not found");
     return { data: serialize.customer(c) };
+  });
+
+  // Create — or, when a customer already matches (externalId, then email,
+  // then phone), fill in only what it's missing and return it.
+  fastify.post("/customers", scope("write_customers"), async (request, reply) => {
+    const { customer, created } = await imports.upsertCustomer(db, request.store.id, request.body);
+    if (created) webhooks.emit(db, request.store.id, "customer.created", { id: customer.id });
+    reply.code(created ? 201 : 200).send({ data: serialize.customer(customer), created });
+  });
+
+  fastify.patch("/customers/:id", scope("write_customers"), async (request) => ({ data: serialize.customer(await imports.updateCustomer(db, request.store.id, request.params.id, request.body)) }));
+
+  // ── Discounts ──
+  fastify.get("/discounts", scope("read_discounts"), async (request) => {
+    const q = pageQuery.extend({ external_id: extQuery, code: z.string().trim().max(60).optional() }).parse(request.query);
+    const where = { storeId: request.store.id, ...(q.external_id && { externalId: q.external_id }), ...(q.code && { code: { equals: q.code, mode: "insensitive" } }), ...since(q) };
+    const [rows, total] = await Promise.all([db.discount.findMany({ where, orderBy: { createdAt: "desc" }, skip: (q.page - 1) * q.limit, take: q.limit }), db.discount.count({ where })]);
+    return paged(rows.map(serialize.discount), q, total);
+  });
+
+  // By externalId, then code; else made with the admin's discount rules.
+  // Imported codes stay off product pages unless showOnStore is true.
+  fastify.post("/discounts", scope("write_discounts"), async (request, reply) => {
+    const { discount, created } = await imports.upsertDiscount(db, request.store.id, request.body);
+    reply.code(created ? 201 : 200).send({ data: serialize.discount(discount), created });
   });
 }
 

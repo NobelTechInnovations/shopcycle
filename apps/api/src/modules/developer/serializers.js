@@ -34,6 +34,7 @@ function product(p) {
     })),
     images: (p.images || []).map((i) => ({ id: i.id, url: i.url, alt: i.altText || null, position: i.position, variant_id: i.variantId || null })),
     metafields: p.metafields || {},
+    external_id: p.externalId || null,
     created_at: iso(p.createdAt),
     updated_at: iso(p.updatedAt),
   };
@@ -45,12 +46,20 @@ function customer(c) {
     name: c.name,
     email: realEmail(c.email) || null,
     phone: c.phone || null,
+    address1: c.address1 || null,
+    address2: c.address2 || null,
     city: c.city || null,
     province: c.province || null,
     zip: c.zip || null,
     country: c.country || null,
     accepts_email_marketing: Boolean(c.acceptsEmailMarketing),
+    accepts_sms_marketing: Boolean(c.acceptsSmsMarketing),
     has_account: Boolean(c.passwordHash || c.emailVerifiedAt),
+    tags: String(c.tags || "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean),
+    external_id: c.externalId || null,
     created_at: iso(c.createdAt),
     updated_at: iso(c.updatedAt),
   };
@@ -109,9 +118,56 @@ function order(o) {
       delivered_at: iso(f.deliveredAt),
     })),
     refunds: (o.refunds || []).map((r) => ({ id: r.id, amount: num(r.amount), method: r.method, reason: r.reason || null, created_at: iso(r.createdAt) })),
+    external_id: o.externalId || null,
+    imported_at: iso(o.importedAt),
     created_at: iso(o.createdAt),
     updated_at: iso(o.updatedAt),
   };
 }
 
-module.exports = { product, customer, order };
+function category(c) {
+  return { id: c.id, name: c.title, handle: c.slug, image: c.image || null, products_count: c._count?.products ?? undefined, external_id: c.externalId || null, created_at: iso(c.createdAt), updated_at: iso(c.updatedAt) };
+}
+
+function collection(c) {
+  return {
+    id: c.id,
+    title: c.title,
+    handle: c.slug,
+    description: c.description || "",
+    image: c.image || null,
+    status: c.status,
+    product_ids: (c.products || []).map((p) => p.productId || p.product?.id).filter(Boolean),
+    external_id: c.externalId || null,
+    created_at: iso(c.createdAt),
+    updated_at: iso(c.updatedAt),
+  };
+}
+
+function discount(d) {
+  return {
+    id: d.id,
+    code: d.method === "automatic" ? null : d.code,
+    title: d.title || null,
+    method: d.method,
+    type: d.type,
+    value: num(d.value),
+    applies_to: d.appliesTo,
+    target_ids: d.targetIds || [],
+    min_subtotal: d.minSubtotal == null ? null : num(d.minSubtotal),
+    min_quantity: d.minQuantity ?? null,
+    max_discount: d.maxDiscount == null ? null : num(d.maxDiscount),
+    usage_limit: d.usageLimit ?? null,
+    usage_count: d.usageCount ?? 0,
+    once_per_customer: Boolean(d.oncePerCustomer),
+    starts_at: iso(d.startsAt),
+    ends_at: iso(d.endsAt),
+    status: d.status,
+    show_on_store: d.showOnStore !== false,
+    external_id: d.externalId || null,
+    created_at: iso(d.createdAt),
+    updated_at: iso(d.updatedAt),
+  };
+}
+
+module.exports = { product, customer, order, category, collection, discount };

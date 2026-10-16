@@ -15,8 +15,9 @@ function GoogleMark() {
 }
 
 /** "Continue with Google" — a full-page visit to the API, which sends the
- * seller to Google and back. Hidden until the platform has Google set up. */
-export function GoogleSignIn() {
+ * seller to Google and back. Hidden until the platform has Google set up.
+ * Sits above the email form, with "Or continue with email" under it. */
+export function GoogleSignIn({ divider = "Or continue with email" }) {
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
@@ -28,17 +29,10 @@ export function GoogleSignIn() {
   if (!enabled) return null;
   return (
     <>
-      <div className="flex items-center gap-3 my-5 text-xs text-ink-muted">
-        <span className="h-px flex-1 bg-app-border" />
-        or
-        <span className="h-px flex-1 bg-app-border" />
-      </div>
-      <a
-        href={`${API_URL}/api/auth/google/start`}
-        className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-app-border bg-app-surface text-sm font-medium text-ink hover:bg-app-bg"
-      >
+      <a href={`${API_URL}/api/auth/google/start`} className="oy-auth-social">
         <GoogleMark /> Continue with Google
       </a>
+      {divider && <div className="oy-auth-divider">{divider}</div>}
     </>
   );
 }

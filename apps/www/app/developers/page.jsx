@@ -10,29 +10,42 @@ export const metadata = {
 const BASE = `${API_URL}/api/v1`;
 
 const SCOPES = [
-  ["read_products", "Read products"],
-  ["write_products", "Create, edit and delete products"],
+  ["read_products", "Read products, categories and collections"],
+  ["write_products", "Create, edit and delete products, categories and collections"],
   ["read_inventory", "Read stock levels"],
   ["write_inventory", "Change stock levels"],
   ["read_orders", "Read orders"],
   ["write_orders", "Ship orders (add tracking)"],
+  ["import_orders", "Import past orders (no payment, stock or messages)"],
   ["read_customers", "Read customers"],
+  ["write_customers", "Create and edit customers"],
+  ["read_discounts", "Read discounts"],
+  ["write_discounts", "Create discounts"],
 ];
 
 const ENDPOINTS = [
   ["GET", "/shop", "—", "Your store: name, handle, currency, time zone, domain."],
-  ["GET", "/products", "read_products", "Products, newest first. Filters: status, q (title or SKU), updated_since."],
+  ["GET", "/products", "read_products", "Products, newest first. Filters: status, q (title or SKU), sku, handle, external_id, updated_since."],
   ["GET", "/products/{id}", "read_products", "One product with its variants and images."],
-  ["POST", "/products", "write_products", "Create a product."],
+  ["POST", "/products", "write_products", "Create a product. category by name (made if new), images copied into your Files, externalId to import safely."],
   ["PATCH", "/products/{id}", "write_products", "Change a product — send only the fields that change."],
   ["DELETE", "/products/{id}", "write_products", "Delete a product."],
+  ["GET", "/categories", "read_products", "Categories. Filters: name, external_id."],
+  ["POST", "/categories", "write_products", "Create a category (name, image, externalId) — or get the one with that name."],
+  ["GET", "/collections", "read_products", "Collections with their product ids. Filter: external_id."],
+  ["POST", "/collections", "write_products", "Create a collection with productIds or productExternalIds."],
   ["GET", "/inventory", "read_inventory", "Stock for every variant (variant_id, sku, quantity)."],
   ["POST", "/inventory/adjust", "write_inventory", "Add to or set a variant's stock, with a reason."],
-  ["GET", "/orders", "read_orders", "Orders, newest first. Filters: payment_status, fulfillment_status, created_since, updated_since."],
+  ["GET", "/orders", "read_orders", "Orders, newest first. Filters: payment_status, fulfillment_status, created_since, external_id, updated_since."],
   ["GET", "/orders/{id}", "read_orders", "One order with line items, address and totals."],
   ["POST", "/orders/{id}/fulfillments", "write_orders", "Ship items: courier, tracking number and link; the shopper is emailed."],
-  ["GET", "/customers", "read_customers", "Customers, newest first. Filters: email, updated_since."],
+  ["POST", "/orders/import", "import_orders", "Record a past order from another platform, with its date and number. No payment, stock change, messages or fees."],
+  ["GET", "/customers", "read_customers", "Customers, newest first. Filters: email, phone, external_id, updated_since."],
   ["GET", "/customers/{id}", "read_customers", "One customer."],
+  ["POST", "/customers", "write_customers", "Create a customer — or fill in the one with that externalId, email or phone."],
+  ["PATCH", "/customers/{id}", "write_customers", "Change a customer."],
+  ["GET", "/discounts", "read_discounts", "Discounts. Filters: code, external_id."],
+  ["POST", "/discounts", "write_discounts", "Create a discount code — or get the one with that code or externalId."],
 ];
 
 const EVENTS = [
@@ -57,6 +70,7 @@ const TOC = [
   ["webhooks", "Webhooks"],
   ["verify", "Verifying a webhook"],
   ["crm", "Connect a CRM"],
+  ["import", "Move a store to Oyklane"],
   ["mcp", "AI agents (MCP)"],
   ["errors", "Errors and limits"],
 ];
@@ -277,6 +291,30 @@ export default function DevelopersPage() {
               with <code>updated_since</code> catches anything a busy CRM missed.
             </li>
           </ol>
+
+          <h2 id="import" className="h2">Move a store to Oyklane</h2>
+          <p>
+            Bring a whole store across — from Shopify or anywhere — with one key that has <code>write_products</code>, <code>write_customers</code>, <code>write_discounts</code>{" "}
+            and <code>import_orders</code>. Send each record&apos;s id from the old store as <code>externalId</code> (e.g. <code>shopify:8123</code>): it&apos;s unique in your store, so
+            running the import again finds what it already made (<code>&quot;created&quot;: false</code>) instead of duplicating it.
+          </p>
+          <ol className="docs__steps">
+            <li><b>Categories</b> — <code>POST /categories</code> with a name. Or skip them and send <code>category</code> by name on each product.</li>
+            <li><b>Products</b> — image URLs are copied into your Files, so nothing depends on the old store. Variants are named by their option values, e.g. <code>M / Red</code>.</li>
+            <li><b>Collections</b> — link products with <code>productExternalIds</code>.</li>
+            <li><b>Customers</b> — matched by externalId, email, then phone; a match is only filled in, never overwritten.</li>
+            <li><b>Discounts</b> — imported codes stay off product pages unless you send <code>showOnStore: true</code>.</li>
+            <li><b>Past orders</b> — <code>POST /orders/import</code> keeps the date and number. Nothing a new order sets off happens: no payment, stock change, emails, WhatsApp, webhooks or Oyklane fees.</li>
+          </ol>
+          <Code label="Import a past order">{`curl -X POST ${BASE}/orders/import \\
+  -H "Authorization: Bearer oyk_…" -H "Content-Type: application/json" \\
+  -d '{"externalId":"shopify:5012","number":1042,"createdAt":"2026-03-02T10:15:00+05:30",
+       "email":"asha@example.com","paymentMethod":"prepaid","paymentStatus":"paid",
+       "fulfillmentStatus":"fulfilled","shipping":49,"total":548,
+       "customer":{"name":"Asha Rao","phone":"+919876543210"},
+       "shippingAddress":{"name":"Asha Rao","address1":"12 MG Road","city":"Bengaluru","province":"Karnataka","zip":"560001","country":"India"},
+       "lineItems":[{"title":"Lakadong Turmeric 250g","sku":"TUR-250","quantity":2,"price":249.5,"productExternalId":"shopify:771"}],
+       "courier":"Delhivery","trackingNumber":"1234567890"}'`}</Code>
 
           <h2 id="mcp" className="h2">AI agents (MCP)</h2>
           <p>

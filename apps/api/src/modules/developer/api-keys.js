@@ -10,12 +10,16 @@ const { HttpError } = require("@shopcycle/utils");
  */
 const SCOPES = [
   { key: "read_products", label: "Read products", group: "Products" },
-  { key: "write_products", label: "Create, edit and delete products", group: "Products" },
+  { key: "write_products", label: "Create, edit and delete products, categories and collections", group: "Products" },
   { key: "read_inventory", label: "Read stock levels", group: "Inventory" },
   { key: "write_inventory", label: "Change stock levels", group: "Inventory" },
   { key: "read_orders", label: "Read orders", group: "Orders" },
   { key: "write_orders", label: "Ship orders (add tracking)", group: "Orders" },
+  { key: "import_orders", label: "Import past orders (no payment, stock or messages)", group: "Orders" },
   { key: "read_customers", label: "Read customers", group: "Customers" },
+  { key: "write_customers", label: "Create and edit customers", group: "Customers" },
+  { key: "read_discounts", label: "Read discounts", group: "Discounts" },
+  { key: "write_discounts", label: "Create discounts", group: "Discounts" },
 ];
 const SCOPE_KEYS = SCOPES.map((s) => s.key);
 

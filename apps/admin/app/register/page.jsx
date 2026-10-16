@@ -7,6 +7,8 @@ import { AuthShell } from "@shopcycle/ui";
 import { apiFetch } from "@/lib/api";
 import { GoogleSignIn } from "@/components/GoogleSignIn";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://oyklane.com";
+
 /** The name and email inside a Google sign-up ticket — display only; the
  * API checks the ticket's signature when the store is created. */
 function readTicket(ticket) {
@@ -49,9 +51,17 @@ export default function RegisterPage() {
 
   return (
     <AuthShell
-      homeHref={process.env.NEXT_PUBLIC_SITE_URL || "https://oyklane.com"}
-      title="Create your store"
+      homeHref={SITE_URL}
+      title="Start your store"
       subtitle="3-day free trial, then ₹49 for your first month."
+      photo="bags"
+      note={
+        <>
+          By continuing, you agree to Oyklane&apos;s{" "}
+          <a href={`${SITE_URL}/terms`} className="underline underline-offset-2 text-ink-muted hover:text-ink">Terms of service</a> and{" "}
+          <a href={`${SITE_URL}/privacy`} className="underline underline-offset-2 text-ink-muted hover:text-ink">Privacy policy</a>.
+        </>
+      }
       footer={
         <>
           Already selling on Oyklane?{" "}
@@ -71,6 +81,7 @@ export default function RegisterPage() {
           description="Name your store to finish. You'll sign in with Google."
         />
       )}
+      {!google && <GoogleSignIn divider="Or sign up with email" />}
 
       <Form layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
         <Form.Item label="Store name" name="storeName" rules={[{ required: true, min: 2, message: "Store name is too short" }]}>
@@ -94,11 +105,10 @@ export default function RegisterPage() {
             </Form.Item>
           </>
         )}
-        <Button type="primary" htmlType="submit" block loading={loading} className="!h-11 !mt-2">
+        <Button type="primary" htmlType="submit" block loading={loading} size="large" className="!mt-2">
           Create store
         </Button>
       </Form>
-      {!google && <GoogleSignIn />}
     </AuthShell>
   );
 }
