@@ -96,7 +96,8 @@ textarea:focus-visible,
 }
 
 /* Sign-in pages (AuthShell): roomier fields and buttons. */
-.oy-auth .ant-form-item-label > label { font-weight: 500; }
+.oy-auth .ant-form-item-label > label { font-weight: 500; width: 100%; }
+.oy-auth .ant-form-item-label > label > span { width: 100%; }
 .oy-auth .ant-input-lg, .oy-auth .ant-input-affix-wrapper-lg { min-height: 48px; border-radius: 10px; }
 .oy-auth .ant-btn-lg, .oy-auth .ant-btn.\!h-11 { height: 48px !important; border-radius: 10px; font-weight: 600; }
 .oy-auth-social { display: flex; height: 48px; width: 100%; align-items: center; justify-content: center; gap: 10px; border-radius: 10px; border: 1px solid #E1E5EA; background: #fff; color: #111827; font-size: 15px; font-weight: 500; text-decoration: none; transition: background .15s ease, border-color .15s ease; }
